@@ -1,0 +1,226 @@
+#!/bin/sh
+
+while getopts hjl o ; do
+     case $o in
+     	h) help="true" ;;
+     	j) pass="true" ;;  
+		l) list='-l' ;;
+     esac
+done
+
+shift $(( OPTIND - 1 ))
+
+jail="$1"
+
+define_variables() {
+	serv_stats="/rw/usr/local/etc/wireguard/serv_stats_ivpn"
+	serv_ips="/rw/usr/local/etc/wireguard/serv_ips_ivpn"
+	serv_current="/rw/usr/local/etc/wireguard/serv_current_ivpn"
+	port="30587"
+	wg0="/rw/usr/local/etc/wireguard/wg0.conf"
+
+	# Securelevel query syntax depends on if script is running inside the jail or not 
+	if [ "$jail" ] && `jls | grep -qs " $jail "` ; then
+
+		if [ -z "$list" -a "$jail" != `hostname` ] ; then
+			seclvl=$(jexec -l -U root $jail sysctl kern.securelevel \
+											| sed "s/kern.securelevel: //")
+		fi	
+
+	elif [ -z "$jail" -a "$pass" ] ; then
+		seclvl=$(sysctl kern.securelevel | sed "s/kern.securelevel: //")
+	fi
+
+	# Restart flag if seclvl is 3	
+	[ "$seclvl" = "3" -a -z "$list" ] && restart="true"
+}
+
+define_messages() {
+     err1=$(printf "%b" "qb-ivpn: ERROR: Must specify a jail") 
+     err1_1=$(printf "%b" "qb-ivpn: ERROR: Jail not specified. If not running from host," \
+					"but running from inside jail, specify the [-j] option")
+     err2=$(printf "%b" "qb-ivpn: ERROR: $jail does not exist or is not fully configured")
+     msg3=$(printf "%b" "qb-ivpn: $jail is off. Starting jail ...")
+     err4=$(printf "%b" "qb-ivpn: ERROR: Failed to start $jail. Exiting") 
+     msg5_1=$(printf "%b" "Downloading latest server data from api.ivpn.net , wait a moment.")
+     msg5_2=$(printf "%b" "Currently connected to the following IVPN server:")
+     warn6_1=$(printf "%b" "qb-ivpn: WARNING: Failed ping IVPN server.")
+     warn6_2=$(printf "%b" "Will use existing json files for modifying wg0.conf.")
+     warn7=$(printf "%b" "qb-ivpn: WARNING: Security level of jail is 3, unable to" \
+					"\nchage pf settings. Restart for new server to take effect.")
+     err8=$(printf "%b" "qb-ivpn: WARNING: Can't modify wg0.conf due to schg flags" \
+					"\nRecommend running qb-ivpn from host instead")
+     err9=$(printf "%b" "qb-ivpn: WARNING: Can't modify pf.conf due to schg flags" \
+					"\nRecommend running qb-ivpn from host instead")
+}
+
+usage() {
+	[ "$ERR" ] && printf "%b" "\n$ERR\n"
+	echo ""
+	echo "qb-ivpn: Fetch IVPN server data, or change servers" 
+	echo "Running from host will automate schg flag, seclvl, and restart" 
+	echo "and <jail> will be restarted automatically if needed."
+	echo "Can run from inside jail, but might cause permissions errors."
+	echo ""
+	echo "Usage: qb-ivpn"
+	echo "Usage: qb-ivpn [-h] [-l] <net-jail>"
+	echo ""
+	echo "   -h: (h)elp: Shows this message" 
+	echo "   -j: (j)ail: Use this option if running from inside jail" 
+	echo "   -l: (l)ist: IVPN server/stats, and exit" 
+	echo ""
+	exit 1
+}
+
+checks() {
+	if [ "$help" ] ; then
+		usage
+
+	elif [ -z "$jail" -a -z "$pass" ] ; then
+		ERR="$err1_1" ; usage
+
+	elif [ "$jail" ] ; then
+		if ! `qb-list -qj "$jail"` ; then
+			ERR="$err2" ; usage
+
+		elif ! `jls | grep -qs " $jail "` ; then
+			printf "%b" "\n$msg3\n"
+			jail -c $jail >> /dev/null 2>&1
+			[ "$?" != "0" ] && ERR="$err4" && usage
+		fi
+	fi
+}
+
+pre_jail() {
+	# Ensure that schg flags don't prevent API update 
+	chflags -R noschg /jails/${jail}/usr/local/etc/wireguard
+	chflags -R noschg /jails/${jail}/rw/usr/local/etc/wireguard
+
+	# If changing servers, securelevel and pf.conf schg flags must be managed 
+	if [ -z "$list" ] ; then 
+		chflags -R noschg /jails/${jail}/etc
+		chflags -R noschg /zusr/${jail}/rw/etc
+	fi
+}
+
+post_jail() {
+	if [ "$restart" ] ; then
+		qb-off -r $jail
+	else
+		sh /usr/local/etc/jail.conf.d/exec.poststart $jail
+	fi
+}
+
+update_api() {
+	ping -Qot 6 api.ivpn.net 
+	if [ "$?" = "0" ] ; then
+		# Update API if ping is successful
+		printf "%b" "\n$msg5_1\n"
+		fetch -qT 10 -o - https://api.ivpn.net/v4/geo-lookup     > $serv_current
+		fetch -qT 10 -o - https://api.ivpn.net/v4/servers/stats  > $serv_stats
+		fetch -qT 10 -o - https://api.ivpn.net/v4/servers.json   > $serv_ips 
+		printf "%b" "\n$msg5_2\n"
+		cat $serv_current | jq
+	else
+		printf "%b" "\n$warn6_1\n"
+		[ -z "$list" ] && printf "%b" "$warn6_2\n"
+		pingfail="true"
+	fi
+
+	# Exit if list option was specified
+	[ "$list" ] && exit 0
+}
+
+national() {
+	countries=$(cat "$serv_stats" \
+			| jq '[.servers[] | .country] | unique' | sed 1d | sed '$d' | nl) 
+
+	echo "$countries"
+	read -p "Select Country (enter number): " c
+
+	country=$(echo "$countries" | sed -n ${c}p \
+			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed "s/[^[:alnum:]]*$//")
+}
+
+town() {
+	cities=$(cat "$serv_stats" | jq --arg COUNTRY "$country" \
+			'[.servers[] | select(.country==$COUNTRY) | .city] | unique' | sed 1d | sed '$d' | nl)
+
+	echo "$cities"
+	read -p "Select City (enter number):" i
+
+	city=$(echo "$cities" | sed -n ${i}p \
+			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed "s/[^[:alnum:]]*$//")
+}
+
+server() {
+	cat "$serv_stats" | jq --arg CITY "$city" '[.servers[] | select(.city==$CITY) | {City: .city, pubkey: .wg_public_key, Gateway: .hostnames.wireguard, ISP: .isp, Active: .is_active, Load: .load}]'
+
+	servers=$(cat $serv_stats | jq --arg CITY "$city" \
+			'[.servers[] | select(.city==$CITY) | .wg_public_key]' | sed 1d | sed '$d' | nl)
+
+	echo "$servers" 
+	read -p "Select Server (enter number): " e
+
+	publickey=$(echo "$servers" | sed -n ${e}p \
+			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed 's/\".*$//')
+
+	endip=$(cat $serv_ips | jq --arg PUB "$publickey" \
+			'.wireguard | .[] | .hosts | .[] | select(.public_key==$PUB) | .host' \
+			| sed 's/^.//' | sed 's/\".*$//')
+
+	endpoint=$(printf "%b" "${endip}:${port}")
+}
+
+update_wg0() {
+	#Checks for schg flags. Modifies wg0.conf if able, warns if not
+	if [ `ls -lo $wg0 | awk '{print $5}'` = "schg" ] ; then
+		printf "%b" "$err8"
+	else
+		sed -i '' -e "s#PublicKey[[:blank:]]*=.*#PublicKey = $publickey#" $wg0
+		sed -i '' -e "s#Endpoint[[:blank:]]*=.*#Endpoint = $endpoint#" $wg0
+	fi
+
+	#Checks for schg flags. Modifies pf.conf able, warns if not
+	if [ `ls -lo /etc/pf.conf | awk '{print $5}'` = "schg" ] ; then
+		printf "%b" "$err9"
+	else
+		sed -i '' -e "s#^wgIP[[:blank:]]*=.*#wgIP = \"$endip\"#" /rw/etc/pf.conf 
+		sed -i '' -e "s#^wgPort[[:blank:]]*=.*#wgPort = \"$port\"#" /rw/etc/pf.conf 
+	fi
+
+	if [ -z "$restart" ] ; then	
+		wg-quick down wg0
+		sleep 1
+		wg-quick up wg0
+		pfctl -f /etc/pf.conf
+	else
+		[ -z "$pass" ] && printf "%b" "\n$warn7"
+	fi
+}
+
+main() {
+	if [ "$jail" -a "$jail" != `hostname` ] ; then
+		pre_jail
+		# The functional part of the script must be executed from inside the jail
+		jexec -l -U root $jail qb-ivpn $list -j
+		post_jail
+
+	elif [ -z "$jail" -a "$pass" ] ; then
+		update_api
+		national
+		town
+		server
+		update_wg0
+	fi
+}
+
+
+define_messages
+checks
+define_variables
+main
+
+
+
+

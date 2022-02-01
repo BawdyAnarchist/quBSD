@@ -1,0 +1,90 @@
+#!/bin/sh
+
+# Destroys non-persistent filesystems for appjails and dispjails; and reclones
+
+jail="$1"
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $jmap
+jconf=$(egrep "^${jail}[[:blank:]]" $jmap | uniq)
+class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
+rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap)
+	# $rootsnap relies on the fact that zfs lists snapshots chronologically
+rootsnap=$(zfs list -t snapshot | egrep -o "zroot/jails/${rootjail}@[^[:blank:]]+" | tail -1)
+jmount1=$(mount | egrep -o "/jails/${jail}/[[:alnum:]]+")
+jmount2=$(mount | egrep -o "^/zusr/${jail}/[^[:blank:]]+")
+
+usage() {
+        printf "%b" "\n$err\n\n"
+        exit 1
+}
+checks() {
+        if [ -z "$jail" ] ; then
+                err="Error: exec.poststop:  Must select a jail"
+                usage
+        elif [ -z "$jmap" ] ; then
+                err="Error: exec.poststop:  No file selected for jailmap.conf"
+                usage
+        elif [ -z "$class" ] ; then
+		err="Error: exec.poststop:  Jail $jail has no class designated in jailmap.conf"
+		usage
+        elif [ -z "$rootjail" ] ; then
+               	err="Error: exec.poststop: Jail $jail has no rootjail designated in jailmap.conf"
+               	usage
+        fi
+}
+
+umount_lingering() {
+	[ -e "/zusr/${jail}/rw/etc/fstab" ] && umount -a -F /zusr/${jail}/rw/etc/fstab > /dev/null 2>&1
+	[ -n "$jmount1" ] && echo "$jmount1" | xargs umount -f > /dev/null 2>&1
+	[ -n "$jmount2" ] && echo "$jmount2" | xargs umount -f > /dev/null 2>&1 
+}
+
+set_flags() {
+## NOTE: UNSURE ABOUT HOW TO DEAL WITH THIS. WAS A PITA FOR TESTING SO I HAD TO REMOVE IT
+## I NEED TO USE DAILY DRIVER TO SEE HOW MUCH A PAIN IT MIGHT BE IN REGULAR USE
+	if [ "$class" = "rootjail" ] ; then 
+#		chflags -R schg "/jails/${jail}" > /dev/null 2>&1
+	else
+	#	chflags -R schg "/zusr/${jail}" > /dev/null 2>&1
+	fi
+}
+
+reclone_appjail() {
+	if [ "$class" != "rootjail" ] ; then 
+		zfs destroy -rRf zroot/jails/$jail
+		zfs clone $rootsnap "zroot/jails/$jail"
+	fi
+}
+
+reclone_dispjail() {
+      if [ "$class" = "dispjail" ] ; then
+                template=$(sed -nE "s/^${jail}[[:blank:]]+template[[:blank:]]+//p" $jmap)
+                homesnap=$(zfs list -t snapshot | \
+                           egrep -o "zusr/${template}@[^[:blank:]]+" | tail -1)
+
+                [ -e "/zusr/${jail}" ] && zfs destroy -rRf zusr/${jail}
+                [ ! -e "/zusr/${jail}" ] && zfs clone ${homesnap} zusr/${jail}
+
+		# Rename folders/mounts with dispjail name 
+                [ -e /zusr/${jail}/home/${template} ] && \
+                        mv /zusr/${jail}/home/${template} /zusr/${jail}/home/${jail}
+                sed -i '' -e "s/${template}/${jail}/g" /zusr/${jail}/rw/etc/fstab
+
+                # Rename unprivileged user to dispjail name 
+                pw -V /zusr/${jail}/rw/etc/ usershow $template > /dev/null 2>&1
+                if [ "$?" = "0" ] ; then
+                        pw -V /zusr/${jail}/rw/etc/ usermod $template -l $jail > /dev/null 2>&1
+                        pw -V /zusr/${jail}/rw/etc/ usermod $jail -d /usr/home/${jail} > /dev/null 2>&1
+                fi
+        fi
+}
+
+
+checks
+umount_lingering 	# Occassionally jail mounts linger and cause problems later 
+set_flags		# Flags up, to protect root and home filesystems when not in use 
+reclone_appjail		# appjail's root filesystems are immediately destroyed and recloned
+reclone_dispjail	# dispjails root *and* home filesystems are immediately destroyed
+
+
+

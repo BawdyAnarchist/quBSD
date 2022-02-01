@@ -1,0 +1,151 @@
+#!/bin/sh
+
+while getopts ah o ; do
+	case $o in
+		a) autoupdate="true" ;;
+		h) help="true" ;;
+	esac
+done
+
+shift $((OPTIND -1 ))
+
+jail="$1"
+newname="$2"
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
+
+define_variables() {
+	# Finds jails dependent on the jail to be renamed
+	rootj_for=$(sed -nE "s/[[:blank:]]+rootjail[[:blank:]]+${jail}\$//p" $jmap)
+	template_for=$(sed -nE "s/[[:blank:]]*template[[:blank:]]+${jail}\$//p" $jmap)
+	tunnel_for=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${jail}\$//p" $jmap)
+}
+
+usage () {
+	[ "$ERR" ] && echo "$ERR"
+	echo ""
+	echo "qb-rename: Renames jail" 
+	echo "Usage: qb-rename [-a] <jail> <new_jailname>" 
+	echo "   -a: (a)utomatically update dependencies of the renamed jail. For" 
+	echo "        example, if <jail> is a tunnel or rootjail for another jail" 
+	echo "   -h: (h)elp:  Outputs this help message"
+	echo ""
+	exit 1
+}
+
+checks() {
+	if [ "$help" ] ; then 
+		usage
+
+	elif [ -z "$jail" ] ; then
+		err="qb-destroy: Error: must specify a <jail>" ; usage
+
+	elif [ -z "$newname" ] ; then
+		err="qb-destroy: Error: must specify a <new_jailname>" ; usage
+
+	elif ! `qb-list -qj "^$jail"` ; then
+		err="qb-destroy: Error: jail $jail is not properly configured or does not exist" ; usage
+
+	elif [ -z "$autoupdate" ] ; then
+        	if [ -n "$rootj_for" ] ; then query="true"
+			printf "%b" "\n$jail is a rootjail for the following jails: \n$rootj_for" 
+		fi
+		if [ -n "$template_for" ] ; then query="true"
+			printf "%b" "\n\n$jail is a template for the following jails: \n$template_for"
+		fi
+		if [ -n "$tunnel_for" ] ; then query="true"
+        		printf "%b" "\n\n$jail is a network tunnel for the following jails:" \
+					"\n$tunnel_for"
+		fi
+		if [ -n "$query" ] ; then
+			printf "%b" "\n\nWould you like to automatically update these dependencies?" \
+				"\n(the jails above will be shutdown and later restarted).  (y/n):  " 
+			read cont
+			if [ "$cont" = "y" -o "$cont" = "Y" ] ; then 
+				autoupdate="true"
+			else
+				printf "%b" "\n\nOnly $jail will be changed, others will remain the same\n"
+			fi
+		fi
+	fi
+}
+
+off_jails () {
+	printf "%b" "Turning off all relevant jails. This could take a minute.\n"
+
+	# If jail is on, turn it off. If there's a problem, force off
+	if `jls | grep -qs " $jail "` ; then 
+		jail -r $jail || jail -R $jail
+	fi
+
+	# Autoupdate needs any of the dependency jails turned off 
+	if [ -n "$autoupdate" ] ; then
+
+		#jails_removed keeps track of which jails were turned off, for later restart 
+		for j in $rootj_for; do
+			if `jls | grep -qs " $j "` ; then
+				jailsremoved="$jailsremoved $j"
+				jail -r $j || jail -R $j
+			fi
+		done
+
+		for j in $template_for; do
+			if `jls | grep -qs " $j "` ; then
+				jailsremoved="$jailsremoved $j"
+				jail -r $j || jail -R $j
+			fi
+		done
+
+		for j in $tunnel_for ; do
+			if `jls | grep -qs " $j "` ; then
+				jailsremoved="$jailsremoved $j"
+				jail -r $j || jail -R $j
+			fi
+		done
+	fi
+}
+
+jrename() {
+	sed -i '' -e "s/^${jail}[[:blank:]]/${newname}	/g" $jmap
+	sed -i '' -E "s/^${jail}[[:blank:]]+\{/${newname} \{/g" /etc/jail.conf
+
+	zfs rename -f zusr/${jail} zusr/${newname}
+	zfs rename -f zroot/jails/${jail} zroot/jails/${newname}
+
+	pw -V /zusr/${jail}/rw/etc/ usershow $jail >> /dev/null 2>&1
+	if [ "$?" = "0" ] ; then
+		pw -V /zusr/${jail}/rw/etc/ usermod 1001 -l $newname 
+		mv /zusr/${newname}/home/${jail} /zusr/${newname}/home/${newname}
+	fi
+}
+
+autoupdate() {
+	if [ -n "$autoupdate" ] ; then
+		for j in $rootj_for ; do
+			qb-edit $j rootjail $newname
+		done
+
+		for j in $template_for ; do
+			qb-edit $j template $newname
+		done
+
+		for j in $tunnel_for ; do
+			qb-edit $j tunnel $newname
+		done
+
+		printf "%b" "Restarting the following jails: $jailsremoved \n\n" 
+		for j in $jailsremoved ; do
+			jail -c $j
+		done
+	fi
+}
+
+
+define_variables
+checks
+off_jails
+jrename
+autoupdate
+
+
+

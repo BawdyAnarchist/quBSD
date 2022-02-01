@@ -1,0 +1,373 @@
+#!/bin/sh
+
+while getopts fhir o ; do
+	case $o in
+		f) force="true" ;;
+		h) help="true" ;;
+		i) param="IP0" ; val="auto" ;;
+		r) restart="true" ;;
+	esac
+done
+
+shift $(( OPTIND - 1 ))
+
+jail="${jail:-"$1"}"
+param="${param:-"$2"}"
+val="${val:-"$3"}"
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//' $jmap  #remove blanks at end of lines
+
+define_variables() {
+	# Valid template jails must have jmap entries and zusr dataset 
+	jmap_appjs=$(qb-list -p class | awk '{print $1}' | uniq)
+	zusrlist=$(zfs list -r zusr | awk '{print $1}')
+	for j in $jmap_appjs ; do
+		`echo "$zusrlist" | egrep -qs "^zusr/$j\$"` &&
+		validtemplatejs=$(printf "%b" "$j" "\n" "$validtemplatejs" | sort)
+	done
+
+	# Valid rootjails must have jmap entries and zroot/jails dataset 
+	jmap_rootjs=$(qb-list -p class | grep rootjail | awk '{print $1}')
+	for j in $jmap_rootjs ; do
+		tmpj=$(zfs list -ro name,used zroot/jails | egrep "^zroot/jails/$j[[:blank:]]")
+		validrootjs=$(printf "%b" "$tmpj" "\n" "$validrootjs")
+	done
+
+	# Additional parameters for later use with tests and messages
+	jmapIPs=$(qb-list -p IP0 | sort -k3)
+	usedIPs=$(qb-connect -l | grep "inet" | sort -k3)
+	netjails=$(echo "$validtemplatejs" | egrep "^net-")
+	
+	validcpuset=$(cpuset -g | sed "s/pid -1 mask: //" | sed "s/pid -1 domain.*//")
+	oldsetting=$(sed -nE "s@^${jail}[[:blank:]]+${param}[[:blank:]]+@@p" $jmap)
+	tunnel=$(sed -nE "s/^${jail}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
+}
+
+usage() {
+	[ "$ERR" ] && printf "%b" "\n$ERR\n"
+	echo ""
+	echo "qb-edit:  Modify jail parameters in jailmap.conf"
+	echo "Checks to ensure a valid arguments were given. If user needs to"
+	echo "modify despite errors, edit jailmap.conf directly or use [-f]"
+	echo ""
+	echo "Usage: qb-edit <jail> <parameter> <value>"
+	echo "       qb-edit [-f][-h][-i][-r] <jail> <parameter> <value>"
+	echo ""
+	echo "   -f: (f)orce:  Modify jailmap, ignore errors" 
+	echo "   -h: (h)elp:  Outputs this help message"
+	echo "   -i: (i)pv4:  Auto-assign IP address along quBSD conventions"
+	echo "   -r: (r)estart the required jails for changes to take effect"
+	echo ""
+	echo "PARAMETERS    saved at /usr/local/etc/jail.conf.d/jailmap.conf"
+	echo "    class:    What type of jail this is: appjail|dispjail|rootjail"
+	echo "    rootjail: Which rootjail system to clone for <jail> . If <jail>" 
+	echo "              is a rootjail; then this entry is self referential," 
+	echo "              but important for script funcitonality." 
+	echo "    template: Only applicable for dispjail. Designates jail to" 
+	echo "              clone (including /home) for dispjail" 
+	echo "    tunnel:   Gateway for <jail> to receive network connectivity"
+	echo "    maxmem:   RAM maximum allocation:  <integer><G|M|K>  "
+	echo "              For example: 4G or 3500M, or \'none' for no limit" 
+	echo "    cpuset:   CPUs a jail may use. Comma separated integers, or a"
+	echo "              range.  For example: 0,1,2,3 is the same as 0-3"
+	echo "              \`none' places no restrictions on jail's CPU access" 
+	echo "    schg:     Directories to receive schg flags: all|sys|none"
+	echo "              \`sys' are files like: /boot /bin /lib , and others"
+	echo "              \`all includes /usr and /home as well"
+	echo "    seclvl:   kern.securelevel to protect <jail>: -1|0|1|2|3"
+	echo "              \`1' or higher is required for schg to take effect" 
+	echo "    no_destroy  Prevents accidental destruction of <jail>"
+	echo "                Change to \`false' in order to use qb-destroy"
+	echo ""
+	exit 1
+}
+
+define_messages() {
+
+	err1="qb-edit: Error: missing argument, must specify jail and parameter" 
+
+	err2=$(printf "%b" "qb-edit: Error: Combination of $jail $param " \
+			"doesnt exist in jailmap.conf")
+
+	err3=$(printf "%b" "qb-edit: Error: parameter $param can only be one of the "\
+			"following rootjail | appjail | dispjail")
+
+	err4=$(printf "%b" "qb-create: ERROR:  You must specify a VALID rootjail."\
+				"\nHere is a list of valid possibilities from zroot/jails \n\n$validrootjs\n" \
+				"\nIf you expected to see another rootjail, check that it's in jailmap.conf" \
+				"\nand a zfs zroot/jails/<jailname> is an original dataset (not a child).")
+
+	err5=$(printf "%b" "qb-create: ERROR:  Must specify a VALID template")
+
+	w6=$(printf "%b" "\nqb-create: WARNING: $tunnel (tunnel_jail) is not fully configured." \
+				"\nHere is a list of valid tunnel possibilities:\n\n$validtemplatejs\n" \
+				"\n\tContinue anyways? (y/n):  ")
+
+	err6=$(printf "%b" "qb-create: ERROR:  User opted to exit, tunnel has incomplete config" \
+				"\nHere are a list of all net-jails:\n\n$netjails\n")
+
+	err7=$(printf "%b" "qb-edit: Error:  User selected auto IP assignment, but jail's tunnel" \
+				"\nis \`none' . First assign a tunnel jail, then the script will know which" \
+				"\nIP address range to select from, along quBSD conventions.")
+
+	err7_1=$(printf "%b" "qb-edit: Error:  IP entered is not a properly formatted IPv4 " \
+				"CIDR address\nMake sure to write the subnet in form IP.IP.IP.IP/subnet")
+
+	err7_2=$(printf "%b" "\nWARNING:  IP assignment diverges from quBSD convention." \
+				"\nDefault behavior:  $tunnel connects to client jails from:" \
+				"\n$ip0_0 - $ip0_255  " \
+				"\n\nINFO: Below are quBSD IP assignment conventions:\n" \
+				"\nGATEWAY          CLIENT               IPv4(min)   IPv4(max)" \
+				"\nnicvm            net-<gateway>    10.99.99.1/24 - 10.99.99.254/24" \
+				"\nnet-<gateway>    appjail_1          10.1.0.2/30 - 10.255.0.2/30" \
+				"\nappjail_1        appjail_2          10.0.1.2/30 - 10.0.255.2/30" \
+				"\nusbvm            appjail          10.88.88.1/30 - 10.88.88.255/30" \
+				"\nnone             none                         none" \
+				"\n\n\tContinue with $IP0 anyways? (y/n):  ")
+
+	err7_3=$(printf "%b" "\nWARNING:  overlaps with an IPv4 already in use.\n" \
+				"Do you really want to do this? (y/n): ")
+
+	err7_4=$(printf "%b" "\nqb-edit:  WARNING: Valid IPv4 ($IP0), but tunnel is \`none'" \
+				"\n\tContinue anyways? (y/n):  ")
+
+	err7_5=$(printf "%b" "qb-edit: ERROR:  User opted to exit, for IP re-assignment")
+
+	err8=$(printf "%b" "qb-edit:  Error: parameter $param can only be one of the " \
+				"following none | sys | all")	
+
+	err9="qb-edit: Error:  $param must be one of the following: -1|0|1|2|3" 
+
+	err10=$(printf "%b" "qb-create: ERROR:  maximum memory must be of " \
+				"VALID format. <integer><G|M|K>\n")
+
+	err11=$(printf "%b" "ERROR: qb-create:  cpuset must be of a VALID format," \
+				"\nand the CPUs must exist. For example:  0,1,2,3  OR  0-3 \n" \
+				"List of valid CPUs:  $validcpuset\n")
+
+	err12="qb-edit: Error: parameter $param must be either true or false" 
+
+	msg13="qb-edit: ALERT: The new value entered is the same as the old value\n" 
+	
+	msg14="qb-edit: New settings won't take effect until $jail is restarted" 
+
+	msg15=$(printf "%b" "qb-edit: Restarting:  $tunnel") 
+
+	msg16=$(printf "%b" "qb-edit: Restarting:  $jail") 
+
+	msg17=$(printf "%b" "qb-edit: ALERT: In order for new connection settings to take effect," \
+				"\nthe following jail(s) must be restarted: ")
+}
+
+checks() {
+	if [ "$help" ] ; then
+		usage
+
+	elif [ -z "$jail" -o -z "$param" ] ; then
+		ERR="$err1" ; usage
+
+	elif ! `egrep -qs "^$jail[[:blank:]]+$param[[:blank:]]+" $jmap` ; then
+		ERR="$err2" ; usage
+	
+	elif [ "$force" ] ; then :
+
+	elif [ "$param" = "class" ] ; then 
+		if [ "$val" != "rootjail" -a "$val" != "appjail" -a "$val" != "dispjail" ] ; then
+			ERR="$err3" ; usage
+		fi
+		
+	elif [ "$param" = "rootjail" ] ; then
+		if ! `echo "$validrootjs" | egrep -qs "^zroot/jails/$val[[:blank:]]"` ; then
+			ERR="$err4" ; usage
+		fi	
+
+	elif [ "$param" = "template" ] ; then 
+		if ! `echo "$validtemplatejs" | egrep -qs "^$val\$"` ; then
+			ERR="$err5" ; usage
+		fi
+
+	elif [ "$param" = "tunnel" -a "$val" != "none" ] ; then
+		if ! `echo "$validtemplatejs" | egrep -qs "^$val\$"` ; then
+			printf "%b" "$w6" ; read resp
+			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err6" && usage
+		else
+			validtunnel="true"
+		fi
+
+	elif [ "$param" = "IP0" ] ; then 
+		IP0="$val"	
+		check_IPv4
+		find_IP
+		define_messages
+
+		if [ "$IP0" = "auto" ] ; then
+			if [ "$tunnel" = "none" ] ; then
+				ERR="$err7" ; usage
+			else
+				IP0="$OPENIP"
+				val="$OPENIP"
+			fi
+
+		elif [ "$validIPv4" != "true" -a "$val" != "none" ] ; then
+			ERR="$err7_1" ; usage
+
+		elif [ "$mismatch" -a "$val" != "none" ] ; then
+			printf "%b" "$err7_2" ; read resp
+			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err7_5" && usage
+
+		elif `printf "%b" "$usedIPs\n$jmapIPs" | egrep -qs "$b3"` \
+			&& [ "$oldsetting" != "$IP0" -a "$val" != "none" ] ; then
+
+			printf "%b" "$err7_3" ; read resp
+			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err7_5" && usage
+
+		elif [ "$ipwithnotunnel" ] ; then
+			printf "%b" "$err7_4" ; read resp
+			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err7_5" && usage
+		fi
+
+	elif [ "$param" = "schg" ] ; then 
+		if [ "$val" != "none" -a "$val" != "sys" -a "$val" != "all" ] ; then
+			ERR="$err8" ; usage
+		fi
+
+	elif [ "$param" = "seclvl" ] ; then 
+		if ! [ "$val" -ge -1 -a "$val" -le 3 ] ; then  
+			ERR="$err9" ; usage
+		fi
+
+	elif [ "$param" = "maxmem" -a "$val" != "none" ] ; then
+		if ! `echo "$val" | egrep -qs "^[[:digit:]]+(G|M|K|g|m|k)\$"` ; then
+			ERR="$err10" ; usage
+		fi
+
+	elif [ "$param" = "cpuset" -a "$val" != "none" ] ; then
+		cpuset_mod=$(echo $val | sed -E "s/(,|-)/ /g") 
+		for c in $cpuset_mod ; do
+			# Every number is followed by a comma except the last one
+			`echo $validcpuset | egrep -qs "$c,|$c\$"` || badcpu="true"
+		done
+
+		if [ "$badcpu" ] ; then
+			ERR="$err11" ; usage 
+		fi
+		
+	elif [ "$param" = "no_destroy" ] ; then 
+		if [ "$val" != "true" -a "$val" != "false" ] ; then
+			ERR="$err12" ; usage
+		fi
+	fi
+
+	if [ "$val" = "$oldsetting" -a -z "$force" ] ; then
+		printf "%b" "\n$msg13"
+	fi
+}
+
+check_IPv4() {
+	# Perhpas not as technically correct as doing a regex,
+	# but it's readable, and the a/b pairs are usable elsewhere
+
+	validIPv4=""
+
+     a0=${IP0%%.*.*.*/*}
+     a4=${IP0##*.*.*.*/}
+          b1=${IP0#*.*}
+          a1=${b1%%.*.*/*}
+               b2=${IP0#*.*.*}
+               a2=${b2%%.*/*}
+                    b3=${IP0%/*}
+                    a3=${b3##*.*.*.}
+
+        if   [ "$a0" -ge 0 -a "$a0" -le 255 -a "$a1" -ge 0 -a "$a1" -le 255 \
+            -a "$a2" -ge 0 -a "$a2" -le 255 -a "$a3" -ge 0 -a "$a3" -le 255 \
+            -a "$a4" -ge 0 -a "$a4" -le 31 ] >> /dev/null 2>&1
+        then
+                echo "$IP0" | egrep -qs "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+"
+                [ "$?" = "0" ] && validIPv4="true"
+        fi
+}
+
+find_IP() {
+	# Search for unused IP. Jail's IP assignment is based on position in the
+	# internal network. Variable indirection simplifies the while loop; and 
+	# generalizes the labeling convention for future code changes/expansion
+
+	cycle=1
+
+	if [ -z "${tunnel##net-tap*}" ] ; then
+		ip1="aa" ; ip2="bb" ; ip3="cycle" ; subnet="24"
+		aa=99 ; bb=99
+
+		# Determines a mismatch in quBSD IP assignment convention
+		[ -n "$IP0" -a "10.$aa.$bb/$subnet" = "$a0.$a1.$a2/$a4" ] || mismatch="true"
+
+	elif [ -z "${tunnel##net*}" ] ; then
+		ip1="cycle" ; ip2="bb" ; ip3="cc" ; subnet="30"
+		bb=0 ; cc=2
+		[ -n "$IP0" -a "10.$bb.$cc/$subnet" = "$a0.$a2.$a3/$a4" ] || mismatch="true"
+
+	elif [ -z "${tunnel##none*}" -a "$IP0" != "none" ] ; then
+		ipwithnotunnel="true" ; cycle=256
+
+	else
+		ip1="aa" ; ip2="cycle" ; ip3="cc" ; subnet="30"
+		aa=0 ; cc=2
+		[ -n "$IP0" -a "10.$aa.$cc/$subnet" = "$a0.$a1.$a3/$a4" ] || mismatch="true"
+	fi
+
+	while [ $cycle -lt 255 ] ; do
+		eval "openip=10.\${$ip1}.\${$ip2}.\${$ip3}"
+		if ! `printf "%b" "${usedIPs}\n${jmapIPs}" | grep -qs "$openip"` ; then
+			OPENIP="$openip/${subnet}"
+
+			# Used to recommend IP ranges in [-g] guided mode
+			cycle=1 && eval "ip0_0=10.\${$ip1}.\${$ip2}.\${$ip3}/$subnet"
+			cycle=255 && eval "ip0_255=10.\${$ip1}.\${$ip2}.\${$ip3}/$subnet"
+			break
+		else
+			cycle=$(( cycle + 1 ))
+			if [ $cycle -gt 254 ] ; then
+				ERR="$e32"
+			fi
+		fi
+	done
+}
+
+main() {
+	# Modify jailmap.conf
+	sed -i '' -E "\@^${jail}[[:blank:]]+${param}@s@[^[:blank:]]+\$@${val}@" $jmap 
+	newjmap=$(cat $jmap | column -t)
+	echo "$newjmap" > $jmap
+
+	printf "%b" "\nSettings for:  $jail\n"
+	qb-list -j $jail -p $param
+
+	if [ "$restart" ] ; then
+		if [ $param = "IP0" -o $param = "tunnel" ] ; then
+			printf "%b" "\n$msg15\n"
+			`jls | egrep -qs " $jail "` && qb-off $tunnel
+			jail -c $tunnel
+		else
+			printf "%b" "\n$msg16\n"
+			`jls | egrep -qs " $jail "` && qb-off $jail 
+			jail -c $jail
+		fi
+	else
+		if [ $param = "IP0" -o $param = "tunnel" ] ; then
+			# A bit of a hack, but it prevents saying that "none" needs to be restarted
+			[ "$tunnel" = "none" ] && tunnel=""
+
+			printf "%b" "${msg17} ${jail} ${tunnel}\n\n"
+
+		elif [ "$param" != "no_destroy" ] ; then
+			printf "%b" "$msg14\n\n"
+		fi
+	fi
+}
+
+define_variables
+define_messages
+checks
+main
+
+

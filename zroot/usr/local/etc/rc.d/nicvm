@@ -1,0 +1,37 @@
+#!/bin/sh
+
+# Starts bhyve virtual machine with PCI passthrough for nicvm at pci0:68:0:0 
+# Virtual interface on tap0 for connectivity 
+
+# PROVIDE: nicvm 
+# REQUIRE: netif jail
+
+. /etc/rc.subr
+
+name="nicvm"
+desc="Starts bhyve VM for network interface (nicvm) and net-tap"
+rcvar="${name}_enable"
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+status_cmd="${name}_status"
+
+nicvm_start() {
+	bhyveload -c stdio -m 600M -d /dev/zvol/zroot/nicvm -S nicvm > /dev/null 2>&1
+
+	bhyve -c 1 -m 600M -H -A -P -S \
+		-s 0:0,hostbridge \
+        	-s 1:0,lpc \
+        	-s 2:0,virtio-net,tap0 \
+        	-s 3:0,virtio-blk,/dev/zvol/zroot/nicvm \
+        	-s 4:0,passthru,68/0/0 \
+        	nicvm > /dev/null 2>&1 &
+}
+
+nicvm_stop() {
+	pkill -f 'bhyve: nicvm'	
+}
+
+
+load_rc_config $name
+run_rc_command "$1"
+

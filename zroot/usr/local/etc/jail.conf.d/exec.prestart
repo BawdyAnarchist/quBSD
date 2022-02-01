@@ -1,0 +1,42 @@
+#!/bin/sh
+
+# Symlinks and pw changes are applied after fstab is mounted 
+
+jail="$1"
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $jmap
+class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
+
+usage() {
+        printf "%b" "\n$err\n\n"
+        exit 1
+}
+checks() {
+        if [ -z "$jail" ] ; then
+                err="Error: exec.prestart:  Must select a jail"
+                usage
+        elif [ -z "$jmap" ] ; then
+                err="Error: exec.prestart:  No file selected for jailmap.conf"
+                usage
+        elif [ -z "$class" ] ; then
+                err="Error: exec.prestart:  Jail $jail has no class designated in jailmap.conf"
+                usage
+	fi
+}
+
+manage_symlinks() {
+	# /rw/ nullfs mounts are best symlinked from within the cloned appjail's root 
+	if [ "$class" != "rootjail" ] ; then
+        	chroot /jails/${jail} /bin/sh <<"EOT"
+                ln_files=$(find "/rw" -type f | sed "s:/rw::")
+                if [ -n "$ln_files" ] ; then
+			ln_dirs=$(echo "$ln_files" | sed "s#\(.*\)/.*#\1#" | sed '/^$/d' | uniq)
+                        echo "$ln_dirs" | xargs mkdir -p 
+                        echo "$ln_files" | xargs -I@ ln -sf /rw@ @
+                fi
+EOT
+	fi
+}
+
+checks
+manage_symlinks 	

@@ -1,0 +1,172 @@
+#!/bin/sh
+
+while getopts dhln o ; do
+	case $o in
+		d) dest_oldest="true" ;;
+		h) help="true" ;;
+		l) list_all="true" ;;
+		n) new="true" ;;
+	esac
+done
+
+shift $(( OPTIND - 1 ))
+
+jail="$1"
+date=$(date +%b%d)
+tyme=$(date +%H%M)
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+
+define_variables() {
+	class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
+
+	# Rootjail vs zusr jails have different zfs datasets to handle 
+	if [ "$class" = "rootjail" ] ; then
+		newsnap="zroot/jails/${jail}@${date}_${tyme}" 
+		newdeps=$(zfs list -o name,origin | grep "${newsnap}" | awk '{print $1}')
+
+		# Destroy option. zfs lists snapshots in chronological order 
+		if [ "$dest_oldest" ] ; then
+			oldsnap=$(zfs list -t snapshot | awk '{print $1}' \
+								| grep "zroot/jails/${jail}@" | head -1)
+			olddeps=$(zfs list -o name,origin | grep "${oldsnap}" | awk '{print $1}') 
+		fi
+	else
+		newsnap="zusr/${jail}@${date}_${tyme}"
+		newdeps=$(zfs list -o name,origin | grep "${newsnap}" | awk '{print $1}')
+
+		if [ "$dest_oldest" ] ; then 
+			oldsnap=$(zfs list -t snapshot | awk '{print $1}' \
+								| grep "zusr/${jail}@" | head -1)
+			olddeps=$(zfs list -o name,origin | grep "${oldsnap}" | awk '{print $1}') 
+		fi
+	fi
+	`zfs list -t snapshot | grep -qs $newsnap` && dupl="true"
+}
+
+define_messages() {
+	err1=$(printf "%b" "qb-snap: ERROR: need to specify an action [-d|-l|-n]")
+	err2=$(printf "%b" "qb-snap: ERROR: Need to list jail")
+	err2_1=$(printf "%b" "qb-snap: ERROR: $jail doesn't exist or isn't configured properly")
+	warn3=$(printf "%b" "qb-snap: WARNING: Snapshot with name, $newsnap, already exists." \
+					"\nReplace?(y/n):  ")
+	warn4=$(printf "%b" "qb-snap: The oldest snapshot: $oldsnap has the following dependencies:")
+	warn5=$(printf "%b" "These jails will be shutdown")
+	warn6=$(printf "%b" "Data inside these jails will be permanently destroyed")
+	warn7=$(printf "%b" "qb-snap: WARNING:  "$newsnap" has the following dependencies:")
+}
+
+usage() {
+	[ "$ERR" ] && printf "%b" "\n$ERR"
+	echo ""
+	echo "qb-snap: Quickly create/view snapshot datasets for <jail>" 
+	echo "Snapshot names default to the form of:  jail@MonDD_HHMM"
+	echo ""
+	echo "Usage: qb-snap [-d|-l|-n] <jail>" 
+	echo "   -d: (d)estroy oldest snapshot of <jail>"
+	echo "   -h: (h)elp . Outputs this help message"
+	echo "   -l: (l)ist all snapshots of <jail>."
+	echo "        If no argument is provided, lists all snapshots"
+	echo "   -n: (n)ew snapshot for <jail>"
+	echo ""
+	exit 1
+}
+
+checks() {
+	if [ "$help" ] ; then
+		usage
+
+	elif ! [ "$dest_oldest" -o "$list_all" -o "$new" ] ; then
+		ERR="$err1" ; usage
+
+	elif [ -z "$list_all" -a -z "$jail" ] ; then 
+		ERR="$err2" ; usage
+
+	elif [ "$jail" ] && ! `qb-list -qj "$jail"` ; then 
+		ERR="$err2_1" ; usage
+
+	elif [ "$new" -a "$dupl" ] ; then
+		printf "%b" "\n$warn3"
+		read resp
+		[ "$resp" = "y" -o "$r" = "Y" ] && replace="true" || exit 0 
+	fi
+
+	if [ "$oldsnap" -a "$olddeps" ] ; then
+		printf "%b" "\n${warn4}\n${olddeps}\n\n" 
+
+		if [ "$root" ] ; then
+			printf "%b" "\n${warn5}"
+		else
+			printf "%b" "\n${warn6}\n"
+		fi
+
+		read -p "Continue (y/n) :" resp
+		[ "$resp" = "y" -o "$r" = "Y" ] && : || exit 0 
+	fi
+
+	if [ "$replace" -a "$dupl" -a "$newdeps" ] ; then
+		printf "%b" "\n$warn7\n$newdeps\n" 
+		
+		if [ "$root" ] ; then
+			printf "%b" "\n${warn5}"
+		else
+			printf "%b" "\n${warn6}"
+		fi
+
+		read -p "Continue (y/n) :" r
+		[ "$r" = "y" -o "$r" = "Y" ] && : || exit 0 
+	fi
+}
+
+list_snaps() {
+	if [ "$list_all" ] ; then
+		echo ""
+
+		if [ -z "$jail" ] ; then
+			zfs list -t snapshot 
+		else
+			zfs list -t snapshot | grep "$jail@"
+		fi
+
+		echo ""
+		exit 0
+	fi
+}
+
+main() {
+	if [ "$dest_oldest" ] ; then
+		olddeps="${olddeps##*/)}"
+		for o in $olddeps ; do
+			`jls | grep -qs " $o "` && qb-off $o
+		done
+
+		`jls | grep -qs " $jail "` && qb-off $jail
+		zfs destroy -Rf $oldsnap
+	fi
+
+	if [ "$replace" -a "$dupl" ] ; then
+		newdeps="${newdeps##*/}"
+		for n in $newdeps ; do
+			`jls | grep -qs " $n "` && qb-off $n
+		done
+		`jls | grep -qs " $jail "` && qb-off $jail
+		zfs destroy -Rf $newsnap
+	fi
+
+	if [ "$new" ] ; then
+		zfs snapshot $newsnap 
+		printf "%b" "\nCreated new snapshot: $newsnap\n"
+	fi
+
+	list_all="true"
+	echo "New state of $jail snapshots is:"
+}
+
+
+define_variables
+define_messages
+checks
+list_snaps 
+main
+list_snaps 
+
+

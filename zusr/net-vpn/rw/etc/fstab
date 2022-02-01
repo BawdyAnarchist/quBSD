@@ -1,0 +1,2 @@
+# Device		   Mountpoint			FStype	Options	Dump	Pass#
+/zusr/net-vpn/rw/   	/jails/net-vpn/rw/		nullfs	rw	0	0	

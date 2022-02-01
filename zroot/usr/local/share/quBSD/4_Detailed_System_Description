@@ -1,0 +1,504 @@
+
+
+This document provides a detailed description of quBSD core design and functionality.
+Most answers can be found here.
+
+
+#########################################################################################
+
+                                   OVERVIEW 
+
+Virtual Machines
+
+zroot/jails
+	Location of root file systems for all jails
+	Running jails operate from this directory
+
+zusr
+	Description of /home and /rw	
+	Explanation of nullfs mounts and symlinks
+	Handling of pwd.db 
+
+List of Default Jails
+
+/usr/local/etc/jail.conf.d
+	exec scripts called by jail
+	jailmap.conf
+
+/usr/local/bin/qb-scripts  - Operational scripts for system management
+
+i3wm
+
+######Avoiding root user  ##still have to do this
+
+
+#########################################################################################
+
+					 	Virtual Machines
+						nicvm  and  usbvm
+
+PCI passthrough sends the network card; and up to 2 USB controllers to nicvm and usbvm.
+
+The VMs are accessible via ssh keys, which were generated automatically during install.
+
+Service files exist at /usr/local/etc/rc.d  
+Use `service nicvm start/stop` and `service usbvm start/stop` 
+
+Inside the VMs, the virtual interface, vtnet0, connects to host via "tap" interfaces.
+These tap interfaces are handled inside of jails, and provide network connectivity via
+gateway tunnels to client jails, using virtual epair interfaces. See: DESC_networking.
+
+qb-usbvm and qb-nicvm are the qb-scripts for management/access of the VMs
+
+nicvm
+	- ssh keys are stored *ONLY* on net-firewall. These should be carefully guarded
+	  as the are the ability to enter your machine from the outside.
+
+	- tap0 is the virtual interface for access into the VM 
+
+	- qb-nicvm 
+		- This script automates opening an ssh connection into the nicvm. Additionally,
+		  in case you need direct access, there's an option to enter nicvm via console.
+
+usbvm
+	- ssh keys are stored on 0gui-template and 0net-template. The usbvm is regarded as 
+	  insecure, and future plans are to make it disposable, so that any potential 
+	  malware that might come from a flash device, dies with the shutdown of the vm. 
+	  For the meantime, the usbvm is persistent, so some caution is advised regarding
+	  which jails you connect to. Hypothetically you could connect a dispjail to it,
+	  and then transfer your files from the dispjail to their final destination.
+
+	- tap1 is the virtual interface for host access into the VM.
+
+	- The usbvm is rarely, if ever, connected online - Just for updates or pkg installs.
+
+	- qb-usbvm
+		- This script automates opening an ssh session into the usbvm, via a specified.
+		  jail. Additionally it comes with an option to access via console if needed.
+		  Finally, there's an option to automatically configure internet to the usbvm.
+	
+##########################################################################################
+
+							/jails/
+
+This directory is the mountpoint for zfs dataset:  zroot/jails
+
+The root-level (system) files for all jails are located here; however, not all jails
+contain full, independent FreeBSD installations. Instead, quBSD installs just a few 
+"rootjails", which act as a base or template for all other jails (appjails). 
+
+This is an important underlying concept of quBSD, and is similar to the Qubes concept.
+rootjails are configured for particular purposes (for example - GUI operations), and 
+then ZFS snapshots are taken. The snapshot is used to create clones (children) datasets, 
+referred to as "appjails", which are the actual workstations for running user 
+applications. The vast majority of user time will occur in appjails. 
+
+Every time that an appjail is both started and stopped, the clone is destroyed, and 
+then re-cloned from the most recent rootjail snapshot. Thus, it is important to treat 
+rootjails with care, to maintain a pristine environment for dependent appjails.
+
+rootjails should only be accessed for updates and pkg installation. Changes will not
+take affect in dependent appjails until a snapshot is taken, and the jail(s) rebooted.
+
+ZFS clones are not full ondisk copies of the install; but rather, ZFS tracks the 
+differences between the snapshot and clone. This is a useful space saving mechanism, 
+and dozens (even hundreds) of appjails can operate from the same parent rootjail. 
+
+This setup provides additional benefits:  
+	- From inside an appjail, you're able to modify all system files
+	- These modifications have no affect on the rootjail from which it was cloned
+	- Meaning, you can do basically anything you want to the appjail root filesystem 
+	  from inside the running jail, run tests/experiments, break things, and then
+	  restore the original state by rebooting the appjail. 
+	- This also protects against malware that might have made it onto a jail
+	
+It is highly recommended to test new packages and configurations inside of a 
+dispjail or test jail, before attempting to install on the rootjail.
+
+quBSD installs 3 full, independent FreeBSD jails. Each a separate dataset:
+	- 0base: A bare bones install, no packages, no configs
+	- 0net:  Has wireguard, wireguard-go, and jq installed, specifically to be 
+		    used for networking (gateway) jails (more description later).
+	- 0gui:  Acts as the primary "desktop" rootjail. Has basic graphical 
+		    environment installed, like Xorg, video drivers, qt/gtk; and any
+		    workstation-type applications that the user chooses to install. 
+		    For example: Falkon, libreoffice, keepass, git, krita, etc. 
+
+/jails/<jailname>/rw/  This will be described in detail later, but it's a mechanism 
+which enables an arbitrary number of jail-specific system files to remain persistent
+between jail reboots. The /rw/ directory is nullfs mounted inside the jail at start.
+
+##########################################################################################
+
+							/zusr/
+
+This directory is the mountpoint for the zpool:  zusr  
+
+For the meantime, quBSD scripts only function if there exists the zpool:  zusr.  
+Merely creating a dataset under zroot, mounted at /zusr will not suffice.
+
+Each jail has a dataset at zusr/ for persistent files, with at most 2 sub-directories:
+	/zusr/<jailname>/home/<jailname>/
+	/zusr/<jailname>/rw/
+
+/home
+	/zusr/<jailname>/home/ gets nullfs mounted at:  /jails/<jailname>/usr/home
+	This is done after an appjail is destroyed/recloned, during jail startup.
+
+	From inside a running jail, this appears like a standard /usr/home/ directory.
+	The <username> and <groupname> for a jail, are identical to the zfs <jailname> 
+
+/rw
+	/zusr/<jailname>/rw/ gets nullfs mounted at:  /jails/<jailname>/rw
+	This is done after an appjail is destroyed/recloned, during jail startup.
+
+	The /rw directory facilitates persistent system (root) level files for each jail.
+	For example, jails can each have a custom rc.conf, pf.conf, resolv.conf, and 
+	importantly:  pwd.db, master.passwd, and associate pw files (more on that later).
+
+	The functionality is simple. After nullfs mount, the corresponding system files 
+	are all symlinked to their /rw counterparts. This requires that all files in /rw 
+	have identical directory/heirarchy mappings as the files that link to them. 
+		- For example:  /zusr/<jailname>/rw/etc/rc.conf  , is the correct location 
+		  to save a custom rc.conf for the jail. Additionally, resolv.conf and 
+		  pf.conf would be placed in the same directory: /zusr/<jailname>/rw/etc/ 
+
+	Conveniently, this means that if you're inside a running jail, you can modify
+	any /rw file by referncing its normal location, and the symlink causes
+	modification of the file in its persistent location at /zusr/<jailname>/rw/ 
+		- For example:  If you're operating from inside the jail:  net-vpn , then
+		  root@net-vpn:~ # vi /etc/rc.conf
+		  would be sufficient to permanently modify the rc.conf file.
+		- One major exception to this rule, is using `pw`. Described later
+
+	Modification of root files *not* symlinked to the /rw direcotry, are ephemeral.
+
+An appjail isn't required to have a /home or /rw directory, but of course there will
+be no persitent files in that case. For example, all net-jails have only a root 
+user, no unprivileged user, and thus, only have /rw , but not /home. 
+
+rootjails do not have a zusr dataset
+
+Jail pwd and users
+	- /rw/ handling is used for pwd management as well. Running each jail with
+	  its <jailname> doubling as the user and group names inside the jail, adds
+	  complexity to pwd.db handling and the automation scripts, but it prevents 
+	  conflicts on the shared .X11-unix socket, and improves segregation. 
+
+	- If a jail has an unprivileged user, the persistent pwd data is stored at:  
+		/zusr/<jailname>/rw/etc/
+
+	- 0gui-template should be used as a template for creating new GUI jails,
+	  which will come with an unprivleged user (again, automatically configured)
+	  For example:  dispjail@dispjail:~ %
+
+	- Don't put multiple unprivleged users in the same jail, as quBSD does not
+	  support this right now. It's likely to cause errors. 
+
+	- When using the `pw` command to modify a user, you must add the [-V] option
+	  to redirect pw to the custom directory. Otherwise changes aren't persistent. 
+		- For example, this command can be run from the host:
+			pw -V /zusr/<jailname>/rw/etc usermod|useradd
+		- Or you can run this comman from inside of the jail
+			pw -V /rw/etc usermod|useradd
+
+##########################################################################################
+
+						List of Default /zusr Jails
+
+quBSD installer creates a set of default /zusr jails that make system customization
+fairly easy. Recommend exploring these directories/files just a bit.
+
+0net-template
+	Not a rootjail, but does have reasonable defaults for most net-jails 
+		rc.conf - Has line for wireguard, but off by default (beware)
+		resolv.conf - has IVPN DNS, probably need to change to yours
+		pf.conf - IMPORTANT! - qbBSD startup scripts depend on particular
+			variables and lines for automated networking to function
+			be vary careful about changing removing the following:
+				$jIP , $wgIP , $routerIP , <pass_ips>
+		/rw/usr/local/etc/wireguard/  has wg0.conf and a few useful files
+		/rw/root/.ssh/usbvm - Contains the ssh keys to access usbvm
+
+	Can be used with the qb-create script to make new jails:
+		qb-create -T 0net-template net-newjail
+
+0gui-template
+	Again, not a rootjail, but a /zusr template jail. 
+
+	!! SECURITY CAUTION !!
+		GUI jails share the /tmp/.X11-unix socket. This is a bit of a security problem
+		given that jails can potentially see each-others screens and clipboard.
+	
+		You might shut down all non-essential jails for security critical tasks
+
+	This one is important, because the "dispjail" (listed later) depends on 
+	0gui-template for all /rw and /home files at launch. Configure your GUI jails 
+	defaults here first, and then use this template with qb-create:
+		qb-create -H -T 0gui-template newguijail  
+
+	!! Careful with some of these settings. Many are crucial for GUI ops!!
+		fstab
+			nullfs mounts /tmp/.X11-unix to the jail's /tmp ; REQUIRED for GUI. 
+			Set of Linux mounts if you're brave enough to try jailing Linuxulator
+		
+		.cshrc
+			setenv DISPLAY :0	  		# REQUIRED for X11 apps to work
+			alias firefox firefox --no-remote  
+				# Avoids issues with shared unix socket, but not strictly required
+			alias cmd cmd				# Obviously I think my aliases are cool	
+
+		rc.conf
+			clear_tmp_X="NO"  
+				# REQUIRED, to prevent jail from attempting to clear /tmp/.X11-unix
+		
+		/rw/root/.ssh/usbvm - ssh keys for accessing usbvm
+	
+		.config - Configure default settings for Falkon, libreoffice, etc 
+
+net-tap
+	net-tap connects directly to the nicvm, via tap0, which shares bridge0 with epairs 
+	of downstream gateway jails. Interfaces are promiscuous, no IPs on net-tap.
+	This jail is considered secure, and highly protected with schg and seclvl=3.  
+	See: /usr/local/share/quBSD/2_Network_Graph for more info
+
+net-firewall	
+	Connects directly to outside internet with no VPN, but does have pf implemented.
+	!Only jail which contains the ssh keys to the nicvm! 
+	Use this for initial setup if you need network before setting up your net-vpn.	
+
+net-vpn
+	Basic template for a wireguard VPN gateway. 	
+	/zusr/net-vpn/rw/usr/local/etc/wireguard/wg0.conf is the file you must edit with
+	your VPN provider's details. Recommend maintaining "PersistentKeepalive = 10"
+	If you're using IVPN, use qb-ivpn for convenience of server selection/application
+
+dispjail
+	Disposable jails are a type of appjail. The entire filesystem is ephemeral, destroyed 
+	at every jail shutdown. Like other appjails, they have a designated rootjail, but they 
+	also have a designated /zusr jail as a template. In the case of dispjail, its 
+	template is 0gui-template; which means it copies the /home and /rw directories at
+	launch. Use dispjails for untrusted:  browsing, files, attchments, or downloads.
+
+	Any /zusr jail can be designated as a template. For quick creation of a dispjail to
+	open a file in a regular appjail, you can use the script: qb-dispjail
+
+Recommended Jails - Ways a user might think about segregating jails by activity/security: 
+	vault - No network connection. Password manager, personal files
+	corporate - Banking/financial logins, and corporate accounts 
+	emails 
+	work
+	social media 
+	browsing - Place for random browsing with persistent storage
+	disp-browsing - Disposable jail for non-persistent browsing activity
+	torrents
+	experimental - Place to try new pkgs and configs. Can also use dispjail	
+	
+##########################################################################################
+
+								SCRIPTS
+
+quBSD was originally just a nameless amalgamation of a few hundred or so lines of shell 
+scripts that I wrote to automate/emulate some of the Qubes concepts on FreeBSD; as well 
+as learn FreeBSD for the first time, and really, learn shell script and Unix operation, 
+with a mind towards maybe creating a small home server. 
+
+Ultimatetly I (attempted to) formalize, generalize, and re-write into a full suite. 
+
+While I have a list of items that I would like to improve and add over time, I 
+hope that what I have created here is sufficiently robust, generalizable, and useful
+in its current state; or at least have the potential to become so.
+
+There are two locations which are the heart of quBSD functionality:
+	/usr/local/etc/jail.conf.d/
+	/usr/local/bin/qb-
+
+##########################################################################################
+
+						/usr/local/etc/jail.conf.d
+
+All exec scripts called by `jail` for start/stop operations live here.
+/etc/jail.conf file is simple enough and rather self explanatory.
+
+Here is a list and short description of the scripts:
+
+	exec.prepare	
+		- ZFS snapshot, destroy, and re-clone operations
+		- Upstream tunnel jails are started. I prefer this, so that jails can 
+		  still be start/stopped regardless of jail off/on status
+
+	exec.prestart
+		- symlinks for /rw/ files are created 
+
+	exec.created
+		- Network interfaces are all configured here, along with pf and rctl
+		- Definitely the most complex part of starting/stopping jails
+
+	exec.poststart
+		- schg flags and kern.securelevel are applied 
+
+	exec.prestop
+		- cleanup of epairs and taps, before shutdown
+
+	exec.poststop
+		- appjail's root filesystem is destroyed and re-cloned
+		- lingering mounts are searched for and unmounted
+
+jailmap.conf
+	This file stores the various system parameters for all jails, in one location.
+
+	Complete data is required for a jail to be able to start. 
+	If no specification is desired for a paramter, write: `none'
+
+	Checks exist in the scripts, but misconfiguration of this file could cause 
+	erratic behavior, and/or loss of data.
+
+	Description of all parameters:
+
+		class:  Type of jail. Only 3 options available
+			- rootjail: Has a full root installation of FreeBSD at:  /jails/
+			- appjail:  Depends on a rootjail for clone of root filesystem 
+			- dispjail: appjail that relies on a template clone for  /rw  /home 
+
+		rootjail:  Which rootjail filesystem to clone. Default options are: 
+			- 0base:  Bare FreeBSD install with no packages or configs
+			- 0net:   Has wireguard, wireguard-go, jq ; for net-jails
+			- 0gui:   Has Xorg, video drivers, qt/gtk ; and user pkgs  
+
+			If the jail is itself a rootjail, this entry is self referential
+			For example: The rootjail of 0base is 0base	
+
+		template:  
+			- Which jail should be cloned for /home an /rw filesystems
+			- Valid only for dispjails.
+			- May be any valid /zusr appjail
+
+		IP0:  IPv4 address of the jail in CIDR notation
+			- Currently only supports 1 IP address, possible expansion later
+		     - If none desired, write "none"
+		     - IP assignments are under certain ranges, for clarity/funciton 
+
+     		10.99.99.1/24  to  10.99.99.254/24
+				- Used by net-jails (tunnels) to connect to nicvm (vtnet0)
+
+			10.1.0.1/30  to  10.255.0.1/30
+				- Used by net-jail tunnels to serve downstream clients
+				- Most user jails will have IP0 in these ranges
+
+			10.0.1.1/30  to  10.0.255.2/30
+				- Designated for 2nd or 3rd layer downstream connections
+				- Used by qb-connect for temporary connections
+				- Otherwise unused, unless defined by user
+
+			10.88.88.1/30  to  10.88.88.2/30
+				- Reserved for usbvm to connect to clients via tap1
+
+		tunnel:  
+			- Which gateway jail should provide network to the jail
+			- Currently only supports automation of 1 tunnel configuration
+
+		maxmem
+			- Uses rctl to assign maximum RAM allocation.
+			- `none' places no limits
+
+		cpuset
+			- Restricts jail to only the specified CPUs
+			- `none' places no restrictions
+
+		schg
+			- Security feature, applies schg flags after startup.
+			- Can only be one of 3 options: none, sys, all
+		
+		seclvl
+			- kern.securelevel of the jail, applied after startup
+
+		no_destroy
+			- Must be set to `false' in order to destroy jail with qb-destroy
+			- Protects against accidental destruction
+			- Protects ONLY against destruction via qb-destroy, not `zfs destroy`
+
+##########################################################################################
+
+							/usr/local/bin/qb-scripts
+
+These scripts all begin with `qb-` , and have reasonably descriptive [-h] help messages. 
+
+Additionally, these scripts are integrated into an i3wm config (more on that later).
+However, they should be usable with any other window manager.
+
+To see a quick summary off all available scripts, run the command:  `qb-help`
+Below is the output from qb-help:
+
+qb-cmd:      Runs a command inside of a jail - starts the jail if off
+
+qb-connect:  Creates/destroys epairs between jails. Options for
+             auto-configuration for immediate internet connectivity
+
+qb-create:   Automates creation of new jails. Options exist to clone
+             an existing jail, initialize/cofigure from scratch,
+             or a guided mode with descriptive help and input prompts
+
+qb-destroy:  Destroys jail and removes all lingering pieces
+
+qb-edit:     Edit jailmap. Checks performed to ensure valid entry
+
+qb-flags:    Remove or re-apply schg flags from all jail files,
+
+qb-hostnet:  Create/destroy epair and internet connectivity for host
+
+qb-ivpn:     Change ivpn servers for tunnel jail
+
+qb-list:     List jailmap settings for a particular jail or parameter
+
+qb-nicvm:    Manage nicvm, off/on, or console mode for troubleshooting
+
+qb-off:      Remove/restart specified jails. Options for -all and -except
+
+qb-pefs:     Creation pefs directory, mount, or decrypt pefs-kmod in jail
+
+qb-rename:   Renames a jail. Option to update downstream dependencies
+
+qb-snap:     Create jail snapshot. Necessary for rootjails and dispjails
+
+qb-stat:     Continuously running status script for quBSD and jail status
+
+qb-tutorial: Interactive orientation users new to quBSD.
+
+qb-usbvm:    Manage usbvm, off/on, or console mode for troubleshooting
+             Option to automate epair connection from usbvm to jail
+
+##########################################################################################
+	
+							i3wm Integration
+
+With a containerized system like this, every jail might have ten or more potential
+quick-keys for various operations / apps.  For example ...
+
+start, stop, restart, user_xterm, root_xterm, chflags, file_manager, browser ...
+
+Considering that a user could have dozens of jails, this can grow rapidly, and there is 
+no configuration in i3 for automated creation of quick-keys on the basis of some 
+underlying mapping mechanism. 
+
+To solve this problem, quBSD is bundled with a simple setup file and generation script,
+which automatically maps and generates all combinations you might want. 
+
+/root/.config/i3/i3gen_setup
+	The upper portion defines:
+		- Which mod and quick keys bind to which jails 
+		- Which commands each jail should have available 
+		- A grouping mechanism to add a second-level mode if necessary, for users 
+		  with dozens/hundreds of jails. With too many jails, your run out of keys
+		  on the keyboard. Instead, jails are grouped together, and the user enters 
+		  a sub-mode, for all jails not available at the first level bindings.
+
+	The lower portion:
+		- Resolves the command associated with each alias from the upper portion.
+
+/root/.config/i3/i3gen.sh
+	This script assembles the mappings from i3gen_setup, into usable lines for the
+	i3 config file, and adds them to the bottom section.
+	 
+
+
+	

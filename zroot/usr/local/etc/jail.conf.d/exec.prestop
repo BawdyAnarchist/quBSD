@@ -1,0 +1,38 @@
+#!/bin/sh
+
+# Cleanly remove and destroy epairs before shutdown 
+
+jail="$1"
+interfaces=$(jexec -l -U root $jail ifconfig -l)
+taps=$(echo "$interfaces" | egrep -o "tap.")
+epairs=$(echo "$interfaces" | egrep -o " epair[[:digit:]]*.")
+
+usage() {
+        printf "%b" "\n$err\n\n"
+        exit 1
+}
+checks() {
+        if [ -z "$jail" ] ; then
+                err="Error: exec.prestop:  Must select a jail"
+                usage
+        fi
+}
+
+remove_taps() {
+	for t in $taps; do
+		ifconfig $t -vnet $jail
+		ifconfig $t down 
+	done
+}
+
+remove_epairs() {
+	for e in $epairs ; do
+		ifconfig $e -vnet $jail
+		ifconfig $e destroy
+	done
+}
+
+
+checks
+remove_taps
+remove_epairs

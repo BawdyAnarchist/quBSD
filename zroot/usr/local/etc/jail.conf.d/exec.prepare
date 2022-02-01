@@ -1,0 +1,112 @@
+#!/bin/sh
+
+
+# Replacement of non-persistent filesystems (appjails and dispjails) 
+# jailmap.conf stores all jail configurations at /usr/local/etc/jail.conf.d/
+
+jail="$1"
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
+date=$(date +%b%d)
+class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
+rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap)
+rootsnap=$(zfs list -t snapshot | egrep -o "zroot/jails/${rootjail}@[^[:blank:]]+" | tail -1)
+tunnel=$(sed -nE "s/^${jail}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
+jmount1=$(mount | egrep -o "/jails/${jail}/[[:alnum:]]+") 
+jmount2=$(mount | egrep -o "^/zusr/${jail}/[^[:blank:]]+")
+
+usage() {
+        printf "%b" "\n$err\n\n"
+        exit 1
+}
+checks() {
+        if [ -z "$jail" ] ; then
+                err="Error: exec.prepare:  Must select a jail"
+                usage
+        elif [ -z "$jmap" ] ; then
+                err="Error: exec.prepare  No file selected for jailmap.conf"
+                usage
+        elif [ -z "$class" ] ; then
+                err="Error: exec.prepare:  Jail $jail has no class designated in jailmap.conf"
+                usage
+        elif [ -z "$rootjail" ] ; then
+                err="Error: exec.prepare: Jail $jail has no rootjail designated in jailmap.conf"
+                usage
+        elif [ -z "$tunnel" ] ; then
+                err="Error: exec.prepare:  Jail $jail has no tunnel desingated in jailmap.conf"
+                usage
+        fi
+}
+
+start_tunnels () {
+	if `egrep -qs "^$tunnel" "$jmap"` && ! `jls | grep -qs $tunnel`  ; then
+		jail -c "$tunnel"
+	fi
+}
+
+umount_lingering() {
+ 	[ -e "/zusr/${jail}/rw/etc/fstab" ] && umount -a -F /zusr/${jail}/rw/etc/fstab > /dev/null 2>&1
+	[ -n "$jmount1" ] && echo "$jmount1" | xargs umount -f 
+	[ -n "$jmount2" ] && echo "$jmount2" | xargs umount -f   
+}
+
+reclone_appjail() {
+	if [ "$class" != "rootjail" ] ; then
+		[ -e "/jails/${jail}" ] && zfs destroy -rRf "zroot/jails/${jail}"  
+		[ ! -e "/jails/${jail}" ] && zfs clone $rootsnap "zroot/jails/${jail}" 
+	fi
+}
+
+reclone_dispjail() {
+	if [ "$class" = "dispjail" ] ; then
+		template=$(sed -nE "s/^${jail}[[:blank:]]+template[[:blank:]]+//p" $jmap)
+		homesnap=$(zfs list -t snapshot | \
+			   egrep -o "zusr/${template}@[^[:blank:]]*" | tail -1) 
+
+		[ -e "/zusr/${jail}" ] && zfs destroy -rRf zusr/${jail}  
+		[ ! -e "/zusr/${jail}" ] && zfs clone ${homesnap} zusr/${jail} 
+		
+		[ -e /zusr/${jail}/home/${template} ] && \
+			mv /zusr/${jail}/home/${template} /zusr/${jail}/home/${jail} 
+		sed -i '' -e "s/${template}/${jail}/g" /zusr/${jail}/rw/etc/fstab 
+
+		# If template has an unprivileged user, pw name needs changed to dispjail name
+		pw -V /zusr/${jail}/rw/etc/ usershow $template  > /dev/null 2>&1
+	        if [ "$?" = "0" ] ; then
+			pw -V /zusr/${jail}/rw/etc/ usermod $template -l $jail
+			pw -V /zusr/${jail}/rw/etc/ groupmod $template -l $jail
+			pw -V /zusr/${jail}/rw/etc/ usermod $jail -d /usr/home/${jail} > /dev/null 2>&1
+		fi
+	fi
+}
+
+flags_down() {      
+	if [ -e /jails/${jail} ] ; then 
+		chflags -R noschg /jails/${jail}  
+	fi
+	if  [ -e /zusr/${jail} ] ; then
+		chflags -R noschg /zusr/${jail}
+	fi
+}
+
+checks 
+
+# Sometimes bridge module unloads
+kldstat -q -m if_bridge || kldload -q if_bridge     
+
+# Prefer this method instead of dependencies, which can limit versatility 
+start_tunnels		
+
+# Potential old/surrepititious mounts are removed as a safety factor 
+umount_lingering 	
+
+# Root filesystem of appjail is destroyed / recloned from rootjail (basejail) 
+reclone_appjail		
+
+# Dispjails also clone their /home and /rw directories from a clean template	
+reclone_dispjail	
+
+# New clones need to remove schg before start (inherited from clones)
+flags_down		
+
+

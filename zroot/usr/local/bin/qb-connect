@@ -1,0 +1,362 @@
+#!/bin/sh
+
+while getopts dhi:ls o ; do
+	case $o in
+		d) destroy="true" ;;
+		h) help="true" ;;
+		i) IP0="$OPTARG" manualIP="true" ;;
+		l) list="true" ;; 
+	esac
+done
+
+shift $(( OPTIND - 1 ))
+
+jail=${jail:="$1"}
+tunnel="$2"
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+mtu="1400"
+
+define_variables() {
+	onjails=$(jls | awk '{print $2}' | tail -n +2)
+	for j in $onjails ; do 
+		# Assemble a list of all interfaces for all running jails
+		interfaces=$(jexec -l -U root $j ifconfig -l | sed "s/lo0//" \
+					| sed -E "s/bridge[^[:blank:]]+//g")
+
+		for i in $interfaces ; do
+			intf_IP=$(jexec -l -U root $j ifconfig -f inet:cidr $i inet \
+				| egrep -o "inet [^[:blank:]]+" | sed "s/inet //") 
+			all_interfaces=$(printf "%b" "$all_interfaces\n$j $i $intf_IP")
+		done
+
+		# For readibility, bridges and their members are listed last for each jail
+		bridges=$(jexec -l -U root $j ifconfig -l | egrep -o "bridge[^[:blank:]]+")
+		for b in $bridges ; do
+			bridge_IP=$(jexec -l -U root $j ifconfig -f inet:cidr $b inet \
+					| egrep -o "$b|inet [^[:blank:]]+" | sed "s/inet //") 
+			all_interfaces=$(printf "%b" "$all_interfaces\n$j $bridge_IP")
+
+			members=$(jexec -l -U root $j ifconfig $b | egrep -o "member: [^[:blank:]]+" \
+					| sed -E "s/member/$j $b member/g" | sed "s/:[[:blank:]]*/:/g")
+			all_interfaces=$(printf "%b" "$all_interfaces\n$members")
+		done
+	done
+
+	# Clean up and categorize all_interfaces list for later usage
+	all_interfaces=$(echo "$all_interfaces" | column -t)
+	jail_interfaces=$(echo "$all_interfaces" | egrep "^$jail ") 
+	jailepairs=$(echo "$jail_interfaces" | awk '{print $2}' | egrep -o "epair[[:digit:]]+")	
+	tunnel_pairs=$(echo "$all_interfaces" | egrep -v "^$jail" | egrep "$jailepairs")	
+
+	# Get jmap IP assignments to prevent overlap if auto-assiging a new epair IP
+	jmapIPs=$(qb-list -p IP0 | sort -k3)
+
+	# Seclvl of 3 would prevent modifying pf. Warning will be issued if so 
+	if [ "$tunnel" ] ; then
+		if `jls | grep -qs " $tunnel "` ; then
+			tunnel_seclvl=$(jexec -l -U root $tunnel sysctl kern.securelevel \
+										| sed "s/kern.securelevel: //")
+		else 
+			tunnel_seclvl=$(sed -nE "s/^${tunnel}[[:blank:]]+seclvl[[:blank:]]+//p" $jmap)
+		fi
+	fi
+
+	if [ "$jail" ] ; then 
+		if `jls | grep -qs " $jail"` ; then
+			jail_seclvl=$(jexec -l -U root $jail sysctl kern.securelevel \
+										| sed "s/kern.securelevel: //")
+		else 
+			jail_seclvl=$(sed -nE "s/^${jail}[[:blank:]]+seclvl[[:blank:]]+//p" $jmap)
+		fi
+	fi
+}
+
+define_messages() {
+	err1="qb-connect: ERROR: Jail:  $jail doesn't exist or is not turned on" 
+	err1_1="qb-connect: ERROR:  $tunnel doesn't exist or isn't fully configured" 
+	err2="qb-connect: ERROR: Must specify target jail or [-l] option"
+	err3="qb-connect: ERROR: Must specify a tunnel-jail to connect to"
+	err4="qb-connect: ERROR: Tunnel jail:  $tunnel is not turned on" 
+	err5="qb-connect: ERROR: [-i $IP0] is not a valid CIDR IPv4 address" 
+	warn6=$(printf "%b" "\nWARNING:  [-i] IP assignment diverges from quBSD convention." \
+				"\nDefault behavior:  $jail and $tunnel epairs connect via these IPs:" \
+				"\n$ip0_0 - $ip0_255  " \
+				"\n\nINFO: Below are quBSD IP assignment conventions:\n" \
+				"\nGATEWAY          CLIENT               IPv4(min)   IPv4(max)" \
+				"\nnicvm            net-<gateway>    10.99.99.1/24 - 10.99.99.254/24" \
+				"\nnet-<gateway>    appjail_1          10.1.0.2/30 - 10.255.0.2/30" \
+				"\nappjail_1        appjail_2          10.0.1.2/30 - 10.0.255.2/30" \
+				"\nusbvm            appjail          10.88.88.1/30 - 10.88.88.255/30" \
+				"\nnone             none                         none" \
+				"\n\n\tContinue with $IP0 anyways? (y/n):  ")
+
+	err6="qb-connect: ERROR: User opted to exit, to change [-i] specification" 
+	warn7=$(printf "%b" "\nWARNING: [-i] overlaps with an IP already in use.\n" \
+					"Continue with $IP0 anyways? (y/n): ")
+	warn8=$(printf "%b" "\nWARNING:  $jail has kern.securelevel=3 applied, and there is" \
+					"\na pf.conf in the the jail's config. It's likely that the pf config" \
+					"\nwill force all packets to be dropped between $jail and $tunnel" \
+					"\nContinue anyways? (y/n): ")
+	err8=$(printf "%b" "qb-connect: ERROR: User opted to exit. Recommend changing the" \
+					"\nseclvl to 2 or less, restart the jail(s), and re-run qb-connect.")
+	warn9=$(printf "%b" "\nWARNING:  $tunnel has kern.securelevel=3 applied, and there is" \
+					"\na pf.conf in the the jail's config. It's likely that the pf config" \
+					"\nwill force all packets to be dropped between $jail and $tunnel" \
+					"\nContinue anyways? (y/n): ")
+	err9=$(printf "%b" "qb-connect: ERROR: Couldn't find an IP address available within" \
+					"\nthe quBSb internal IP conventions for this jail-tunnel pair." \
+					"\nNormally IP is between:  $ip0_0  and  $ip0" \
+					"\nRecommend running again with [-i <IPv4>] manually assigned.")
+	err10=$(printf "%b" "qb-connect: ERROR:  $jail start exited with errors.") 
+	msg11=$(printf "%b" "qb-connect: ALERT:  $jail and $tunnel are connected, but pfctl," \
+					"\ndefault route, and /etc/resolv.conf have not been configured.")
+	msg12=$(printf "%b" "qb-connect: ALERT:  When connecting net-<jail> to net-tap, you likely" \
+					"\nneed to manual modify pf.conf in $jail for connection to funciton")
+}
+
+usage() {
+	[ -n "$ERR" ] && printf "%b" "\n$ERR\n"
+	echo ""
+	echo "qb-connect:  Create / list virtual interfaces between two jails"
+	echo "IP is auto assigned, but can be manually specified. Additionally"
+	echo "pfctl, resolve.conf, and default route are autoconfigured"
+	echo ""
+	echo "Usage: qb-connect [-i <IPv4>] <target-jail> <tunnel-jail>" 
+	echo "       qb-connect [-d][-l] <target-jail>"
+	echo "       qb-connect -d <target-jail> <tunnel-jail>"
+	echo ""
+	echo "   -d: (d)estroy all epairs for the target. If tunnel jail is specified"
+	echo "        then only epairs common to the target/tunnel pair are destroyed"
+	echo "   -h: (h)elp:  Outputs this help message"
+	echo "   -i: (i)p:  Override auto IP assignment. Must be valid IPv4 in CIDR"
+	echo "        notation.  Include the subnet:  IP.IP.IP.IP/subnet"
+	echo "   -l: (l)ist:  All interfaces and IPs for all running jails. If" 
+	echo "        <jail> is specified, list outputs interfaces only for <jail>" 
+	echo ""
+	exit 1
+}
+
+checks() {
+	if [ "$help" ] ; then
+		usage
+
+	elif ! `jls | grep -qs " $jail "` ; then
+		ERR="$err1" ; usage
+
+	elif [ "$tunnel" ] && ! `qb-list -qj $tunnel` ; then
+		ERR="$err1_1" ; usage
+
+	# Checks accomplished for normal ops (connecting a jail/tunnel)
+	elif [ -z "$list" -a -z "$destroy" ] ; then
+		if [ -z "$jail" ] ; then
+			ERR="$err2" ; usage
+
+		elif [ -z "$tunnel" ] ; then
+			ERR="$err3" ; usage
+
+		# Standard checks for a manually specified IP
+		elif [ "$manualIP" ] ; then
+			if [ -z "$validIPv4" ] ; then
+				ERR="$err5" ; usage
+
+			elif [ "$mismatch" ] ; then
+	               printf "%b" "$warn6" ; read resp
+	               [ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err6" && usage
+			
+			elif `printf "%b" "$all_interfaces\n$jmapIPs" | egrep -qs "$b3"` ; then 
+				printf "%b" "$warn7" ; read resp
+				[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err6" && usage
+			fi
+
+		elif [ "$jail_seclvl" = 3 -a -e "/zusr/$jail/rw/etc/pf.conf" ] ; then
+			printf "%b" "$warn8" ; read resp
+			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err8" && usage
+			
+		elif [ "$tunnel_seclvl" = 3 -a -e "/zusr/$tunnel/rw/etc/pf.conf" ] ; then
+			printf "%b" "$warn9" ; read resp
+			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err8" && usage
+		fi
+
+	elif [ "$destroy" ] ; then
+		if [ "$tunnel" ] && ! `jls | grep -qs " $tunnel"` ; then
+			ERR="$err4" ; usage
+		fi
+	fi
+}
+
+check_IPv4() {
+	# Perhpas not as technically correct as doing a regex,
+	# but it's readable, and the a/b pairs are usable elsewhere
+	# IPv4 cidr:  a0.a1.a2.a3/a4
+
+	validIPv4=""
+
+	a0=${IP0%%.*.*.*/*}
+	a4=${IP0##*.*.*.*/}
+		b1=${IP0#*.*}
+		a1=${b1%%.*.*/*}
+			b2=${IP0#*.*.*}
+			a2=${b2%%.*/*}
+				b3=${IP0%/*}
+				a3=${b3##*.*.*.}
+
+	if    [ "$a0" -ge 0 -a "$a0" -le 255 -a "$a1" -ge 0 -a "$a1" -le 255 \
+		-a "$a2" -ge 0 -a "$a2" -le 255 -a "$a3" -ge 0 -a "$a3" -le 255 \
+		-a "$a4" -ge 0 -a "$a4" -le 31 ] >> /dev/null 2>&1
+	then
+		echo "$IP0" | egrep -qs "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+"
+		[ "$?" = "0" ] && validIPv4="true"
+	fi
+}
+
+find_IP() {
+	# Search for unused IP. Jail's IP assignment is based on position in the
+	# internal network. Variable indirection simplifies the while loop; and
+	# generalizes the labeling convention for future code changes/expansion
+
+	cycle=1
+	if [ -z "$tunnel" ] ; then
+		# If there is no tunnel or, it's a net-tap jail, skip the IP0 loop-search
+		cycle=256
+	
+	elif [ -z "${tunnel##net-tap*}" ] ; then
+		# First part of variable indirection. Assigns the variable names
+		ip1="aa" ; ip2="bb" ; ip3="cycle" ; subnet="24"
+		aa=99 ; bb=99 
+		[ -n "$IP0" -a "10.$aa.$bb/$subnet" = "$a0.$a1.$a2/$a4" ] || mismatch="true"
+		
+	elif [ -z "${tunnel##net-*}" ] ; then
+		ip1="cycle" ; ip2="bb" ; ip3="cc" ; subnet="30"
+		bb=0 ; cc=2
+		[ -n "$IP0" -a "10.$bb.$cc/$subnet" = "$a0.$a2.$a3/$a4" ] || mismatch="true"
+
+	else
+		ip1="aa" ; ip2="cycle" ; ip3="cc" ; subnet="30"
+		aa=0 ; cc=2
+		[ -n "$IP0" -a "10.$aa.$cc/$subnet" = "$a0.$a1.$a3/$a4" ] || mismatch="true"
+	fi
+
+	while [ $cycle -lt 255 ] ; do
+		# Second part of variable indirection. Uses one eval, rather than 
+		# multiple if/thens to construct the IP and loop search
+		eval "openip=10.\${$ip1}.\${$ip2}.\${$ip3}"
+
+		# If the IP on this cycle is not found anywhere, then it can be used
+		if ! `printf "%b" "${all_interfaces}\n${jmapIPs}" | grep -qs "$openip"` ; then
+			IP0=${IP0:-"${openip}/${subnet}"}
+
+			# Used for message generation, to inform user of quBSD internal IP conventions 
+			cycle=1 && eval "ip0_0=10.\${$ip1}.\${$ip2}.\${$ip3}/$subnet"
+			cycle=255 && eval "ip0_255=10.\${$ip1}.\${$ip2}.\${$ip3}/$subnet"
+			break
+		else
+			cycle=$(( cycle + 1 ))
+			if [ $cycle -gt 254 ] ; then
+				ERR="$err9" ; usage
+			fi
+		fi
+	done
+}
+
+list_output() {
+	if [ "$list" ] ; then 
+		if [ -n "$jail" ] ; then 
+			printf "%b" "\nHere are the interfaces for:  $jail" "\n$jail_interfaces\n"
+			printf "%b" "\n$jail is connected to these jails:  "
+			if [ -n "$jailepairs" ] ; then
+				echo "yeah im here"
+				printf "%b" "\n$tunnel_pairs\n\n"
+			else
+				printf "%b" "\n\n"
+			fi  
+		else
+			printf "%b" "\nAll interfaces and IP addresses for all running jails\n" \
+					"$all_interfaces\n\n"
+		fi
+
+		# Exit if use didn't specify [-d]
+		[ -z "$destroy" ] && exit 0
+	fi
+}
+
+destroy_epairs() {
+	if [ "$destroy" ] ; then
+		if [ -z "$tunnel" ] ; then
+			dest_epairs=$(jexec -l -U root $jail ifconfig -g epair)
+
+		elif [ "$destroy" -a "$tunnel" ] ; then 
+			dest_epairs=$(echo "$tunnel_pairs" | egrep "^${tunnel}[[:blank:]]+epair" \
+														| awk '{print $2}')
+		fi
+
+		echo "${dest_epairs%?}b" | xargs -I@ ifconfig @ -vnet $jail
+		echo "${dest_epairs%?}b" | xargs -I@ ifconfig @ destroy 
+		exit 0
+	fi
+}
+
+configure_epairs() {
+	# Start tunnel if it's off
+	if ! `jls | grep -qs " $tunnel "` ; then
+		read -p "$tunnel is off.  Start it? y/n: " p
+		if [ "$p" = "y" ] ; then
+			jail -c $tunnel >> /dev/null
+			[ "$?" != "0" ] && ERR="$err10" && usage
+		else
+			exit 0
+		fi
+	fi
+
+	# Create the epair and send to jails
+     epair=$(ifconfig epair create)
+     ifconfig "${epair%?}a" vnet $tunnel
+     ifconfig "${epair%?}b" vnet $jail
+
+     # If tunnel contains a tap interface, connect epair to bridge
+     if [ -z "${tunnel##net-tap*}" ] ; then
+          jexec -l -U root $tunnel ifconfig bridge0 addm "${epair%?}a"
+          jexec -l -U root $tunnel ifconfig "${epair%?}a" up
+		printf "%b" "\n$msg12\n"
+
+	elif [ "$IP0" -a "$tunnel" ] ; then
+		# Apply IP0 to tunnel		
+          jexec -l -U root $tunnel ifconfig "${epair%?}a" \
+						inet "${IP0%.*/*}.1/${IP0#*/}" mtu $mtu up
+	fi	
+
+	if [ "$IP0" ] ; then
+		# Apply IP0 to jail
+	     jexec -l -U root $jail ifconfig "${epair%?}b" inet $IP0 mtu $mtu up
+	fi
+}
+
+configure_network() {
+	# Add the IP to the tunnel's pf table
+	if [ -e "/jails/${tunnel}/rw/etc/pf.conf" -a "$tunnel_seclvl" -lt 3 ] ; then
+		jexec -l -U root $tunnel pfctl -t pass_ips -T add $IP0
+	fi
+
+	# Add the IP to the jail's pf table
+	if [ -e "/jails/${jail}/rw/etc/pf.conf" -a "$jail_seclvl" -lt 3 ] ; then
+		jexec -l -U root $jail pfctl -t pass_ips -T add $IP0
+	fi
+
+	# Add default route and a resolv.conf for jail to connect to the internet
+	jexec -l -U root $jail route add default "${IP0%.*/*}.1"
+	cp /zusr/${tunnel}/rw/etc/resolv.conf /jails/${jail}/rw/etc/
+
+	echo ""
+}
+
+
+define_variables
+check_IPv4
+find_IP
+define_messages
+checks
+list_output 
+destroy_epairs 
+configure_epairs
+configure_network
+
+

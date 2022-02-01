@@ -1,0 +1,80 @@
+#!/bin/sh
+
+while getopts aehr o ; do
+	case $o in
+		a) all="true" ;;
+		e) exclude="true" ;;
+		h) help="true" ;;
+		r) restart="true" ;;
+	esac
+done
+
+shift $(( OPTIND - 1 ))
+args="$@"
+onjails=$(jls | sed 1d | awk '{print $2}' )
+
+usage() {
+	echo ""
+	echo "qb-off: Shut down multiple jails at once" 
+	echo "If no option is specified: Shuts down only the jails listed"
+	echo ""
+	echo "Usage: qb-off <jail_name>"
+	echo "Usage: qb-off [-h] [-a|-e] <jail_name> <jail_name> ... <jail_name>"
+	echo "   -a: (a)ll:  Shutdown all jails"
+	echo "   -e: (e)xcept:  Shutdown all jails except for those listed"
+     echo "   -h: (h)elp:  Outputs this help message"
+	echo "   -r: (r)estart:  Removes and restarts the jail"
+	echo ""
+	exit 1
+}
+
+checks() {
+	if [ "$help" ] ; then
+		usage
+
+	elif [ -z "$all" -a -z "$exclude" -a -z "$args" ] ; then
+		echo "qb-off: Error: Must provide an option or argument"
+		usage
+
+	elif [ "$all" -a "$exclude" ] ; then
+		echo "qb-off: Error: Conflicting options. Cannot select both [-a] and [-e]" 
+		usage
+	fi
+}
+
+remove_list() {
+	if [ "$all" ] ; then 
+		remove="$onjails"
+
+	elif [ "$exclude" ] ; then
+		for a in $args ; do
+			remove=$(echo $onjails | sed "s/$a//")
+		done
+
+	else	
+		remove="$args"
+	fi
+}
+
+remove() {
+	for r in $remove; do
+		if ` jls | grep -qs " $r "` ; then
+			jailnum=$(jls | grep " $r " | awk '{print $1}')
+			jail -r $r
+
+			# Run a hard remove "-R" if the previous -r failed 
+			`jls | grep -qs " $r "` && jail -R $jailnum
+			[ "$restart" ] && jail -c $r 
+		else
+			echo "Jail $jail does not exist. Skipping." 
+		fi	
+	done
+}
+
+
+checks 
+remove_list
+remove
+
+
+

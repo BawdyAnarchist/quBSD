@@ -1,0 +1,123 @@
+# quBSD:  THESE ARE RECOMMENDATIONS / IDEAS FOR INCORPORATION INTO YOUR OWN I3 CONFIG
+
+# quBSD: HIGHLY RECOMMEND. Opens xterm on host, or in jail, depending on active window
+bindsym $mod+Return exec qb-cmd -n 
+
+# quBSD: HIGHLY RECOMMEND. Like above, but if active window is a jail, open xterm on host
+bindsym $mod+Shift+Return exec xterm 
+
+# Standard workspace variable definition
+set $ws1 "1"
+set $ws2 "2"
+set $ws3 "3"
+set $ws4 "4"
+set $ws5 "5"
+set $ws6 "6"
+set $ws7 "7"
+set $ws8 "8"
+set $ws9 "9"
+set $ws10 "10"
+
+# quBSD expansion of workspaces. These will be available with expanded modes later on. 
+set $ws11 "11"
+set $ws12 "12"
+set $ws13 "13"
+set $ws14 "14"
+set $ws15 "15"
+set $ws16 "16"
+set $ws17 "17"
+set $ws18 "18"
+set $ws19 "19"
+set $ws20 "20"
+
+# quBSD: Lock the screen
+bindsym $mod+o exec "i3lock -e -f -c 000000"
+
+# quBSD: Volume commands. Notice that "comma" and "period" correspond to: "<" and ">"
+bindsym $mod+comma exec "mixer vol -10"
+bindsym $mod+period exec "mixer vol +10"
+bindsym $mod+shift+comma exec "mixer vol -50"
+bindsym $mod+shift+period exec "mixer vol +50"
+
+# quBSD: Floating Modifiers, which might be convenient for specific windows
+# User might want to adjust their minimum size, and/or other programs
+floating_minimum_size 1100 x 700
+for_window [floating] move position center 
+for_window [title="Spectacle"] floating enable
+
+# quBSD: Two concepts are happening below with "quickselect" mode:
+	# 1) Extra workspaces require additional modes to access them (using the number keys)
+	# 2) "quickselect" mode contains your most commonly used commands.
+
+# "grave" is the tilde sign: "~".
+bindsym $mod+grave mode "quickselect1"
+
+mode "quickselect1" {
+	# The tilde/grave will get you back/forth between quickselect1 and 2.
+	bindsym grave mode "quickselect2"
+
+	# Some examples of bindsyms that you might want
+	bindsym c exec qb-cmd corporate firefox, mode "default"
+	bindsym d exec qb-cmd dispjail falkon , mode "default"
+	bindsym e exec qb-cmd email firefox, mode "default"
+	bindsym k exec qb-cmd vault keepassxc , mode "default"
+	bindsym r exec qb-cmd social falkon, mode "default"
+
+	# Inside of quickselect, you only need to press the number key to switch workspace 
+	bindsym 1 workspace number $ws1, mode "default"
+	bindsym 2 workspace number $ws2, mode "default"
+	bindsym 3 workspace number $ws3, mode "default"
+	bindsym 4 workspace number $ws4, mode "default"
+	bindsym 5 workspace number $ws5, mode "default"
+	bindsym 6 workspace number $ws6, mode "default"
+	bindsym 7 workspace number $ws7, mode "default"
+	bindsym 8 workspace number $ws8, mode "default"
+	bindsym 9 workspace number $ws9, mode "default"
+	bindsym 0 workspace number $ws10, mode "default"
+
+	# However, you still use "Shift" to move containers (windows) around
+	bindsym Shift+1 move container to workspace number $ws1, mode "default"
+	bindsym Shift+2 move container to workspace number $ws2, mode "default"
+	bindsym Shift+3 move container to workspace number $ws3, mode "default"
+	bindsym Shift+4 move container to workspace number $ws4, mode "default"
+	bindsym Shift+5 move container to workspace number $ws5, mode "default"
+	bindsym Shift+6 move container to workspace number $ws6, mode "default"
+	bindsym Shift+7 move container to workspace number $ws7, mode "default"
+	bindsym Shift+8 move container to workspace number $ws8, mode "default"
+	bindsym Shift+9 move container to workspace number $ws9, mode "default"
+	bindsym Shift+0 move container to workspace number $ws10, mode "default"
+
+	bindsym Return mode "default"
+	bindsym Escape mode "default"
+
+}
+
+mode "quickselect2" {
+	bindsym grave mode "quickselect1"
+
+	bindsym 1 workspace number $ws11, mode "default"
+	bindsym 2 workspace number $ws12, mode "default"
+	bindsym 3 workspace number $ws13, mode "default"
+	bindsym 4 workspace number $ws14, mode "default"
+	bindsym 5 workspace number $ws15, mode "default"
+	bindsym 6 workspace number $ws16, mode "default"
+	bindsym 7 workspace number $ws17, mode "default"
+	bindsym 8 workspace number $ws18, mode "default"
+	bindsym 9 workspace number $ws19, mode "default"
+	bindsym 0 workspace number $ws20, mode "default"
+
+	bindsym Shift+1 move container to workspace number $ws11, mode "default"
+	bindsym Shift+2 move container to workspace number $ws12, mode "default"
+	bindsym Shift+3 move container to workspace number $ws13, mode "default"
+	bindsym Shift+4 move container to workspace number $ws14, mode "default"
+	bindsym Shift+5 move container to workspace number $ws15, mode "default"
+	bindsym Shift+6 move container to workspace number $ws16, mode "default"
+	bindsym Shift+7 move container to workspace number $ws17, mode "default"
+	bindsym Shift+8 move container to workspace number $ws18, mode "default"
+	bindsym Shift+9 move container to workspace number $ws19, mode "default"
+	bindsym Shift+0 move container to workspace number $ws20, mode "default"
+
+	bindsym Return mode "default"
+	bindsym Escape mode "default"
+}
+

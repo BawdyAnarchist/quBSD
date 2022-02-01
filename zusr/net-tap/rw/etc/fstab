@@ -1,0 +1,2 @@
+# Device		   Mountpoint			FStype	Options	Dump	Pass#
+/zusr/net-tap/rw/   	   /jails/net-tap/rw/		nullfs	rw	0	0	

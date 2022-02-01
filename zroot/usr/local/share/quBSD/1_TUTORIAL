@@ -1,0 +1,432 @@
+
+################################  CONTENTS  ##################################
+
+MERGE FILES
+
+FIRST SCRIPTS 
+
+BASIC JAIL HANDLING
+
+CREATING NEW JAILS
+
+VIEWING/MODIFYING JAILS
+
+ROOTJAIL HANDLING
+
+ACCESSING THE VMS
+
+MISCELLANEOUS COMMANDS
+
+I3WM
+
+CONCLUSION
+
+
+###############################  MERGE FILES  #################################
+
+Any pre-existing files that were modified, have original versions saved at: 
+	/root/old_zroot_configs
+	You may need to manually review them and merge your settings
+
+/etc/resolv.conf
+	- You'll likely need to add your VPN or personal resolver to:
+		host, 0gui-template, 0gui, 0net, inside nicvm/usbvm
+
+/usr/local/etc/X11
+	If you make any modifications, remember to keep the line  
+		xhost + local:
+ 
+/root/.config/i3/config 
+	- If you have an existing config, a new $mod+Return command was added
+	- Use i3gen for your new jails to auto-generate quick keys 
+	- See last section "I3WM" for more info
+
+
+##############################  FIRST SCRIPTS  ###############################
+
+It is recommended to have already run `startx` and place two terminals
+side by side. One to run this tutorial, the other to run commands. 
+
+Give these commands a try: 
+
+qb-help 
+	Lists all available scripts, with a short description. You can also run
+	any script with [-h] option for detailed help informaiton
+
+qb-stat
+	This is a real-time continuous running program that gives the status and
+	configuration of all jails, as well as the nicvm and usbvm. 
+
+	You can see the default jails already installed; sorted by the column "T"
+	dividing jails by function, preferencing appjails at the top.
+
+	At the bottom, it informs you of the active window selected. This is a
+	security measure to prevent operating in the wrong jail accidentally
+
+	Additionally, if the host has an active interface with an IP address, 
+	a warning is printed that host networking is active. Remember that it's
+	a security measure to keep host offline.
+
+
+###########################  BASIC JAIL HANDLING  #############################
+
+We will start running some commands so you can get a feel for navegation.
+
+jail -c <jailname>
+jail -r <jailname>
+	Start/stop jails using the FreeBSD inbuilt command. Jails that provide 
+	network, will be automatically started if required 
+
+qb-cmd <jailname> <program>
+	This is a versatile command, and is used alot by the i3 mappings.
+	It can launch gui apps inside of a jail as well.
+
+qb-off <jailname> <jailname2> ... <jailname3>
+	Makes stopping multiple jails more convenient. for more info: qb-off -h
+
+
+# Go ahead and run this in a side terminal, and keep it running.	
+	qb-stat
+
+# Now let's start the firewall jail and check the network:
+	jail -c net-firewall 
+	# Notice it will start net-tap first, and then net-firewall	
+
+# You can enter the jail with the following command:
+	qb-cmd -r net-firewall
+	# This is equivalent to:  jexec -l -U root net-firewall /bin/csh
+	# net-jails have no users, so you must use [-r] to enter as root.
+	# If the jail wasn't already on, the script would start it.
+
+# You should now see:  
+	root@net-firewall:~ # 
+
+# If things went correctly at install, you should have network:
+	ping 1.1.1.1
+
+# If not check that you're connected to the nicvm:
+	ping 10.99.99.1
+
+	If not, then something went wrong at install. This isn't a troubleshooting,
+	guide, but we will cover how to access the nicvm and usbvm later. You 
+	want to ping between jails/VM, check vtnet0, your interface, pf.conf.
+
+# You can also take a look at the pf.conf:
+	vi /etc/pf.conf
+	# This of course is from inside the running jail
+	# You will *NOT* be able to save changes, because the firewall jail
+	# has default schg flags applied. Instead you would need to either
+	# stop the jail and edit from host, or qb-edit the secuirty settings.
+
+# Now exit net-firewall with:  
+	exit
+
+# Establish a network connection for host. 
+	qb-hostnet -u
+	# This will also throw a big warning at the bottom of qb-stat
+
+# Run some commands that require network.
+	ping freebsd.org	
+	pkg update
+
+# Bring down host networking. Was just as an example.
+	qb-hostnet -d     
+
+# Test out your disposable jail, gui functionality, and connection
+  	qb-cmd dispjail falkon
+	# This should cause dispjail to start, and falkon to pop up.
+
+# Close Falkon browser
+
+
+###########################  VIEWING/MODIFYING JAILS  #############################
+
+# To see all parameters for a jail (in this example, dispjail):
+	qb-list -j dispjail
+
+# Above you can see all available parameters. Lets chech the tunnel for all jails: 
+	qb-list -p tunnel 
+	# Notice that host shows up as well. It can be changed
+	# Recommend not changing nicvm/usbvm, required for qb-scripts to function 
+
+# And now lets see what internal IP addresses are assigned:
+	qb-list -p IP0
+	# quBSD has a convention for internal IPs. See 4_Detailed_System_Description
+
+# If you want to see a list of all your jails:
+	qb-list -a
+
+# And if you want to see the zfs datasets for all jails:
+	qb-list -za
+
+# Take a look at all of the options for qb-edit. We could have set a [restart] flag
+	qb-edit -h
+
+# There's a protection mechanism before destroying a jail:
+	qb-list -p no_destroy
+	# You can see all jails are "true". In order to use qb-destroy, you must first
+	# qb-edit <jailname> no_destroy false
+
+
+#############################  ACCESSING THE VMS  ################################
+
+# Access the nicvm so you can review it, configure if necessary, and harden:
+# SSH keys were saved *only* to net-firewall 
+	qb-nicvm -s net-firewall
+	
+	# Verify that your pf.conf has the port of your VPN (same line as other ports)
+		vi /etc/pf.conf
+		# Careful if using pfctl -f /etc/pf.conf ; will kill your SSH connection	
+
+	# I had to add an mtu setting to my rc.conf becuase of IVPN
+		vi /etc/rc.conf
+		ifconfig_igb0="DHCP mtu 1400"
+
+	# Make required edits, test your connection/VPN; then apply security settings.
+
+	# Recommend applying schg to all system files, and secure level = 3
+	# ! THIS WILL MAKE ALL FILES AND NETWORK SETTING NON-MODIFIABLE!
+	# Make sure to have made all mods, and checked your network before doing this
+		vi /etc/rc.conf
+			kern_securelevel_enable="YES"
+			kern_securelevel="3"
+
+		chflags -R schg /bin /boot /etc /lib /libexec /media /mnt /net /proc \
+					 /rescue /root /sbin /sys /usr /var /zroot
+
+		sysctl kern.securelevel="3"
+
+	# Gracefully exit nicvm SSH connection:
+		exit
+
+# Access the usbvm with any jail. [-i] option creates a network connection 
+	qb-usbvm -i dispjail
+	
+	# You can remove the password from usbvm. It's not security critical.
+		passwd root
+		{enter} {enter}
+
+	# Check that /etc/resolv.conf has an appropriate entry for pkg installation
+		cat /etc/resolv.conf
+	
+	# Check that you have a network connection
+		ping freebsd.org
+
+	# Normally usbvm is offline, but now you can install pkgs like these:
+		# Mount ext4 (linux) devices
+		pkg install fusefs-lkl
+		lklfuse -o type=ext4 /dev/da0 /mnt
+	
+		# Mount Android phone
+		pkg install fusefs-jmtpfs
+		jmtpfs -o allow_other /mnt
+
+	# Exit gracefully, and the internet connection will be severed automatically 
+		exit
+	
+	# Side Note: quBSD doesn't have usbvm automount or user configured
+		# Better security would configure a user with mount privileges
+		# It's on the todo list for future quBSD improvements
+
+# To copy files from dispjail into the usbvm, these are useful commands:
+	# In a host terminal, establish a connection between dispjail and usbvm
+	qb-usbvm dispjail
+
+	# In a *different* host terminal:
+	qb-cmd dispjail
+	scp -r /path/to/file/on/dispjail root@10.88.88.1:/dir/inside/usbvm
+		# usbvm operates on 10.88.88.1
+
+# You can also access the VMs directly on the terminal, in console mode, typically 
+# for troubleshooting. For example, if you need to drop securelevel in nicvm to 
+# edit files or update; do the following commands: 
+
+	# This will shut down nicvm, and re-launch in terminal
+		qb-nicvm -c     
+		Press 2 at boot splash screen
+	# To modify files, you will need to re-mount / as rw 
+		umount -Af
+		zfs unmount -a
+		mount -u -o rw /
+
+# Take a look at the other options for accessing usbvm:
+	qb-usbvm -h
+	
+
+###########################  VPN AND TUNNEL JAILS  ##############################
+
+# The wireguard config for net-vpn is stored at:
+	vi /zusr/net-vpn/rw/usr/local/etc/wireguard/wg0.conf
+
+# Default tunnel for all jails is net-firewall, which has no VPN. 
+# When you're vpn is configured, and tested, change your jails and host tunnels
+
+# qb-edit
+# All parameters except the devfs rulenumber can be changed with qb-edit 
+# qb-edit checks the format correctness of user input, but can be overridden.
+
+# Here we will change the tunnel for dispjail, to your vpn-jail
+	qb-edit dispjail tunnel net-vpn
+	# Notice the alert at the bottom. Jails depend on being included in their
+	# tunnel's pf.conf. You must restart the jails for settings to take effect.
+
+# And do the same for host
+	qb-edit host tunnel net-vpn
+
+# You probably need to update host resolv.conf with your VPN DNS
+	vi /etc/resolv.conf
+
+# You will also need to update dispjail resolv.conf. REMEMBER - dispjail has no
+# persistent files. You will need modify 0gui-template:
+	vi /zusr/0gui-template/rw/etc/resolv.conf
+
+# Now snapshot 0gui-template, so that your dispjail will use the most recent changes
+	qb-snap -n 0gui-template
+	# snapshot is only necessary when a jail provides clones to other jails
+
+# NOTE: net-jails are protected with schg flags, and seclvl 3. 
+# You can't edit pf or change network settings if the jail is on. 
+
+# Turn off the jail and edit from host:
+	qb-off net-vpn
+	vi /zusr/net-vpn/rw/pf.conf
+	jail -c net-vpn
+
+# Remember to set resolv.conf for host, 0gui-template, 0gui, and the VMs 
+
+
+############################  CREATING NEW JAILS  #############################
+
+# Alot can be learned about the options and functionality of quBSD jails, 
+# merely by working through the qb-create command. Starting with this:
+	qb-create -g <new_jailname>
+
+[-g] guided mode, takes you through a series of user inputs and prompts for 
+selecting all possible jail options, with explanations of what they are. It is
+recommended to go through this now, as much will make sense simply by creating
+a few jails with guided mode. 
+
+0gui-template
+	- dispjail inherets all /rw and /home files from /zusr/0gui-template/..
+	- My personal settings are saved to /home (falkon, .cshrc)
+	- ! Dont delete the line 'DISPLAY :0' in .cshrc, or else gui wont work 
+		- All else can be adjusted to user preference
+
+# Use 0gui-template this as a template for creating other gui-jails
+# You don't have to use guided, mode, you can create from comman line
+	qb-create -T 0gui-template -H -t net-vpn <new_gui_jail>
+	# [-H] copies the /home directory files to the new jail
+	# [-t] sets a tunnel for the new jail, and auto-assigns IP address.
+	
+# Finally, to destroy a jail; use the commands:
+	qb-edit <jailname> no_destroy false
+	qb-destroy <jailname>
+	# `no_destroy' is a protection mechanism associated with qb-edit. 
+
+
+#############################  ROOTJAIL HANDLING  ################################
+
+Remember rootjails are pristine. Their snapshot serves a fresh clone every time 
+an appjail is started/stopped. You must snapshot after changes, and restart jails.
+
+Here's an example of the process for installing new pkgs into: 0gui
+
+# Bring up hostnet
+	qb-hostnet -u
+
+# Start 0gui 
+	jail -c 0gui
+
+# chroot into jail and install pkgs
+	chroot /jails/0gui
+	pkg install <pkgs>
+	exit
+
+# Turn off 0gui
+	jail -r 0gui   
+	# You could also use:  qb-off 0gui  to do the same thing
+
+# Snapshot the new state of 0gui and restart any jails that use that rootjail
+	qb-snap -n 0gui
+
+# Restart any jails dependent on 0gui, to access new pkgs
+	qb-off -r <guijail1> <guijail2> ...
+
+# Remember to turn off host internet connection:
+	qb-hostnet -d
+
+# You could also use `pkg -j 0gui` on host, however, I prefer to be 
+# simulated inside the jail environment when installing pkgs.
+
+
+################################  MISCELLANEOUS ##################################
+
+Firefox
+	If you don't have sound, add this line to about:config
+		media.cubeb.backend = oss
+
+Obviously you can check qb-help for a list of everything, but there's a couple 
+gotchas worth covering ...
+
+qb-flags -d|-u
+	quBSD applies schg chflags at jail start. See:  qb-list -p schg
+	If you wish to edit files without restarting jail, use qb-flags from host
+	to drop flags, edit files, then bring up again.
+
+qb-connect <target_jail> <tunnel_jail>
+	Creates an an adhoc connection between two jails, and auto applies an IP
+	IP address. Useful for testing and troubleshooting. Remember that pf.conf 
+	might filter packets, and securelevel might prevent network changes. 
+
+qb-ivpn
+	I use IVPN, so this was a script I made for myself. Sorry if you don't, use
+	them, you'll have to settle with manually editing your wg0.conf
+
+qb-pefs
+	Pefs encrypted directories. Applies a bit of automation to the whole thing.	
+	Altho pefs is already pretty easy.  
+
+
+####################################  I3WM  ######################################
+
+/root/.config/i3/config
+	# quBSD install replaced your previous line for:  $mod+Return
+		$mod+Return exec qb-cmd -n
+		# It opens an xterm for the active window, whether jail or host
+
+	# quBSD added line for opening xterm on host, regardless of active window.
+		$mod+Shift+Return exec xterm
+	
+/root/.config/i3/config_qubsd
+	Recommend taking a look, and potentially merging with your config
+	There's some useful stuff like volume control and expanded workspaces
+
+/root/.config/i3/i3gen.conf
+/root/.config/i3/i3gen.sh
+
+	These are tools for creating a bindsym mode for each jail. The problem 
+	being solved, is that there's too many jail/command combos, for each combo 
+	to have its own key. You'll run out of keyboard space.
+
+	# Edit i3gen.conf with your jails and desired commands, then run i3gen.sh
+		vi /root/.config/i3/i3gen.conf
+		sh /root/.config/i3/i3gen.sh
+		# Your main config will have all specified jail/command pairs appended
+		# to the bottom of the config. 
+	
+	!! IMPORTANT !! Do not put any of your personal configs below these created
+	lines. Everything below these lines are deleted every time you run i3gen.sh
+
+
+###################################################################################
+
+Okay, thats about it. I apologize if the installer didn't work for you. 
+It was written on a fresh install with minimal pkgs on host. And probably needs 
+improvement to make it more robust.
+
+There is a full Manual_Install file, which details all of the steps required to
+configure a system this way. 
+
+Shoot questions/ideas to me over Github, or on the FreeBSD forums!
+
+

@@ -1,0 +1,226 @@
+#!/bin/sh
+
+while getopts cdhi o ; do
+	case $o in
+		c) console="true" ;;
+		d) disconnect="true" ;;
+		h) help="true" ;;
+		i) internet="true" ;;
+	esac
+done
+
+shift $(( OPTIND -1 ))
+
+jail="$1"
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
+
+define_variables() {
+	usbvmIP=$(egrep "^usbvm[[:blank:]]+IP0" $jmap | awk '{print $3}')
+	jailconnectIP="${usbvmIP%.*/*}.2/${usbvmIP#*.*.*.*/}"
+	tap=$(egrep "^usbvm[[:blank:]]+tunnel" $jmap | awk '{print $3}')
+	
+	jmapIPs=$(qb-list -p IP0 | awk '{print $3}')
+	usedIPs=$(qb-connect -l | awk '{print $3}')
+
+	# Determine if usbvm process is running
+	pgrep -f 'bhyve: usbvm' >> /dev/null 2>&1 && vm_on="true" 
+}
+
+define_messages() {
+	err1=$(printf "%b" "qb-usbvm: ERROR: Must specify an option, or a jail to connect") 
+	err2=$(printf "%b" "qb-usbvm: ERROR: $jail doesn't exist or isn't properly configured")
+	msg3=$(printf "%b" "qb-usbvm: ALERT: usbvm is running. To access via console mode," \
+				"\n(usually for troubleshooting), the script must first shutdown usbvm.")
+	msg4=$(printf "%b" "qb-usbvm: ALERT: Sending commands to usbvm. If it has a password, it" \
+				"\nmust be entered twice (first: run commands; second: ssh into terminal")
+	err5=$(printf "%b" "qb-usbvm: ERROR: Unable to find unused IPv4 address" \
+				"\nbetween 10.99.99.1  -  10.99.99.255")
+	msg6=$(printf "%b" "qb-usbvm: Shutting down usbvm. Wait for about 10 seconds")
+	msg7=$(printf "%b" "qb-usbvm: usbvm is shutdown, wait 10 more seconds for safety.") 
+	msg8=$(printf "%b" "qb-usbvm: Re-launching usbvm in console, mode, please wait ...") 
+}
+
+usage() {
+	[ "$ERR" ] && printf "%b" "\n$ERR\n"
+	echo ""
+	echo "qb-usbvm: Manages and automates usbvm functions and connectivity"
+	echo "If you just need to turn on/off usbvm, use service"
+	echo "Default behavior connects usbvm and <jail> via tap interface" 
+	echo ""
+	echo "Usage: qb-usbvm <jail>" 
+	echo "       qb-usbvm [-i] <jail>" 
+	echo "       qb-usbvm [-c|-d|-h]" 
+	echo ""
+	echo "   -c: (c)onsole:  Launch usbvm with stdio on terminal console"
+	echo "   -d: (d)isconnect:  Remove usbvm tap interface from all jails" 
+	echo "        Places tap interface on host, but DOWN"
+	echo "   -h: (h)elp:  Outputs this help message"
+	echo "   -i: (i)nternet:  Connect usbvm to internet, and connect <jail>"
+	echo "        to usbvm via ssh.  Used for updates and pkg downloads" 
+	echo ""
+	exit 1
+}
+
+checks() {
+	if [ "$help" ] ; then 
+		usage 
+
+	elif [ -z "$jail" -a "$OPTIND" = "1" ] ; then
+		ERR="$err1" ; usage
+
+	elif [ -n "$jail" ] && ! `qb-list -qj $jail` ; then
+		ERR="$err2" ; usage
+
+	elif [ "$console" -a "$vm_on" ] ; then
+		printf "%b" "\n$msg3\n" 
+		restart="true"
+	fi
+}
+
+find_IP() {
+	cycle=1
+	while [ "$cycle" -lt 255 ] ; do
+		openip="10.99.99.$cycle"
+
+		# If the IP on this cycle is not found anywhere, then it can be used
+		if ! `printf "%b" "${usedIPs}\n${jmapIPs}" | grep -qs "$openip"` ; then
+			IP0=${IP0:-"${openip}/24"}
+			break
+		else
+			cycle=$(( cycle + 1 ))
+			if [ $cycle -gt 254 ] ; then
+				ERR="$err9" ; usage
+			fi
+		fi
+	done
+}
+
+poweron_console_mode() {
+	bhyveload -c stdio -m 1G -d /dev/zvol/zroot/usbvm -S usbvm 
+	
+	bhyve -c 1 -m 1G -H -A -P -S \
+		-s 0:0,hostbridge \
+		-s 1:0,lpc \
+		-s 2:0,virtio-net,"$tap" \
+		-s 3:0,virtio-blk,/dev/zvol/zroot/usbvm \
+		-s 4:0,passthru,71/0/1 \
+		-s 5:0,passthru,71/0/3 \
+		-l com1,stdio \
+		usbvm 
+}	
+
+configure_networking() {
+	# tap goes to net-tap, for simultaneous access between: jail/usbvm and usbvm/internet  
+	ifconfig $tap vnet net-tap
+	jexec -l -U root net-tap ifconfig bridge0 addm $tap 
+	jexec -l -U root net-tap ifconfig $tap up 
+
+	# Configure epair for jail ssh into usbvm
+	epair=$(ifconfig epair create)
+	ifconfig ${epair%?}a vnet net-tap
+	ifconfig ${epair%?}b vnet $jail
+
+	# Ensure that epairs are destroyed regardless of exit status 
+	trap 'ifconfig ${epair%?}b -vnet $jail ; ifconfig ${epair%?}b destroy' SIGINT SIGTERM EXIT
+
+	jexec -l -U root net-tap ifconfig bridge0 addm ${epair%?}a
+	jexec -l -U root net-tap ifconfig ${epair%?}a up
+	jexec -l -U root $jail ifconfig ${epair%?}b inet "$jailconnectIP" up
+
+	# Make sure ssh keys are inside the target jail
+	if ! [ -e "/zusr/${jail}/rw/root/.ssh/usbvm" ] ; then
+		cp -a /zusr/0gui-template/rw/root/.ssh  /jails/${jail}/root/
+	fi
+
+}
+
+remove_tap() {
+	# onjails must be determined immediately prior, or it will have incorrect state
+	onjails=$(jls | awk '{print $2}' | tail -n +2)
+	for o in $onjails ; do
+		if `jexec -l -U root $o ifconfig -l | egrep -qs "$tap"` ; then  
+			ifconfig $tap -vnet $o
+			ifconfig $tap down	
+		fi
+	done
+}
+
+main() {
+	# Remove any prior tap settings to start from known state
+	remove_tap
+	trap 'remove_tap' SIGINT SIGTERM EXIT
+
+	[ "$disconnect" ] && exit 0
+
+	if [ "$restart" ] ; then
+		# Configue tap for ping test
+		ifconfig $tap inet "$jailconnectIP" up
+		service usbvm stop
+		printf "%b" "\n$msg6\n"
+
+		# Use ping-test to determine when usbvm is shutdown
+		count=1
+		while : ; do
+			ping -o -t 1 "${usbvmIP%/*}" >> /dev/null 2>&1
+			
+			# This is because I don't know any way to test for when the usbvm *ACTUALLY*
+			# Shuts down, so the user is provided with some info while waiting an extra
+			# 10 seconds. Otherwise, had errors trying to start usbvm console too soon
+			if [ "$?" != "0" ] ; then 
+				printf "%b" "\n$msg7\n"
+				next=$(( count + 10 ))
+				while [ $count -lt $next ] ; do 	
+					printf "%b" "$count .. "
+					sleep 1
+					count=$(( count + 1 ))
+				done
+				break
+			fi
+
+			printf "%b" "$count .. "
+			sleep 1
+			count=$(( count + 1 ))
+		done
+
+		printf "%b" "\n$msg8\n"
+	fi
+
+	if [ "$console" ] ; then
+		printf "%b" "\n$msg8\n"
+		poweron_console_mode
+		exit 0
+
+	elif [ -n "$jail" ] ; then
+		# Make sure that jail is on
+		`jls | grep -qs " $jail "` || jail -c $jail 
+		
+		# Internet connection calls for handling tap/epairs differently 
+		if [ "$internet" ] ; then
+			find_IP
+			configure_networking
+			
+			# Need to configure networking. This prevents entering password twice 
+			jexec -l -U root $jail ssh -t -i /root/.ssh/usbvm root@${usbvmIP%/*} \
+							"echo '' \
+							; echo 'Type:  exit to leave usbvm and return to host' \
+							; echo '' \
+							; ifconfig vtnet0 alias $IP0 up \
+							; route add default 10.99.99.1 \
+							; /bin/csh -i \
+							; ifconfig vtnet0 inet $IP0 -alias"
+		else 
+			ifconfig $tap vnet $jail
+			jexec -l -U root $jail ifconfig $tap inet "$jailconnectIP" up
+			jexec -l -U root $jail ssh -i /root/.ssh/usbvm root@${usbvmIP%/*}
+		fi
+	fi
+}
+
+define_variables
+define_messages
+checks
+main
+
+
+

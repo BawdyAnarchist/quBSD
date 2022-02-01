@@ -1,0 +1,55 @@
+
+                       An outline of quBSD future development 
+
+
+MAJOR UPGRADES
+
+	Host as Unprivileged user
+		- All jails will have an epair to an offline *Control Jail*
+		- Unprivileged user on host will pass jails SSH commands via Control Jail
+		- Control jail pf will block all, except port 22 between host and jails
+
+	ZFS Encrypted Jails
+
+	Tor and I2P Jails
+
+	USBVM
+		- Make the usbvm disposable/ephemeral, as a malware countermeasure 
+		- Auto-install various useful mounting stuff for common devices
+		- Create a proper unprivileged user with devd.conf and automounts
+		- Auto remove password from usbvm
+
+
+BEST PRACTICES / CLEANUP
+
+	Make it so that zusr isn't required to be a separate zpool dataset
+
+	PCI Passthrough  
+		- Bus addresses should be a config spec, not handjammed into the scripts
+	
+	Maybe MTU should be available as a config option
+		- Perhaps a general expansion with a quBSD.conf for other options. 
+	
+	qb-usbvm
+		When xterm is closed with ssh connection, the tap1 connect between jail 
+		and usbvm should be severed. Need a "trap" command
+
+
+MINOR UPGRADES
+
+	qb-mvpn
+		- Mullvad VPN: Query and parse mullvad server json; apply to VPN
+
+	qb-cam/mic
+		- webcam and mic get brought up with script
+
+	qb-update
+		- Update rootjails, create snapshots 
+
+	Config file that maps workspaces to GUI apps; script to launch apps startx
+
+	Crons
+		- Popup warning if zpool errors are discovered
+		- Popup warning if host has been network connected for too long
+
+

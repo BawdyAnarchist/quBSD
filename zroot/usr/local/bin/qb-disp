@@ -1,0 +1,69 @@
+#!/bin/sh
+
+while getopts h o ; do
+	case $o in
+		h) help="true" ;;
+	esac
+done
+
+shift $(( OPTIND - 1 ))
+
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+jail="$1"
+newjail="DISP-${jail}"
+datetime=$(date +%b%d_%H%M)
+newsnap="zusr/${jail}@${datetime}"
+
+usage() {
+	echo "qb-disp: Creates a disposable jail, using <jail> as a template,"
+	echo "and then launches a floating terminal from inside that jail"
+	echo "The disposable jail is destroyed when the terminal is closed"
+	echo ""
+	echo "Use this for opening questionable files or conducting risky operations"
+	echo ""
+	echo "Usage: qb-disp [-h][-i <ip_addr>] -r <existing_jail> <run_cmd>"
+	echo "Usage: qb-disp -p" 
+	echo "         -h: outputs this usage message"
+	exit 1
+}
+
+checks() {
+	if [ "$help" ] ; then 
+		usage
+
+	elif [ -z "$jail" ] ; then 
+		echo "qb-disp: Error: Must specify a <jail> to clone for dispjail"
+		usage 
+
+	elif ! `qb-list -qj "$jail"` ; then
+		printf "%b" "qb-disp: Error: clone for dispjail $jail" \
+				"is not properly configured or does not exist"
+		usage
+	fi
+}
+
+main() {
+	# Will need a snapshot for the dispjail. Trap to destroy it later
+	zfs snapshot $newsnap
+		trap 'zfs destroy -rRf $newsnap' SIGINT SIGTERM SIGHUP SIGKILL SIGQUIT EXIT
+
+	# Create dispjail and edit no_destroy flag
+	qb-create -c dispjail -t none -i none -T $jail $newjail 
+		trap	'destroy_dispjail' SIGINT SIGTERM SIGHUP SIGKILL SIGQUIT EXIT
+
+	# Launch a floating terminal for the dispjail
+	xterm -e csh -c "i3-msg -q floating enable, move position center; qb-cmd $newjail"
+}
+
+destroy_dispjail() {
+	jail -R $newjail
+
+	zfs destroy -rRf zroot/jails/$newjail
+	zfs destroy -rRf zusr/$newjail
+	sed -i '' -E "/^${newjail}[[:blank:]]/d" $jmap
+	sed -i '' -E "/^${newjail}(\{|[[:blank:]])/,/^}/d" /etc/jail.conf 
+}
+
+checks
+main
+

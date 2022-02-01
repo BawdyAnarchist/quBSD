@@ -1,0 +1,15 @@
+# Device		     	Mountpoint					FStype	Options	Dump	Pass#
+
+/zusr/0gui-template/rw/     	/jails/0gui-template/rw/			nullfs	rw	0	0	
+/zusr/0gui-template/home/ 	/jails/0gui-template/usr/home/			nullfs 	rw	0	0
+/tmp/.X11-unix	   		/jails/0gui-template/tmp/.X11-unix		nullfs	rw	0	0
+
+# MOUNTS FOR LINUX JAILS. LIMITED SUCCESS WITH USING LINUX COMPAT INSIDE OF JAIL 
+# /zusr/linuxjail/home/     /jails/linuxjail/compat/ubuntu/home      		nullfs  rw 				0       0
+# /tmp/.X11-unix             /jails/linuxjail/compat/ubuntu/tmp/.X11-unix     	nullfs  rw      			0       0
+# devfs                      /jails/linuxjail/compat/ubuntu/dev       		devfs   rw,late 			0       0
+# tmpfs                      /jails/linuxjail/compat/ubuntu/dev/shm   		tmpfs   rw,late,size=1g,mode=1777       0       0
+# fdescfs                    /jails/linuxjail/compat/ubuntu/dev/fd    		fdescfs rw,late,linrdlink       	0       0
+# linprocfs                  /jails/linuxjail/compat/ubuntu/proc      		linprocfs    rw,late 			0       0
+# linsysfs                   /jails/linuxjail/compat/ubuntu/sys       		linsysfs     rw,late 			0       0
+# /tmp                       /jails/linuxjail/compat/ubuntu/tmp       		nullfs  rw,late 			0       0

@@ -1,0 +1,98 @@
+#!/bin/sh
+
+while getopts chd:u o ; do
+	case $o in
+		c) create="true" ;;
+		h) help="true" ;;
+		d) directory="$OPTARG" ;;
+		u) unmount="true" ;;
+	esac
+done
+
+shift $(( OPTIND - 1 ))
+jail="$1"
+
+define_variables() {
+	directory="${directory:-$2}" 
+	directory="${directory:-/zusr/${jail}/home/${jail}/crypt}"
+	cryptmount=$(mount | egrep -o "/jails/${jail}/usr/home/${jail}/[[:alnum:]]*")
+}
+
+define_messages() {
+	err1=$(printf "%b" "qb-pefs: ERROR: You must enter a jailname")
+	err2=$(printf "%b" "qb-pefs: ERROR: $j is an invalid jailname or has incomplete jail setup")
+	err3=$(printf "%b" "qb-pefs ERROR: $directory not a valid" \
+					"\ndirectory, and user has not specified the [-c] option to create it")
+	err5=$(printf "%b" "qb-pefs ERROR: Failed to load pefs.ko kernel module." \
+					"Make sure that pefs-kmod pkg in installed to host")
+	msg6=$(printf "%b" "Jail must be on, starting: $jail")
+	err7=$(printf "%b" "Start jail: $jail , failed, exiting") 
+	msg8=$(printf "%b" "Decrypting container, enter passphrase one more time:")
+}
+
+usage() {
+	[ "$ERR" ] && printf "%b" "\n$ERR\n"
+	echo ""
+	echo "qb-pefs: Mounts an encrypted pefs volume inside of a running jail" 
+	echo "         Default directory is /zusr/<jail>/home/<jail>/crypt"
+	echo ""
+	echo "Usage: qb-pefs <jailname>"
+	echo "Usage: qb-pefs [-h] [-d <directory>] <jailname>"
+	echo "   -c: (c)reate:  Create and configure new pefs directory" 
+	echo "   -d: (d)irectory:  Override default, and mount specified directory" 
+	echo "        <directory> must be entered based on location of HOST "
+	echo "   -h: (h)elp:  Outputs this help message"
+	echo "   -u: (u)nmount:  Removes pefs mount from jail, encrypts files" 
+	echo ""
+	exit 1
+}
+
+checks() {
+	if [ "$help" ] ; then
+		usage
+
+	elif [ -z "$jail" ] ; then
+		ERR="$err1" ; usage
+
+	elif ! `qb-list -qj "$jail"` ; then
+		ERR="$err2" ; usage
+
+	elif ! [ -d "$directory" -o -n "$create" ] ; then
+		ERR="$err3" ; usage
+
+	elif ! `kldstat | grep -qs "pefs.ko"` ; then
+		kldload pefs.ko >> /dev/null 2>&1
+		if [ "$?" != "0" ] ; then
+			ERR="$err5" ; usage
+		fi
+	fi
+}
+
+main() {
+	if [ "$unmount" ] ; then
+		[ -n "$cryptmount" ] && echo "$cryptmount" | xargs umount -f > /dev/null
+		exit 0
+
+	elif ! `jls | grep -qs " $jail "` ; then
+		printf "%b" "\n$msg6\n"
+		jail -c $jail >> /dev/null 2>&1
+		[ "$?" != "0" ] && ERR="$err7" && usage
+	fi
+	
+	if [ "$create" ] ; then
+		mkdir -p $directory
+		chown 1001:1001 $directory
+		pefs addchain -fZ $directory
+	fi
+
+	pefs mount $directory /jails/${jail}/usr/home/${jail}/crypt 
+	[ "$create" ] && printf "%b" "\n$msg8\n"
+	pefs addkey -c /jails/${jail}/usr/home/${jail}/crypt 
+}
+
+define_variables
+define_messages
+checks
+main
+
+

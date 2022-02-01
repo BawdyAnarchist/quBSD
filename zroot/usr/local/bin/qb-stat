@@ -1,0 +1,143 @@
+#!/bin/sh
+
+# Realtime 1-sec updates on the status of all containers
+
+while getopts c:h o ; do
+	case $o in
+		c) col="$OPTARG" ;;
+		h) help="true" ;;
+	esac
+done
+
+shift $(( OPTIND - 1 ))
+
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+tmp="/tmp/qb-stat.txt"
+tmp2="/tmp/qb-stat2.txt"
+col="${col:=5,5}"
+
+trap "{ rm $tmp > /dev/null 2>&1 ; rm $tmp2 > /dev/null 2>&1 ; exit 0 ; }" SIGINT SIGTERM EXIT
+
+usage() {
+	echo ""
+	echo "qb-stat: Lists status of all jails"
+	echo "Usage: qb-stat [-c <column>] [-h]"
+	echo "   -c: (c)olumn to column to sort by"
+	echo "   -h: (h)elp:  Outputs this help message"
+	echo ""
+	exit 1
+}
+
+checks() {
+	[ "$help" ] && usage
+}
+
+assemble_header() {
+	[ -e "$tmp" ] && rm $tmp 
+	[ -e "$tmp2" ] && rm $tmp2
+	mktemp $tmp > /dev/null
+	mktemp $tmp2 > /dev/null
+	printf "%b" "CONTAINER\tJID\tCLASS\tTUNNEL\tT\tDISK\t%RAM\t%CPU\n" >> $tmp
+}
+
+define_variables() {
+	#Jails data
+	jails=$(egrep "[^[:blank:]]+[[:blank:]]+class[[:blank:]]+" $jmap | awk '{print $1}') 
+	zfs_list=$(zfs list -ro name,used)
+
+	# Active window info
+	id=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
+	active=$(xprop -id $id | grep "WM_CLIENT_MACHINE" | sed "s/WM_CLIENT_MACHINE(STRING) = \"//")
+	active="${active%\"}"
+
+	# Input devices status
+	cam=$(service webcamd onestatus | grep -o "webcamd is running")
+	mic=$(service virtual_oss onestatus | grep -o "virtual_oss is running")
+
+	# Host connected
+	interfaces=$(ifconfig -l | sed "s/lo0//")
+	for i in $interfaces ; do
+		ifconfig $i inet | egrep -qs "^[[:blank:]]*inet"
+		[ "$?" = "0" ] && hostnet="true" || hostnet=""
+	done
+}
+
+get_jails_loop() {
+	for j in $jails ; do
+		class=$(sed -nE "s/^${j}[[:blank:]]+class[[:blank:]]+//p" $jmap)
+		class="${class%jail}"
+		tunnel=$(sed -nE "s/^${j}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
+		tunnel="${tunnel:--}"
+		disk="-"
+		jid="-"
+		cpu="-"
+		ram="-"
+		
+		if `jls | grep -qs " $j "` ; then
+			jid=$(jls -j $j -n jid | sed "s/jid=//") 
+			cpu=$(ps au -J $j | awk '{sum+=$3;} END {print sum;}')
+			ram=$(ps au -J $j | awk '{sum+=$4;} END {print sum;}')
+		fi	
+
+		if [ "$class" = "root" -o -z "${j##0*template}" ] ; then 
+			disk=$(echo "$zfs_list" | sed -nE "s#^zroot/jails/${j}[[:blank:]]+##p")
+			sub=4
+
+		elif [ "$class" = "VM" ] ; then 
+			# Future functionality - bhyvectl or ping test for on/connected
+			disk=$(echo "$zfs_list" | sed -nE "s#^zroot/${j}[[:blank:]]+##p")
+			sub=5
+		else 
+			disk=$(echo "$zfs_list" | sed -nE "s#^zusr/${j}[[:blank:]]+##p")
+
+			if [ -z "${j##net*}" ] ; then sub="3"
+			elif [ -z "${j##node*}" ] ; then sub="2"
+			elif [ -z "${j##host*}" ] ; then sub="0" 
+			else sub="1"
+			fi
+		fi
+
+		tunnel="${tunnel:--}"
+		disk="${disk:--}"
+		jid="${jid:--}"
+		cpu="${cpu:--}"
+
+		printf "%b" "$j\t" "$jid\t" "$class\t" "$tunnel\t$sub\t" "$disk\t" "$ram\t" "$cpu\n" >> $tmp
+	done
+}
+
+print_alerts() {
+	echo "----------------  active window:  $active   -------------------"
+
+	if [ "$cam" -o "$mic" -o "$hostnet" ] ; then
+		echo -e "###############################################################"
+		[ "$cam" ] \
+		&& echo "##          W E B C A M   D A E M O N   I S   O N  !!        ##"  
+		[ "$mic" ] \
+		&& echo "##      M I C R O P H O N E   D A E M O N  I S  O N  !!      ##"
+		[ "$hostnet" ] \
+		&& echo "##     H O S T  I S  N E T W O R K  C O N N E C T E D !!     ##" 
+		echo -e "###############################################################"
+	fi
+
+}
+
+main() {
+	while : ; do 
+		assemble_header
+		define_variables
+		get_jails_loop
+		(head -n 1 $tmp && tail -n +2 $tmp | sort -k $col) >> $tmp2
+		clear
+		cat $tmp2 | column -t
+		print_alerts
+		sleep 1
+	done
+}
+
+
+checks
+define_variables
+main
+
+

@@ -1,0 +1,183 @@
+#!/bin/sh
+
+#  Virtual interfaces, pf, and resource control are best done before starting services 
+
+jail="$1"
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $jmap
+jpf="/zusr/$jail/rw/etc/pf.conf"
+wgconf="/zusr/$jail/rw/usr/local/etc/wireguard/wg0.conf"
+class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
+rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap)
+jIP=$(sed -nE "s/^${jail}[[:blank:]]+IP0[[:blank:]]+//p" $jmap)
+IP0="$jIP"
+tunnel=$(sed -nE "s/^${jail}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
+tunoftunnel=$(sed -nE "s/^${tunnel}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
+connects=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${jail}//p" $jmap)
+maxmem=$(sed -nE "s/^${jail}[[:blank:]]+maxmem[[:blank:]]+//p" $jmap) 
+cpuset=$(sed -nE "s/^${jail}[[:blank:]]+cpuset[[:blank:]]+//p" $jmap) 
+
+if [ -e "$wgconf" ] ; then
+	wgIP=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*//p" $wgconf | \
+						sed -n "s/:[[:digit:]]*.*//p")
+	wgPort=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*.*://p" $wgconf) 
+fi
+mtu="1400"
+
+usage() {
+	printf "%b" "\n$err\n\n"
+	exit 1
+}
+
+checks() {
+	if [ -z "$jail" ] ; then
+		err="Error: exec.poststart:  Must select a jail"
+		usage
+	elif [ -z "$jmap" ] ; then
+		err="Error: exec.poststart:  No file selected for jailmap.conf"
+		usage
+	elif [ -z "$class" ] ; then
+		err="Error: exec.poststart: $jail has no class designated in jailmap.conf"
+		usage
+	elif [ -z "$rootjail" ] ; then
+		err="Error: exec.poststart: $jail has no rootjail designated in jailmap.conf" 
+	 	usage
+	elif [ -z "$tunnel" ] ; then
+		err="Error: exec.poststart: $jail has no tunnel desingated in jailmap.conf"
+		usage
+	elif [ -z "$jIP" ] ; then
+		err="Error: exec.poststart: $jail has no IP0 setting jailmap.conf"
+		usage
+	elif [ -z "$validIPv4" -a "$jIP" != "none" ] ; then
+		err="Error: exec.poststart: $jail IP0 must be \`none' or valid CIDR IPv4"
+		usage
+	fi
+}
+
+check_IPv4() {
+     # Perhpas not as technically correct as doing a regex,
+     # but it's readable, and the a/b pairs are usable elsewhere
+     # IPv4 cidr:  a0.a1.a2.a3/a4
+
+	validIPv4=""
+
+     a0=${IP0%%.*.*.*/*}
+     a4=${IP0##*.*.*.*/}
+          b1=${IP0#*.*}
+          a1=${b1%%.*.*/*}
+               b2=${IP0#*.*.*}
+               a2=${b2%%.*/*}
+                    b3=${IP0%/*}
+                    a3=${b3##*.*.*.}
+
+     if    [ "$a0" -ge 0 -a "$a0" -le 255 -a "$a1" -ge 0 -a "$a1" -le 255 \
+          -a "$a2" -ge 0 -a "$a2" -le 255 -a "$a3" -ge 0 -a "$a3" -le 255 \
+          -a "$a4" -ge 0 -a "$a4" -le 31 ] >> /dev/null 2>&1
+     then
+          echo "$IP0" | egrep -qs "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+"
+          [ "$?" = "0" ] && validIPv4="true"
+     fi
+}
+
+configure_tap() {
+	ifconfig $tunnel vnet $jail
+	jexec -l -U root $jail ifconfig bridge0 create up 
+	jexec -l -U root $jail ifconfig bridge0 addm $tunnel
+	jexec -l -U root $jail ifconfig $tunnel up
+}
+
+upstream_tunnel() {
+	epair=$(ifconfig epair create)
+	ifconfig "${epair%?}a" vnet $tunnel
+	ifconfig "${epair%?}b" vnet $jail
+
+	# If tunnel contains a tap interface, connect epair to bridge, no IP
+	if [ -z "${tunoftunnel##tap*}" ] ; then 
+		jexec -l -U root $tunnel ifconfig bridge0 addm "${epair%?}a"
+		jexec -l -U root $tunnel ifconfig "${epair%?}a" mtu $mtu up
+	else
+		jexec -l -U root $tunnel ifconfig "${epair%?}a" inet "${jIP%.*/*}.1/${jIP#*/}" mtu $mtu up 
+	fi
+
+	# If NAT occurs without a VPN tunnel (wg0); then modify the epair 
+	if `egrep -qs "^jepair = " $jpf` ; then
+		sed -i '' -e "s/^jepair =.*/jepair = \"${epair%?}b\"/" $jpf 
+	fi
+
+	# MTU HACK: The mtu specification at the end will be unnecessary for most people
+	jexec -l -U root $jail ifconfig "${epair%?}b" inet $jIP mtu $mtu up 
+	jexec -l -U root $jail route add default "${jIP%.*/*}.1" 
+}
+
+client_connections() {
+     # Connect downstream client jails. net-tap serves VPN jails. VPN jails serve other appjails
+	epair=$(ifconfig epair create)
+	ifconfig "${epair%?}a" vnet $jail
+	ifconfig "${epair%?}b" vnet $c
+	jexec -l -U root $c ifconfig "${epair%?}b" inet $cIP mtu $mtu up
+
+     # net-tap has a bridge
+	if [ -z "${tunnel##tap*}" ] ; then	  
+		jexec -l -U root $jail ifconfig bridge0 addm "${epair%?}a"
+		jexec -l -U root $jail ifconfig "${epair%?}a" up
+		jexec -l -U root $c route add default "${cIP%.*/*}.1"
+		jexec -l -U root $c wg-quick down wg0 
+		jexec -l -U root $c wg-quick up wg0 
+	else
+		jexec -l -U root $jail ifconfig "${epair%?}a" inet "${cIP%.*/*}.1/${cIP#*/}" mtu $mtu up
+		jexec -l -U root $c route add default "${cIP%.*/*}.1"
+	fi
+}
+
+configure_epairs() {
+	# Jails with a tap interface specified in jailmap.conf receive their respective taps 
+	if [ -z "${tunnel#tap?}" ] ; then
+		configure_tap 	
+	fi
+
+	# Connects jail to its upstream tunnel specified in jailmap.conf
+	if [ "$jIP" != "none" ] && `jls | grep -qs "$tunnel"` ; then
+		upstream_tunnel	
+	fi
+
+	# Cycle through downstream clients, check IPs, bring up epairs for running jails
+	for c in $connects ; do 
+		cIP=$(sed -nE "s/^${c}[[:blank:]]+IP0[[:blank:]]+//p" $jmap) 
+		IP0="$cIP"
+		check_IPv4
+
+		if [ -n "$c" -a "$validIPv4" ] ; then
+			nat_table="${cIP} ${nat_table}"
+
+			if `jls | grep -qs " $c "` ; then
+				client_connections
+			fi
+		fi
+	done
+}
+
+pf_modify() {
+	if [ -e "$jpf" ] ; then
+		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"$jIP\"@" $jpf
+		sed -i '' -e "s@^routerIP[[:blank:]]*=.*@routerIP = \"${jIP%.*/*}.1\"@" $jpf
+		sed -i '' -e "s@^wgIP[[:blank:]]*=.*@wgIP = \"$wgIP\"@" $jpf
+		sed -i '' -e "s@^wgPort[[:blank:]]*=.*@wgPort = \"$wgPort\"@" $jpf
+		sed -i '' -e "s@^table <pass_ips>.*@table <pass_ips> { $nat_table}@" "$jpf"
+	fi
+}
+
+resource_ctl() {
+        rctl -r jail:${jail}:: > /dev/null 2>&1
+        [ -n "$maxmem" -a "$maxmem" != "none" ] && rctl -a jail:${jail}:memoryuse:deny=${maxmem}
+        [ -z "$cpuset" -o "$cpuset" = "none" ] && cpuset -j $jail -cl 1-47 || cpuset -j $jail -cl $cpuset
+}
+
+
+check_IPv4
+checks 
+configure_epairs
+pf_modify			
+resource_ctl			
+
+
+

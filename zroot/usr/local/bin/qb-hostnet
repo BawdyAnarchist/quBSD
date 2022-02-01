@@ -1,0 +1,70 @@
+#!/bin/sh
+
+while getopts dhu o ; do
+	case $o in
+		d) down="true" ;;
+		h) help="true" ;;
+		u) up="true" ;;
+	esac
+done
+
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//' $jmap   #removes blanks at end of lines
+jIP=$(sed -n "s/^host[[:blank:]]*IP0[[:blank:]]*//p" $jmap)
+tunnel=$(sed -nE "s/^host[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
+
+# NOTE - This is a hack for IVPN. Most people will not need this
+mtu="1400"
+
+usage() {
+	[ -n "$ERR" ] && echo "$ERR"
+	echo ""
+	echo "qb-hostnet: Connect host to tunnel, as specified in jailmap"
+	echo "Usage: hostnet [-h] [-d|-u]"
+	echo "   -h: (h)elp: Outputs this help message"
+	echo "   -d: (d)own: Removes host connectivity, pf blocks all traffic"	
+	echo "   -u: (u)p: Creates epair interface to connect host to tunnel"
+	echo ""
+	exit 1
+}
+
+checks() {
+	if [ "$help" ] ; then
+		usage
+	elif [ $OPTIND = 1 ] ; then
+		ERR="hostnet: Error: must provide an option" 
+		usage
+	elif [ "$up" -a "$down" ] ; then
+		ERR="hostnet: Error: conflicting options, cannot use both [-d] and [-u]"
+		usage
+	fi
+}
+
+hostnet_down() {
+	ifconfig -l | grep -o "epair[[:digit:]]*[a,b]" | xargs -I@ ifconfig @ destroy
+	pfctl -f /etc/pf.conf	
+}
+
+hostnet_up () {
+	! `jls | grep -qs " $tunnel "` && jail -c $tunnel 
+	epair=$(ifconfig epair create)
+
+	ifconfig "${epair%?}a" vnet $tunnel
+	jexec -l $tunnel ifconfig "${epair%?}a" inet ${jIP%.*/*}.1/${jIP#*/} mtu $mtu up
+
+	ifconfig "${epair%?}b" inet $jIP mtu $mtu up
+	route add default "${jIP%.*/*}.1"
+
+	# It seemed that simply loading a fully separate pf.conf was better than sed
+	pfctl -f /etc/pf_pass.conf
+}
+
+
+checks 
+hostnet_down 
+if [ "$up" ] ; then
+	hostnet_up
+fi
+
+
+

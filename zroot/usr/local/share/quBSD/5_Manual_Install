@@ -1,0 +1,446 @@
+In case you have problems with the installer (likely due to already having a custom system), this manual documents the steps you need to accomplish to get your system set up in a similar way.
+
+
+#########################  REFERENCE STUFF INCLUDED FOR CONVENIENCE  ########################
+
+  # Download the boot iso.
+    fetch http://ftp4.freebsd.org/pub/FreeBSD/releases/ISO-IMAGES/13.0/FreeBSD-13.0-RELEASE-amd64-mini.memstick.img
+
+  # GPG PubKey for FreeBSD binaries (altho it's expired, a bit odd)
+    pub   rsa2048 2010-08-03 [SC] [expired: 2019-11-01]
+        78B3 42BA 26C7 B2AC 681E  A7BE 524F 0C37 A0B9 46A3
+    uid           [ expired] Glen Barber <gjb@FreeBSD.org>
+
+  # Drop onto a USB stick
+    dd if=/path/to/FreeBSD-13.0-RELEASE-amd64-mini.memstick.img of=/dev/daX bs=1m conv=sync status=progress
+
+  # Remember that from the console, you can change your TTYVs for multiple screens:
+        Either F1-F10 keys, or alt+FX, or ctrl+alt+FX
+
+
+
+#####################################  PREINSTALL CHECKS  ###################################
+
+  # Read the PRE-INSTALL doc in this directory. The quBSD scripts all work from specific  
+  # directories and zfs datasets. You will have errors if they're not set like this: 
+  	zfs dataset:  zroot/jails mounted at /jails
+	zfs dataset:  zusr mounted at zusr
+
+  # The zusr dataset should be a fully separate zpool, as quBSD scripts will error otherwise 
+  # Future functionality will allow for a zroot/zusr dataset under zpool
+	you can export an existing zpool and re-import it under the zusr name.
+    	zpool export <old_poolname>
+	zpool import -f <old_poolname> zusr  # Might need the -f option if it wasn't exported 
+
+
+
+####################################  HOST CONFIGURATION  ###################################
+
+  # The script doesn't do this, but you should obviously have an updated system with all pkgs 
+
+    	freebsd-update fetch install
+	pkg update
+	pkg install doas xorg dbus nvidia-driver nvidia-settings vim i3 i3status i3lock \
+		pefs-kmod virtual_oss webcamd 
+
+  # Files that probably have personal settings to merge quBSD (with some settings examples)
+  	/boot/loader.conf
+		autboot_delay
+		snd_hda_load
+	/etc/resolv.conf  
+		VPN or your personal reseolver	
+		On host, 0gui-template, 0gui, 0net, inside nicvm/usbvm
+	/etc/sysctl.conf
+		hw.snd.default_unit
+	/root/
+		.Xresources
+		.cshrc - remember to keep DISPLAY :0
+		.vimrc
+		.config/i3/config - remember to use i3gen for your new jails as you create them
+	/usr/local/etc/X11
+		../xorg.conf.d/xorg.conf - you might have some hints
+		../xinit/xinitrc
+			Remember to keep the line  xhost + local:
+			exec i3 (or your wm)
+
+
+######################################  COPY QUBSD FILES  #####################################
+
+  # Make sure you have a copy of the FreeBSD ISO on host, you'll need it for the VMs
+    	fetch -o /usr/local/share https://download.freebsd.org/ftp/releases/amd64/amd64/ISO-IMAGES/13.0/FreeBSD-13.0-RELEASE-amd64-bootonly.iso
+
+  # /zusr/quBSD/zroot
+    	The files under zroot mostly map to their corresponding locations on root `/'
+		The only exeptions that don't map apples/apples, are the nicvm and usbvm
+		directories. The files here will later be SSH pushed to VMs during setup 	
+
+  # /zusr/quBSD/zusr/
+	Create a corresponding zfs dataset under zusr for each directory, then copy -a
+
+
+#####################################  MODIFY QUBSD FILES  ####################################
+
+  # MERGE and/or edits will be required for quite a few different files
+
+	/root/.config/i3  - I recommend trying my i3 setup. Extra workspaces, convenient 
+		quick keys, and auto-generation script to handle all the extra jails 
+
+	/etc/rc.conf  ;  /etc/sysctl.conf  ;  loader.conf  
+		These are definitely just addons and NOT complete default templates
+
+	/etc/devfs.rules
+		Addon rulesets necessary for the jails. The installer script resolves the
+		numbering between here and jail.conf; but you'll need to do it manually
+
+		See the difference at the bottom for nvidia cards vs others
+
+	/etc/jail.conf
+		If you already have jails, you'll want to merge them into this file.
+		DO NOT COMMENTED LINE AT THE BOTTOM:  #Disp Jails 
+
+	/usr/local/etc/X11/xinit/xinitrc
+		For GUI jails to work, you must have the line   xhost + local:
+		
+		If you're running i3; you need this line:  exec i3
+
+
+#################################  CONFIGURE PCI PASSTHROUGH  #################################
+
+  # We isolate the NIC because it's inhrently untrusted, and can be subject to DMA attack
+  # USB devices are also untrusted, and are isolated to a VM, SSH to transfer files
+
+  # Figure out which PCI device corresponds to your network card
+    	ifconfig 
+	pciconf -lv | grep "= network"
+		example:  igb0@pci0:68:0:0
+
+  # USB Slots - Unfortunately there's no easy way to know which physical ports correspond
+  # with which number designations. Likely the higher numbered xhci are the ones on the top
+  # and/or front of your case. 
+		example:  xhci5@pci0:71:0:1	
+	
+  # Add them to /boot/loader.conf . The formatting changes, so be careful. Example:
+    	pptdevs="68/0/0 71/0/1"
+		!IMPORTANT! - Leave at least 1 USB port for you keyboard!
+
+  # You also need to modify some of the scripts:
+    	/usr/local/etc/rc.d/nicvm
+		change  "passthru,68/0/0"  to your own PCI slots
+	Also change the files at these locations:
+		/usr/local/etc/rc.d/usbvm
+		/usr/local/bin/usbvm
+		/usr/local/bin/nicvm
+   
+
+#####################################  ROOT JAILS SETUP  ######################################
+    
+  # Rootjails contain a full filesystem and packages for appjails. Appjails are basically
+  # daily driver jails, with user data and configs. Rootjails are cloned at every appjail
+  # start/stop. This is highly versatile, and confers a few benefits over nullfs read-only 
+  # mounting system files into appjails:
+    
+    	1. You have a complete and full FreeBSD system, which is merely receiving user-
+	   specific configs and files, rather than the reverse, where you might try to 
+	   decide which system files to mount.
+	   
+	2. You can modify the system, install pkgs, and experiment in appjails without fear
+	   of breaking your jail. Just turn it off/on again to restore the original state.
+
+	3. If you want to lock down your jail, quBSD provides chflags and securelevel options
+
+	3. The /rw folder is for system-specific files that need to persist across jail
+	   start/stop. quBSD automatically finds these files and symlinks them at start
+
+  # Now to install the first rootjail: 0base, which is just a basic/updated install, no more
+
+    	zfs create zroot/jails/0base
+	bsdinstall /jails/0base
+	freebsd-update -b /jails/0base fetch install
+	chroot /jails/0base /usr/sbin/pkg update
+
+  # nullfs mounts push zusr data to clean snapshots, under the directories /rw and /home 
+    	mkdir /jails/0base/rw
+	mkdir /jails/0base/usr/home
+
+  # jail will throw errors if it doesn't see an fstab (due to the way jail.conf is set up)
+	cat /etc/fstab | head -1 > /jails/0base/etc/fstab
+
+  # The rootjails do better with a highly restrictive rc.conf, which disables most services.
+	cp /zusr/quBSD/net-tap/rw/etc/rc.conf /jails/0base/etc
+
+##  CONFIGURING APPLICATION SPECIFIC ROOTJAILS (vpn tunnels, firewall, and GUI setup) 
+
+  # Now snapshot 0base and send it to new rootjails
+    	zfs snapshot zroot/0base@MonDD_HHMM [that's monthDay_HoursMinutes]
+	zfs send zroot/0base@Dec24_2359 | zfs recv zroot/0net
+	zfs send zroot/0base@Dec24_2359 | zfs recv zroot/0gui
+
+  # GUI jails share the .X11-unix socket with host via nullfs mount !NOTE! - This comes with
+  # security implications. Other X11 apps can see your other screens, and clipboard
+    	mkdir /jails/0gui/tmp/.X11-unix
+
+  # Start the 0net and 0gui jails so that we can install pkgs [pkg needs the /dev/null mount]
+  	jail -c 0net
+	jail -c 0gui
+
+  # 0net needs wireguard implementation. Hopefully makes it into the kernel next release 
+	chroot /jails/0net 
+		pkg install wireguard wireguard-go jq
+		exit
+    
+  # 0gui packages will vary by person, but here is one way to think about it:
+    	Essential for GUI	
+		Xorg nvidia-driver qt5 dbus 
+	Common for most GUI uses
+		vim falkon keepassxc xpdf spectacle libreoffice firefox pacmanfm
+	Extras that are pretty decent
+		krita gwenview pacmanfm git telegram-desktop hexchat google-translate-cli 
+	## Time for a side ramble, skip this if you don't care about open source spyware.
+	## Firefox is fully opensource spyware with a dev path controlled by google. Every
+	## new release sees new default-spying settings that must be surgically disabled with
+	## an ever growing user js. USE FALKON INSTEAD anywhere you can. Unfortunately I'm 
+	## seeing more an more sites not work with Falkon, and I'm sure this is no accident
+	## and yes, I do see the irony in complaining about spyware while adding Telegram,lol
+
+  # Snapshot the 0net and 0gui rootjails. IMPORTANT! Any changes you make to a rootjail will
+  # not be seen in the appjail until you do a zfs snapshot!
+	zfs snapshot zroot/jails/0net@Dec24_2359
+	zfs snapshot zroot/jails/0gui@Dec24_2359
+
+
+##  We're ready to configure the bhyve virtual machines, but first we must reboot 
+##  for the PCI passthough on the NIC and USB slots to take effect.
+
+
+					#################################################
+					##           	     REBOOT    		       ##
+					#################################################
+
+
+#############################  CONFIGURE BHYVE VIRTUAL MACHINES  ##############################
+
+  # Create zfs volume for nicvm 
+        zfs create -V2G -o volmode=dev zroot/nicvm
+
+  # Use the script provided by FreeBSD for nicvm installs.  
+  # !IMPORTANT: REMEMEMBER TO CHANGE  68/0/0  to your own!
+	sh /usr/share/examples/bhyve/vmrun.sh -c 1 -m 600M -p 68/0/0 -t tap0 -d /dev/zvol/zroot/nicvm -i -I /usr/local/share/FreeBSD-13.0-RELEASE-amd64-bootonly.iso nicvm
+
+  # Complete the installer with these options:
+        - Deselect all debug, 32-bit, ports, and test stuff (one of the first screens)
+        - AutoZFS ; 0 swap ; stripe vtbd0
+        - Set a good password.  nicvm is entrance point into your computer from the outside
+        - Select phyical nic (igb0, em0, wls0, etc)
+                --Do NOT select vtnet0. It's just a virtual interface for internal network
+        - DHCP IPv4. You can manually configure if you want, but it's unnecessary
+        - SELECT SSHD!, Will be the primary access method into the VMs. Deslect others
+        - Select all system hardening options
+        - No users
+        - Exit, BUT DON'T REBOOT. Manual Configuration, open shell and copy these commands
+                sysrc ifconfig_vtnet0="inet 10.99.99.1/24"
+                sed -i '' -e "s/#PermitRootLogin no/PermitRootLogin yes/" /etc/ssh/sshd_config
+                freebsd-update fetch install
+                exit
+        - Then you can reboot the VM. Press "4" on the reboot screen to exit
+        (HINT: highlight with mouse, switch back to main TTYV, then shift+insert to paste text)
+
+  # Copy the completed nicvm install, to be used for the usbvm 
+	zfs snapshot zroot/nicvm@Dec24_2359
+        zfs send zroot/nicvm@Dec24_2359 | zfs recv zroot/usbvm
+
+  # Start both the nicvm and usbvm. This could take a minute or two. 
+  	service nicvm onestart
+	service usbvm onestart
+
+  # Configure host networking to reach the USBVM first
+  	pfctl -f /etc/pf_pass.conf
+	ifconfig tap1 inet 10.99.99.2/24 up
+
+  # Generate SSH keys for the usbvm. It will be passwordless since it's a low security risk 
+        ssh-keygen -f /root/.ssh/usbvm -P ""
+  
+  # Do a ping check to see if the usbvm is booted yet
+  	ping 10.99.99.1
+
+  # Push the SSH keys. !IMPORTANT! The DHCP server might hang after booting VM from a 
+  # fresh install, which prevents SSHD. If you get a "connection refused" error, wait 
+  # 10-20 secs and keep retrying until it succeeds. Could take 1-2 minutes
+        ssh-copy-id -i /root/.ssh/usbvm root@10.99.99.1
+
+  # When successful, you can now push the config files to the usbvm
+ 	scp -i /root/.ssh/usbvm /zusr/quBSD/zroot/usbvm/* root@$10.99.99.1:/root 
+
+  # SSH into the usbvm and set everything up
+  	ssh -i /root/.ssh/usbvm root@10.99.99.1
+                mv /root/loader.conf /boot/
+                mv /root/sshd_config /etc/ssh/
+                mv /root/rc.conf /etc/
+                mv /root/sysctl.conf /etc/
+		exit
+
+  # Move SSH keys to 0net-template and 0gui-template for use by appjails into the usbvm
+  # It's important to move "known_hosts" or SSH will think there's a hacker
+  	cp /root/.ssh/* /zusr/0net-template/rw/root/.ssh
+  	mv /root/.ssh/* /zusr/0gui-template/rw/root/.ssh
+
+  # Change the connection to the nicvm
+  	ifconfig tap1 -alias
+	ifconfig tap0 inet 10.99.99.2/24 up
+
+  # SSH keys for the nicvm. !IMPORTANT! SSH key to the nicvm is security critical, conferring
+  # access to system from the outside. Set a good password (can be same as nicvm root)
+        ssh-keygen -f /root/.ssh/nicvm
+                /root/.ssh/nicvm
+  
+  # Do a ping check to see if the nicvm is booted yet
+  	ping 10.99.99.1
+
+  # Push the SSH keys. Again, if the DHCP server hangs, retry until successful (1-2 minutes) 
+        ssh-copy-id -i /root/.ssh/nicvm root@10.99.99.1
+
+  # When successful, you can now push the config files to the nicvm
+ 	scp -i /root/.ssh/nicvm /zusr/quBSD/zroot/nicvm/* root@$10.99.99.1:/root 
+
+  # SSH into the nicvm and set everything up. Your NIC should be in rc.conf 
+  	ssh -i /root/.ssh/nicvm root@10.99.99.1
+		mv /root/loader.conf /boot/
+                mv /root/pf.conf /etc/
+                mv /root/sshd_config /etc/ssh/
+                cat /root/rc.conf | xargs sysrc
+                rm /root/rc.conf
+
+  # Move the SSH keys to net-firewall. Again, these are security critical 
+  	mv /root/.ssh/* /zusr/net-firewall/rw/root/.ssh
+
+  # Enable the usbvm and nicvm to start at boot time 
+	sysrc nicvm_enable="YES"
+	sysrc usbvm_enable="YES"
+
+
+## And that's about all the critical setup items! However, we need to reboot host for VM
+## changes to take effect, and we should test everything after reboot to ensure functionality
+## Finally, you probably want pkgs in the usbv for mounting ext4 (Linux) and Android devices
+## Here are some useful pkgs and commands in the usbvm:
+	# pkg install fusefs-jmtpfs fusefs-lkl
+		# jmtpfs -o allow_other /mnt
+		# lklfuse -o type=ext4 /dev/da0p1 /mnt
+
+
+
+					#################################################
+					##           	     REBOOT    		       ##
+					#################################################
+
+
+########################################  REBOOT CHECKS  #############################################
+
+  # Now it's time to run some basic checks to make sure everything is looking good
+  # Recommend doing this inside of an X session
+  	startx
+
+  # Create the net-tap jail. -v option for verbosity in case of problems
+  	jail -vc net-tap
+	jail -vc net-firewall  
+
+  # Use the first qb-script, -r option for root
+	jcmd -r net-tap
+		ifconfig   	# bridge0 should contain tap0 and epair0a, no IPs, all promisc
+		exit
+
+  # Then go into net-firewall, epair0b should have inet 10.99.99.2/24 
+	jcmd -r net-firewall
+		ifconfig	
+		ping 10.99.99.1		# Check ping to the nicvm 
+		ping 1.1.1.1		# Check ping to the outside world
+		ping freebsd.org 	# Check that your resolv.conf is correct 
+		ssh -i /root/.ssh/nicvm root@10.99.99.1	    # Make sure you can SSH into nicvm
+			exit
+		exit
+
+  # Now go into the (gui) appjail, which is obviously a disposable jail
+	jail -vc dispjail
+	jcmd -r dispjail
+		ping 1.1.1.1		# Check ping to the outside world
+		ping freebsd.org 	# Check that your resolv.conf is correct 
+		xcalc			# X11 calculator to confirm GUI is functional
+
+  # If everything checks out, then you're ready to customize your setup! 
+
+  # See qb-tutorial for a guide on what to do next and how to use quBSD
+
+
+########################################  TROUBLESHOOTING  ###########################################
+
+The qb-scripts are good in their scope, there are basic checks to help prevent terrible mistakes
+   (bourne out of having made some terrible mistakes early on when I was just tinkering, lol) 
+   ... HOWEVER ...
+The scripts are not highly robust. Avoid doing things like stringing them together or attempting to
+put a bunch of them into other complex scripts.  
+
+  # You hope never to end up there, but if you need to edit files in single user mode, 
+  # the mounts are read-only; so you need to remount in order to edit files
+        umount -Af
+        zfs unmount -a 
+        mount -u -o rw / 
+
+  # Problems launching jails
+  	/etc/jail.conf  -  Chech that your jail is there
+	/usr/local/etc/jail.conf.d/jailmap.conf  
+		quBSD needs the jail's configuration here as well
+		All 3 columns should have entries, even if it is just "none"
+	zfs list -t snapshot zroot/jails/0gui (or 0net)
+		Make sure you have a snapshot of the rootjail
+	zfs list -r zusr/<jailname>
+		zfs dataset per jail at /zusr isn't a strict requirement, but best practice
+	/zusr/<jailname>/fstab
+		fstab entries should nullfs mount /rw and /home directories to /jails/<jailname>
+	/zusr/<jailname>/rw/etc/ .. group, master.passwd, passwd, pwd.db, spwd.db
+		The gui jails need pw user data here
+		pw -V /zusr/<jailname>/rw/etc usershow -a
+			-V option redirects pw to a different /etc (kinda like a chroot)
+			The username MUST be same name as the jail (and /usr/home directory)
+			If you clone or zfs send you MUST change the pw data for non net-jails
+	/zusr/<jailname>/rw/etc/rc.conf 
+		You should have a specific rc.conf for each jail, even if it's just boiler plate
+
+  # Problems editing configs (especially inside a net-jail)
+  	Net jails are hardened with schg and securelevel 3. You will need to adjust their levels
+	before starting them in order to edit them 
+		jedit <jailname> seclvl -1
+		jedit <jailname> jschg none
+
+	Alternatively, you can edit them from host while they're turned on, if you drop flags:
+		jflags -d <jailname>
+
+  # net-jails connectivity and/or ping issues
+	/etc/resolv.conf will change depending on if you have VPN or not
+  	Check all epairs have a full connection chain, and are UP
+	Ping check directly between epairs. Failures here are usually pf.conf
+	pfctl -f /etc/pf.conf    and/or   serivce pf restart
+	tcpdump -i <interface>  will help you pinpoint where packets are being dropped
+
+  # GUI problems. Hopefully these tips will help you avoid headaches getting X11 to work: 
+	# Adds local domains to xhost permissions	
+        /usr/local/etc/X11/xinitr/xinitrc  
+                xhost + local:
+                exec i3
+
+  # Graphics card specifics
+  	/etc/devfs.rules 
+		Double check that your rule numbers match your /etc/jail.conf entries 
+		When in doubt for troubleshooting:  add unhide all
+		After devfs.rules edits, you MUST:  service devfs restart	
+
+        /usr/local/etc/X11/xorg.conf.d/xorg.conf
+                Xorg --configure	# Try this if in doubt
+	
+	Your drivers need to be installed on both host and in the jail
+
+  # You need the DISPLAY environment set in both jail and host
+        root/.cshrc 
+                setenv DISPLAY :0
+	Or .shrc, or .tshrc ; which ever shell you're using
+  
+  # All files and configs which were copied over should be saved in: /root/old_zroot_configs
+
+  # All files and configs which would have been changed are in the /zusr/quBSD/ directory

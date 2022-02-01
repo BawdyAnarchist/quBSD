@@ -1,0 +1,60 @@
+#!/bin/sh
+
+while getopts dhu o ; do
+	case $o in
+		d) down="true" ;;
+		h) help="true" ;;
+		u) up="true" ;; 
+	esac
+done
+
+shift $(( OPTIND - 1 ))
+jail="$1"
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
+
+usage() {
+	echo ""
+	echo "qb-flags: Toggles schg/noschg for the indicated jail"
+	echo ""
+	echo "Usage: qb-flags [-h] [-d|-u] <jail>"	
+	echo "   -d: (d)own: recursive noschg flags for target jail"
+	echo "   -u: (u)p: re-applies jailmap settings to target jail"
+     echo "   -h: (h)elp: Outputs this help message"
+	echo ""
+	exit 1
+}
+
+checks() {
+	if [ "$help" ] ; then
+		usage
+
+	elif [ -z "$down" -a -z "$up" ] ; then
+		echo "qb-flags: ERROR: must specify -d (down) or -u (up) for flags" 
+		usage
+
+	elif [ "$down" -a "$up" ] ; then
+		echo "qb-flags: ERROR: must specify only one option, [-d or -u], not both" 
+		usage
+
+	elif [ -z "$jail" ] ; then
+		echo "qb-flags: ERROR: must specify a target jail" 
+		usage
+
+	elif ! `qb-list -qj "$jail"` ; then
+		echo "qb-flags: ERROR: $jail does not exist or is not configured properly"
+		usage
+	fi
+}
+
+checks
+
+if [ "$down" ] ; then
+	chflags -R noschg /jails/$jail
+	chflags -R noschg /zusr/$jail
+
+elif [ "$up" ] ; then
+	/usr/local/etc/jail.conf.d/exec.poststart $jail
+fi
+
+

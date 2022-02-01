@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# chflags should be applied after all system files and startup has been accomplished 
+
+jail="$1"
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $jmap
+schg=$(sed -nE "s/^${jail}[[:blank:]]+schg[[:blank:]]+//p" $jmap)
+seclvl=$(sed -nE "s/^${jail}[[:blank:]]+seclvl[[:blank:]]+//p" $jmap)
+
+usage() {
+	printf "%b" "\n$err\n\n"
+	exit 1
+}
+checks() {
+        if [ -z "$jail" ] ; then
+                err="Error: exec.poststart:  Must select a jail"
+		usage
+        elif [ -z "$jmap" ] ; then
+                err="Error: exec.poststart:  No file selected for jailmap.conf"
+		usage
+        fi
+}
+
+security_flags() {
+	[ -z "$schg" -o "$schg" = "none" ] && jdir=""
+	[ "$schg" = "all" ] && jdir="/bin /sbin /boot /etc /home /lib /libexec /root /rw /usr"
+	[ "$schg" = "sys" ] && jdir="/boot /rw /bin /sbin /etc /lib /libexec /usr/bin /usr/sbin \
+					/usr/lib /usr/libexec /usr/libdata /usr/lib32 /usr/local"
+	for d in $jdir; do
+		[ -e "/jails/${jail}${d}" ] && chflags -R schg "/jails/${jail}${d}"
+	done 
+	[ -n "$seclvl" ] && jexec -l $jail sysctl kern.securelevel="$seclvl" || exit 0
+}
+
+checks 
+
+security_flags
+
