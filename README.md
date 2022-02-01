@@ -1,4 +1,4 @@
-#### quBSD is a system management tool which emulates a Qubes-like containerization schema, but with FreeBSD jails for daily workloads. It's written entirely in shell, based on zfs, and uses the underlying FreeBSD tools.
+#### quBSD is wrapper for a jails/bhyve implementation of a Qubes-inspired containerization schema. Written in shell, based on zfs, and uses the underlying FreeBSD tools.
 
 The goal is to run all workloads inside of jails, and make host merely a coordinator. quBSD comes with an installer script, which creates and configures a series of jails, and even a couple VMs for PCI device isolation. There are a set of scripts which facilitate management of the entire setup.
 
