@@ -1,19 +1,25 @@
 #!/bin/sh
 
-
 # Replacement of non-persistent filesystems (appjails and dispjails) 
 # jailmap.conf stores all jail configurations at /usr/local/etc/jail.conf.d/
 
-jail="$1"
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
+
+# Define script variables
+jail="$1"
 date=$(date +%b%d)
 class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
 rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap)
-rootsnap=$(zfs list -t snapshot | egrep -o "zroot/jails/${rootjail}@[^[:blank:]]+" | tail -1)
+rootsnap=$(zfs list -t snapshot | egrep -o "${jails_zfs}/${rootjail}@[^[:blank:]]+" | tail -1)
 tunnel=$(sed -nE "s/^${jail}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
-jmount1=$(mount | egrep -o "/jails/${jail}/[[:alnum:]]+") 
-jmount2=$(mount | egrep -o "^/zusr/${jail}/[^[:blank:]]+")
+jmount1=$(mount | egrep -o "${m_jails}/${jail}/[[:alnum:]]+") 
+jmount2=$(mount | egrep -o "^${m_zusr}/${jail}/[^[:blank:]]+")
 
 usage() {
         printf "%b" "\n$err\n\n"
@@ -45,15 +51,15 @@ start_tunnels () {
 }
 
 umount_lingering() {
- 	[ -e "/zusr/${jail}/rw/etc/fstab" ] && umount -a -F /zusr/${jail}/rw/etc/fstab > /dev/null 2>&1
+ 	[ -e "${m_zusr}/${jail}/rw/etc/fstab" ] && umount -a -F ${m_zusr}/${jail}/rw/etc/fstab > /dev/null 2>&1
 	[ -n "$jmount1" ] && echo "$jmount1" | xargs umount -f 
 	[ -n "$jmount2" ] && echo "$jmount2" | xargs umount -f   
 }
 
 reclone_appjail() {
 	if [ "$class" != "rootjail" ] ; then
-		[ -e "/jails/${jail}" ] && zfs destroy -rRf "zroot/jails/${jail}"  
-		[ ! -e "/jails/${jail}" ] && zfs clone $rootsnap "zroot/jails/${jail}" 
+		[ -e "${m_jails}/${jail}" ] && zfs destroy -rRf "${jails_zfs}/${jail}"  
+		[ ! -e "${m_jails}/${jail}" ] && zfs clone $rootsnap "${jails_zfs}/${jail}" 
 	fi
 }
 
@@ -61,31 +67,31 @@ reclone_dispjail() {
 	if [ "$class" = "dispjail" ] ; then
 		template=$(sed -nE "s/^${jail}[[:blank:]]+template[[:blank:]]+//p" $jmap)
 		homesnap=$(zfs list -t snapshot | \
-			   egrep -o "zusr/${template}@[^[:blank:]]*" | tail -1) 
+			   egrep -o "${zusr_zfs}/${template}@[^[:blank:]]*" | tail -1) 
 
-		[ -e "/zusr/${jail}" ] && zfs destroy -rRf zusr/${jail}  
-		[ ! -e "/zusr/${jail}" ] && zfs clone ${homesnap} zusr/${jail} 
+		[ -e "${m_zusr}/${jail}" ] && zfs destroy -rRf ${zusr_zfs}/${jail}  
+		[ ! -e "${m_zusr}/${jail}" ] && zfs clone ${homesnap} ${zusr_zfs}/${jail} 
 		
-		[ -e /zusr/${jail}/home/${template} ] && \
-			mv /zusr/${jail}/home/${template} /zusr/${jail}/home/${jail} 
-		sed -i '' -e "s/${template}/${jail}/g" /zusr/${jail}/rw/etc/fstab 
+		[ -e ${m_zusr}/${jail}/home/${template} ] && \
+			mv ${m_zusr}/${jail}/home/${template} ${m_zusr}/${jail}/home/${jail} 
+		sed -i '' -e "s/${template}/${jail}/g" ${m_zusr}/${jail}/rw/etc/fstab 
 
 		# If template has an unprivileged user, pw name needs changed to dispjail name
-		pw -V /zusr/${jail}/rw/etc/ usershow $template  > /dev/null 2>&1
+		pw -V ${m_zusr}/${jail}/rw/etc/ usershow $template  > /dev/null 2>&1
 	        if [ "$?" = "0" ] ; then
-			pw -V /zusr/${jail}/rw/etc/ usermod $template -l $jail
-			pw -V /zusr/${jail}/rw/etc/ groupmod $template -l $jail
-			pw -V /zusr/${jail}/rw/etc/ usermod $jail -d /usr/home/${jail} > /dev/null 2>&1
+			pw -V ${m_zusr}/${jail}/rw/etc/ usermod $template -l $jail
+			pw -V ${m_zusr}/${jail}/rw/etc/ groupmod $template -l $jail
+			pw -V ${m_zusr}/${jail}/rw/etc/ usermod $jail -d /usr/home/${jail} > /dev/null 2>&1
 		fi
 	fi
 }
 
 flags_down() {      
-	if [ -e /jails/${jail} ] ; then 
-		chflags -R noschg /jails/${jail}  
+	if [ -e ${m_jails}/${jail} ] ; then 
+		chflags -R noschg ${m_jails}/${jail}  
 	fi
-	if  [ -e /zusr/${jail} ] ; then
-		chflags -R noschg /zusr/${jail}
+	if  [ -e ${m_zusr}/${jail} ] ; then
+		chflags -R noschg ${m_zusr}/${jail}
 	fi
 }
 

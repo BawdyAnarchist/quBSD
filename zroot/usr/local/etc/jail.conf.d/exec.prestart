@@ -2,9 +2,13 @@
 
 # Symlinks and pw changes are applied after fstab is mounted 
 
-jail="$1"
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//g' $jmap
+
+# Define script variables
+jail="$1"
 class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
 
 usage() {
@@ -27,7 +31,7 @@ checks() {
 manage_symlinks() {
 	# /rw/ nullfs mounts are best symlinked from within the cloned appjail's root 
 	if [ "$class" != "rootjail" ] ; then
-        	chroot /jails/${jail} /bin/sh <<"EOT"
+        	chroot ${m_jails}/${jail} /bin/sh <<"EOT"
                 ln_files=$(find "/rw" -type f | sed "s:/rw::")
                 if [ -n "$ln_files" ] ; then
 			ln_dirs=$(echo "$ln_files" | sed "s#\(.*\)/.*#\1#" | sed '/^$/d' | uniq)

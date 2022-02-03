@@ -16,14 +16,17 @@ stop_cmd="${name}_stop"
 status_cmd="${name}_status"
 
 nicvm_start() {
-	bhyveload -c stdio -m 600M -d /dev/zvol/zroot/nicvm -S nicvm > /dev/null 2>&1
+	ppt_nic=$(sed -nE "s:ppt_nic[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
+	zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
+
+	bhyveload -c stdio -m 600M -d /dev/zvol/${zroot}/nicvm -S nicvm > /dev/null 2>&1
 
 	bhyve -c 1 -m 600M -H -A -P -S \
 		-s 0:0,hostbridge \
         	-s 1:0,lpc \
         	-s 2:0,virtio-net,tap0 \
-        	-s 3:0,virtio-blk,/dev/zvol/zroot/nicvm \
-        	-s 4:0,passthru,68/0/0 \
+        	-s 3:0,virtio-blk,/dev/zvol/${zroot}/nicvm \
+        	-s 4:0,passthru,"$ppt_nic" \
         	nicvm > /dev/null 2>&1 &
 }
 

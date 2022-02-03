@@ -115,7 +115,7 @@ qb-off <jailname> <jailname2> ... <jailname3>
 	vi /etc/pf.conf
 	# This of course is from inside the running jail
 	# You will *NOT* be able to save changes, because the firewall jail
-	# has default schg flags applied. Instead you would need to either
+	# by default comew with schg flags applied. You would need to either
 	# stop the jail and edit from host, or qb-edit the secuirty settings.
 
 # Now exit net-firewall with:  
@@ -132,11 +132,14 @@ qb-off <jailname> <jailname2> ... <jailname3>
 # Bring down host networking. Was just as an example.
 	qb-hostnet -d     
 
-# Test out your disposable jail, gui functionality, and connection
-  	qb-cmd dispjail falkon
-	# This should cause dispjail to start, and falkon to pop up.
+# Test for basic GUI functionality in dispjail 
+  	qb-cmd dispjail xcalc 
+	# This should cause dispjail to start, and xcalc to pop up.
 
-# Close Falkon browser
+# Or if you want to try a more complex program (if you installed it).
+  	qb-cmd dispjail falkon
+
+close all dispjail windows
 
 
 ###########################  VIEWING/MODIFYING JAILS  #############################
@@ -202,10 +205,6 @@ qb-off <jailname> <jailname2> ... <jailname3>
 # Access the usbvm with any jail. [-i] option creates a network connection 
 	qb-usbvm -i dispjail
 	
-	# You can remove the password from usbvm. It's not security critical.
-		passwd root
-		{enter} {enter}
-
 	# Check that /etc/resolv.conf has an appropriate entry for pkg installation
 		cat /etc/resolv.conf
 	
@@ -241,7 +240,8 @@ qb-off <jailname> <jailname2> ... <jailname3>
 # for troubleshooting. For example, if you need to drop securelevel in nicvm to 
 # edit files or update; do the following commands: 
 
-	# This will shut down nicvm, and re-launch in terminal
+	# This will shut down nicvm, and re-launch in terminal 	
+		<so don't do it unless your really need to>
 		qb-nicvm -c     
 		Press 2 at boot splash screen
 	# To modify files, you will need to re-mount / as rw 
@@ -256,7 +256,7 @@ qb-off <jailname> <jailname2> ... <jailname3>
 ###########################  VPN AND TUNNEL JAILS  ##############################
 
 # The wireguard config for net-vpn is stored at:
-	vi /zusr/net-vpn/rw/usr/local/etc/wireguard/wg0.conf
+	vi /quBSD/zusr/net-vpn/rw/usr/local/etc/wireguard/wg0.conf
 
 # Default tunnel for all jails is net-firewall, which has no VPN. 
 # When you're vpn is configured, and tested, change your jails and host tunnels
@@ -278,7 +278,7 @@ qb-off <jailname> <jailname2> ... <jailname3>
 
 # You will also need to update dispjail resolv.conf. REMEMBER - dispjail has no
 # persistent files. You will need modify 0gui-template:
-	vi /zusr/0gui-template/rw/etc/resolv.conf
+	vi /quBSD/zusr/0gui-template/rw/etc/resolv.conf
 
 # Now snapshot 0gui-template, so that your dispjail will use the most recent changes
 	qb-snap -n 0gui-template
@@ -289,10 +289,16 @@ qb-off <jailname> <jailname2> ... <jailname3>
 
 # Turn off the jail and edit from host:
 	qb-off net-vpn
-	vi /zusr/net-vpn/rw/pf.conf
+	vi /quBSD/zusr/net-vpn/rw/pf.conf
 	jail -c net-vpn
 
 # Remember to set resolv.conf for host, 0gui-template, 0gui, and the VMs 
+
+# Finally, after you have configured and tested your VPN, raise the security
+	qb-edit net-vpn seclvl 3
+	qb-edit net-vpn schg all
+	# This might be a bit overkill, and you'll need to be mindful of
+	# reducing security levels when you need to make edits
 
 
 ############################  CREATING NEW JAILS  #############################
@@ -307,7 +313,7 @@ recommended to go through this now, as much will make sense simply by creating
 a few jails with guided mode. 
 
 0gui-template
-	- dispjail inherets all /rw and /home files from /zusr/0gui-template/..
+	- dispjail inherets all /rw and /home files from /quBSD/zusr/0gui-template/..
 	- My personal settings are saved to /home (falkon, .cshrc)
 	- ! Dont delete the line 'DISPLAY :0' in .cshrc, or else gui wont work 
 		- All else can be adjusted to user preference
@@ -338,7 +344,7 @@ Here's an example of the process for installing new pkgs into: 0gui
 	jail -c 0gui
 
 # chroot into jail and install pkgs
-	chroot /jails/0gui
+	chroot /quBSD/jails/0gui
 	pkg install <pkgs>
 	exit
 

@@ -2,16 +2,23 @@
 
 # Destroys non-persistent filesystems for appjails and dispjails; and reclones
 
-jail="$1"
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//g' $jmap
+
+# Define script variables
+jail="$1"
 jconf=$(egrep "^${jail}[[:blank:]]" $jmap | uniq)
 class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
 rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap)
-	# $rootsnap relies on the fact that zfs lists snapshots chronologically
-rootsnap=$(zfs list -t snapshot | egrep -o "zroot/jails/${rootjail}@[^[:blank:]]+" | tail -1)
-jmount1=$(mount | egrep -o "/jails/${jail}/[[:alnum:]]+")
-jmount2=$(mount | egrep -o "^/zusr/${jail}/[^[:blank:]]+")
+# $rootsnap relies on the fact that zfs lists snapshots chronologically
+rootsnap=$(zfs list -t snapshot | egrep -o "${jails_zfs}/${rootjail}@[^[:blank:]]+" | tail -1)
+jmount1=$(mount | egrep -o "${m_jails}/${jail}/[[:alnum:]]+")
+jmount2=$(mount | egrep -o "^${m_zusr}/${jail}/[^[:blank:]]+")
 
 usage() {
         printf "%b" "\n$err\n\n"
@@ -34,7 +41,7 @@ checks() {
 }
 
 umount_lingering() {
-	[ -e "/zusr/${jail}/rw/etc/fstab" ] && umount -a -F /zusr/${jail}/rw/etc/fstab > /dev/null 2>&1
+	[ -e "${m_zusr}/${jail}/rw/etc/fstab" ] && umount -a -F ${m_zusr}/${jail}/rw/etc/fstab > /dev/null 2>&1
 	[ -n "$jmount1" ] && echo "$jmount1" | xargs umount -f > /dev/null 2>&1
 	[ -n "$jmount2" ] && echo "$jmount2" | xargs umount -f > /dev/null 2>&1 
 }
@@ -43,16 +50,16 @@ set_flags() {
 ## NOTE: UNSURE ABOUT HOW TO DEAL WITH THIS. WAS A PITA FOR TESTING SO I HAD TO REMOVE IT
 ## I NEED TO USE DAILY DRIVER TO SEE HOW MUCH A PAIN IT MIGHT BE IN REGULAR USE
 	if [ "$class" = "rootjail" ] ; then 
-#		chflags -R schg "/jails/${jail}" > /dev/null 2>&1
+#		chflags -R schg "${m_jails}/${jail}" > /dev/null 2>&1
 	else
-	#	chflags -R schg "/zusr/${jail}" > /dev/null 2>&1
+	#	chflags -R schg "${m_zusr}/${jail}" > /dev/null 2>&1
 	fi
 }
 
 reclone_appjail() {
 	if [ "$class" != "rootjail" ] ; then 
-		zfs destroy -rRf zroot/jails/$jail
-		zfs clone $rootsnap "zroot/jails/$jail"
+		zfs destroy -rRf ${jails_zfs}/$jail
+		zfs clone $rootsnap "${jails_zfs}/$jail"
 	fi
 }
 
@@ -60,21 +67,21 @@ reclone_dispjail() {
       if [ "$class" = "dispjail" ] ; then
                 template=$(sed -nE "s/^${jail}[[:blank:]]+template[[:blank:]]+//p" $jmap)
                 homesnap=$(zfs list -t snapshot | \
-                           egrep -o "zusr/${template}@[^[:blank:]]+" | tail -1)
+                           egrep -o "${zusr_zfs}/${template}@[^[:blank:]]+" | tail -1)
 
-                [ -e "/zusr/${jail}" ] && zfs destroy -rRf zusr/${jail}
-                [ ! -e "/zusr/${jail}" ] && zfs clone ${homesnap} zusr/${jail}
+                [ -e "${m_zusr}/${jail}" ] && zfs destroy -rRf ${zusr_zfs}/${jail}
+                [ ! -e "${m_zusr}/${jail}" ] && zfs clone ${homesnap} ${zusr_zfs}/${jail}
 
 		# Rename folders/mounts with dispjail name 
-                [ -e /zusr/${jail}/home/${template} ] && \
-                        mv /zusr/${jail}/home/${template} /zusr/${jail}/home/${jail}
-                sed -i '' -e "s/${template}/${jail}/g" /zusr/${jail}/rw/etc/fstab
+                [ -e ${m_zusr}/${jail}/home/${template} ] && \
+                        mv ${m_zusr}/${jail}/home/${template} ${m_zusr}/${jail}/home/${jail}
+                sed -i '' -e "s/${template}/${jail}/g" ${m_zusr}/${jail}/rw/etc/fstab
 
                 # Rename unprivileged user to dispjail name 
-                pw -V /zusr/${jail}/rw/etc/ usershow $template > /dev/null 2>&1
+                pw -V ${m_zusr}/${jail}/rw/etc/ usershow $template > /dev/null 2>&1
                 if [ "$?" = "0" ] ; then
-                        pw -V /zusr/${jail}/rw/etc/ usermod $template -l $jail > /dev/null 2>&1
-                        pw -V /zusr/${jail}/rw/etc/ usermod $jail -d /usr/home/${jail} > /dev/null 2>&1
+                        pw -V ${m_zusr}/${jail}/rw/etc/ usermod $template -l $jail > /dev/null 2>&1
+                        pw -V ${m_zusr}/${jail}/rw/etc/ usermod $jail -d /usr/home/${jail} > /dev/null 2>&1
                 fi
         fi
 }

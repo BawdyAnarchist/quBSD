@@ -2,6 +2,7 @@
 
 # Cleanly remove and destroy epairs before shutdown 
 
+# Define script variables
 jail="$1"
 interfaces=$(jexec -l -U root $jail ifconfig -l)
 taps=$(echo "$interfaces" | egrep -o "tap.")

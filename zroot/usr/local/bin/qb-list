@@ -12,6 +12,12 @@ while getopts ahqzj:p: o ; do
 done
 
 shift $(( OPTIND - 1 ))
+
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 
 usage() {
@@ -61,9 +67,9 @@ get_variables () {
 	jmap_jail=$(echo "$jmap_all" | egrep "(^${jail}[[:blank:]]+)|^CONTAINER" | column -t) 
 	jmap_jail_param=$(echo "$jmap_jail" | egrep "(^CONTAINER)|($param)" | column -t)
 
-	# Gets all of the zfs data for both zroot and zusr
-	zroot_all=$(zfs list -rt all -o name,used,origin, zroot/jails)
-	zusr_all=$(zfs list -Hrt all -o name,used,origin, zusr)
+	# Gets all of the zfs data for both zroot and ${zusr_zfs}
+	zroot_all=$(zfs list -rt all -o name,used,origin, ${jails_zfs})
+	zusr_all=$(zfs list -Hrt all -o name,used,origin, ${zusr_zfs})
 	zfs_all=$(printf "%b" "\n" "$zroot_all\n$zusr_all\n" | column -t)
 	zfs_jail=$(echo "$zfs_all" | egrep "(^NAME)|($jail(@|[[:blank:]]))" | column -t)
 }

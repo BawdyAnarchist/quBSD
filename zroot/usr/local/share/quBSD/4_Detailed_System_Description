@@ -10,11 +10,11 @@ Most answers can be found here.
 
 Virtual Machines
 
-zroot/jails
-	Location of root file systems for all jails
+/quBSD/jails
+	Default Location of root file systems for all jails
 	Running jails operate from this directory
 
-zusr
+/quBSD/zusr
 	Description of /home and /rw	
 	Explanation of nullfs mounts and symlinks
 	Handling of pwd.db 
@@ -28,8 +28,6 @@ List of Default Jails
 /usr/local/bin/qb-scripts  - Operational scripts for system management
 
 i3wm
-
-######Avoiding root user  ##still have to do this
 
 
 #########################################################################################
@@ -81,7 +79,17 @@ usbvm
 
 							/jails/
 
-This directory is the mountpoint for zfs dataset:  zroot/jails
+"zroot/quBSD/jails" refers to the recommended dataset for storing root filesystems for 
+jails.  However, you may have selected a different dataset at install. 
+This option was stored at:  /usr/local/bin/etc/jail.conf.d/quBSD.conf
+The default mountpoint for this dataset is /quBSD/jails but it can be changed with:  
+	zfs set mountpoint=/jails zroot/quBSD/jails
+
+The quBSD scripts will automatically adjust to any mountpoint changes you make, but if
+you want to change the dataset or zpool, you must modify quBSD.conf
+
+**Personally, I like to set my mountpoint at simply:  /jails  to ease navegation**
+The rest of this file will reference either quBSD/jails or /jails for brevity.
 
 The root-level (system) files for all jails are located here; however, not all jails
 contain full, independent FreeBSD installations. Instead, quBSD installs just a few 
@@ -132,10 +140,17 @@ between jail reboots. The /rw/ directory is nullfs mounted inside the jail at st
 
 							/zusr/
 
-This directory is the mountpoint for the zpool:  zusr  
+"zusr" refers to the dataset where jail's persistent files are stored. This option was
+selected at install, and stored at /usr/local/bin/etc/jail.conf.d/quBSD.conf
+The default mountpoint is /quBSD/zusr but that can be changed with:  
+	zfs set mountpoint=/zusr /zroot/quBSD/zusr
+	# Your dataset might be different than zroot, depending on what you chose at install
 
-For the meantime, quBSD scripts only function if there exists the zpool:  zusr.  
-Merely creating a dataset under zroot, mounted at /zusr will not suffice.
+The quBSD scripts will automatically adjust to any mountpoint changes you make, but if
+you want to change the dataset or zpool, you must modify quBSD.conf
+
+**Personally, I like to set my mountpoint at simply:  /zusr  to ease navegation.**
+The rest of this file will reference "/zusr" for brevity.
 
 Each jail has a dataset at zusr/ for persistent files, with at most 2 sub-directories:
 	/zusr/<jailname>/home/<jailname>/
@@ -309,9 +324,9 @@ While I have a list of items that I would like to improve and add over time, I
 hope that what I have created here is sufficiently robust, generalizable, and useful
 in its current state; or at least have the potential to become so.
 
-There are two locations which are the heart of quBSD functionality:
+There are two directories which are the heart of quBSD functionality:
 	/usr/local/etc/jail.conf.d/
-	/usr/local/bin/qb-
+	/usr/local/bin/qb-*
 
 ##########################################################################################
 
@@ -483,7 +498,7 @@ underlying mapping mechanism.
 To solve this problem, quBSD is bundled with a simple setup file and generation script,
 which automatically maps and generates all combinations you might want. 
 
-/root/.config/i3/i3gen_setup
+/root/.config/i3/i3gen.conf
 	The upper portion defines:
 		- Which mod and quick keys bind to which jails 
 		- Which commands each jail should have available 
@@ -498,6 +513,9 @@ which automatically maps and generates all combinations you might want.
 /root/.config/i3/i3gen.sh
 	This script assembles the mappings from i3gen_setup, into usable lines for the
 	i3 config file, and adds them to the bottom section.
+	WARNING - Do not put any config lines below the auto-generated lines, or they will
+	end up being deleted, the next time this script is run. Put all config lines above 
+	the auto-generated ones.
 	 
 
 

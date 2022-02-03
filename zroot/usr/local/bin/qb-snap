@@ -11,32 +11,37 @@ done
 
 shift $(( OPTIND - 1 ))
 
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+
+# Define script variables
 jail="$1"
 date=$(date +%b%d)
 tyme=$(date +%H%M)
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 
 define_variables() {
 	class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
 
 	# Rootjail vs zusr jails have different zfs datasets to handle 
 	if [ "$class" = "rootjail" ] ; then
-		newsnap="zroot/jails/${jail}@${date}_${tyme}" 
+		newsnap="${jails_zfs}/${jail}@${date}_${tyme}" 
 		newdeps=$(zfs list -o name,origin | grep "${newsnap}" | awk '{print $1}')
 
 		# Destroy option. zfs lists snapshots in chronological order 
 		if [ "$dest_oldest" ] ; then
 			oldsnap=$(zfs list -t snapshot | awk '{print $1}' \
-								| grep "zroot/jails/${jail}@" | head -1)
+								| grep "${jails_zfs}/${jail}@" | head -1)
 			olddeps=$(zfs list -o name,origin | grep "${oldsnap}" | awk '{print $1}') 
 		fi
 	else
-		newsnap="zusr/${jail}@${date}_${tyme}"
+		newsnap="${zusr_zfs}/${jail}@${date}_${tyme}"
 		newdeps=$(zfs list -o name,origin | grep "${newsnap}" | awk '{print $1}')
 
 		if [ "$dest_oldest" ] ; then 
 			oldsnap=$(zfs list -t snapshot | awk '{print $1}' \
-								| grep "zusr/${jail}@" | head -1)
+								| grep "${zusr_zfs}/${jail}@" | head -1)
 			olddeps=$(zfs list -o name,origin | grep "${oldsnap}" | awk '{print $1}') 
 		fi
 	fi

@@ -17,17 +17,34 @@ stop_cmd="${name}_stop"
 statys_cmd="${name}_status"
 
 usbvm_start() {
-	bhyveload -c stdio -m 1G -d /dev/zvol/zroot/usbvm -S usbvm > /dev/null 2>&1
+	ppt_usb1=$(sed -nE "s:ppt_usb1[[:blank:]]+:: p" /usr/local/etc/jail.conf.d/quBSD.conf)
+	ppt_usb2=$(sed -nE "s:ppt_usb2[[:blank:]]+:: p" /usr/local/etc/jail.conf.d/quBSD.conf)
+	zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
 
-	bhyve -c 1 -m 1G -H -A -P -S \
-        	-s 0:0,hostbridge \
-        	-s 1:0,lpc \
-        	-s 2:0,virtio-net,tap1 \
-        	-s 3:0,virtio-blk,/dev/zvol/zroot/usbvm \
-        	-s 4:0,passthru,71/0/1 \
-        	-s 5:0,passthru,71/0/3 \
-        	usbvm > /dev/null 2>&1 &
+	bhyveload -c stdio -m 1G -d /dev/zvol/${zroot}/usbvm -S usbvm > /dev/null 2>&1
 
+	if [ "$ppt_usb1" -a "$ppt_usb2" ] ; then
+		bhyve -c 1 -m 1G -H -A -P -S \
+    		    	-s 0:0,hostbridge \
+    		    	-s 1:0,lpc \
+        		-s 2:0,virtio-net,tap1 \
+        		-s 3:0,virtio-blk,/dev/zvol/${zroot}/usbvm \
+        		-s 4:0,passthru,"$ppt_usb1" \
+        		-s 5:0,passthru,"$ppt_usb2" \
+        		usbvm > /dev/null 2>&1 &
+	
+	elif [ -z "$ppt_usb1" -a -z "$ppt_usb2" ] ; then
+		exit 1
+
+	else
+		bhyve -c 1 -m 1G -H -A -P -S \
+    		    	-s 0:0,hostbridge \
+    		    	-s 1:0,lpc \
+        		-s 2:0,virtio-net,tap1 \
+        		-s 3:0,virtio-blk,/dev/zvol/${zroot}/usbvm \
+        		-s 4:0,passthru,"${ppt_usb1}${ppt_usb2}" \
+        		usbvm > /dev/null 2>&1 &
+	fi
 }
 
 usbvm_stop() {

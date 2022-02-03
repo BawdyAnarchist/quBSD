@@ -12,7 +12,14 @@ qb-usbvm connects any specified jail via ssh, or [-c] for direct console launch.
 
 #################################  JAILS  CONCEPTS  ####################################
 
-zroot/jails mounts to /jails , and contains root-level system files for all jails.
+"zroot/quBSD/jails" refers to the recommended dataset for storing root filesystems for 
+jails. However, you may have selected a different dataset than "zroot" at install.
+This option was stored at:  /usr/local/bin/etc/jail.conf.d/quBSD.conf
+The default mountpoint for this dataset is /quBSD/jails but it can be changed with:
+     zfs set mountpoint=/jails zroot/quBSD/jails
+
+**Personally, I like to set my mountpoint at simply:  /jails  to ease navegation**
+The rest of this file will reference either quBSD/jails or /jails for brevity.
 
 "rootjails" are full ondisk FreeBSD installations; serving pristine clones to appjails. 
 Three rootjails are installed by default:
@@ -35,7 +42,15 @@ Recommend testing desired changes inside of an appjail, before modifying the roo
 
 #################################  JAILS  CONCEPTS  ####################################
 
-zusr/ mounts to /zusr , a separate zpool with persistent jail-specific files.
+"zusr" refers to the dataset where jail's persistent files are stored. This option was 
+selected at install, and stored at /usr/local/bin/etc/jail.conf.d/quBSD.conf
+The default mountpoint is /quBSD/zusr but that can be changed with:  
+	zfs set mountpoint=/zusr /zroot/quBSD/zusr
+	# Your dataset might be different than zroot, depending on what you chose at install
+
+The rest of this file will reference "/zusr" for brevity. 
+
+**Personally, I like to set my mountpoint at simply:  /zusr  to ease navegation.
 
 Each jail has its own dataset under zusr, with at most, 2 sub-directories:
 
@@ -51,8 +66,8 @@ Each jail has its own dataset under zusr, with at most, 2 sub-directories:
 	 	   Example:  /zusr/<jailname>/rw/etc/rc.conf is a custom rc.conf for <jailname>
 
 	/rw also stores/handles pwd info.  Modifying jail pw requires [-V] redirection.
-		pw -V /zusr/<jail>/rw/etc usermod       # If run from host, outside the jail
-		pw -V /rw/etc/ usermod 			     # If run from inside the jail
+		pw -V /quBSD/zusr/<jail>/rw/etc usermod    # If run from host, outside the jail
+		pw -V /rw/etc/ usermod                     # If run from inside the jail
 
 	Don't add multiple users to a jail, as it might cause errors
 

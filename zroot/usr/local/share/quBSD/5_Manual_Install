@@ -1,4 +1,7 @@
-In case you have problems with the installer (likely due to already having a custom system), this manual documents the steps you need to accomplish to get your system set up in a similar way.
+
+In case you have problems with the installer (likely due to already having a custom system), this manual documents the steps you need to accomplish to get your system set up in a similar way. You can see it's fairly intense.
+
+I've made some significant modifications to the installer and scripts since writing this guide, so beware that its possible this doesnt cover every single nook and cranny of the install. But it should get you in the ballpark. 
 
 
 #########################  REFERENCE STUFF INCLUDED FOR CONVENIENCE  ########################
@@ -21,17 +24,17 @@ In case you have problems with the installer (likely due to already having a cus
 
 #####################################  PREINSTALL CHECKS  ###################################
 
-  # Read the PRE-INSTALL doc in this directory. The quBSD scripts all work from specific  
-  # directories and zfs datasets. You will have errors if they're not set like this: 
+  # This Manual_Install guide references two zpool datasets:
   	zfs dataset:  zroot/jails mounted at /jails
-	zfs dataset:  zusr mounted at zusr
+	zfs dataset:  zusr mounted at /zusr
 
-  # The zusr dataset should be a fully separate zpool, as quBSD scripts will error otherwise 
-  # Future functionality will allow for a zroot/zusr dataset under zpool
-	you can export an existing zpool and re-import it under the zusr name.
+  # This is different than the default settings of the installer, but easier to read. 
+  # You could use any zpool/dataset you want, mounted anywhere you want. But the name of the
+  # zpool must be stored at:  /usr/local/etc/jail.conf.d/quBSD.conf
+
+  # You can export an existing zpool and re-import it under the zusr name if you want.
     	zpool export <old_poolname>
 	zpool import -f <old_poolname> zusr  # Might need the -f option if it wasn't exported 
-
 
 
 ####################################  HOST CONFIGURATION  ###################################
@@ -195,12 +198,6 @@ In case you have problems with the installer (likely due to already having a cus
 		vim falkon keepassxc xpdf spectacle libreoffice firefox pacmanfm
 	Extras that are pretty decent
 		krita gwenview pacmanfm git telegram-desktop hexchat google-translate-cli 
-	## Time for a side ramble, skip this if you don't care about open source spyware.
-	## Firefox is fully opensource spyware with a dev path controlled by google. Every
-	## new release sees new default-spying settings that must be surgically disabled with
-	## an ever growing user js. USE FALKON INSTEAD anywhere you can. Unfortunately I'm 
-	## seeing more an more sites not work with Falkon, and I'm sure this is no accident
-	## and yes, I do see the irony in complaining about spyware while adding Telegram,lol
 
   # Snapshot the 0net and 0gui rootjails. IMPORTANT! Any changes you make to a rootjail will
   # not be seen in the appjail until you do a zfs snapshot!
@@ -441,6 +438,3 @@ put a bunch of them into other complex scripts.
                 setenv DISPLAY :0
 	Or .shrc, or .tshrc ; which ever shell you're using
   
-  # All files and configs which were copied over should be saved in: /root/old_zroot_configs
-
-  # All files and configs which would have been changed are in the /zusr/quBSD/ directory

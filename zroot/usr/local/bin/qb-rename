@@ -9,10 +9,18 @@ done
 
 shift $((OPTIND -1 ))
 
-jail="$1"
-newname="$2"
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
+
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
+
+# Define script variables
+jail="$1"
+newname="$2"
 
 define_variables() {
 	# Finds jails dependent on the jail to be renamed
@@ -108,14 +116,15 @@ off_jails () {
 jrename() {
 	sed -i '' -e "s/^${jail}[[:blank:]]/${newname}	/g" $jmap
 	sed -i '' -E "s/^${jail}[[:blank:]]+\{/${newname} \{/g" /etc/jail.conf
+	sed -i '' -e "s/${jail}/${newname}/g" ${m_zusr}/${jail}/rw/etc/fstab 
 
-	zfs rename -f zusr/${jail} zusr/${newname}
-	zfs rename -f zroot/jails/${jail} zroot/jails/${newname}
+	zfs rename -f ${zusr_zfs}/${jail} ${zusr_zfs}/${newname}
+	zfs rename -f ${jails_zfs}/${jail} ${jails_zfs}/${newname}
 
-	pw -V /zusr/${jail}/rw/etc/ usershow $jail >> /dev/null 2>&1
+	pw -V ${m_zusr}/${jail}/rw/etc/ usershow $jail >> /dev/null 2>&1
 	if [ "$?" = "0" ] ; then
-		pw -V /zusr/${jail}/rw/etc/ usermod 1001 -l $newname 
-		mv /zusr/${newname}/home/${jail} /zusr/${newname}/home/${newname}
+		pw -V ${m_zusr}/${jail}/rw/etc/ usermod 1001 -l $newname 
+		mv ${m_zusr}/${newname}/home/${jail} ${m_zusr}/${newname}/home/${newname}
 	fi
 }
 

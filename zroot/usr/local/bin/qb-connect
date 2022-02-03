@@ -11,10 +11,17 @@ done
 
 shift $(( OPTIND - 1 ))
 
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
+jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
+
+# Define script variables
 jail=${jail:="$1"}
 tunnel="$2"
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-mtu="1400"
 
 define_variables() {
 	onjails=$(jls | awk '{print $2}' | tail -n +2)
@@ -168,11 +175,11 @@ checks() {
 				[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err6" && usage
 			fi
 
-		elif [ "$jail_seclvl" = 3 -a -e "/zusr/$jail/rw/etc/pf.conf" ] ; then
+		elif [ "$jail_seclvl" = 3 -a -e "${m_zusr}/$jail/rw/etc/pf.conf" ] ; then
 			printf "%b" "$warn8" ; read resp
 			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err8" && usage
 			
-		elif [ "$tunnel_seclvl" = 3 -a -e "/zusr/$tunnel/rw/etc/pf.conf" ] ; then
+		elif [ "$tunnel_seclvl" = 3 -a -e "${m_zusr}/$tunnel/rw/etc/pf.conf" ] ; then
 			printf "%b" "$warn9" ; read resp
 			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err8" && usage
 		fi
@@ -332,18 +339,18 @@ configure_epairs() {
 
 configure_network() {
 	# Add the IP to the tunnel's pf table
-	if [ -e "/jails/${tunnel}/rw/etc/pf.conf" -a "$tunnel_seclvl" -lt 3 ] ; then
+	if [ -e "${m_jails}/${tunnel}/rw/etc/pf.conf" -a "$tunnel_seclvl" -lt 3 ] ; then
 		jexec -l -U root $tunnel pfctl -t pass_ips -T add $IP0
 	fi
 
 	# Add the IP to the jail's pf table
-	if [ -e "/jails/${jail}/rw/etc/pf.conf" -a "$jail_seclvl" -lt 3 ] ; then
+	if [ -e "${m_jails}/${jail}/rw/etc/pf.conf" -a "$jail_seclvl" -lt 3 ] ; then
 		jexec -l -U root $jail pfctl -t pass_ips -T add $IP0
 	fi
 
 	# Add default route and a resolv.conf for jail to connect to the internet
 	jexec -l -U root $jail route add default "${IP0%.*/*}.1"
-	cp /zusr/${tunnel}/rw/etc/resolv.conf /jails/${jail}/rw/etc/
+	cp ${m_zusr}/${tunnel}/rw/etc/resolv.conf ${m_jails}/${jail}/rw/etc/
 
 	echo ""
 }

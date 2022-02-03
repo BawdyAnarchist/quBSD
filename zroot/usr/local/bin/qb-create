@@ -19,26 +19,34 @@ done
 
 shift $(( OPTIND - 1 ))
 
-newjail="$1"
-datetime=$(date +%b%d_%H%M)
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
+
 jconf="/etc/jail.conf"
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
 
+# Define script variables
+newjail="$1"
+datetime=$(date +%b%d_%H%M)
+
 define_variables() {
 
-	# Valid template jails must have jmap entries and zusr dataset 
+	# Valid template jails must have jmap entries and ${zusr_zfs} dataset 
 	jmap_appjs=$(qb-list -p class | grep appjail | awk '{print $1}')
-	zusrlist=$(zfs list -r zusr | awk '{print $1}')
+	zusrlist=$(zfs list -r ${zusr_zfs} | awk '{print $1}')
 	for j in $jmap_appjs ; do
-		`echo "$zusrlist" | egrep -qs "^zusr/$j\$"` &&
+		`echo "$zusrlist" | egrep -qs "^${zusr_zfs}/$j\$"` &&
 				validtemplatejs=$(printf "%b" "$j" "\n" "$validtemplatejs")
 	done
 
-	# Valid rootjails must have jmap entries and zroot/jails dataset 
+	# Valid rootjails must have jmap entries and ${jails_zfs} dataset 
 	jmap_rootjs=$(qb-list -p class | grep rootjail | awk '{print $1}')
 	for j in $jmap_rootjs ; do
-		tmpj=$(zfs list -ro name,used zroot/jails | egrep "^zroot/jails/$j[[:blank:]]")
+		tmpj=$(zfs list -ro name,used ${jails_zfs} | egrep "^${jails_zfs}/$j[[:blank:]]")
 		validrootjs=$(printf "%b" "$tmpj" "\n" "$validrootjs")
 	done
 
@@ -74,7 +82,7 @@ usage() {
 	echo "   -T: (T)emplate: <newjail> inherits JAIL PARAMETERS of <template_jail>"
 	echo "        but can be overriden by specifying JAIL PARAMETER options"
 	echo "        All /rw files (like rc.conf, fstab, pwd) are copied and modified"
-	echo "   -H: (H)OME: /zusr/<template_jail>/home files are copied to <newjail>"
+	echo "   -H: (H)OME: ${m_zusr}/<template_jail>/home files are copied to <newjail>"
 	echo "        Only valid with [-T]"
 	echo "        Hint: Use [-H] with appjail templates like 0gui-template to create"
 	echo "        new jails with a set of baseline configs (eg: .cshrc, .config)"
@@ -125,9 +133,9 @@ define_errors() {
 			"\nfollowing: <appjail|rootjail|dispjail>")
 
 	e5=$(printf "%b" "qb-create: ERROR: [-r] You must specify a VALID rootjail."\
-			"\nHere is a list of valid possibilities from zroot/jails \n\n$validrootjs\n" \
+			"\nHere is a list of valid possibilities from ${jails_zfs} \n\n$validrootjs\n" \
 			"\nIf you expected to see another rootjail, check that it's in jailmap.conf" \
-			"\nand a zfs zroot/jails/<jailname> is an original dataset (not a child).")
+			"\nand a zfs ${jails_zfs}/<jailname> is an original dataset (not a child).")
 
 	e6=$(printf "%b" "qb-create: ERROR: [-r] [-T] mismatch in combination with [-c rootjail]" \
 			"\nCreating a rootjail requires user to specify an existing rootjail with" \
@@ -175,7 +183,7 @@ define_errors() {
 
 	e22=$(printf "%b" "\n\tERROR:  Selection was invalid. If you expected another" \
 			"\nrootjail, check that it's designated in jailmap.conf and that " \
-			"\nzfs list -o name,origin zroot/jails/<jailname>" \
+			"\nzfs list -o name,origin ${jails_zfs}/<jailname>" \
 			"\nshows your expected rootjail as not being a child zfs dataset" \
 			"\n\n\tChoose one of the rootjails above:  \n")
 
@@ -247,8 +255,8 @@ define_messages() {
 			"\n$validtemplatejs\n\n\tSelect a valid template from the above:  ")
 
 	m3=$(printf "%b" "\nTemplate jails can simplify the process of creating a new jail\n" \
-			"For example zusr/rw files will be copied (like fstab, rc.conf, resolv.conf)" \
-			"\nand a user will be created. Otherwise enter: none , and /zusr/$newjail will" \
+			"For example ${zusr_zfs}/rw files will be copied (like fstab, rc.conf, resolv.conf)" \
+			"\nand a user will be created. Otherwise enter: none , and ${m_zusr}/$newjail will" \
 			"\nbe created but empty. Valid templates are as follows:\n\n$validtemplatejs" \
 			"\n\n\tSelect one of the above or \`none\':  ")
 
@@ -318,8 +326,8 @@ checks_main() {
 		ERR="$e1" ; usage
 	
 	# Checks that the proposed new jailname doesn't already exist (or partially exist).
-	elif `zfs list -rt all | egrep -qs "^zroot/jails/$newjail[[:blank:]]"` || \
-	     `zfs list -rt all | egrep -qs "^zusr/$newjail[[:blank:]]"` || \
+	elif `zfs list -rt all | egrep -qs "^${jails_zfs}/$newjail[[:blank:]]"` || \
+	     `zfs list -rt all | egrep -qs "^${zusr_zfs}/$newjail[[:blank:]]"` || \
 	     `echo "$jmap_rootjs" | egrep -qs "^$newjail\$"` || \
 	     `echo "$jmap_appjs" | egrep -qs "^$newjail\$"` ; then
 	     	ERR="$e8" ; usage
@@ -372,7 +380,7 @@ check_parameters() {
 	if [ "$class" != "appjail" -a "$class" != "rootjail" -a "$class" != "dispjail" ] ; then
 		ERR="$e4" ; usage
 
-	elif ! `echo "$validrootjs" | egrep -qs "^zroot/jails/$rootjail[[:blank:]]"` ; then
+	elif ! `echo "$validrootjs" | egrep -qs "^${jails_zfs}/$rootjail[[:blank:]]"` ; then
 		ERR="$e5" && usage
 
 	elif [ "$class" = "rootjail" -a  "$template" -a "$rootjail" != "$template" ] ; then
@@ -475,11 +483,11 @@ get_parents() {
 		
 		clear
 		
-		if [ "$class" = "appjail" -a -e "/zusr/$template/home/$template" ] ; then 
+		if [ "$class" = "appjail" -a -e "${m_zusr}/$template/home/$template" ] ; then 
 			define_messages
 			rootjail=$(qb-list -j $template -p rootjail | grep "rootjail" | awk '{print $3}')
 
-			printf "%b" "$m4 `zfs list -o used zusr/$template | tail -1` $m4_1"
+			printf "%b" "$m4 `zfs list -o used ${zusr_zfs}/$template | tail -1` $m4_1"
 			read resp
 			[ "$resp" = "y" -o "$resp" = "Y" ] && copyhome="true"
 
@@ -504,8 +512,8 @@ get_parents() {
 
 		while : ; do 
 			read rootjail 
-			rootjail="${rootjail#zroot/jails/}"
-			`echo "$validrootjs" | egrep -qs "^zroot/jails/$rootjail[[:blank:]]"` && break
+			rootjail="${rootjail#${jails_zfs}/}"
+			`echo "$validrootjs" | egrep -qs "^${jails_zfs}/$rootjail[[:blank:]]"` && break
 			printf "%b" "$e22"
 		done
 	fi
@@ -682,65 +690,65 @@ find_IP() {
 
 change_zroot() {	
 	# Check for an existing snapshot; create on if non-existent
-	rootsnap=$(zfs list -Ht snapshot | egrep -o "zroot/jails/${rootjail}@[^[:blank:]]+" | tail -1)
-	[ "$rootsnap" ] || zfs snapshot zroot/jails/$rootjail@$datetime
+	rootsnap=$(zfs list -Ht snapshot | egrep -o "${jails_zfs}/${rootjail}@[^[:blank:]]+" | tail -1)
+	[ "$rootsnap" ] || zfs snapshot ${jails_zfs}/$rootjail@$datetime
 
-	rootsnap=$(zfs list -t snapshot | egrep -o "zroot/jails/${rootjail}@[^[:blank:]]+" | tail -1)
-	rootsize=$(zfs list -o used zroot/jails/$rootjail | tail -1)
+	rootsnap=$(zfs list -t snapshot | egrep -o "${jails_zfs}/${rootjail}@[^[:blank:]]+" | tail -1)
+	rootsize=$(zfs list -o used ${jails_zfs}/$rootjail | tail -1)
 
 	# A new rootjail is a full installation. Otherwise, appjails just use clones
 	if [ "$class" = "rootjail" ] ; then
 		printf "%b" "\nqb-create:  Copying $rootsize of data to new dataset: "
-			"zroot/jails/$newjail\nDepending on the size, this could take a minute"
-echo		zfs send $rootsnap | zfs recv zroot/jails/$newjail
+			"${jails_zfs}/$newjail\nDepending on the size, this could take a minute"
+echo		zfs send $rootsnap | zfs recv ${jails_zfs}/$newjail
 	else
-echo		zfs clone $rootsnap zroot/jails/$newjail
+echo		zfs clone $rootsnap ${jails_zfs}/$newjail
 	fi
 }
 
 change_zusr() {
 	# Check for a snapshot; create if non-existant. 
 	if [ "$template" -a "$template" != "none" ] ; then
-		zusrsnap=$(zfs list -Ht snapshot | egrep -o "zusr/$template@[^[:blank:]]+" | tail -1)
+		zusrsnap=$(zfs list -Ht snapshot | egrep -o "${zusr_zfs}/$template@[^[:blank:]]+" | tail -1)
 		if [ -z "$zusrsnap" ] ; then
 			snapped="true"
-			zfs snapshot zusr/$template@$datetime
+			zfs snapshot ${zusr_zfs}/$template@$datetime
 		fi	
 		
-		zusrsnap=$(zfs list -Ht snapshot | egrep -o "zusr/$template@[^[:blank:]]+" | tail -1)
-		zusrsize=$(zfs list -o used zusr/$template | tail -1)
+		zusrsnap=$(zfs list -Ht snapshot | egrep -o "${zusr_zfs}/$template@[^[:blank:]]+" | tail -1)
+		zusrsize=$(zfs list -o used ${zusr_zfs}/$template | tail -1)
 		
 		if [ "$class" = "dispjail" ] ; then
-			zfs clone $zusrsnap zusr/$newjail
+			zfs clone $zusrsnap ${zusr_zfs}/$newjail
 
 		elif [ "$copyhome" ] ; then
 			printf "%b" "\nqb-create: Sending $zusrsize of data from" \
-				"/zusr/$template to zusr/$newjail\n\n"
-			zfs send $zusrsnap | zfs recv zusr/$newjail
+				"${m_zusr}/$template to ${zusr_zfs}/$newjail\n\n"
+			zfs send $zusrsnap | zfs recv ${zusr_zfs}/$newjail
 
 			# If we created a snapshot, destroy it if not needed. Prevents cluttering  
 			if [ "$class" != "dispjail" -a "$snapped" ] ; then
 				zfs destroy -rRf $zusrsnap
-				zfs destroy -rRf zusr/$newjail@$datetime	
+				zfs destroy -rRf ${zusr_zfs}/$newjail@$datetime	
 			fi
 
 		elif [ "$class" = "appjail" ] ; then
-			zfs create zusr/${newjail}
-			[ -e /zusr/$template/rw ] && cp -a /zusr/$template/rw /zusr/$newjail/
+			zfs create ${zusr_zfs}/${newjail}
+			[ -e ${m_zusr}/$template/rw ] && cp -a ${m_zusr}/$template/rw ${m_zusr}/$newjail/
 		fi
 
 		# /home directory must be renamed
-		if [ -e /zusr/$newjail/home/$template ] ; then 
-			mv /zusr/$newjail/home/$template /zusr/$newjail/home/$newjail
+		if [ -e ${m_zusr}/$newjail/home/$template ] ; then 
+			mv ${m_zusr}/$newjail/home/$template ${m_zusr}/$newjail/home/$newjail
 		fi
 	else
-		zfs create zusr/${newjail}
+		zfs create ${zusr_zfs}/${newjail}
 
-		if [ "$template" -a -e /zusr/$template/rw ] ; then
-			cp -a /zusr/$template/rw /zusr/$newjail/
+		if [ "$template" -a -e ${m_zusr}/$template/rw ] ; then
+			cp -a ${m_zusr}/$template/rw ${m_zusr}/$newjail/
 		else
-			mkdir -p /zusr/$newjail/rw/etc/
-			cat /etc/fstab | head -1 > /zusr/$newjail/rw/etc/fstab
+			mkdir -p ${m_zusr}/$newjail/rw/etc/
+			cat /etc/fstab | head -1 > ${m_zusr}/$newjail/rw/etc/fstab
 
 			printf "%b" "\nqb-create: ALERT: No fstab entries, rc.conf, or pwd were " \
 				"\ncreated, because [-T template] was not specified.\n"
@@ -751,15 +759,15 @@ change_zusr() {
 change_config_files() {
 
 	# Modify fstab
-	sed -i '' -E "s/${template}/${newjail}/g" /zusr/$newjail/rw/etc/fstab >> /dev/null 2>&1
+	sed -i '' -E "s/${template}/${newjail}/g" ${m_zusr}/$newjail/rw/etc/fstab >> /dev/null 2>&1
 
 	# Modify pw user 1001, if it exists 
-	pw -V /zusr/$newjail/rw/etc/ usershow 1001 >> /dev/null 2>&1
+	pw -V ${m_zusr}/$newjail/rw/etc/ usershow 1001 >> /dev/null 2>&1
 	if [ "$?" = "0" ] ; then 
-		[ -e /zusr/$newjail/home/$newjail ] || mkdir -p /zusr/$newjail/home/$newjail
-		pw -V /zusr/$newjail/rw/etc/ usermod 1001 -l $newjail
-		pw -V /zusr/$newjail/rw/etc/ groupmod 1001 -l $newjail
-		pw -V /zusr/$newjail/rw/etc/ usermod 1001 -d /usr/home/$newjail  >> /dev/null 2>&1
+		[ -e ${m_zusr}/$newjail/home/$newjail ] || mkdir -p ${m_zusr}/$newjail/home/$newjail
+		pw -V ${m_zusr}/$newjail/rw/etc/ usermod 1001 -l $newjail
+		pw -V ${m_zusr}/$newjail/rw/etc/ groupmod 1001 -l $newjail
+		pw -V ${m_zusr}/$newjail/rw/etc/ usermod 1001 -d /usr/home/$newjail  >> /dev/null 2>&1
 	fi
 	
 	# If no template, just use rootjail for convenience

@@ -2,11 +2,16 @@
 
 #  Virtual interfaces, pf, and resource control are best done before starting services 
 
-jail="$1"
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//g' $jmap
-jpf="/zusr/$jail/rw/etc/pf.conf"
-wgconf="/zusr/$jail/rw/usr/local/etc/wireguard/wg0.conf"
+
+# Define script variables
+jail="$1"
+jpf="${m_zusr}/$jail/rw/etc/pf.conf"
+wgconf="${m_zusr}/$jail/rw/usr/local/etc/wireguard/wg0.conf"
 class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
 rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap)
 jIP=$(sed -nE "s/^${jail}[[:blank:]]+IP0[[:blank:]]+//p" $jmap)
@@ -16,13 +21,12 @@ tunoftunnel=$(sed -nE "s/^${tunnel}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
 connects=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${jail}//p" $jmap)
 maxmem=$(sed -nE "s/^${jail}[[:blank:]]+maxmem[[:blank:]]+//p" $jmap) 
 cpuset=$(sed -nE "s/^${jail}[[:blank:]]+cpuset[[:blank:]]+//p" $jmap) 
-
+mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
 if [ -e "$wgconf" ] ; then
 	wgIP=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*//p" $wgconf | \
 						sed -n "s/:[[:digit:]]*.*//p")
 	wgPort=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*.*://p" $wgconf) 
 fi
-mtu="1400"
 
 usage() {
 	printf "%b" "\n$err\n\n"

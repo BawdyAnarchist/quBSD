@@ -9,28 +9,34 @@ done
 
 shift $(( OPTIND - 1 ))
 
-jail="$1"
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+
 jconf="/etc/jail.conf"
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//g' $jmap   # Remove blanks at EOL, prevents errors
+
+# Define script variables
+jail="$1"
 
 get_variables() {
 	class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
 	no_destroy=$(sed -nE "s/^$jail[[:blank:]]+no_destroy[[:blank:]]+//p" $jmap) 
 	offjails=$(zfs list -o name,origin | egrep "$jail\@.*\$" \
 									| awk '{print $1}' | sed "s@.*/@@")
-
+	
 	# Get sizes of datasets to be destroyed, and simulation messages from zfs 
-	zfs list zusr/$jail >> /dev/null 2>&1 
+	zfs list ${zusr_zfs}/$jail >> /dev/null 2>&1 
 	if [ "$?" = "0" ] ; then
-		zusrdata=$(zfs list -o used zusr/$jail | tail -1) 
-		destzusr=$(zfs destroy -nvrRf zusr/$jail)
+		zusrdata=$(zfs list -o used ${zusr_zfs}/$jail | tail -1) 
+		destzusr=$(zfs destroy -nvrRf ${zusr_zfs}/$jail)
 	fi
 
-	zfs list zroot/jails/$jail >> /dev/null 2>&1 
+	zfs list ${jails_zfs}/$jail >> /dev/null 2>&1 
 	if [ "$?" = "0" ] ; then
-		zrootdata=$(zfs list -o used zroot/jails/$jail | tail -1)
-		destzroot=$(zfs destroy -nvrRf zroot/jails/$jail)
+		zrootdata=$(zfs list -o used ${jails_zfs}/$jail | tail -1)
+		destzroot=$(zfs destroy -nvrRf ${jails_zfs}/$jail)
 	fi
 
 }
@@ -98,8 +104,8 @@ main() {
 		fi
 	done
 
-	[ "$destzroot" ] && zfs destroy -rRf zroot/jails/$jail
-	[ "$destzusr" ] && zfs destroy -rRf zusr/$jail
+	[ "$destzroot" ] && zfs destroy -rRf ${jails_zfs}/$jail
+	[ "$destzusr" ] && zfs destroy -rRf ${zusr_zfs}/$jail
 	sed -i '' -E "/^${jail}[[:blank:]]/d" $jmap
 	sed -i '' -E "/^${jail}(\{|[[:blank:]])/,/^}/d" $jconf
 }

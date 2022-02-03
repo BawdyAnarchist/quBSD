@@ -11,14 +11,24 @@ done
 
 shift $(( OPTIND -1 ))
 
-jail="$1"
+# Get datasets, mountpoints; and define files.
+zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
+
+# Define script variables
+jail="$1"
 
 define_variables() {
 	usbvmIP=$(egrep "^usbvm[[:blank:]]+IP0" $jmap | awk '{print $3}')
 	jailconnectIP="${usbvmIP%.*/*}.2/${usbvmIP#*.*.*.*/}"
 	tap=$(egrep "^usbvm[[:blank:]]+tunnel" $jmap | awk '{print $3}')
+	ppt_usb1=$(sed -nE "s:ppt_usb1[[:blank:]]+:: p" /usr/local/etc/jail.conf.d/quBSD.conf)
+	ppt_usb2=$(sed -nE "s:ppt_usb2[[:blank:]]+:: p" /usr/local/etc/jail.conf.d/quBSD.conf)
 	
 	jmapIPs=$(qb-list -p IP0 | awk '{print $3}')
 	usedIPs=$(qb-connect -l | awk '{print $3}')
@@ -97,17 +107,38 @@ find_IP() {
 }
 
 poweron_console_mode() {
-	bhyveload -c stdio -m 1G -d /dev/zvol/zroot/usbvm -S usbvm 
+	bhyveload -c stdio -m 1G -d /dev/zvol/${zroot}/usbvm -S usbvm 
+
+	if [ "$ppt_usb1" -a "$ppt_usb2" ] ; then
+		bhyve -c 1 -m 1G -H -A -P -S \
+    		    	-s 0:0,hostbridge \
+    		    	-s 1:0,lpc \
+        		-s 2:0,virtio-net,tap1 \
+        		-s 3:0,virtio-blk,/dev/zvol/${zroot}/usbvm \
+        		-s 4:0,passthru,"$ppt_usb1" \
+        		-s 5:0,passthru,"$ppt_usb2" \
+			-l com1,stdio \
+			usbvm 
 	
-	bhyve -c 1 -m 1G -H -A -P -S \
-		-s 0:0,hostbridge \
-		-s 1:0,lpc \
-		-s 2:0,virtio-net,"$tap" \
-		-s 3:0,virtio-blk,/dev/zvol/zroot/usbvm \
-		-s 4:0,passthru,71/0/1 \
-		-s 5:0,passthru,71/0/3 \
-		-l com1,stdio \
-		usbvm 
+	elif [ -z "$ppt_usb1" -a -z "$ppt_usb2" ] ; then
+		bhyve -c 1 -m 1G -H -A -P -S \
+    		    	-s 0:0,hostbridge \
+    		    	-s 1:0,lpc \
+        		-s 2:0,virtio-net,tap1 \
+        		-s 3:0,virtio-blk,/dev/zvol/${zroot}/usbvm \
+			-l com1,stdio \
+			usbvm 
+
+	else
+		bhyve -c 1 -m 1G -H -A -P -S \
+    		    	-s 0:0,hostbridge \
+    		    	-s 1:0,lpc \
+        		-s 2:0,virtio-net,tap1 \
+        		-s 3:0,virtio-blk,/dev/zvol/${zroot}/usbvm \
+        		-s 4:0,passthru,"${ppt_usb1}${ppt_usb2}" \
+			-l com1,stdio \
+			usbvm 
+	fi
 }	
 
 configure_networking() {
@@ -129,10 +160,9 @@ configure_networking() {
 	jexec -l -U root $jail ifconfig ${epair%?}b inet "$jailconnectIP" up
 
 	# Make sure ssh keys are inside the target jail
-	if ! [ -e "/zusr/${jail}/rw/root/.ssh/usbvm" ] ; then
-		cp -a /zusr/0gui-template/rw/root/.ssh  /jails/${jail}/root/
+	if ! [ -e "${m_zusr}/${jail}/rw/root/.ssh/usbvm" ] ; then
+		cp -a ${m_zusr}/0gui-template/rw/root/.ssh  ${m_jails}/${jail}/root/
 	fi
-
 }
 
 remove_tap() {
@@ -221,6 +251,5 @@ define_variables
 define_messages
 checks
 main
-
 
 

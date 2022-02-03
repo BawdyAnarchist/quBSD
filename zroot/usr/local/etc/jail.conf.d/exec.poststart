@@ -2,9 +2,14 @@
 
 # chflags should be applied after all system files and startup has been accomplished 
 
-jail="$1"
+# Get datasets, mountpoints; and define files.
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//g' $jmap
+
+# Define script variables
+jail="$1"
 schg=$(sed -nE "s/^${jail}[[:blank:]]+schg[[:blank:]]+//p" $jmap)
 seclvl=$(sed -nE "s/^${jail}[[:blank:]]+seclvl[[:blank:]]+//p" $jmap)
 
@@ -28,7 +33,7 @@ security_flags() {
 	[ "$schg" = "sys" ] && jdir="/boot /rw /bin /sbin /etc /lib /libexec /usr/bin /usr/sbin \
 					/usr/lib /usr/libexec /usr/libdata /usr/lib32 /usr/local"
 	for d in $jdir; do
-		[ -e "/jails/${jail}${d}" ] && chflags -R schg "/jails/${jail}${d}"
+		[ -e "${m_jails}/${jail}${d}" ] && chflags -R schg "${m_jails}/${jail}${d}"
 	done 
 	[ -n "$seclvl" ] && jexec -l $jail sysctl kern.securelevel="$seclvl" || exit 0
 }

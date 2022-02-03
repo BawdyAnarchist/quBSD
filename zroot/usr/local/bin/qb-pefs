@@ -10,12 +10,27 @@ while getopts chd:u o ; do
 done
 
 shift $(( OPTIND - 1 ))
+
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
+
+# Define script variables
 jail="$1"
 
 define_variables() {
+	# If -z $directory, pefs_dirs will find all .pefs.db directories (for unmount)
+	rel_directory=$(echo $directory | sed "s:${m_zusr}/${jail}/home/${jail}/::")
+	pefs_dirs=$(find ${m_jails}/${jail}/usr/home/${jail}/${rel_directory} -name '.pefs.db' \
+														| sed 's:/.pefs.db::g')
+	# Default directory if not defined by user
 	directory="${directory:-$2}" 
-	directory="${directory:-/zusr/${jail}/home/${jail}/crypt}"
-	cryptmount=$(mount | egrep -o "/jails/${jail}/usr/home/${jail}/[[:alnum:]]*")
+	directory="${directory:-${m_zusr}/${jail}/home/${jail}/crypt}"
+
+	# Must find rel_directory again for ops not related to unmount
+	rel_directory=$(echo $directory | sed "s:${m_zusr}/${jail}/home/${jail}/::")
 }
 
 define_messages() {
@@ -34,13 +49,14 @@ usage() {
 	[ "$ERR" ] && printf "%b" "\n$ERR\n"
 	echo ""
 	echo "qb-pefs: Mounts an encrypted pefs volume inside of a running jail" 
-	echo "         Default directory is /zusr/<jail>/home/<jail>/crypt"
+	echo "         Default directory is ${m_zusr}/<jail>/home/<jail>/crypt"
 	echo ""
 	echo "Usage: qb-pefs <jailname>"
 	echo "Usage: qb-pefs [-h] [-d <directory>] <jailname>"
 	echo "   -c: (c)reate:  Create and configure new pefs directory" 
 	echo "   -d: (d)irectory:  Override default, and mount specified directory" 
 	echo "        <directory> must be entered based on location of HOST "
+	echo "        <directory> must be inside zusr home directory of jail"
 	echo "   -h: (h)elp:  Outputs this help message"
 	echo "   -u: (u)nmount:  Removes pefs mount from jail, encrypts files" 
 	echo ""
@@ -70,7 +86,9 @@ checks() {
 
 main() {
 	if [ "$unmount" ] ; then
-		[ -n "$cryptmount" ] && echo "$cryptmount" | xargs umount -f > /dev/null
+		for p in $pefs_dirs ; do
+			umount -f $p
+		done
 		exit 0
 
 	elif ! `jls | grep -qs " $jail "` ; then
@@ -85,9 +103,9 @@ main() {
 		pefs addchain -fZ $directory
 	fi
 
-	pefs mount $directory /jails/${jail}/usr/home/${jail}/crypt 
+	pefs mount $directory ${m_jails}/${jail}/usr/home/${jail}/${rel_directory}
 	[ "$create" ] && printf "%b" "\n$msg8\n"
-	pefs addkey -c /jails/${jail}/usr/home/${jail}/crypt 
+	pefs addkey -c ${m_jails}/${jail}/usr/home/${jail}/${rel_directory}
 }
 
 define_variables

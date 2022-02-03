@@ -16,6 +16,8 @@ sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents err
 define_variables() {
 	nicvmIP=$(egrep "^nicvm[[:blank:]]+IP0" $jmap | awk '{print $3}')
 	tap=$(egrep "^nicvm[[:blank:]]+tunnel" $jmap | awk '{print $3}')
+	ppt_nic=$(sed -nE "s:ppt_nic[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
+	zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
 
 	firewallIP=$(egrep "^net-firewall[[:blank:]]+IP0" $jmap | awk '{print $3}')
 	firewall_tun=$(egrep "^net-firewall[[:blank:]]+tunnel" $jmap | awk '{print $3}')
@@ -75,14 +77,14 @@ checks() {
 }
 
 poweron_console_mode() {
-	bhyveload -c stdio -m 600M -d /dev/zvol/zroot/nicvm -S nicvm 
+	bhyveload -c stdio -m 600M -d /dev/zvol/${zroot}/nicvm -S nicvm 
 	
 	bhyve -c 1 -m 600M -H -A -P -S \
 		-s 0:0,hostbridge \
 		-s 1:0,lpc \
 		-s 2:0,virtio-net,"$tap" \
-		-s 3:0,virtio-blk,/dev/zvol/zroot/nicvm \
-		-s 4:0,passthru,68/0/0 \
+		-s 3:0,virtio-blk,/dev/zvol/${zroot}/nicvm \
+		-s 4:0,passthru,"$ppt_nic" \
 		-l com1,stdio \
 		nicvm 
 }	
@@ -129,7 +131,5 @@ define_variables
 define_messages
 checks
 main
-
-
 
 

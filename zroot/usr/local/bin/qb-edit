@@ -11,25 +11,34 @@ done
 
 shift $(( OPTIND - 1 ))
 
-jail="${jail:-"$1"}"
-param="${param:-"$2"}"
-val="${val:-"$3"}"
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
+
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//' $jmap  #remove blanks at end of lines
 
+# Define script variables
+jail="${jail:-"$1"}"
+param="${param:-"$2"}"
+val="${val:-"$3"}"
+
 define_variables() {
-	# Valid template jails must have jmap entries and zusr dataset 
+	# Valid template jails must have jmap entries and ${zusr_zfs} dataset 
 	jmap_appjs=$(qb-list -p class | awk '{print $1}' | uniq)
-	zusrlist=$(zfs list -r zusr | awk '{print $1}')
+	zusrlist=$(zfs list -r ${zusr_zfs} | awk '{print $1}')
 	for j in $jmap_appjs ; do
-		`echo "$zusrlist" | egrep -qs "^zusr/$j\$"` &&
-		validtemplatejs=$(printf "%b" "$j" "\n" "$validtemplatejs" | sort)
+		if `echo "$zusrlist" | egrep -qs "^${zusr_zfs}/$j\$"` ; then
+			validtemplatejs=$(printf "%b" "$j" "\n" "$validtemplatejs" | sort)
+		fi
 	done
 
-	# Valid rootjails must have jmap entries and zroot/jails dataset 
+	# Valid rootjails must have jmap entries and ${jails_zfs} dataset 
 	jmap_rootjs=$(qb-list -p class | grep rootjail | awk '{print $1}')
 	for j in $jmap_rootjs ; do
-		tmpj=$(zfs list -ro name,used zroot/jails | egrep "^zroot/jails/$j[[:blank:]]")
+		tmpj=$(zfs list -ro name,used ${jails_zfs} | egrep "^${jails_zfs}/$j[[:blank:]]")
 		validrootjs=$(printf "%b" "$tmpj" "\n" "$validrootjs")
 	done
 
@@ -93,9 +102,9 @@ define_messages() {
 			"following rootjail | appjail | dispjail")
 
 	err4=$(printf "%b" "qb-create: ERROR:  You must specify a VALID rootjail."\
-				"\nHere is a list of valid possibilities from zroot/jails \n\n$validrootjs\n" \
+				"\nHere is a list of valid possibilities from ${jails_zfs} \n\n$validrootjs\n" \
 				"\nIf you expected to see another rootjail, check that it's in jailmap.conf" \
-				"\nand a zfs zroot/jails/<jailname> is an original dataset (not a child).")
+				"\nand a zfs ${jails_zfs}/<jailname> is an original dataset (not a child).")
 
 	err5=$(printf "%b" "qb-create: ERROR:  Must specify a VALID template")
 
@@ -177,7 +186,7 @@ checks() {
 		fi
 		
 	elif [ "$param" = "rootjail" ] ; then
-		if ! `echo "$validrootjs" | egrep -qs "^zroot/jails/$val[[:blank:]]"` ; then
+		if ! `echo "$validrootjs" | egrep -qs "^${jails_zfs}/$val[[:blank:]]"` ; then
 			ERR="$err4" ; usage
 		fi	
 

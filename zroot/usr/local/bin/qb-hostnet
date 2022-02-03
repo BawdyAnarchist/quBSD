@@ -8,13 +8,14 @@ while getopts dhu o ; do
 	esac
 done
 
+# Define files
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//' $jmap   #removes blanks at end of lines
+
+# Define script variables
 jIP=$(sed -n "s/^host[[:blank:]]*IP0[[:blank:]]*//p" $jmap)
 tunnel=$(sed -nE "s/^host[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
-
-# NOTE - This is a hack for IVPN. Most people will not need this
-mtu="1400"
+mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
 
 usage() {
 	[ -n "$ERR" ] && echo "$ERR"
