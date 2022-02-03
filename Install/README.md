@@ -3,7 +3,7 @@
 - quBSD doesn't configure host Xorg / sound. User should've already configured these. 
 - Minimize host pkgs, try to put the rest in jails. Here's an example of my host pkgs:
    - doas Xorg nvidia-driver vim i3 i3status i3lock dbus pefs-kmod virtual_oss webcamd    
-- Putting your user data (zusr) on a separate pool that the root system, is a good idea.
+- The installer allows you to choose the same zpool for both rootjail data, and jail's user data (zusr). However, it's best practice (even on a normal system), to segregate user data to a different pool/partition.
 
 **REQUIREMENTS**
 - You must have at least one zfs zpool/dataset available on host
