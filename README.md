@@ -34,7 +34,6 @@ Additional Features
    - Viewing and editing of jail parameters     
    - Realtime continuous monitoring of jail status and resource usage     
    - Descriptive help pages      
-   - Handling/access for nicvm and usbvm virtual machines     
+   - Simplified handling/access for nicvm and usbvm virtual machines     
 
-For a complete description of system functionality and how to install, navegate to:      
-[quBSD/zroot/usr/local/share/quBSD/](https://github.com/BawdyAnarchist/quBSD/tree/master/zroot/usr/local/share/quBSD)
+For a full description of system functionality at [quBSD/zroot/usr/local/share/quBSD/](https://github.com/BawdyAnarchist/quBSD/tree/master/zroot/usr/local/share/quBSD)
