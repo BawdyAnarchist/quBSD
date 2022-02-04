@@ -86,8 +86,9 @@ check_IPv4() {
 configure_tap() {
 	ifconfig $tunnel vnet $jail
 	jexec -l -U root $jail ifconfig bridge0 create up 
+	jexec -l -U root $jail ifconfig bridge0 mtu $mtu 
+	jexec -l -U root $jail ifconfig $tunnel mtu $mtu up
 	jexec -l -U root $jail ifconfig bridge0 addm $tunnel
-	jexec -l -U root $jail ifconfig $tunnel up
 }
 
 upstream_tunnel() {
@@ -97,8 +98,8 @@ upstream_tunnel() {
 
 	# If tunnel contains a tap interface, connect epair to bridge, no IP
 	if [ -z "${tunoftunnel##tap*}" ] ; then 
-		jexec -l -U root $tunnel ifconfig bridge0 addm "${epair%?}a"
 		jexec -l -U root $tunnel ifconfig "${epair%?}a" mtu $mtu up
+		jexec -l -U root $tunnel ifconfig bridge0 addm "${epair%?}a"
 	else
 		jexec -l -U root $tunnel ifconfig "${epair%?}a" inet "${jIP%.*/*}.1/${jIP#*/}" mtu $mtu up 
 	fi
@@ -122,8 +123,8 @@ client_connections() {
 
      # net-tap has a bridge
 	if [ -z "${tunnel##tap*}" ] ; then	  
+		jexec -l -U root $jail ifconfig "${epair%?}a" mtu $mtu up
 		jexec -l -U root $jail ifconfig bridge0 addm "${epair%?}a"
-		jexec -l -U root $jail ifconfig "${epair%?}a" up
 		jexec -l -U root $c route add default "${cIP%.*/*}.1"
 		jexec -l -U root $c wg-quick down wg0 
 		jexec -l -U root $c wg-quick up wg0 
