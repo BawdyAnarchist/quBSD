@@ -813,7 +813,7 @@ usbvm_configure() {
 	# IP needs to be managed between tap1 and tap0; since usbvm changed IP needs a reboot to take effect
 	ifconfig tap1 -alias
 	ifconfig tap0 inet $nicIP2 up
-	cp /root/.ssh/* ${m_zusr}/0net-template/rw/root/.ssh
+	[ -e "${m_zusr}/0gui-template/rw/root/.ssh" ] || mkdir -p "${m_zusr}/0gui-template/rw/root/.ssh" ] 
 	mv /root/.ssh/* ${m_zusr}/0gui-template/rw/root/.ssh
 
 	printf "%b" "\n\nKeys/configs pushed to USBVM. You probably still want to install pkgs for mounting" \
@@ -828,7 +828,7 @@ nicvm_configure() {
 	printf "%b" "\nNow configuring nicvm. Set a good password for nicvm SSH (can be same as nicvm root passwd)\n\n"
 
 	ssh-keygen -f /root/.ssh/nicvm 
-	ssh-copy-id -i /root/.ssh/nicvm root@$nicIP1 
+	ssh-copy-id -o StrictHostKeyChecking=no -i /root/.ssh/nicvm root@$nicIP1 
 
 	if [ "$?" != "0" ] ; then  
 		printf "%b" "\n\nIf the connection was refused, sometimes the DHCP client can hang, directly after VM" \
@@ -861,6 +861,7 @@ nicvm_configure() {
 	clear
 
 	# Move keys to net-firewall jail
+	[ -e "${m_zusr}/0net-template/rw/root/.ssh" ] || mkdir -p "${m_zusr}/0net-template/rw/root/.ssh" ] 
 	mv /root/.ssh/* ${m_zusr}/net-firewall/rw/root/.ssh/
 
 	printf "%b" "\n\nAdjusting sysrc to launch nicvm and usbvm at boot\n"
