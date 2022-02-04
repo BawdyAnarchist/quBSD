@@ -64,7 +64,7 @@ remove() {
 
 			# Run a hard remove "-R" if the previous -r failed 
 			`jls | grep -qs " $r "` && jail -R $jailnum
-			[ "$restart" ] && jail -c $r 
+			[ "$restart" ] && jail -c $r >> /dev/null
 		else
 			echo "Jail $jail does not exist. Skipping." 
 		fi	
