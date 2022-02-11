@@ -61,6 +61,9 @@ reclone_appjail() {
 		[ -e "${m_jails}/${jail}" ] && zfs destroy -rRf "${jails_zfs}/${jail}"  
 		[ ! -e "${m_jails}/${jail}" ] && zfs clone $rootsnap "${jails_zfs}/${jail}" 
 	fi
+	
+	# New clones need to remove schg before start (inherited from clones)
+	flags_down
 }
 
 reclone_dispjail() {
@@ -71,7 +74,10 @@ reclone_dispjail() {
 
 		[ -e "${m_zusr}/${jail}" ] && zfs destroy -rRf ${zusr_zfs}/${jail}  
 		[ ! -e "${m_zusr}/${jail}" ] && zfs clone ${homesnap} ${zusr_zfs}/${jail} 
-		
+
+		# New clones need to remove schg before start (inherited from clones)
+		flags_down
+
 		[ -e ${m_zusr}/${jail}/home/${template} ] && \
 			mv ${m_zusr}/${jail}/home/${template} ${m_zusr}/${jail}/home/${jail} 
 		sed -i '' -e "s/${template}/${jail}/g" ${m_zusr}/${jail}/rw/etc/fstab 
@@ -111,8 +117,5 @@ reclone_appjail
 
 # Dispjails also clone their /home and /rw directories from a clean template	
 reclone_dispjail	
-
-# New clones need to remove schg before start (inherited from clones)
-flags_down		
 
 
