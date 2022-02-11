@@ -7,12 +7,12 @@ preinstall_variables() {
 	date=$(date +%b%d)
 	tyme=$(date +%H%M)
 
-     zpools=$(zpool list -H -o name)
+	zpools=$(zpool list -H -o name)
 	zusrlist="0net-template 0gui-template net-tap net-vpn net-firewall dispjail"
 	
 	# Define mountpoints 
-     m_jails="/quBSD/jails"
-     m_zusr="/quBSD/zusr"
+	m_jails="/quBSD/jails"
+	m_zusr="/quBSD/zusr"
 
 	# Define datasets, if they exist
 	if [ -e /usr/local/etc/jail.conf.d/quBSD.conf ] ; then
