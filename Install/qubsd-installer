@@ -272,6 +272,10 @@ qubsd_files_copy() {
 	sed -i '' -e "s:m_jails:${m_jails}:g" /etc/jail.conf   >> $qlog 2>&1
 	sed -i '' -e "s:m_zusr:${m_zusr}:g" /etc/jail.conf   >> $qlog 2>&1
 
+	# 0gui-template needs user-level permissions applied
+	chown -R 1001:1001 ${m_zusr}/0gui-template/home/0gui-template
+	chflags -R noschg ${m_zusr}/0gui-template/home/0gui-template
+
 	printf "%b" "\nFiles copied from quBSD repo to their respective directories," \
 			"\nand/or modifications have been made." \
 			"\n\nXorg Notes: If you install Xorg after this, it might overwrite xinitrc." \
