@@ -115,8 +115,8 @@ qb-off <jailname> <jailname2> ... <jailname3>
 	vi /etc/pf.conf
 	# This of course is from inside the running jail
 	# You will *NOT* be able to save changes, because the firewall jail
-	# by default comew with schg flags applied. You would need to either
-	# stop the jail and edit from host, or qb-edit the secuirty settings.
+	# by default comes with schg flags applied. You would need to either
+	# stop the jail and edit from host, or qb-edit the security settings.
 
 # Now exit net-firewall with:  
 	exit
@@ -147,7 +147,7 @@ close all dispjail windows
 # To see all parameters for a jail (in this example, dispjail):
 	qb-list -j dispjail
 
-# Above you can see all available parameters. Lets chech the tunnel for all jails: 
+# Above you can see all available parameters. Lets check the tunnel for all jails: 
 	qb-list -p tunnel 
 	# Notice that host shows up as well. It can be changed
 	# Recommend not changing nicvm/usbvm, required for qb-scripts to function 
@@ -259,7 +259,7 @@ close all dispjail windows
 	vi /quBSD/zusr/net-vpn/rw/usr/local/etc/wireguard/wg0.conf
 
 # Default tunnel for all jails is net-firewall, which has no VPN. 
-# When you're vpn is configured, and tested, change your jails and host tunnels
+# When your vpn is configured, and tested, change your jails and host tunnels
 
 # qb-edit
 # All parameters except the devfs rulenumber can be changed with qb-edit 
@@ -318,8 +318,8 @@ a few jails with guided mode.
 	- ! Dont delete the line 'DISPLAY :0' in .cshrc, or else gui wont work 
 		- All else can be adjusted to user preference
 
-# Use 0gui-template this as a template for creating other gui-jails
-# You don't have to use guided, mode, you can create from comman line
+# Use 0gui-template as a template for creating other gui-jails
+# You don't have to use guided, mode, you can create from command line
 	qb-create -T 0gui-template -H -t net-vpn <new_gui_jail>
 	# [-H] copies the /home directory files to the new jail
 	# [-t] sets a tunnel for the new jail, and auto-assigns IP address.
@@ -381,11 +381,11 @@ qb-flags -d|-u
 
 qb-connect <target_jail> <tunnel_jail>
 	Creates an an adhoc connection between two jails, and auto applies an IP
-	IP address. Useful for testing and troubleshooting. Remember that pf.conf 
+	address. Useful for testing and troubleshooting. Remember that pf.conf 
 	might filter packets, and securelevel might prevent network changes. 
 
 qb-ivpn
-	I use IVPN, so this was a script I made for myself. Sorry if you don't, use
+	I use IVPN, so this was a script I made for myself. Sorry if you don't use
 	them, you'll have to settle with manually editing your wg0.conf
 
 qb-pefs
