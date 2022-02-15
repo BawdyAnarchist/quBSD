@@ -928,7 +928,6 @@ reboot_checks() {
 	if [ "$resp" != "y" -a "$resp" != "Y" ] ; then
 		state="postjails"
 		state_rollback
-	else
 	fi
 
 	if [ "$state" = "rebootchecks" ] ; then	
