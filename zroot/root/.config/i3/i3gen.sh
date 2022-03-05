@@ -94,8 +94,8 @@ jailgen() {
 
 		## Searches for alias, and replaces with full command
 		for p in $progs; do
-			sym=$(echo "$hostcommands" | egrep "^${p}" | awk '{print $2}')
-			passed_command=$(echo "$hostcommands" | egrep "^${p}" \
+			sym=$(echo "$hostcommands" | egrep "^${p} " | awk '{print $2}')
+			passed_command=$(echo "$hostcommands" | egrep "^${p} " \
 			| sed "s/^[^[:blank:]]*[[:blank:]]*[^[:blank:]]*[[:blank:]]*//" | sed "s,\$jail,${jail},") 
 		
 			if [ -n "$sym" ]; then	

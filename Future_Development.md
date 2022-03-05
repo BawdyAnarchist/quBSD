@@ -29,6 +29,11 @@ All files inside scripts should be made into variable references
 
 column -t some of the conf files
 
+qb-ivpn - sed error - needs better separation of the -j option to not throw error.
+        - Also an unused variable "pingfail"
+	   - Current server should be upgraded to show current settings, even if not connected
+	   - Need to verify how well it works when connection is down
+
 
 ### MINOR UPGRADES
 
