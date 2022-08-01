@@ -43,12 +43,12 @@ qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 
 qb-cam/mic - webcam and mic get brought up with script
 
-qb-update - Update rootjails, create snapshots 
+qb-update - Update rootjails, create snapshots
+
+qb-snap - Add an option for snapshotting host before an update
 
 Config file that maps workspaces to GUI apps; script to launch apps startx
 
 Crons
 - Popup warning if zpool errors are discovered
 - Popup warning if host has been network connected for too long
-
-
