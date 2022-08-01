@@ -21,7 +21,7 @@ usbvm_start() {
 	ppt_usb2=$(sed -nE "s:ppt_usb2[[:blank:]]+:: p" /usr/local/etc/jail.conf.d/quBSD.conf)
 	zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
 
-	bhyveload -c stdio -m 1G -d /dev/zvol/${zroot}/usbvm -S usbvm > /dev/null 2>&1 &
+	bhyveload -c stdio -m 1G -d /dev/zvol/${zroot}/usbvm -S usbvm > /dev/null 2>&1 
 
 	if [ "$ppt_usb1" -a "$ppt_usb2" ] ; then
 		bhyve -c 1 -m 1G -H -A -P -S \
