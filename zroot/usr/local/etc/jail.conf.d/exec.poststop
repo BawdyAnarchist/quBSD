@@ -72,6 +72,9 @@ reclone_dispjail() {
                 [ -e "${m_zusr}/${jail}" ] && zfs destroy -rRf ${zusr_zfs}/${jail}
                 [ ! -e "${m_zusr}/${jail}" ] && zfs clone ${homesnap} ${zusr_zfs}/${jail}
 
+		# Remove schg flags (if inherited from clones) to modify new snap
+		[ -e ${m_zusr}/${jail} ] && chflags -R noschg ${m_zusr}/${jail}
+
 		# Rename folders/mounts with dispjail name 
                 [ -e ${m_zusr}/${jail}/home/${template} ] && \
                         mv ${m_zusr}/${jail}/home/${template} ${m_zusr}/${jail}/home/${jail}
