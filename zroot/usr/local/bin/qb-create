@@ -757,6 +757,8 @@ change_zusr() {
 }
 
 change_config_files() {
+	# Remove schg on /rw files for new jail
+	chflags -R noschg ${m_zusr}/$newjail/rw /dev/null 2>&1
 
 	# Modify fstab
 	sed -i '' -E "s/${template}/${newjail}/g" ${m_zusr}/$newjail/rw/etc/fstab >> /dev/null 2>&1
