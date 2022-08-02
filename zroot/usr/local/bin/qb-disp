@@ -61,10 +61,11 @@ main() {
 }
 
 destroy_dispjail() {
-	jail -R $newjail
+	jail -r $newjail
 
 	zfs destroy -rRf ${jails_zfs}/$newjail
 	zfs destroy -rRf ${zusr_zfs}/$newjail
+	zfs destroy $newsnap
 	sed -i '' -E "/^${newjail}[[:blank:]]/d" $jmap
 	sed -i '' -E "/^${newjail}(\{|[[:blank:]])/,/^}/d" /etc/jail.conf 
 }
