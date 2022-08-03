@@ -47,6 +47,8 @@ qb-update - Update rootjails, create snapshots
 
 qb-snap - Add an option for snapshotting host before an update
 
+qb-create - While in guided mode, add option to enter "auto" for IP assignment 
+
 Config file that maps workspaces to GUI apps; script to launch apps startx
 
 Crons
