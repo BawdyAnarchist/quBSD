@@ -383,15 +383,22 @@ check_parameters() {
 	elif ! `echo "$validrootjs" | egrep -qs "^${jails_zfs}/$rootjail[[:blank:]]"` ; then
 		ERR="$e5" && usage
 
-	elif [ "$class" = "rootjail" -a  "$template" -a "$rootjail" != "$template" ] ; then
-		ERR="$e6" && usage
+	elif [ "$class" = "rootjail" -a -n "$template" ] ; then 
+		if [ "$rootjail" != "$template" ] ; then
+			ERR="$e6" && usage
 
-	elif [ "$copyhome" -a -z "$template" ] ; then
+		elif ! `echo "$validrootjs" | egrep -qs "^${jails_zfs}/$template[[:blank:]]"` ; then
+			ERR="$e9" && usage
+		fi
+	fi
+
+	if [ "$copyhome" -a -z "$template" ] ; then
 		ERR="$e7" && usage
 
-	elif ! `echo "$validtemplatejs" | egrep -qs "^$template\$"` ; then
-		ERR="$e9" && usage
-
+	elif [ "$class" != "rootjail" ] ; then 
+		if ! `echo "$validtemplatejs" | egrep -qs "^$template\$"` ; then
+			ERR="$e9" && usage
+		fi
 	fi
 
 	if `echo "$validtemplatejs" | egrep -qs "^$tunnel\$"` ; then
@@ -698,11 +705,11 @@ change_zroot() {
 
 	# A new rootjail is a full installation. Otherwise, appjails just use clones
 	if [ "$class" = "rootjail" ] ; then
-		printf "%b" "\nqb-create:  Copying $rootsize of data to new dataset: "
+		printf "%b" "\nqb-create:  Copying $rootsize of data to new dataset: " \
 			"${jails_zfs}/$newjail\nDepending on the size, this could take a minute"
-echo		zfs send $rootsnap | zfs recv ${jails_zfs}/$newjail
+		zfs send -vP $rootsnap | zfs recv -v ${jails_zfs}/$newjail
 	else
-echo		zfs clone $rootsnap ${jails_zfs}/$newjail
+		zfs clone $rootsnap ${jails_zfs}/$newjail
 	fi
 }
 
@@ -724,7 +731,7 @@ change_zusr() {
 		elif [ "$copyhome" ] ; then
 			printf "%b" "\nqb-create: Sending $zusrsize of data from" \
 				"${m_zusr}/$template to ${zusr_zfs}/$newjail\n\n"
-			zfs send $zusrsnap | zfs recv ${zusr_zfs}/$newjail
+			zfs send -vP $zusrsnap | zfs recv -v ${zusr_zfs}/$newjail
 
 			# If we created a snapshot, destroy it if not needed. Prevents cluttering  
 			if [ "$class" != "dispjail" -a "$snapped" ] ; then
@@ -758,7 +765,7 @@ change_zusr() {
 
 change_config_files() {
 	# Remove schg on /rw files for new jail
-	chflags -R noschg ${m_zusr}/$newjail/rw /dev/null 2>&1
+	[ -e ${m_zusr}/$newjail/rw ] && chflags -R noschg ${m_zusr}/$newjail/rw /dev/null 2>&1
 
 	# Modify fstab
 	sed -i '' -E "s/${template}/${newjail}/g" ${m_zusr}/$newjail/rw/etc/fstab >> /dev/null 2>&1
@@ -784,25 +791,31 @@ change_config_files() {
 	qb-edit $newjail schg $schg			>> /dev/null
 	qb-edit -f $newjail IP0 $IP0			>> /dev/null
 	qb-edit $newjail maxmem $maxmem 		>> /dev/null
-	qb-edit $newjail rootjail $rootjail	>> /dev/null
 	qb-edit $newjail seclvl $seclvl 		>> /dev/null 
 	qb-edit -f $newjail tunnel $tunnel 	>> /dev/null 
+
+	# New rootjails need to redirect the rootjail line to self
+	if [ "$class" = "rootjail" ] ; then 
+		qb-edit $newjail rootjail $newjail   >> /dev/null
+	else
+		qb-edit $newjail rootjail $rootjail  >> /dev/null
+	fi
 
 	# Dispjails have one extra line for template
 	if [ "$class" = "dispjail" -a ! `egrep -qs "^$newjail[[:blank:]]+template" $jmap` ] ; then
 		printf "%b" "$newjail\ttemplate\t$template\n" >> $jmap
 	fi
-
+	
 	printf "%b" "Here are the jailmap settings for $newjail:\n"
 	qb-list -j $newjail
 
 	# jail.conf settings
 	mktemp /tmp/qb-create > /dev/null
-	sed -nE "/^${template}[[:blank:]]*\{/,/\}/p" /etc/jail.conf >> /tmp/qb-create 
+	sed -nE "/^${template}[[:blank:]]*\{/,/\}/p" $jconf >> /tmp/qb-create 
 	sed -i '' -E "s/${template}/${newjail}/" /tmp/qb-create
 
 	if [ "$class" = "rootjail" ] ; then
-		sed -i '' -e "/# Root Jails/r /tmp/qb-create" $jconf
+		sed -i '' -e "/# Rootjails/r /tmp/qb-create" $jconf
 
 	elif [ -z "${newjail##net-*}" ] ; then
 		sed -i '' -e "/# Net Jails/r /tmp/qb-create" $jconf
