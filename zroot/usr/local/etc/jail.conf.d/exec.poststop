@@ -60,26 +60,31 @@ reclone_appjail() {
 	if [ "$class" != "rootjail" ] ; then 
 		zfs destroy -rRf ${jails_zfs}/$jail
 		zfs clone $rootsnap "${jails_zfs}/$jail"
+
+		# Add user and group to freshly cloned rootjail
+		pw -V ${m_jails}/${jail}/etc/ useradd -n $jail -u 1001 -d /usr/home/${jail} -s /bin/csh 
 	fi
 }
 
 reclone_dispjail() {
-      if [ "$class" = "dispjail" ] ; then
-                template=$(sed -nE "s/^${jail}[[:blank:]]+template[[:blank:]]+//p" $jmap)
-                homesnap=$(zfs list -t snapshot | \
-                           egrep -o "${zusr_zfs}/${template}@[^[:blank:]]+" | tail -1)
+	if [ "$class" = "dispjail" ] ; then
+		template=$(sed -nE "s/^${jail}[[:blank:]]+template[[:blank:]]+//p" $jmap)
+		homesnap=$(zfs list -t snapshot | \
+		egrep -o "${zusr_zfs}/${template}@[^[:blank:]]+" | tail -1)
 
-                [ -e "${m_zusr}/${jail}" ] && zfs destroy -rRf ${zusr_zfs}/${jail}
-                [ ! -e "${m_zusr}/${jail}" ] && zfs clone ${homesnap} ${zusr_zfs}/${jail}
+		# Destroy/reclone existing dispjail /home
+		[ -e "${m_zusr}/${jail}" ] && zfs destroy -rRf ${zusr_zfs}/${jail}
+		[ ! -e "${m_zusr}/${jail}" ] && zfs clone ${homesnap} ${zusr_zfs}/${jail}
 
 		# Remove schg flags (if inherited from clones) to modify new snap
 		[ -e ${m_zusr}/${jail} ] && chflags -R noschg ${m_zusr}/${jail}
 
-		# Rename folders/mounts with dispjail name 
-                [ -e ${m_zusr}/${jail}/home/${template} ] && \
-                        mv ${m_zusr}/${jail}/home/${template} ${m_zusr}/${jail}/home/${jail}
-                sed -i '' -e "s/${template}/${jail}/g" ${m_zusr}/${jail}/rw/etc/fstab
-        fi
+		# Rename directories and mounts with dispjail name 
+		[ -e ${m_zusr}/${jail}/home/${template} ] && \
+				mv ${m_zusr}/${jail}/home/${template} ${m_zusr}/${jail}/home/${jail}
+		
+		sed -i '' -e "s/${template}/${jail}/g" ${m_zusr}/${jail}/rw/etc/fstab
+	fi
 }
 
 
@@ -96,10 +101,6 @@ reclone_appjail
 
 # dispjails root *and* home filesystems are immediately destroyed
 reclone_dispjail	
-
-# Add user and group to freshly cloned rootjail
-pw -V ${m_jails}/${jail}/etc/ useradd -n $jail -u 1001 -d /usr/home/${jail} -s /bin/csh 
-
 
 
 
