@@ -81,14 +81,6 @@ reclone_dispjail() {
 		[ -e ${m_zusr}/${jail}/home/${template} ] && \
 			mv ${m_zusr}/${jail}/home/${template} ${m_zusr}/${jail}/home/${jail} 
 		sed -i '' -e "s/${template}/${jail}/g" ${m_zusr}/${jail}/rw/etc/fstab 
-
-		# If template has an unprivileged user, pw name needs changed to dispjail name
-		pw -V ${m_zusr}/${jail}/rw/etc/ usershow $template  > /dev/null 2>&1
-	        if [ "$?" = "0" ] ; then
-			pw -V ${m_zusr}/${jail}/rw/etc/ usermod $template -l $jail
-			pw -V ${m_zusr}/${jail}/rw/etc/ groupmod $template -l $jail
-			pw -V ${m_zusr}/${jail}/rw/etc/ usermod $jail -d /usr/home/${jail} > /dev/null 2>&1
-		fi
 	fi
 }
 
@@ -117,5 +109,9 @@ reclone_appjail
 
 # Dispjails also clone their /home and /rw directories from a clean template	
 reclone_dispjail	
+
+# Add user and group to freshly cloned rootjail 
+pw -V ${m_jails}/${jail}/etc/ useradd -n $jail -u 1001 -d /usr/home/${jail} -s /bin/csh 
+
 
 
