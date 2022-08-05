@@ -64,6 +64,9 @@ reclone_appjail() {
 	
 	# New clones need to remove schg before start (inherited from clones)
 	flags_down
+
+	# Add user and group to freshly cloned rootjail 
+	pw -V ${m_jails}/${jail}/etc/ useradd -n $jail -u 1001 -d /usr/home/${jail} -s /bin/csh 
 }
 
 reclone_dispjail() {
@@ -75,9 +78,10 @@ reclone_dispjail() {
 		[ -e "${m_zusr}/${jail}" ] && zfs destroy -rRf ${zusr_zfs}/${jail}  
 		[ ! -e "${m_zusr}/${jail}" ] && zfs clone ${homesnap} ${zusr_zfs}/${jail} 
 
-		# New clones need to remove schg before start (inherited from clones)
+		# New clones need to remove schg before start (inherited from parent)
 		flags_down
 
+		# Rename directories and mounts with dispjail name 
 		[ -e ${m_zusr}/${jail}/home/${template} ] && \
 			mv ${m_zusr}/${jail}/home/${template} ${m_zusr}/${jail}/home/${jail} 
 		sed -i '' -e "s/${template}/${jail}/g" ${m_zusr}/${jail}/rw/etc/fstab 
@@ -109,9 +113,5 @@ reclone_appjail
 
 # Dispjails also clone their /home and /rw directories from a clean template	
 reclone_dispjail	
-
-# Add user and group to freshly cloned rootjail 
-pw -V ${m_jails}/${jail}/etc/ useradd -n $jail -u 1001 -d /usr/home/${jail} -s /bin/csh 
-
 
 
