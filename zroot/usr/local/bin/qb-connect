@@ -271,7 +271,6 @@ list_output() {
 			printf "%b" "\nHere are the interfaces for:  $jail" "\n$jail_interfaces\n"
 			printf "%b" "\n$jail is connected to these jails:  "
 			if [ -n "$jailepairs" ] ; then
-				echo "yeah im here"
 				printf "%b" "\n$tunnel_pairs\n\n"
 			else
 				printf "%b" "\n\n"
