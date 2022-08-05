@@ -34,6 +34,7 @@ qb-ivpn - sed error - needs better separation of the -j option to not throw erro
 	   - Current server should be upgraded to show current settings, even if not connected
 	   - Need to verify how well it works when connection is down
 
+qb-create - Really should have some trap functions set when zfs cloning
 
 ### MINOR UPGRADES
 
@@ -49,7 +50,15 @@ qb-snap - Add an option for snapshotting host before an update
 
 qb-create - While in guided mode, add option to enter "auto" for IP assignment 
 
-Config file that maps workspaces to GUI apps; script to launch apps startx
+qb-stat - Change "class" column to class_rootjail. Maybe even realtime switching of sort, columns, and presentation (maybe)
+
+qb-edit - the -i option should be able to be applied when setting the tunnel
+
+usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
+
+startup.conf and startup.sh - Config file that maps workspaces to GUI apps; script to launch apps startx
+
+add autostart option to jailmap.conf, and a service startup script for autostart
 
 Crons
 - Popup warning if zpool errors are discovered
