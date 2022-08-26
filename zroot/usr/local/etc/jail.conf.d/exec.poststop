@@ -62,7 +62,7 @@ reclone_appjail() {
 		zfs clone $rootsnap "${jails_zfs}/$jail"
 
 		# Add user and group to freshly cloned rootjail
-		pw -V ${m_jails}/${jail}/etc/ useradd -n $jail -u 1001 -d /usr/home/${jail} -s /bin/csh 
+		pw -V ${m_jails}/${jail}/etc/ useradd -n $jail -u 1001 -d /usr/home/${jail} -s /bin/csh 2>&1
 	fi
 }
 
