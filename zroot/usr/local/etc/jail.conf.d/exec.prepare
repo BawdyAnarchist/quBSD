@@ -60,13 +60,13 @@ reclone_appjail() {
 	if [ "$class" != "rootjail" ] ; then
 		[ -e "${m_jails}/${jail}" ] && zfs destroy -rRf "${jails_zfs}/${jail}"  
 		[ ! -e "${m_jails}/${jail}" ] && zfs clone $rootsnap "${jails_zfs}/${jail}" 
-	fi
-	
-	# New clones need to remove schg before start (inherited from clones)
-	flags_down
 
-	# Add user and group to freshly cloned rootjail 
-	pw -V ${m_jails}/${jail}/etc/ useradd -n $jail -u 1001 -d /usr/home/${jail} -s /bin/csh 
+		# New clones need to remove schg before start (inherited from clones)
+		flags_down
+
+		# Add user and group to freshly cloned rootjail 
+		pw -V ${m_jails}/${jail}/etc/ useradd -n $jail -u 1001 -d /usr/home/${jail} -s /bin/csh 2>&1
+	fi
 }
 
 reclone_dispjail() {
