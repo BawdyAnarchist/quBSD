@@ -40,6 +40,8 @@ qb-create - Really should have some trap functions set when zfs cloning
 
 Test out having the rootjails at high security levels when turned off.
 
+exec.created (or prestart) - can use dirname for copying the /rw files
+
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 
 qb-cam/mic - webcam and mic get brought up with script
@@ -53,6 +55,9 @@ qb-create - While in guided mode, add option to enter "auto" for IP assignment
 qb-stat - Change "class" column to class_rootjail. Maybe even realtime switching of sort, columns, and presentation (maybe)
 
 qb-edit - the -i option should be able to be applied when setting the tunnel
+	   - the -r option didn't seem to restart the jails required
+
+qb-disp - Need to make sure that you're incrementing with a DISP number, so that you don't overlap when starting a new DISP more than once.
 
 usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
 
