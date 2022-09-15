@@ -17,13 +17,12 @@ rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap)
 jIP=$(sed -nE "s/^${jail}[[:blank:]]+IP0[[:blank:]]+//p" $jmap)
 IP0="$jIP"
 tunnel=$(sed -nE "s/^${jail}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
-tunoftunnel=$(sed -nE "s/^${tunnel}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
 connects=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${jail}//p" $jmap)
 maxmem=$(sed -nE "s/^${jail}[[:blank:]]+maxmem[[:blank:]]+//p" $jmap) 
 cpuset=$(sed -nE "s/^${jail}[[:blank:]]+cpuset[[:blank:]]+//p" $jmap) 
 mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
 if [ -e "$wgconf" ] ; then
-	wgIP=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*//p" $wgconf | \
+	Endpoint=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*//p" $wgconf | \
 						sed -n "s/:[[:digit:]]*.*//p")
 	wgPort=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*.*://p" $wgconf) 
 fi
@@ -83,61 +82,45 @@ check_IPv4() {
      fi
 }
 
-configure_tap() {
-	ifconfig $tunnel vnet $jail
-	jexec -l -U root $jail ifconfig bridge0 create up 
-	jexec -l -U root $jail ifconfig bridge0 mtu $mtu 
-	jexec -l -U root $jail ifconfig $tunnel mtu $mtu up
-	jexec -l -U root $jail ifconfig bridge0 addm $tunnel
-}
-
 upstream_tunnel() {
-	epair=$(ifconfig epair create)
-	ifconfig "${epair%?}a" vnet $tunnel
-	ifconfig "${epair%?}b" vnet $jail
+	ext_if=$(ifconfig epair create)
+	ext_if="${ext_if%?}b"
+	ifconfig "${ext_if%?}a" vnet $tunnel
+	ifconfig "${ext_if%?}b" vnet $jail
 
-	# If tunnel contains a tap interface, connect epair to bridge, no IP
-	if [ -z "${tunoftunnel##tap*}" ] ; then 
-		jexec -l -U root $tunnel ifconfig "${epair%?}a" mtu $mtu up
-		jexec -l -U root $tunnel ifconfig bridge0 addm "${epair%?}a"
-	else
-		jexec -l -U root $tunnel ifconfig "${epair%?}a" inet "${jIP%.*/*}.1/${jIP#*/}" mtu $mtu up 
-	fi
-
-	# If NAT occurs without a VPN tunnel (wg0); then modify the epair 
-	if `egrep -qs "^jepair = " $jpf` ; then
-		sed -i '' -e "s/^jepair =.*/jepair = \"${epair%?}b\"/" $jpf 
-	fi
+	# Configure the tunnel side of the epair
+	jexec -l -U root $tunnel ifconfig "${ext_if%?}a" inet "${jIP%.*/*}.1/${jIP#*/}" mtu $mtu up 
 
 	# MTU HACK: The mtu specification at the end will be unnecessary for most people
-	jexec -l -U root $jail ifconfig "${epair%?}b" inet $jIP mtu $mtu up 
+	jexec -l -U root $jail ifconfig "${ext_if%?}b" inet $jIP mtu $mtu up 
 	jexec -l -U root $jail route add default "${jIP%.*/*}.1" 
 }
 
 client_connections() {
-     # Connect downstream client jails. net-tap serves VPN jails. VPN jails serve other appjails
-	epair=$(ifconfig epair create)
-	ifconfig "${epair%?}a" vnet $jail
-	ifconfig "${epair%?}b" vnet $c
-	jexec -l -U root $c ifconfig "${epair%?}b" inet $cIP mtu $mtu up
+	int_if=$(ifconfig epair create)
+	ifconfig "${int_if%?}a" vnet $jail
+	ifconfig "${int_if%?}b" vnet $c
 
-     # net-tap has a bridge
-	if [ -z "${tunnel##tap*}" ] ; then	  
-		jexec -l -U root $jail ifconfig "${epair%?}a" mtu $mtu up
-		jexec -l -U root $jail ifconfig bridge0 addm "${epair%?}a"
-		jexec -l -U root $c route add default "${cIP%.*/*}.1"
-		jexec -l -U root $c wg-quick down wg0 
-		jexec -l -U root $c wg-quick up wg0 
-	else
-		jexec -l -U root $jail ifconfig "${epair%?}a" inet "${cIP%.*/*}.1/${cIP#*/}" mtu $mtu up
-		jexec -l -U root $c route add default "${cIP%.*/*}.1"
-	fi
+	jexec -l -U root $jail ifconfig "${int_if%?}a" inet "${cIP%.*/*}.1/${cIP#*/}" mtu $mtu up
+
+	jexec -l -U root $c ifconfig "${int_if%?}b" inet $cIP mtu $mtu up
+	jexec -l -U root $c route add default "${cIP%.*/*}.1"
+	jexec -l -U root $c route add default "${cIP%.*/*}.1"
+	
+	# If there are wg interfaces, bring them down and back up
+	wg_intf=$(jexec -l -U root $c ifconfig -g tun | grep "wg")
+	for w in $wg_intf ; do 
+		jexec -l -U root $c wg-quick down $w 
+		jexec -l -U root $c wg-quick up $w 
+	done
 }
 
 configure_epairs() {
 	# Jails with a tap interface specified in jailmap.conf receive their respective taps 
-	if [ -z "${tunnel#tap?}" ] ; then
-		configure_tap 	
+	if [ "$jail" = "net-firewall" ] ; then
+		ifconfig $tunnel vnet $jail
+		jexec -l -U root $jail ifconfig $tunnel mtu $mtu up
+		ext_if="$tunnel"
 	fi
 
 	# Connects jail to its upstream tunnel specified in jailmap.conf
@@ -163,11 +146,15 @@ configure_epairs() {
 
 pf_modify() {
 	if [ -e "$jpf" ] ; then
+		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"$ext_if\"@" $jpf
+		sed -i '' -e "s@^int_if[[:blank:]]*=.*@int_if = \"$int_if\"@" $jpf
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"$jIP\"@" $jpf
 		sed -i '' -e "s@^routerIP[[:blank:]]*=.*@routerIP = \"${jIP%.*/*}.1\"@" $jpf
-		sed -i '' -e "s@^wgIP[[:blank:]]*=.*@wgIP = \"$wgIP\"@" $jpf
-		sed -i '' -e "s@^wgPort[[:blank:]]*=.*@wgPort = \"$wgPort\"@" $jpf
 		sed -i '' -e "s@^table <pass_ips>.*@table <pass_ips> { $nat_table}@" "$jpf"
+		if [ "$jail" != "net-firewall" ] ; then
+			sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"$Endpoint\"@" $jpf  
+			sed -i '' -e "s@^wgPort[[:blank:]]*=.*@wgPort = \"$wgPort\"@" $jpf  
+		fi
 	fi
 }
 

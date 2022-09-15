@@ -19,6 +19,20 @@ USBVM
 Expand install options     
 - Can select to merge zroo and zusr with other existing dataset/mount     
 
+0SERV Default and 0serv-template
+  - You will need to chown the www directory structures
+  - Decision on whether or not to role the zusr under a single zfs snapshot, or snapshot usrlocal
+
+nicvm 
+  - Make it a Linux VM so that it can use all the wireless protocols.
+     - Someone made a post about this in FreeBSD
+  - Make it strictly a passthrough, promiscuous
+  - Make net-tap into net-firewall, and handles all the routing operations
+     - NAT all networks separately so that no traffic is visible to other networks
+	  In other words, each IVPN jail is NATed from separate subnets on net-firewall, just as
+	  each appjail is NATed from separate subnets on the IVPN jail.
+     - Servers will "look" like they're at a similar "gateway layer depth" as the IVPN jails.
+
 
 ### BEST PRACTICES / CLEANUP
 
@@ -34,7 +48,15 @@ qb-ivpn - sed error - needs better separation of the -j option to not throw erro
 	   - Current server should be upgraded to show current settings, even if not connected
 	   - Need to verify how well it works when connection is down
 
-qb-create - Really should have some trap functions set when zfs cloning
+qb-create 
+	- Really should have some trap functions set when zfs cloning
+	- apparently -g selecting "none" template is having zfs problems
+	- Failed to create /etc/jail.conf entry for: qb-create -T net-vpn net-wireguard
+	- It's still screwed up somehow. Not accepting a creation with all options. 
+	- Need to go through with a fine tooth comb. And/or do some fuzzing.
+
+pf.conf
+	- wgIP constant really should be called "endpointIP" or something like that
 
 ### MINOR UPGRADES
 
