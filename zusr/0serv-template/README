@@ -1,0 +1,56 @@
+################  DESCRIPTION  OF  0serv-template  IMPLEMENTATION  ################
+
+rw is used for customizing individual system files (like rc.conf, or pf.conf)
+   - quBSD symlinks these files during appjail start, replacing rootjail clones 
+   - Directory/filename in rw, must map exactly the same as the file it replaces
+   - rw nullfs mounts on the appjail's root. For example: /jails/{appjail}/rw/ 
+
+All other directories are nullfs mounted during appjail startup
+   - usr/home 
+   - usr/local/etc - Recommended location for most jail-specific server configs
+	  !! If you install new pkgs to 0serv, manually copy local/etc files to here!! 
+   - usr/local/www - Recommend location for server data 
+   - var/db/mysql - Recommend keeping mysql at its default location
+
+Default nullfs mounts are already in the fstab, but if you wish to change them:
+   - Edit rw/etc/fstab, to change mounts at appjail creation 
+
+
+####  PRE-INSTALLED  SOFTWARE  ON  0serv ROOTJAIL  ####
+
+wireguard
+wireguard-go
+
+apache24 
+	mod_php81
+
+mariadb105-server 
+
+php81-8.1.7 
+	php-fpm_exporter 
+	php81-mysqli 
+	php81-ctype-8.1.7
+	php81-curl
+	php81-dom
+	php81-filter
+	php81-gd
+	php81-mbstring
+	php81-posix
+	php81-session
+	php81-simplexml
+	php81-xmlreader
+	php81-xmlwriter
+	php81-zlib
+	php81-pdo_mysql
+	php81-fileinfo
+	php81-bz2
+	php81-bcmath
+	php81-gmp
+	php81-ftp
+	php81-imap
+	php81-intl
+	php81-exif
+	php81-pecl-memcached
+	php81-pecl-imagick-im7-3.5.1_1
+
+syncthing
