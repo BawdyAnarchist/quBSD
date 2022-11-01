@@ -58,7 +58,8 @@ set_flags() {
 
 reclone_appjail() {
 	if [ "$class" != "rootjail" ] ; then 
-		zfs destroy -rRf ${jails_zfs}/$jail
+		zfs list ${jails_zfs}/${jail} > /dev/null 2>&1
+			[ "$?" = 0 ] && zfs destroy -rRf ${jails_zfs}/${jail}
 		zfs clone $rootsnap "${jails_zfs}/$jail"
 
 		# Add user and group to freshly cloned rootjail
@@ -73,15 +74,16 @@ reclone_dispjail() {
 		egrep -o "${zusr_zfs}/${template}@[^[:blank:]]+" | tail -1)
 
 		# Destroy/reclone existing dispjail /home
-		[ -e "${m_zusr}/${jail}" ] && zfs destroy -rRf ${zusr_zfs}/${jail}
-		[ ! -e "${m_zusr}/${jail}" ] && zfs clone ${homesnap} ${zusr_zfs}/${jail}
+		zfs list "${zusr_zfs}/${jail}" > /dev/null 2>&1 
+			[ "$?" = 0 ] && zfs destroy -rRf ${zusr_zfs}/${jail}
+		zfs clone ${homesnap} ${zusr_zfs}/${jail}
 
 		# Remove schg flags (if inherited from clones) to modify new snap
 		[ -e ${m_zusr}/${jail} ] && chflags -R noschg ${m_zusr}/${jail}
 
 		# Rename directories and mounts with dispjail name 
-		[ -e ${m_zusr}/${jail}/home/${template} ] && \
-				mv ${m_zusr}/${jail}/home/${template} ${m_zusr}/${jail}/home/${jail}
+		[ -e ${m_zusr}/${jail}/usr/home/${template} ] && \
+				mv ${m_zusr}/${jail}/usr/home/${template} ${m_zusr}/${jail}/usr/home/${jail}
 		
 		sed -i '' -e "s/${template}/${jail}/g" ${m_zusr}/${jail}/rw/etc/fstab
 	fi
@@ -99,7 +101,7 @@ set_flags
 # appjail's root filesystems are immediately destroyed and recloned
 reclone_appjail		
 
-# dispjails root *and* home filesystems are immediately destroyed
+# dispjails root filesystem and /zusr data are destroyed and recloned 
 reclone_dispjail	
 
 
