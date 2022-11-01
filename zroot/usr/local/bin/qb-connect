@@ -226,10 +226,10 @@ find_IP() {
 		# If there is no tunnel or, it's a net-tap jail, skip the IP0 loop-search
 		cycle=256
 	
-	elif [ -z "${tunnel##net-tap*}" ] ; then
+	elif [ "$tunnel" = "net-firewall" ] ; then
 		# First part of variable indirection. Assigns the variable names
 		ip1="aa" ; ip2="bb" ; ip3="cycle" ; subnet="24"
-		aa=99 ; bb=99 
+		aa=255 ; bb=99 
 		[ -n "$IP0" -a "10.$aa.$bb/$subnet" = "$a0.$a1.$a2/$a4" ] || mismatch="true"
 		
 	elif [ -z "${tunnel##net-*}" ] ; then
