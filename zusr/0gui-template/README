@@ -1,0 +1,39 @@
+################  DESCRIPTION  OF  0gui-template  IMPLEMENTATION  ################
+
+rw is used for customizing individual system files (like rc.conf)
+   - quBSD symlinks these files during appjail start, replacing rootjail clones 
+   - Directory/filename in rw, must map exactly the same as the file it replaces
+   - rw nullfs mounts on the appjail's root. For example: /jails/{appjail}/rw/ 
+
+usr/home/0gui-template is the home directory 
+   - Jails come with only a single user, with the same name as the jail
+	  - To add users, copy from /jails/0gui/etc/ to /zusr/<jailname>/rw/etc/ ...
+	      group master.passwd passwd pwd.db spwd.db
+       - Then use pw redirection to operate on these files:
+           pw -V /zusr/<jailname>/rw/etc  useradd|groupad
+   - Recommend personalizing the general setup you want for other GUI jails
+       .cshrc
+       .vim/ and .vimrc
+       .config/falkon/profiles/default/settings.ini
+   - You can use 0gui-template for new GUI jails, with the following command:
+       qb-create -T 0gui-template -H mynewjail
+
+Default nullfs mounts are already in the fstab, but if you wish to change them:
+   - Edit rw/etc/fstab, to change mounts applied during appjail creation 
+
+**Note About Privacy:**  If you create a persistent .mozilla/firefox profile in 0gui-template; it likely comes with fingerpriting risks between your various jails. Create profile in each jail.
+
+
+####  PRE-INSTALLED  SOFTWARE  ON  0gui  ROOTJAIL  ####
+(only if user selected this option during install)
+
+Xorg
+qt5
+dbus
+vim
+xpdf
+libreoffice
+falkon
+firefox
+keepassxc
+spectacle
