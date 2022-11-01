@@ -1,9 +1,10 @@
 #!/bin/sh
 
-while getopts chs o ; do
+while getopts chns o ; do
 	case $o in
 		c) console="true" ;;
 		h) help="true" ;;
+		n) no_run="true" ;;
 		s) ssh="true" ;;
 	esac
 done
@@ -20,7 +21,6 @@ define_variables() {
 	zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
 
 	firewallIP=$(egrep "^net-firewall[[:blank:]]+IP0" $jmap | awk '{print $3}')
-	firewall_tun=$(egrep "^net-firewall[[:blank:]]+tunnel" $jmap | awk '{print $3}')
 
 	# Determines if nicvm process is running
 	pgrep -f 'bhyve: nicvm' >> /dev/null 2>&1 && vm_on="true"
@@ -37,6 +37,7 @@ define_messages() {
 	msg6=$(printf "%b" "qb-nicvm: Waiting for nicvm to shutdown before launching console" \
 				"\nPlease wait for 20 seconds.")
 	msg7=$(printf "%b" "qb-nicvm: Launching nicvm. Wait a moment")
+	err8=$(printf "%b" "qb-nicvm: ERROR: [-n] should only be used with [-c] option")
 }
 
 usage() {
@@ -49,6 +50,8 @@ usage() {
 	echo ""
 	echo "   -c: (c)onsole:  Launch nicvm with stdio on terminal console"
 	echo "   -h: (h)elp:  Outputs this help message"
+	echo "   -n: (n)o_run:  Don't run the console, just print the commands"
+	echo "                  Use only in combination with -c option"
 	echo "   -s: (s)sh:  Establish ssh connection into nicvm, via net-firewall"
 	echo ""
 	exit 1
@@ -67,9 +70,9 @@ checks() {
 	elif [ "$ssh" -a -n "${firewallIP%%10.99.99.*}" ] ; then
 		ERR="$err2" ; usage
 
-	elif [ "$firewall_tun" != "net-tap" ] ; then
-		ERR="$err4" ; usage
-	
+	elif [ "$ssh" -a -n "$no_run" ] ; then
+		ERR="$err8" ; usage
+
 	elif [ "$console" -a "$vm_on" ] ; then
 		printf "%b" "\n$msg3" 
 		restart="true"
@@ -77,8 +80,17 @@ checks() {
 }
 
 poweron_console_mode() {
+	# Only print out commands if -n option is selected
+	if [ -n "$no_run" ] ; then
+		echo bhyveload -c stdio -m 600M -d /dev/zvol/${zroot}/nicvm -S nicvm 
+
+		echo bhyve -c 1 -m 600M -H -A -P -S -s 0:0,hostbridge -s 1:0,lpc -s 2:0,virtio-net,"$tap" -s 3:0,virtio-blk,/dev/zvol/${zroot}/nicvm -s 4:0,passthru,"$ppt_nic" -l com1,stdio nicvm 
+		
+		exit 0
+	fi
+
 	bhyveload -c stdio -m 600M -d /dev/zvol/${zroot}/nicvm -S nicvm 
-	
+
 	bhyve -c 1 -m 600M -H -A -P -S \
 		-s 0:0,hostbridge \
 		-s 1:0,lpc \
