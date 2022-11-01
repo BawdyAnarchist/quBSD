@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# Quick way of changing the DPI of the system
+
+dpi="$1"
+
+if [ $dpi -lt 50 ] ; then
+	echo "DPI of $dpi is too low, exiting" && exit 1
+
+elif [ $dpi -gt 350 ] ; then
+	echo "DPI of $dpi is too high, exiting" && exit 1
+
+else
+	echo "Xft.dpi: $dpi" | xrdb -merge
+
+fi
