@@ -65,11 +65,9 @@ Each jail has its own dataset under zusr, with at most, 2 sub-directories:
 		have identical directory structure (hierarchy) for the files they will replace.
 	 	   Example:  /zusr/<jailname>/rw/etc/rc.conf is a custom rc.conf for <jailname>
 
-	/rw also stores/handles pwd info.  Modifying jail pw requires [-V] redirection.
+	/rw can also handles pwd info; however, modifying jail pw requires [-V] redirection.
 		pw -V /quBSD/zusr/<jail>/rw/etc usermod    # If run from host, outside the jail
 		pw -V /rw/etc/ usermod                     # If run from inside the jail
-
-	Don't add multiple users to a jail, as it might cause errors
 
 Rootjails don't have a zusr/ dataset
 
