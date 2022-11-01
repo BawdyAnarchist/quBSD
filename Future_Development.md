@@ -21,20 +21,36 @@ Expand install options
 
 0SERV Default and 0serv-template
   - You will need to chown the www directory structures
-  - Decision on whether or not to role the zusr under a single zfs snapshot, or snapshot usrlocal
+  - Integrate into install script
+  - Certainly is alot of work to do on integrating this better
+      (difficult caz lots of options. Is there really a base?)
 
 nicvm 
   - Make it a Linux VM so that it can use all the wireless protocols.
      - Someone made a post about this in FreeBSD
-  - Make it strictly a passthrough, promiscuous
-  - Make net-tap into net-firewall, and handles all the routing operations
-     - NAT all networks separately so that no traffic is visible to other networks
-	  In other words, each IVPN jail is NATed from separate subnets on net-firewall, just as
-	  each appjail is NATed from separate subnets on the IVPN jail.
-     - Servers will "look" like they're at a similar "gateway layer depth" as the IVPN jails.
 
+qb-windows
+	- command that shows the jail, window title, and workspace of all active windows
+
+net-firewall 
+	- jail start should auto update the servIPs in pf.conf
+		- This might require some thought about setting an "auto" option in the settings.
+		  because people making servers might not want an auto setting
+
+Detect changes in nic and USB so that you can rewrite the file if necessary
 
 ### BEST PRACTICES / CLEANUP
+
+- net-firewall pf.conf might not be fully generalized for routerIP. 
+	- basically, exec.created relies on setting the last number to "1". 
+     - Then it modifes pf.conf, but that might be inappropriate
+	- Also needs to aggregate *all* client connections wireguard ports
+	- jIP is hand hammed from jailconf, but check that DHCP works too
+	- The pass in from clients would also let servers do it
+  		- Segregate the servers from clients more carefully
+		- Maybe even segregate the wg gateways from clients as well
+
+- networking rework. Need to update the IP conventions - both checks and docs 
 
 qb-usbvm     
 - When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
@@ -47,6 +63,7 @@ qb-ivpn - sed error - needs better separation of the -j option to not throw erro
         - Also an unused variable "pingfail"
 	   - Current server should be upgraded to show current settings, even if not connected
 	   - Need to verify how well it works when connection is down
+	   - pf.conf references the endpoint IP. Needs to be updated as well
 
 qb-create 
 	- Really should have some trap functions set when zfs cloning
@@ -54,6 +71,14 @@ qb-create
 	- Failed to create /etc/jail.conf entry for: qb-create -T net-vpn net-wireguard
 	- It's still screwed up somehow. Not accepting a creation with all options. 
 	- Need to go through with a fine tooth comb. And/or do some fuzzing.
+	- Need to add an option for copying usrlocal
+	- Add option for "auto" IP assignment during guided
+	- Logic on "Would you like to also .... something about /home directory of template"
+		needs fixed, because no template shouldn't ask you to copy a non existent home.
+
+qb-rename
+	- didn't rename the subfolder under home
+	- requires that you bring flags down for the jail in quesiton first (specifically the fstab was protected)
 
 pf.conf
 	- wgIP constant really should be called "endpointIP" or something like that
@@ -64,20 +89,34 @@ Test out having the rootjails at high security levels when turned off.
 
 exec.created (or prestart) - can use dirname for copying the /rw files
 
+qb-dpi - make it so that a program can launch under alt dpi settings and return to normal
+	- You could even add it as an option to qb-cmd, and i3gen.sh/conf
+	
+	- Also good to add it to startup.sh
+
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 
 qb-cam/mic - webcam and mic get brought up with script
 
 qb-update - Update rootjails, create snapshots
 
-qb-snap - Add an option for snapshotting host before an update
+qb-snap 
+	- Add an option for snapshotting host before an update
+	- usrlocal in 0serv jails needs to automatically added to qb-snap
 
 qb-create - While in guided mode, add option to enter "auto" for IP assignment 
 
-qb-stat - Change "class" column to class_rootjail. Maybe even realtime switching of sort, columns, and presentation (maybe)
+qb-stat 
+	- Experiment with sort and colors
+	- VM add functionality like "on" IP addy, etc
 
-qb-edit - the -i option should be able to be applied when setting the tunnel
-	   - the -r option didn't seem to restart the jails required
+qb-list
+	- extra options for seeing snapshots of jails
+
+qb-edit 
+	- the -i option should be able to be applied when setting the tunnel
+	- the -r option didn't seem to restart the jails required
+	- should have a check for duplicate IP0
 
 qb-disp - Need to make sure that you're incrementing with a DISP number, so that you don't overlap when starting a new DISP more than once.
 
@@ -90,3 +129,6 @@ add autostart option to jailmap.conf, and a service startup script for autostart
 Crons
 - Popup warning if zpool errors are discovered
 - Popup warning if host has been network connected for too long
+- that manage ZFS snapshots
+- Run checks for any other problems. Like ...?
+
