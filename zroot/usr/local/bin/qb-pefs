@@ -22,15 +22,15 @@ jail="$1"
 
 define_variables() {
 	# If -z $directory, pefs_dirs will find all .pefs.db directories (for unmount)
-	rel_directory=$(echo $directory | sed "s:${m_zusr}/${jail}/home/${jail}/::")
+	rel_directory=$(echo $directory | sed "s:${m_zusr}/${jail}/usr/home/${jail}/::")
 	pefs_dirs=$(find ${m_jails}/${jail}/usr/home/${jail}/${rel_directory} -name '.pefs.db' \
 														| sed 's:/.pefs.db::g')
 	# Default directory if not defined by user
 	directory="${directory:-$2}" 
-	directory="${directory:-${m_zusr}/${jail}/home/${jail}/crypt}"
+	directory="${directory:-${m_zusr}/${jail}/usr/home/${jail}/crypt}"
 
 	# Must find rel_directory again for ops not related to unmount
-	rel_directory=$(echo $directory | sed "s:${m_zusr}/${jail}/home/${jail}/::")
+	rel_directory=$(echo $directory | sed "s:${m_zusr}/${jail}/usr/home/${jail}/::")
 }
 
 define_messages() {
@@ -49,7 +49,7 @@ usage() {
 	[ "$ERR" ] && printf "%b" "\n$ERR\n"
 	echo ""
 	echo "qb-pefs: Mounts an encrypted pefs volume inside of a running jail" 
-	echo "         Default directory is ${m_zusr}/<jail>/home/<jail>/crypt"
+	echo "         Default directory is ${m_zusr}/<jail>/usr/home/<jail>/crypt"
 	echo ""
 	echo "Usage: qb-pefs <jailname>"
 	echo "Usage: qb-pefs [-h] [-d <directory>] <jailname>"
