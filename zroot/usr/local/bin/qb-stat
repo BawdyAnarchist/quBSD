@@ -20,7 +20,20 @@ jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d
 jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 tmp="/tmp/qb-stat.txt"
 tmp2="/tmp/qb-stat2.txt"
-col="${col:=5,5}"
+col="${col:=6,6}"
+
+# Define colors 
+# NOTE: printf counts ANSI color escapes with \tabs in alignment
+#       As a result, any color used for jails/VMs must have same length escapes
+COL_OFF='\033[0m'	     # Turn off color	
+ NORMAL='\033[0;39m'     # Default terminal settings 
+  GREEN='\033[1;7;32m'   # Green, inverted, for active window alert 
+    RED='\033[1;31m'     # Bold Red
+   BRED='\033[1;5;31m'   # Blinking bold red, for hostnet connection alert
+   BLUE='\033[0;34m'     # Blue - server jails 
+   GRAY='\033[0;90m'     # Gray - system, templates, host, VMs, misc jails 
+ YELLOW='\033[0;33m'     # Yellow - net jails 
+  HILIT='\033[7;39m'     # Highlighted top line
 
 trap "{ rm $tmp > /dev/null 2>&1 ; rm $tmp2 > /dev/null 2>&1 ; exit 0 ; }" SIGINT SIGTERM EXIT
 
@@ -43,7 +56,8 @@ assemble_header() {
 	[ -e "$tmp2" ] && rm $tmp2
 	mktemp $tmp > /dev/null
 	mktemp $tmp2 > /dev/null
-	printf "%b" "CONTAINER\tJID\tCLASS\tTUNNEL\tT\tDISK\t%RAM\t%CPU\n" >> $tmp
+
+	printf "%b" "${HILIT}CONTAINER\tJID\tTUNNEL\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" >> $tmp
 }
 
 define_variables() {
@@ -55,6 +69,7 @@ define_variables() {
 	id=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
 	active=$(xprop -id $id | grep "WM_CLIENT_MACHINE" | sed "s/WM_CLIENT_MACHINE(STRING) = \"//")
 	active="${active%\"}"
+	[ "$active" = "quBSD" ] && active="host" 
 
 	# Input devices status
 	cam=$(service webcamd onestatus | grep -o "webcamd is running")
@@ -74,6 +89,8 @@ get_jails_loop() {
 		class="${class%jail}"
 		tunnel=$(sed -nE "s/^${j}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
 		tunnel="${tunnel:--}"
+		rootjail=$(sed -nE "s/^${j}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap)
+		rootjail="${rootjail:--}"
 		disk="-"
 		jid="-"
 		cpu="-"
@@ -97,33 +114,44 @@ get_jails_loop() {
 			disk=$(echo "$zfs_list" | sed -nE "s#^${zusr_zfs}/${j}[[:blank:]]+##p")
 
 			if [ -z "${j##net*}" ] ; then sub="3"
-			elif [ -z "${j##node*}" ] ; then sub="2"
-			elif [ -z "${j##host*}" ] ; then sub="0" 
+			elif [ -z "${j##serv*}" ] ; then sub="2"
+			elif [ -z "${j##host*}" ] ; then sub="6" 
 			else sub="1"
 			fi
 		fi
 
 		tunnel="${tunnel:--}"
+		rootjail="${rootjail:--}"
 		disk="${disk:--}"
 		jid="${jid:--}"
 		cpu="${cpu:--}"
 
-		printf "%b" "$j\t" "$jid\t" "$class\t" "$tunnel\t$sub\t" "$disk\t" "$ram\t" "$cpu\n" >> $tmp
+		case $sub in
+			1) TEMPCOL=${NORMAL} ;;
+			2) TEMPCOL=${BLUE} ;;
+			3) TEMPCOL=${YELLOW} ;;
+			4) TEMPCOL=${GRAY} ;;
+			5) TEMPCOL=${GRAY} ;;
+			6) TEMPCOL=${GRAY} ;;
+
+		esac
+
+		printf "%b" "${TEMPCOL}$j\t" "$jid\t" "$tunnel\t" "$class\t" "$rootjail\t" "$sub\t" "$disk\t" "$ram\t" "${cpu}${COL_OFF}\n" >> $tmp
 	done
 }
 
 print_alerts() {
-	echo "----------------  active window:  $active   -------------------"
+	printf "%b" "${GREEN}-------------------   ACTIVE WINDOW:  $active    ------------------${COL_OFF}\n"
 
 	if [ "$cam" -o "$mic" -o "$hostnet" ] ; then
-		echo -e "###############################################################"
+		echo -e "${RED}##############################################################" 
 		[ "$cam" ] \
-		&& echo "##          W E B C A M   D A E M O N   I S   O N  !!        ##"  
+		&& echo -e "##          W E B C A M   D A E M O N   I S   O N  !!        ##"  
 		[ "$mic" ] \
-		&& echo "##      M I C R O P H O N E   D A E M O N  I S  O N  !!      ##"
+		&& echo -e "##      M I C R O P H O N E   D A E M O N  I S  O N  !!      ##"
 		[ "$hostnet" ] \
-		&& echo "##     H O S T  I S  N E T W O R K  C O N N E C T E D !!     ##" 
-		echo -e "###############################################################"
+		&& echo -e "##${BRED}     H O S T  I S  N E T W O R K  C O N N E C T E D !!    ${COL_OFF}${RED}##" 
+		echo -e "##############################################################${COL_OFF}"
 	fi
 
 }
@@ -133,8 +161,8 @@ main() {
 		assemble_header
 		define_variables
 		get_jails_loop
-		(head -n 1 $tmp && tail -n +2 $tmp | sort -k $col) >> $tmp2
 		clear
+		(head -n 1 $tmp && tail -n +2 $tmp | sort -k $col | cut -f1,2,3,4,5,7,8,9) >> $tmp2
 		cat $tmp2 | column -t
 		print_alerts
 		sleep 1
