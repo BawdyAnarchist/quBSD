@@ -394,7 +394,7 @@ check_parameters() {
 	if [ "$copyhome" -a -z "$template" ] ; then
 		ERR="$e7" && usage
 
-	elif [ "$class" != "rootjail" ] ; then 
+	elif [ "$class" != "rootjail" -a -n "$template" ] ; then 
 		if ! `echo "$validtemplatejs" | egrep -qs "^$template\$"` ; then
 			ERR="$e9" && usage
 		fi
@@ -489,7 +489,7 @@ get_parents() {
 		
 		clear
 		
-		if [ "$class" = "appjail" -a -e "${m_zusr}/$template/home/$template" ] ; then 
+		if [ "$class" = "appjail" -a -e "${m_zusr}/$template/usr/home/$template" ] ; then 
 			define_messages
 			rootjail=$(qb-list -j $template -p rootjail | grep "rootjail" | awk '{print $3}')
 
@@ -744,8 +744,8 @@ change_zusr() {
 		fi
 
 		# /home directory must be renamed
-		if [ -e ${m_zusr}/$newjail/home/$template ] ; then 
-			mv ${m_zusr}/$newjail/home/$template ${m_zusr}/$newjail/home/$newjail
+		if [ -e ${m_zusr}/$newjail/usr/home/$template ] ; then 
+			mv ${m_zusr}/$newjail/usr/home/$template ${m_zusr}/$newjail/usr/home/$newjail
 		fi
 	else
 		zfs create ${zusr_zfs}/${newjail}
@@ -772,7 +772,7 @@ change_config_files() {
 	# Modify pw user 1001, if it exists 
 	pw -V ${m_zusr}/$newjail/rw/etc/ usershow 1001 >> /dev/null 2>&1
 	if [ "$?" = "0" ] ; then 
-		[ -e ${m_zusr}/$newjail/home/$newjail ] || mkdir -p ${m_zusr}/$newjail/home/$newjail
+		[ -e ${m_zusr}/$newjail/usr/home/$newjail ] || mkdir -p ${m_zusr}/$newjail/usr/home/$newjail
 		pw -V ${m_zusr}/$newjail/rw/etc/ usermod 1001 -l $newjail
 		pw -V ${m_zusr}/$newjail/rw/etc/ groupmod 1001 -l $newjail
 		pw -V ${m_zusr}/$newjail/rw/etc/ usermod 1001 -d /usr/home/$newjail  >> /dev/null 2>&1
