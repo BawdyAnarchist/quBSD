@@ -24,7 +24,7 @@ mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
 if [ -e "$wgconf" ] ; then
 	Endpoint=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*//p" $wgconf | \
 						sed -n "s/:[[:digit:]]*.*//p")
-	wgPort=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*.*://p" $wgconf) 
+	wgPorts=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*.*://p" $wgconf) 
 fi
 
 usage() {
@@ -147,13 +147,12 @@ configure_epairs() {
 pf_modify() {
 	if [ -e "$jpf" ] ; then
 		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"$ext_if\"@" $jpf
-		sed -i '' -e "s@^int_if[[:blank:]]*=.*@int_if = \"$int_if\"@" $jpf
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"$jIP\"@" $jpf
 		sed -i '' -e "s@^routerIP[[:blank:]]*=.*@routerIP = \"${jIP%.*/*}.1\"@" $jpf
 		sed -i '' -e "s@^table <pass_ips>.*@table <pass_ips> { $nat_table}@" "$jpf"
 		if [ "$jail" != "net-firewall" ] ; then
 			sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"$Endpoint\"@" $jpf  
-			sed -i '' -e "s@^wgPort[[:blank:]]*=.*@wgPort = \"$wgPort\"@" $jpf  
+			sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"$wgPorts\"@" $jpf  
 		fi
 	fi
 }
