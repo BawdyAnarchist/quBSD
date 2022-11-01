@@ -1,0 +1,6 @@
+# Device                               Mountpoint                              FStype Options Dump Pass#
+/zusr/0serv-template/rw/    	         /jails/0serv-template/rw/               nullfs rw      0    0	
+/zusr/0serv-template/usr/home/         /jails/0serv-template/usr/home/         nullfs rw      0    0
+/zusr/0serv-template/usr/local/etc/    /jails/0serv-template/usr/local/etc/    nullfs rw      0    0
+/zusr/0serv-template/usr/local/www/    /jails/0serv-template/usr/local/www/    nullfs rw      0    0
+/zusr/0serv-template/var/db/mysql/     /jails/0serv-template/var/db/mysql/     nullfs rw      0    0
