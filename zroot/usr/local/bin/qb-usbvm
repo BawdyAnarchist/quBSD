@@ -1,11 +1,12 @@
 #!/bin/sh
 
-while getopts cdhi o ; do
+while getopts cdhin o ; do
 	case $o in
 		c) console="true" ;;
 		d) disconnect="true" ;;
 		h) help="true" ;;
 		i) internet="true" ;;
+		n) no_run="true" ;;
 	esac
 done
 
@@ -49,6 +50,7 @@ define_messages() {
 	msg6=$(printf "%b" "qb-usbvm: Shutting down usbvm. Wait for about 10 seconds")
 	msg7=$(printf "%b" "qb-usbvm: usbvm is shutdown, wait 10 more seconds for safety.") 
 	msg8=$(printf "%b" "qb-usbvm: Re-launching usbvm in console, mode, please wait ...") 
+     err9=$(printf "%b" "qb-usbvm: ERROR: [-n] should only be used with [-c] option")
 }
 
 usage() {
@@ -68,6 +70,7 @@ usage() {
 	echo "   -h: (h)elp:  Outputs this help message"
 	echo "   -i: (i)nternet:  Connect usbvm to internet, and connect <jail>"
 	echo "        to usbvm via ssh.  Used for updates and pkg downloads" 
+	echo "   -n: (n)o_run:  Don't run VM. Instead, show bhyve commands"
 	echo ""
 	exit 1
 }
@@ -82,9 +85,13 @@ checks() {
 	elif [ -n "$jail" ] && ! `qb-list -qj $jail` ; then
 		ERR="$err2" ; usage
 
-	elif [ "$console" -a "$vm_on" ] ; then
+	elif [ "$console" -a "$vm_on" -a -z "$no_run" ] ; then
 		printf "%b" "\n$msg3\n" 
 		restart="true"
+
+     elif [ -n "$no_run" -a -z "$console" ] ; then
+		ERR="$err9" ; usage
+
 	fi
 }
 
@@ -107,6 +114,30 @@ find_IP() {
 }
 
 poweron_console_mode() {
+	# If no_run option was selected print out commands then exit
+	if [ -n "$no_run" ] ; then
+		echo ""
+		echo bhyveload -c stdio -m 1G -d /dev/zvol/${zroot}/usbvm -S usbvm 
+		echo ""
+
+		if [ "$ppt_usb1" -a "$ppt_usb2" ] ; then
+			echo bhyve -c 1 -m 1G -H -A -P -S -s 0:0,hostbridge -s 1:0,lpc -s 2:0,virtio-net,tap1 -s 3:0,virtio-blk,/dev/zvol/${zroot}/usbvm -s 4:0,passthru,"$ppt_usb1" -s 5:0,passthru,"$ppt_usb2" -l com1,stdio usbvm 
+			echo ""
+			exit 0	
+		elif [ -z "$ppt_usb1" -a -z "$ppt_usb2" ] ; then
+			echo	bhyve -c 1 -m 1G -H -A -P -S -s 0:0,hostbridge -s 1:0,lpc -s 2:0,virtio-net,tap1 -s 3:0,virtio-blk,/dev/zvol/${zroot}/usbvm -l com1,stdio usbvm 
+			echo ""
+			exit 0
+		else
+			echo bhyve -c 1 -m 1G -H -A -P -S -s 0:0,hostbridge -s 1:0,lpc -s 2:0,virtio-net,tap1 -s 3:0,virtio-blk,/dev/zvol/${zroot}/usbvm -s 4:0,passthru,"${ppt_usb1}${ppt_usb2}" -l com1,stdio usbvm 
+			echo ""
+			exit 0
+		fi
+	fi
+
+	# Load VMs
+	printf "%b" "\n$msg8\n"
+
 	bhyveload -c stdio -m 1G -d /dev/zvol/${zroot}/usbvm -S usbvm 
 
 	if [ "$ppt_usb1" -a "$ppt_usb2" ] ; then
@@ -217,7 +248,6 @@ main() {
 	fi
 
 	if [ "$console" ] ; then
-		printf "%b" "\n$msg8\n"
 		poweron_console_mode
 		exit 0
 
