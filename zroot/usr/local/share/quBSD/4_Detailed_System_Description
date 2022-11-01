@@ -207,9 +207,6 @@ Jail pwd and users
 	  which will come with an unprivleged user (again, automatically configured)
 	  For example:  dispjail@dispjail:~ %
 
-	- Don't put multiple unprivleged users in the same jail, as quBSD does not
-	  support this right now. It's likely to cause errors. 
-
 	- When using the `pw` command to modify a user, you must add the [-V] option
 	  to redirect pw to the custom directory. Otherwise changes aren't persistent. 
 		- For example, this command can be run from the host:
