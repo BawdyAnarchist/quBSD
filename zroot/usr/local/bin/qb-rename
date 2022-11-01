@@ -114,6 +114,8 @@ off_jails () {
 }
 
 jrename() {
+	chflags -R noschg ${m_zusr}/$jail
+
 	sed -i '' -e "s/^${jail}[[:blank:]]/${newname}	/g" $jmap
 	sed -i '' -E "s/^${jail}[[:blank:]]+\{/${newname} \{/g" /etc/jail.conf
 	sed -i '' -e "s/${jail}/${newname}/g" ${m_zusr}/${jail}/rw/etc/fstab 
@@ -121,11 +123,11 @@ jrename() {
 	zfs rename -f ${zusr_zfs}/${jail} ${zusr_zfs}/${newname}
 	zfs rename -f ${jails_zfs}/${jail} ${jails_zfs}/${newname}
 
-	pw -V ${m_zusr}/${jail}/rw/etc/ usershow $jail >> /dev/null 2>&1
-	if [ "$?" = "0" ] ; then
-		pw -V ${m_zusr}/${jail}/rw/etc/ usermod 1001 -l $newname 
-		mv ${m_zusr}/${newname}/home/${jail} ${m_zusr}/${newname}/home/${newname}
-	fi
+	mv ${m_zusr}/${newname}/usr/home/${jail} \
+				${m_zusr}/${newname}/usr/home/${newname} > /dev/null 2>&1 
+	
+	# Jails don't necessarily have custom pw; but modify if so
+	pw -V ${m_zusr}/${newname}/rw/etc/ usermod -n ${jail} -l ${newname} -d /usr/home/${newname} > /dev/null 2>&1
 }
 
 autoupdate() {
