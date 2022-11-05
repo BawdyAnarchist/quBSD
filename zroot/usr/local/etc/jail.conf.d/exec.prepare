@@ -61,6 +61,7 @@ reclone_appjail() {
 		zfs list "${jails_zfs}/${jail}" > /dev/null 2>&1 
 			[ "$?" = 0 ] && zfs destroy -rRf "${jails_zfs}/${jail}"  
 		zfs clone $rootsnap "${jails_zfs}/${jail}" 
+		zfs set qubsd:autosnap=- "${jails_zfs}/${jail}"
 
 		# New clones need to remove schg before start (inherited from clones)
 		flags_down
@@ -79,6 +80,7 @@ reclone_dispjail() {
 		zfs list "${zusr_zfs}/${jail}" > /dev/null 2>&1
 			[ "$?" = 0 ] && zfs destroy -rRf ${zusr_zfs}/${jail}  
 		zfs clone ${homesnap} ${zusr_zfs}/${jail} 
+		zfs set qubsd:autosnap=- "${zusr_zfs}/${jail}"
 
 		# New clones need to remove schg before start (inherited from parent)
 		flags_down
