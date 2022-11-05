@@ -61,6 +61,7 @@ reclone_appjail() {
 		zfs list ${jails_zfs}/${jail} > /dev/null 2>&1
 			[ "$?" = 0 ] && zfs destroy -rRf ${jails_zfs}/${jail}
 		zfs clone $rootsnap "${jails_zfs}/$jail"
+		zfs set qubsd:autosnap=- "${jails_zfs}/$jail"
 
 		# Add user and group to freshly cloned rootjail
 		pw -V ${m_jails}/${jail}/etc/ useradd -n $jail -u 1001 -d /usr/home/${jail} -s /bin/csh 2>&1
@@ -76,7 +77,8 @@ reclone_dispjail() {
 		# Destroy/reclone existing dispjail /home
 		zfs list "${zusr_zfs}/${jail}" > /dev/null 2>&1 
 			[ "$?" = 0 ] && zfs destroy -rRf ${zusr_zfs}/${jail}
-		zfs clone ${homesnap} ${zusr_zfs}/${jail}
+		zfs clone "${homesnap}" "${zusr_zfs}/${jail}"
+		zfs set qubsd:autosnap=- "${zusr_zfs}/$jail"
 
 		# Remove schg flags (if inherited from clones) to modify new snap
 		[ -e ${m_zusr}/${jail} ] && chflags -R noschg ${m_zusr}/${jail}
