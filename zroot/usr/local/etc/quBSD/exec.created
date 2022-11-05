@@ -2,25 +2,27 @@
 
 #  Virtual interfaces, pf, and resource control are best done before starting services 
 
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $JMAP
+
 # Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF) 
 m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $jmap
 
 # Define script variables
 jail="$1"
 jpf="${m_zusr}/$jail/rw/etc/pf.conf"
 wgconf="${m_zusr}/$jail/rw/usr/local/etc/wireguard/wg0.conf"
-class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
-rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap)
-jIP=$(sed -nE "s/^${jail}[[:blank:]]+IP0[[:blank:]]+//p" $jmap)
+class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP)
+jIP=$(sed -nE "s/^${jail}[[:blank:]]+IP0[[:blank:]]+//p" $JMAP)
 IP0="$jIP"
-tunnel=$(sed -nE "s/^${jail}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
-connects=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${jail}//p" $jmap)
-maxmem=$(sed -nE "s/^${jail}[[:blank:]]+maxmem[[:blank:]]+//p" $jmap) 
-cpuset=$(sed -nE "s/^${jail}[[:blank:]]+cpuset[[:blank:]]+//p" $jmap) 
-mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
+tunnel=$(sed -nE "s/^${jail}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
+connects=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${jail}//p" $JMAP)
+maxmem=$(sed -nE "s/^${jail}[[:blank:]]+maxmem[[:blank:]]+//p" $JMAP) 
+cpuset=$(sed -nE "s/^${jail}[[:blank:]]+cpuset[[:blank:]]+//p" $JMAP) 
+mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" $QBCONF) 
 if [ -e "$wgconf" ] ; then
 	Endpoint=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*//p" $wgconf | \
 						sed -n "s/:[[:digit:]]*.*//p")
@@ -36,7 +38,7 @@ checks() {
 	if [ -z "$jail" ] ; then
 		err="Error: exec.poststart:  Must select a jail"
 		usage
-	elif [ -z "$jmap" ] ; then
+	elif [ -z "$JMAP" ] ; then
 		err="Error: exec.poststart:  No file selected for jailmap.conf"
 		usage
 	elif [ -z "$class" ] ; then
@@ -130,7 +132,7 @@ configure_epairs() {
 
 	# Cycle through downstream clients, check IPs, bring up epairs for running jails
 	for c in $connects ; do 
-		cIP=$(sed -nE "s/^${c}[[:blank:]]+IP0[[:blank:]]+//p" $jmap) 
+		cIP=$(sed -nE "s/^${c}[[:blank:]]+IP0[[:blank:]]+//p" $JMAP) 
 		IP0="$cIP"
 		check_IPv4
 

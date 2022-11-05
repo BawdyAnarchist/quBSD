@@ -11,13 +11,16 @@ done
 
 shift $(( OPTIND - 1 ))
 
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+
 # Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
 m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
 m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
+
+mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" $QBCONF)
 
 # Define script variables
 jail=${jail:="$1"}
@@ -55,8 +58,8 @@ define_variables() {
 	jailepairs=$(echo "$jail_interfaces" | awk '{print $2}' | egrep -o "epair[[:digit:]]+")	
 	tunnel_pairs=$(echo "$all_interfaces" | egrep -v "^$jail" | egrep "$jailepairs")	
 
-	# Get jmap IP assignments to prevent overlap if auto-assiging a new epair IP
-	jmapIPs=$(qb-list -p IP0 | sort -k3)
+	# Get JMAP IP assignments to prevent overlap if auto-assiging a new epair IP
+	JMAPIPs=$(qb-list -p IP0 | sort -k3)
 
 	# Seclvl of 3 would prevent modifying pf. Warning will be issued if so 
 	if [ "$tunnel" ] ; then
@@ -64,7 +67,7 @@ define_variables() {
 			tunnel_seclvl=$(jexec -l -U root $tunnel sysctl kern.securelevel \
 										| sed "s/kern.securelevel: //")
 		else 
-			tunnel_seclvl=$(sed -nE "s/^${tunnel}[[:blank:]]+seclvl[[:blank:]]+//p" $jmap)
+			tunnel_seclvl=$(sed -nE "s/^${tunnel}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
 		fi
 	fi
 
@@ -73,7 +76,7 @@ define_variables() {
 			jail_seclvl=$(jexec -l -U root $jail sysctl kern.securelevel \
 										| sed "s/kern.securelevel: //")
 		else 
-			jail_seclvl=$(sed -nE "s/^${jail}[[:blank:]]+seclvl[[:blank:]]+//p" $jmap)
+			jail_seclvl=$(sed -nE "s/^${jail}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
 		fi
 	fi
 }
@@ -154,7 +157,7 @@ checks() {
 			if [ -z "$validIPv4" ] ; then
 				ERR="$err5" ; usage
 
-			elif `printf "%b" "$all_interfaces\n$jmapIPs" | egrep -qs "$b3"` ; then 
+			elif `printf "%b" "$all_interfaces\n$JMAPIPs" | egrep -qs "$b3"` ; then 
 				printf "%b" "$warn7" ; read resp
 				[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err6" && usage
 			fi
@@ -209,7 +212,7 @@ find_IP() {
 		openip="10.99.${cycle}.2"
 
 		# If the IP on this cycle is not found anywhere, then it can be used
-		if ! `printf "%b" "${all_interfaces}\n${jmapIPs}" | grep -qs "$openip"` ; then
+		if ! `printf "%b" "${all_interfaces}\n${JMAPIPs}" | grep -qs "$openip"` ; then
 			IP0=${IP0:-"${openip}/30"}
 			break
 		else

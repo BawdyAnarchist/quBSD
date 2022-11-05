@@ -1,17 +1,17 @@
 #!/bin/sh
 
-# chflags should be applied after all system files and startup has been accomplished 
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $JMAP
 
 # Get datasets, mountpoints; and define files.
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
-m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $jmap
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
 
 # Define script variables
 jail="$1"
-schg=$(sed -nE "s/^${jail}[[:blank:]]+schg[[:blank:]]+//p" $jmap)
-seclvl=$(sed -nE "s/^${jail}[[:blank:]]+seclvl[[:blank:]]+//p" $jmap)
+schg=$(sed -nE "s/^${jail}[[:blank:]]+schg[[:blank:]]+//p" $JMAP)
+seclvl=$(sed -nE "s/^${jail}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
 
 usage() {
 	printf "%b" "\n$err\n\n"
@@ -21,7 +21,7 @@ checks() {
         if [ -z "$jail" ] ; then
                 err="Error: exec.poststart:  Must select a jail"
 		usage
-        elif [ -z "$jmap" ] ; then
+        elif [ -z "$JMAP" ] ; then
                 err="Error: exec.poststart:  No file selected for jailmap.conf"
 		usage
         fi

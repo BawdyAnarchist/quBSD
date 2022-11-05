@@ -19,15 +19,16 @@ done
 
 shift $(( OPTIND - 1 ))
 
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $JMAP    # Removes blanks at EOL, prevents errors
+
+# Get datasets and mountpoints
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
 m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
 m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 
-jconf="/etc/jail.conf"
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
 
 # Define script variables
 newjail="$1"
@@ -35,23 +36,23 @@ datetime=$(date +%b%d_%H%M)
 
 define_variables() {
 
-	# Valid template jails must have jmap entries and ${zusr_zfs} dataset 
-	jmap_appjs=$(qb-list -p class | grep appjail | awk '{print $1}')
+	# Valid template jails must have JMAP entries and ${zusr_zfs} dataset 
+	JMAP_appjs=$(qb-list -p class | grep appjail | awk '{print $1}')
 	zusrlist=$(zfs list -r ${zusr_zfs} | awk '{print $1}')
-	for j in $jmap_appjs ; do
+	for j in $JMAP_appjs ; do
 		`echo "$zusrlist" | egrep -qs "^${zusr_zfs}/$j\$"` &&
 				validtemplatejs=$(printf "%b" "$j" "\n" "$validtemplatejs")
 	done
 
-	# Valid rootjails must have jmap entries and ${jails_zfs} dataset 
-	jmap_rootjs=$(qb-list -p class | grep rootjail | awk '{print $1}')
-	for j in $jmap_rootjs ; do
+	# Valid rootjails must have JMAP entries and ${jails_zfs} dataset 
+	JMAP_rootjs=$(qb-list -p class | grep rootjail | awk '{print $1}')
+	for j in $JMAP_rootjs ; do
 		tmpj=$(zfs list -ro name,used ${jails_zfs} | egrep "^${jails_zfs}/$j[[:blank:]]")
 		validrootjs=$(printf "%b" "$tmpj" "\n" "$validrootjs")
 	done
 
 	# Additional parameters for later use with tests and messages
-	jmapIPs=$(qb-list -p IP0 | tail +3 | sort -k3)
+	JMAPIPs=$(qb-list -p IP0 | tail +3 | sort -k3)
 	usedIPs=$(qb-connect -l | tail +3 | sort -k3)
 	netjails=$(echo "$validtemplatejs" | egrep "^net-")
 	validcpuset=$(cpuset -g | sed "s/pid -1 mask: //" | sed "s/pid -1 domain.*//")
@@ -88,7 +89,7 @@ usage() {
 	echo "        new jails with a set of baseline user configs (eg: .cshrc, .config)"
 	echo ""
 	echo "JAIL PARAMETERS  "
-	echo "      Stored at /usr/local/etc/jail.conf.d/jailmap.conf"
+	echo "      Stored at /usr/local/etc/quBSD/jailmap.conf"
 	echo ""
 	echo "   -c: (c)lass: Classification of <newjail>"
 	echo "        Valid arguments: <appjail|rootjail|dispjail>" 
@@ -126,7 +127,7 @@ define_errors() {
 			"[-T <template>] | [-g] | [-c <class> -r <rootjail>]\n")
 	
 	e3=$(printf "%b" "qb-create: ERROR: [-T] The selected template jail:  $template is \n" \
-			"not sufficiently configured in /usr/local/etc/jail.conf.d/jailmap.conf")
+			"not sufficiently configured in /usr/local/etc/quBSD/jailmap.conf")
 
 	e4=$(printf "%b" "qb-create: ERROR: [-c] Class must be one of the" \
 			"\nfollowing: <appjail|rootjail|dispjail>")
@@ -159,7 +160,7 @@ define_errors() {
 			"\nINFO: quBSD IP assignment conventions are as follows:\n")
 
 	e15=$(printf "%b" "qb-create: ERROR: User opted to quit due to IPv4 overlap." \
-			"\nHere is a mapping of all IPs designated in jailmap.conf:\n\n$jmapIPs\n" \
+			"\nHere is a mapping of all IPs designated in jailmap.conf:\n\n$JMAPIPs\n" \
 			"\nAnd all the IPs currently in use by running jails:\n\n$usedIPs")
 
 	e15_1=$(printf "%b" "qb-create: ERROR: User opted to exit, to re-evaluate IP and/or tunnel") 
@@ -289,7 +290,7 @@ define_messages() {
 		"\nan epair will be created at jail start. Here's a list off all net-<jails>\n" \
 		"\n`egrep -o "^net[^[:blank:]]+" $jconf` \n\n\tSelect a tunnel jail (or: none):  ")
 	m8=$(printf "%b" "\nIP address should be entered as IPv4 CIDR notation" \
-		"\nFor reference, here's what is already designated in jail.conf:$jmapIPs" \
+		"\nFor reference, here's what is already designated in jail.conf:$JMAPIPs" \
 		"\n\nAnd here's a mapping of everything that is currently in use:$usedIPs" \
 		"\n\n\tBased on the selected tunnel, quBSD convention would be to" \
 		"\n\tassign an IP like the following:  $ip0_255  " \
@@ -326,8 +327,8 @@ checks_main() {
 	# Checks that the proposed new jailname doesn't already exist (or partially exist).
 	elif `zfs list -rt all | egrep -qs "^${jails_zfs}/$newjail[[:blank:]]"` || \
 	     `zfs list -rt all | egrep -qs "^${zusr_zfs}/$newjail[[:blank:]]"` || \
-	     `echo "$jmap_rootjs" | egrep -qs "^$newjail\$"` || \
-	     `echo "$jmap_appjs" | egrep -qs "^$newjail\$"` ; then
+	     `echo "$JMAP_rootjs" | egrep -qs "^$newjail\$"` || \
+	     `echo "$JMAP_appjs" | egrep -qs "^$newjail\$"` ; then
 	     	ERR="$e8" ; usage
 
 	# Guided mode travels a different route, with its own set of checks and messages
@@ -346,14 +347,14 @@ checks_main() {
 check_parameters() {
 	# Variables not specified at command line, get initialized off the template
 	if [ "$template" ] ; then
-		class=${class:-`sed -nE "s/^${template}[[:blank:]]+class[[:blank:]]+//p" $jmap`}
-		cpuset=${cpuset:-`sed -nE "s/^${template}[[:blank:]]+cpuset[[:blank:]]+//p" $jmap`}
-		IP0=${IP0:-`sed -nE "s/^${template}[[:blank:]]+IP0[[:blank:]]+//p" $jmap`}
-		schg=${schg:-`sed -nE "s/^${template}[[:blank:]]+schg[[:blank:]]+//p" $jmap`}
-		maxmem=${maxmem:-`sed -nE "s/^${template}[[:blank:]]+maxmem[[:blank:]]+//p" $jmap`}
-		rootjail=${rootjail:-`sed -nE "s/^${template}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap`}
-		seclvl=${seclvl:-`sed -nE "s/^${template}[[:blank:]]+seclvl[[:blank:]]+//p" $jmap`}
-		tunnel=${tunnel:-`sed -nE "s/^${template}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap`}
+		class=${class:-`sed -nE "s/^${template}[[:blank:]]+class[[:blank:]]+//p" $JMAP`}
+		cpuset=${cpuset:-`sed -nE "s/^${template}[[:blank:]]+cpuset[[:blank:]]+//p" $JMAP`}
+		IP0=${IP0:-`sed -nE "s/^${template}[[:blank:]]+IP0[[:blank:]]+//p" $JMAP`}
+		schg=${schg:-`sed -nE "s/^${template}[[:blank:]]+schg[[:blank:]]+//p" $JMAP`}
+		maxmem=${maxmem:-`sed -nE "s/^${template}[[:blank:]]+maxmem[[:blank:]]+//p" $JMAP`}
+		rootjail=${rootjail:-`sed -nE "s/^${template}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP`}
+		seclvl=${seclvl:-`sed -nE "s/^${template}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP`}
+		tunnel=${tunnel:-`sed -nE "s/^${template}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP`}
 
 		# Enusre that template conferred at least a class and rootjail 
 		if [ -z "$class" -o -z "$rootjail" ] ; then
@@ -415,7 +416,7 @@ check_parameters() {
 			printf "%b" "$w1" ; read resp 
 			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$e14" && usage
 		
-		elif `printf "%b" "$usedIPs\n$jmapIPs" | egrep -qs "$b3"` ; then 
+		elif `printf "%b" "$usedIPs\n$JMAPIPs" | egrep -qs "$b3"` ; then 
 			printf "%b" "$w2" ; read resp 
 			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$e15" && usage
 		
@@ -554,7 +555,7 @@ get_networking() {
 				[ "$resp" = "y" -o "$resp" = "Y" ] && break 
 				printf "%b" "$m9"
 			
-			elif `printf "%b" "$usedIPs\n$jmapIPs" | egrep -qs "$b3"` ; then 
+			elif `printf "%b" "$usedIPs\n$JMAPIPs" | egrep -qs "$b3"` ; then 
 				printf "%b" "$w3" ; read resp 
 				[ "$resp" = "y" -o "$resp" = "Y" ] && break 
 				printf "%b" "\n$m9"
@@ -683,7 +684,7 @@ find_IP() {
         while [ $cycle -lt 255 ] ; do
                 eval "openip=\${$ip0}.\${$ip1}.\${$ip2}.\${$ip3}"
 
-                if ! `printf "%b" "${usedIPs}\n${jmapIPs}" | grep -qs "$openip"` ; then
+                if ! `printf "%b" "${usedIPs}\n${JMAPIPs}" | grep -qs "$openip"` ; then
                         OPENIP="$openip/${ee}"
 
                         # Used to recommend IP ranges in [-g] guided mode
@@ -768,7 +769,7 @@ change_config_files() {
 	[ -z "$template" ] && template="$rootjail"
 	
 	# Copy lines from template and modify with newjail 
-	sed -nE "/^$template[[:blank:]]+/s/^$template/$newjail/p" $jmap >> $jmap
+	sed -nE "/^$template[[:blank:]]+/s/^$template/$newjail/p" $JMAP >> $JMAP
 
 	# Any parameters that are non-blank, were specified and should be changed
 	qb-edit $newjail class $class 		>> /dev/null
@@ -787,8 +788,8 @@ change_config_files() {
 	fi
 
 	# Dispjails have one extra line for template
-	if [ "$class" = "dispjail" -a ! `egrep -qs "^$newjail[[:blank:]]+template" $jmap` ] ; then
-		printf "%b" "$newjail\ttemplate\t$template\n" >> $jmap
+	if [ "$class" = "dispjail" -a ! `egrep -qs "^$newjail[[:blank:]]+template" $JMAP` ] ; then
+		printf "%b" "$newjail\ttemplate\t$template\n" >> $JMAP
 	fi
 	
 	printf "%b" "Here are the jailmap settings for $newjail:\n"

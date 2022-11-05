@@ -12,26 +12,28 @@ done
 
 shift $(( OPTIND -1 ))
 
-# Get datasets, mountpoints; and define files.
-zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $JMAP    # Removes blanks at EOL, prevents errors
+
+# Get datasets and mountpoints
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
 m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
 m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
+
 
 # Define script variables
 jail="$1"
 
 define_variables() {
-	usbvmIP=$(egrep "^usbvm[[:blank:]]+IP0" $jmap | awk '{print $3}')
+	usbvmIP=$(egrep "^usbvm[[:blank:]]+IP0" $JMAP | awk '{print $3}')
 	jailconnectIP="${usbvmIP%.*/*}.2/${usbvmIP#*.*.*.*/}"
-	tap=$(egrep "^usbvm[[:blank:]]+tunnel" $jmap | awk '{print $3}')
-	ppt_usb1=$(sed -nE "s:ppt_usb1[[:blank:]]+:: p" /usr/local/etc/jail.conf.d/quBSD.conf)
-	ppt_usb2=$(sed -nE "s:ppt_usb2[[:blank:]]+:: p" /usr/local/etc/jail.conf.d/quBSD.conf)
+	tap=$(egrep "^usbvm[[:blank:]]+tunnel" $JMAP | awk '{print $3}')
+	ppt_usb1=$(sed -nE "s:ppt_usb1[[:blank:]]+:: p" $QBCONF) 
+	ppt_usb2=$(sed -nE "s:ppt_usb2[[:blank:]]+:: p" $QBCONF) 
 	
-	jmapIPs=$(qb-list -p IP0 | awk '{print $3}')
+	JMAPIPs=$(qb-list -p IP0 | awk '{print $3}')
 	usedIPs=$(qb-connect -l | awk '{print $3}')
 
 	# Determine if usbvm process is running
@@ -101,7 +103,7 @@ find_IP() {
 		openip="10.99.99.$cycle"
 
 		# If the IP on this cycle is not found anywhere, then it can be used
-		if ! `printf "%b" "${usedIPs}\n${jmapIPs}" | grep -qs "$openip"` ; then
+		if ! `printf "%b" "${usedIPs}\n${JMAPIPs}" | grep -qs "$openip"` ; then
 			IP0=${IP0:-"${openip}/24"}
 			break
 		else

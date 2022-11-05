@@ -12,12 +12,13 @@ done
 shift $(( OPTIND - 1 ))
 
 # Get datasets, mountpoints; and define files.
-zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+JCONF="/usr/local/etc/quBSD/quBSD.conf"
+zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $JCONF) 
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $JCONF) 
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $JCONF) 
 
 # Define script variables
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
 tmp="/tmp/qb-stat.txt"
 tmp2="/tmp/qb-stat2.txt"
 col="${col:=6,6}"
@@ -62,7 +63,7 @@ assemble_header() {
 
 define_variables() {
 	#Jails data
-	jails=$(egrep "[^[:blank:]]+[[:blank:]]+class[[:blank:]]+" $jmap | awk '{print $1}') 
+	jails=$(egrep "[^[:blank:]]+[[:blank:]]+class[[:blank:]]+" $JMAP | awk '{print $1}') 
 	zfs_list=$(zfs list -ro name,used)
 
 	# Active window info
@@ -85,11 +86,11 @@ define_variables() {
 
 get_jails_loop() {
 	for j in $jails ; do
-		class=$(sed -nE "s/^${j}[[:blank:]]+class[[:blank:]]+//p" $jmap)
+		class=$(sed -nE "s/^${j}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
 		class="${class%jail}"
-		tunnel=$(sed -nE "s/^${j}[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
+		tunnel=$(sed -nE "s/^${j}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
 		tunnel="${tunnel:--}"
-		rootjail=$(sed -nE "s/^${j}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap)
+		rootjail=$(sed -nE "s/^${j}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP)
 		rootjail="${rootjail:--}"
 		disk="-"
 		jid="-"

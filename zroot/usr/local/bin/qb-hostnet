@@ -9,13 +9,14 @@ while getopts dhu o ; do
 done
 
 # Define files
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//' $jmap   #removes blanks at end of lines
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//' $JMAP   #removes blanks at end of lines
 
 # Define script variables
-jIP=$(sed -n "s/^host[[:blank:]]*IP0[[:blank:]]*//p" $jmap)
-tunnel=$(sed -nE "s/^host[[:blank:]]+tunnel[[:blank:]]+//p" $jmap)
-mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
+jIP=$(sed -n "s/^host[[:blank:]]*IP0[[:blank:]]*//p" $JMAP)
+tunnel=$(sed -nE "s/^host[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
+mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" $QBCONF) 
 
 usage() {
 	[ -n "$ERR" ] && echo "$ERR"

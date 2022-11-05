@@ -14,11 +14,12 @@ done
 shift $(( OPTIND - 1 ))
 
 # Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
 m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
 m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
 
 usage() {
 	[ "$quiet" ] && exit 1
@@ -35,7 +36,7 @@ usage() {
 	echo "   -q: (q)uiet:  Suppress all output an only return an exit status" 
 	echo "   -z: (z)fs:  List all zfs datasets associated with <jail>" 
 	echo ""
-	echo "PARAMETERS    saved at /usr/local/etc/jail.conf.d/jailmap.conf"
+	echo "PARAMETERS    saved at /usr/local/etc/quBSD/jailmap.conf"
 	echo "    class:    appjail, dispjail, or rootjail"
 	echo "    cpuset:   CPUs a jail may use, or \`none' for no limit"
 	echo "    schg:     Directories to receive schg flags: all|sys|none"
@@ -50,22 +51,22 @@ usage() {
 }
 
 get_variables () {
-	jmap_all=$(cat $jmap | uniq)
+	JMAP_all=$(cat $JMAP | uniq)
 
 	# List of only uniq containers (jails and VMs)	
-	jmap_list=$(egrep "^[^[:blank:]]+[[:blank:]]" $jmap | awk '{print $1}' | tail +3 | uniq)
+	JMAP_list=$(egrep "^[^[:blank:]]+[[:blank:]]" $JMAP | awk '{print $1}' | tail +3 | uniq)
 
-	# This adds the devfs ruleset from /etc/jail.conf to jmap_all 
-	for j in $jmap_list ; do
+	# This adds the devfs ruleset from /etc/jail.conf to JMAP_all 
+	for j in $JMAP_list ; do
 		jail_conf=$(sed -nE "/^${j}[[:blank:]]*\{/,/\}/p" /etc/jail.conf | \
 								grep "devfs_ruleset")
-		[ -n "$jail_conf" ] && jmap_all=$(printf "%b" "$jmap_all\n$j\t$jail_conf")
+		[ -n "$jail_conf" ] && JMAP_all=$(printf "%b" "$JMAP_all\n$j\t$jail_conf")
 	done
 
 	# Filters for the jail; the parameter; or the single line combo of jail/param if both were specified
-	jmap_param=$(echo "$jmap_all" | egrep "(^[^[:blank:]]+[[:blank:]]+"$param")|(^CONTAINER)" | column -t)
-	jmap_jail=$(echo "$jmap_all" | egrep "(^${jail}[[:blank:]]+)|^CONTAINER" | column -t) 
-	jmap_jail_param=$(echo "$jmap_jail" | egrep "(^CONTAINER)|($param)" | column -t)
+	JMAP_param=$(echo "$JMAP_all" | egrep "(^[^[:blank:]]+[[:blank:]]+"$param")|(^CONTAINER)" | column -t)
+	JMAP_jail=$(echo "$JMAP_all" | egrep "(^${jail}[[:blank:]]+)|^CONTAINER" | column -t) 
+	JMAP_jail_param=$(echo "$JMAP_jail" | egrep "(^CONTAINER)|($param)" | column -t)
 
 	# Gets all of the zfs data for both zroot and ${zusr_zfs}
 	zroot_all=$(zfs list -rt all -o name,used,origin, ${jails_zfs})
@@ -83,18 +84,18 @@ checks() {
 		usage
 	fi
 
-	if [ -n "$jail" ] && ! `echo "$jmap_all" | egrep -qs "^$jail[[:blank:]]"` ; then
+	if [ -n "$jail" ] && ! `echo "$JMAP_all" | egrep -qs "^$jail[[:blank:]]"` ; then
 		ERR="qb-list: ERROR: Jail doesn't exist or is not configured properly"
 		usage 
 	fi
 
-	if [ -n "$param" ] && ! `echo "$jmap_all" | awk '{print $2}' | egrep -qs "$param"` ; then
+	if [ -n "$param" ] && ! `echo "$JMAP_all" | awk '{print $2}' | egrep -qs "$param"` ; then
 		ERR="qb-list: ERROR: The parameter "$param" doesn't exist" 
 		usage 
 	fi
 
 	if [ "$jail" -a "$param" ] ; then
-		if [ -z "$jmap_jail_param" ] ; then
+		if [ -z "$JMAP_jail_param" ] ; then
 			ERR=$(printf "%b" "qb-list ERROR: The combination of ${jail}" \
 				" ${param} does not exist in jailmap.conf")
 			usage
@@ -115,16 +116,16 @@ print_settings() {
 		fi
 
 	elif [ "$all" ] ; then
-		printf "%b" "\n$jmap_list\n\n" | sort
+		printf "%b" "\n$JMAP_list\n\n" | sort
 
 	elif [ "$jail" -a "$param" ] ; then
-		printf "%b" "\n$jmap_jail_param\n\n" 
+		printf "%b" "\n$JMAP_jail_param\n\n" 
 
 	elif [ "$jail" ] ; then
-		printf "%b" "\n$jmap_jail\n\n" 
+		printf "%b" "\n$JMAP_jail\n\n" 
 
 	elif [ "$param" ] ; then
-		printf "%b" "\n$jmap_param\n\n" 
+		printf "%b" "\n$JMAP_param\n\n" 
 	fi
 }
 

@@ -11,33 +11,33 @@ done
 
 shift $(( OPTIND -1 ))
 
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $JMAP    # Removes blanks at EOL, prevents ERRors
 
 define_variables() {
-	nicvmIP=$(egrep "^nicvm[[:blank:]]+IP0" $jmap | awk '{print $3}')
-	tap=$(egrep "^nicvm[[:blank:]]+tunnel" $jmap | awk '{print $3}')
-	ppt_nic=$(sed -nE "s:ppt_nic[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
-	zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
+	nicvmIP=$(egrep "^nicvm[[:blank:]]+IP0" $JMAP | awk '{print $3}')
+	tap=$(egrep "^nicvm[[:blank:]]+tunnel" $JMAP | awk '{print $3}')
+	ppt_nic=$(sed -nE "s:ppt_nic[[:blank:]]+::p" $QBCONF) 
+	zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $QBCONF) 
 
-	firewallIP=$(egrep "^net-firewall[[:blank:]]+IP0" $jmap | awk '{print $3}')
+	firewallIP=$(egrep "^net-firewall[[:blank:]]+IP0" $JMAP | awk '{print $3}')
 
 	# Determines if nicvm process is running
 	pgrep -f 'bhyve: nicvm' >> /dev/null 2>&1 && vm_on="true"
 }
 
 define_messages() {
-	err1=$(printf "%b" "qb-nicvm: ERROR: Must specify an option (action)") 
-	err2=$(printf "%b" "qb-nicvm: ERROR: net-firewall IP should be valid IPv4 and along " \
-				"quBSD conventions, (10.99.99.xx/24), else ssh connection can't be made")
-	msg3=$(printf "%b" "qb-nicvm: ALERT: nicvm is running. To access via console mode," \
+	ERR1=$(printf "%b" "qb-nicvm: ERROR: Must specify an option (action)") 
+	ERR2=$(printf "%b" "qb-nicvm: ERROR: net-firewall IP should be valid IPv4")
+	MSG3=$(printf "%b" "qb-nicvm: ALERT: nicvm is running. To access via console mode," \
 				"\n(usually for troubleshooting), the script must first shutdown nicvm")
-	err4=$(printf "%b" "qb-nicvm: ERROR: net-firewall must have tunnel set to: net-tap")
-	err5=$(printf "%b" "qb-nicvm: ERROR: Could not start net-firewall. Exiting.")
-	msg6=$(printf "%b" "qb-nicvm: Waiting for nicvm to shutdown before launching console" \
+	ERR4=$(printf "%b" "qb-nicvm: ERROR: net-firewall must have tunnel set to: net-tap")
+	ERR5=$(printf "%b" "qb-nicvm: ERROR: Could not start net-firewall. Exiting.")
+	MSG6=$(printf "%b" "qb-nicvm: Waiting for nicvm to shutdown before launching console" \
 				"\nPlease wait for 20 seconds.")
-	msg7=$(printf "%b" "qb-nicvm: Launching nicvm. Wait a moment")
-	err8=$(printf "%b" "qb-nicvm: ERROR: [-n] should only be used with [-c] option")
+	MSG7=$(printf "%b" "qb-nicvm: Launching nicvm. Wait a moment")
+	ERR8=$(printf "%b" "qb-nicvm: ERROR: [-n] should only be used with [-c] option")
 }
 
 usage() {
@@ -62,19 +62,16 @@ checks() {
 		usage 
 
 	elif [ "$OPTIND" = "1" ] ; then
-		ERR="$err1" ; usage
+		ERR="$ERR1" ; usage
 
 	elif [ "$ssh" -a "$firewallIP" = "none" ] ; then
-		ERR="$err2" ; usage
-
-	elif [ "$ssh" -a -n "${firewallIP%%10.99.99.*}" ] ; then
-		ERR="$err2" ; usage
+		ERR="$ERR2" ; usage
 
 	elif [ "$ssh" -a -n "$no_run" ] ; then
-		ERR="$err8" ; usage
+		ERR="$ERR8" ; usage
 
 	elif [ "$console" -a "$vm_on" ] ; then
-		printf "%b" "\n$msg3" 
+		printf "%b" "\n$MSG3" 
 		restart="true"
 	fi
 }
@@ -82,12 +79,15 @@ checks() {
 poweron_console_mode() {
 	# Only print out commands if -n option is selected
 	if [ -n "$no_run" ] ; then
-		echo bhyveload -c stdio -m 600M -d /dev/zvol/${zroot}/nicvm -S nicvm 
 
-		echo bhyve -c 1 -m 600M -H -A -P -S -s 0:0,hostbridge -s 1:0,lpc -s 2:0,virtio-net,"$tap" -s 3:0,virtio-blk,/dev/zvol/${zroot}/nicvm -s 4:0,passthru,"$ppt_nic" -l com1,stdio nicvm 
+		printf "%b" "\n\nbhyveload -c stdio -m 600M -d /dev/zvol/${zroot}/nicvm -S nicvm\n\n"
+
+		printf "%b" "bhyve -c 1 -m 600M -H -A -P -S -s 0:0,hostbridge -s 1:0,lpc -s 2:0,virtio-net,"$tap" -s 3:0,virtio-blk,/dev/zvol/${zroot}/nicvm -s 4:0,passthru,"$ppt_nic" -l com1,stdio nicvm\n\n" 
 		
 		exit 0
 	fi
+
+	printf "%b" "\n$MSG7\n"
 
 	bhyveload -c stdio -m 600M -d /dev/zvol/${zroot}/nicvm -S nicvm 
 
@@ -102,11 +102,11 @@ poweron_console_mode() {
 }	
 
 main() {
-	if [ "$restart" ] ; then
+	if [ "$restart" -a -z "no_run" ] ; then
 		# I couldn't find a reliable way of ensuring a proper/full nicvm shutdown
 		# Use a countdown from 20 seconds ... slightly dirty way of doing it 
 		service nicvm stop	
-		printf "%b" "\n\n$msg6\n"
+		printf "%b" "\n\n$MSG6\n"
 
 		count=1
 		while [ $count -lt 20 ] ; do
@@ -125,7 +125,6 @@ main() {
 	fi
 
 	if [ "$console" ] ; then
-		printf "%b" "\n$msg7"
 		poweron_console_mode
 		exit 0
 	fi
@@ -133,7 +132,7 @@ main() {
 	if [ "$ssh" ] ; then
 		# net-firewall must be on 
 		`jls | grep -qs " net-firewall "` || jail -c net-firewall >> /dev/null 2>&1
-		[ "$?" != "0" ] && ERR="$err5" && usage
+		[ "$?" != "0" ] && ERR="$ERR5" && usage
 
 		jexec -l -U root net-firewall ssh -i /root/.ssh/nicvm root@${nicvmIP%/*}
 	fi

@@ -11,10 +11,12 @@ done
 
 shift $(( OPTIND - 1 ))
 
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+
 # Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF) 
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF) 
 
 # Define script variables
 jail="$1"
@@ -22,7 +24,7 @@ date=$(date +%b%d)
 tyme=$(date +%H%M)
 
 define_variables() {
-	class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
+	class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
 
 	# Rootjail vs zusr jails have different zfs datasets to handle 
 	if [ "$class" = "rootjail" ] ; then

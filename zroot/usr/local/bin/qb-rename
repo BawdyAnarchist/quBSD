@@ -9,14 +9,16 @@ done
 
 shift $((OPTIND -1 ))
 
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
-m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
-m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
+# Files definitions
+QBCONF="/usr/local/etc/quBSD/quBSD"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $JMAP  # Removes blanks at EOL, prevents errors
 
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $jmap    # Removes blanks at EOL, prevents errors
+# Get datasets and mountpoints
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 
 # Define script variables
 jail="$1"
@@ -24,9 +26,9 @@ newname="$2"
 
 define_variables() {
 	# Finds jails dependent on the jail to be renamed
-	rootj_for=$(sed -nE "s/[[:blank:]]+rootjail[[:blank:]]+${jail}\$//p" $jmap)
-	template_for=$(sed -nE "s/[[:blank:]]*template[[:blank:]]+${jail}\$//p" $jmap)
-	tunnel_for=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${jail}\$//p" $jmap)
+	rootj_for=$(sed -nE "s/[[:blank:]]+rootjail[[:blank:]]+${jail}\$//p" $JMAP)
+	template_for=$(sed -nE "s/[[:blank:]]*template[[:blank:]]+${jail}\$//p" $JMAP)
+	tunnel_for=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${jail}\$//p" $JMAP)
 }
 
 usage () {
@@ -116,7 +118,7 @@ off_jails () {
 jrename() {
 	chflags -R noschg ${m_zusr}/$jail
 
-	sed -i '' -e "s/^${jail}[[:blank:]]/${newname}	/g" $jmap
+	sed -i '' -e "s/^${jail}[[:blank:]]/${newname}	/g" $JMAP
 	sed -i '' -E "s/^${jail}[[:blank:]]+\{/${newname} \{/g" /etc/jail.conf
 	sed -i '' -e "s/${jail}/${newname}/g" ${m_zusr}/${jail}/rw/etc/fstab 
 

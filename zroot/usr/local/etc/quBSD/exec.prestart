@@ -2,14 +2,19 @@
 
 # Symlinks are applied after fstab is mounted 
 
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $JMAP
+
+# Get datasets and mountpoints
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
 m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $jmap
 
 # Define script variables
 jail="$1"
-class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
+class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
 
 usage() {
         printf "%b" "\n$err\n\n"
@@ -19,7 +24,7 @@ checks() {
         if [ -z "$jail" ] ; then
                 err="Error: exec.prestart:  Must select a jail"
                 usage
-        elif [ -z "$jmap" ] ; then
+        elif [ -z "$JMAP" ] ; then
                 err="Error: exec.prestart:  No file selected for jailmap.conf"
                 usage
         elif [ -z "$class" ] ; then

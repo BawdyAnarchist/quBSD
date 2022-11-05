@@ -2,19 +2,21 @@
 
 # Destroys non-persistent filesystems for appjails and dispjails; and reclones
 
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $JMAP
+
 # Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
 m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
 m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $jmap
 
 # Define script variables
 jail="$1"
-jconf=$(egrep "^${jail}[[:blank:]]" $jmap | uniq)
-class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
-rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $jmap)
+jconf=$(egrep "^${jail}[[:blank:]]" $JMAP | uniq)
+class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP)
 # $rootsnap relies on the fact that zfs lists snapshots chronologically
 rootsnap=$(zfs list -t snapshot | egrep -o "${jails_zfs}/${rootjail}@[^[:blank:]]+" | tail -1)
 jmount1=$(mount | egrep -o "${m_jails}/${jail}/[[:alnum:]]+")
@@ -28,7 +30,7 @@ checks() {
         if [ -z "$jail" ] ; then
                 err="Error: exec.poststop:  Must select a jail"
                 usage
-        elif [ -z "$jmap" ] ; then
+        elif [ -z "$JMAP" ] ; then
                 err="Error: exec.poststop:  No file selected for jailmap.conf"
                 usage
         elif [ -z "$class" ] ; then
@@ -70,7 +72,7 @@ reclone_appjail() {
 
 reclone_dispjail() {
 	if [ "$class" = "dispjail" ] ; then
-		template=$(sed -nE "s/^${jail}[[:blank:]]+template[[:blank:]]+//p" $jmap)
+		template=$(sed -nE "s/^${jail}[[:blank:]]+template[[:blank:]]+//p" $JMAP)
 		homesnap=$(zfs list -t snapshot | \
 		egrep -o "${zusr_zfs}/${template}@[^[:blank:]]+" | tail -1)
 

@@ -8,10 +8,14 @@ done
 
 shift $(( OPTIND - 1 ))
 
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+
+# Get datasets and mountpoints
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
+m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
+m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 
 # Define script variables
 jail="$1"
@@ -66,7 +70,7 @@ destroy_dispjail() {
 	zfs destroy -rRf ${jails_zfs}/$newjail
 	zfs destroy -rRf ${zusr_zfs}/$newjail
 	zfs destroy $newsnap
-	sed -i '' -E "/^${newjail}[[:blank:]]/d" $jmap
+	sed -i '' -E "/^${newjail}[[:blank:]]/d" $JMAP
 	sed -i '' -E "/^${newjail}(\{|[[:blank:]])/,/^}/d" /etc/jail.conf 
 }
 

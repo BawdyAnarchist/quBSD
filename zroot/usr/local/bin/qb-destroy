@@ -9,20 +9,20 @@ done
 
 shift $(( OPTIND - 1 ))
 
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" /usr/local/etc/jail.conf.d/quBSD.conf)
+QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+sed -i '' -e 's/[[:blank:]]*$//g' $JMAP   # Remove blanks at EOL, prevents errors
 
-jconf="/etc/jail.conf"
-jmap="/usr/local/etc/jail.conf.d/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $jmap   # Remove blanks at EOL, prevents errors
+# Get datasets, mountpoints; and define files.
+zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
+jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
 
 # Define script variables
 jail="$1"
 
 get_variables() {
-	class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $jmap)
-	no_destroy=$(sed -nE "s/^$jail[[:blank:]]+no_destroy[[:blank:]]+//p" $jmap) 
+	class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+	no_destroy=$(sed -nE "s/^$jail[[:blank:]]+no_destroy[[:blank:]]+//p" $JMAP) 
 	offjails=$(zfs list -o name,origin | egrep "$jail\@.*\$" \
 									| awk '{print $1}' | sed "s@.*/@@")
 	
@@ -106,7 +106,7 @@ main() {
 
 	[ "$destzroot" ] && zfs destroy -rRf ${jails_zfs}/$jail
 	[ "$destzusr" ] && zfs destroy -rRf ${zusr_zfs}/$jail
-	sed -i '' -E "/^${jail}[[:blank:]]/d" $jmap
+	sed -i '' -E "/^${jail}[[:blank:]]/d" $JMAP
 	sed -i '' -E "/^${jail}(\{|[[:blank:]])/,/^}/d" $jconf
 }
 
