@@ -1,0 +1,35 @@
+#!/bin/sh
+
+zfs_sendrecv() {
+cat << EOF
+# Initial send
+zfs send -R zroot/0testjails@Nov04_ | zfs recv -o qubsd:autosnap="-" -F ztestbackup/0testjails
+zfs send -R zdata/testjails@Nov04_ | zfs recv -o qubsd:autosnap="-" -F ztestbackup/testjails
+
+# Incremental
+zfs send -R -i zroot/0testjails@Nov04_ zroot/0testjails@Nov04_ | zfs recv ztestbackup/0testjails
+zfs send -R -i zdata/testjails@Nov04_ zdata/testjails@Nov04_ | zfs recv ztestbackup/testjails
+
+# Incremental multi-step (this have a intermediary increment in between
+zfs send -R -I @Nov04_01:41 zroot/0testjails@Nov04_01:46 | zfs recv ztestbackup/0testjails
+zfs send -R -I @Nov04_01:41 zdata/testjails@Nov04_01:46 | zfs recv ztestbackup/testjails
+
+EOF
+}
+
+zfs_sendrecv
+
+
+## To make this work
+# Dont forget to make a zfs custom prop column for backup location
+# You'll need to read from the backup pool, for last snapshot
+# If it doesn't exist, make it 
+# And now on second thought, the -R option is probably no good. Caz new datasets
+# But if it does exist, you need to grab the last snap on the backup, the most recent on the source
+# Use the incremental -I, to avoid any real problems
+
+# eventually I have the fantasy that I'll script this into an ssh location. 
+
+# Here's a YT video that might help you alot. He does incremental streams over ssh, and compression, speed, etc
+# https://www.youtube.com/watch?v=NHM2T0uxkUM
+
