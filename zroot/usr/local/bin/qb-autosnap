@@ -1,0 +1,181 @@
+#!/bin/sh
+
+usage() {
+	[ -n "$ERR" ] && printf "%b" "\n$ERR\n"
+
+cat << ENDOFUSAGE
+
+qb-autosnap:  Tool for automated snapshots and thinning 
+
+Usage:  qb-autosnap 
+        qb-autosnap [-d][
+        qb-autosnap [-l dataset|snapshot]
+        qb-autosnap [-t <integer><unit-of-time>]
+
+   -d:  (d)estroy snapshots older than qubsd:destroy-date.
+   -h:  (h)elp.  Output this help message.
+   -l:  (l)ist associated datasets and exit. Can filter with
+        <dataset> or <snapshot>. No arguments will show all.
+   -s:  (s)napshot datasets tagged with qubsd:autosnap.
+   -t:  (t)ime-to-live:  Available time TTL_UNITS are:  m|H|D|W|Y  
+                         For example:  120m | 48H | 30D 
+        If [-t] is unspecified, snapshot will not be thinned.
+
+This tool creates custom ZFS User Properties to track and 
+manage all datasets associated with qb-autosnap:
+   qubsd:autosnap      Designates inclusion in autosnap 
+   qubsd:time-to-live  Human readable surive time of snapshot 
+   qubsd:destroy-date  Unix time to destroy snapshot (thin) 
+   qubsd:autocreated   All datasets associated with this tool 
+   qubsd:backup        Backups sync'd to secondary dataset 
+       Recommend using a separate zpool disk for backups. 
+       Future dev will allow for ssh <hostname> backups. 
+
+Datasets can be added/removed from management, with ZFS: 
+   zfs set qubsd:autosnap=<true|false> <dataset>
+
+This script integrates into /etc/crontab. User must manually
+uncomment lines to activate. Edit lines to adjust frequency. 
+
+ENDOFUSAGE
+exit 0
+}
+
+define_errors() {
+	e1=$(printf "%b" "qb-autosnap: ERROR: Format for [-t] must be <integer><unit-of-time> \n" \
+			       "                    For example:  60m  or  24H  or  21W")
+	e2=$(printf "%b" "qb-autosnap: ERROR: Invalid option selected")
+}
+
+get_options() {
+	local OPTIND
+	while getopts ':dhl:st:' opt ; do
+		case $opt in 
+			d) 	DESTROY=true ;;
+			h) 	usage ;;
+			l) 	LIST=${OPTARG} ;;
+			s) 	SNAPSHOT=true ;;	
+			t) 	TTL="${OPTARG}" ;;
+			\:) 	LIST="all" ;;
+			\?) 	ERR="$e2" ; usage ;;
+		esac
+	done
+
+	shift $(( OPTIND - 1 ))
+}
+
+define_variables() {
+	# Datasets tagged with qubsd:autosnap. Includes extra columns for [-l]
+	ZSOURCE_C=$(zfs list -rH -o name,qubsd:autosnap,qubsd:backup-location \
+						| grep -E "[[:blank:]]+true[[:blank:]]")
+
+	# Cleanup list for use with for-loop script
+	ZLIST=$(echo "$ZSOURCE_C" | awk '{print $1}')
+	
+	# Snapshots with a qubsd:D_DATE. Includes extra columns for [-l]
+	ZSNAPS_C=$(zfs list -H -t snapshot -o name,qubsd:time-to-live,qubsd:destroy-date,qubsd:autocreated \
+						| grep -E "yes$" | awk '{print $1, $2, $3}') 
+
+	# Cleanup list for use with for-loop script
+	SNAPLIST=$(echo "$ZSNAPS_C" | grep -E "[[:blank:]]+[[:digit:]]+$" | awk '{print $1}')
+
+	# Separate TTL_INT integer from the time TTL_UNITS 
+	TTL_INT="${TTL%?}"
+	TTL_UNITS="${TTL##*[0-9]}"
+	DATE_UNIX=$(date +%s)
+}
+
+checks() {
+	if [ -n "$TTL" ] && ! echo "$TTL_INT" | grep -Eq '^[0-9]+$' ; then
+		ERR=$e1 ; usage
+
+	elif [ -n "$TTL" ] && ! echo "$TTL_UNITS" | grep -Eq "m|H|D|W|Y" ; then
+		ERR=$e1 ; usage
+
+	fi	
+}
+
+calculate_variables() {
+	if [ -n "$TTL" ] ; then  
+		case $TTL_UNITS in
+			m)	SNAPNAME=$(date +%b%d_%H:%M)
+				TTL_UNIX=$(( TTL_INT * 60 )) 
+				D_DATE=$(( TTL_UNIX + DATE_UNIX)) ;;
+
+			H)	SNAPNAME=$(date +%b%d_%H_Hourly)
+				TTL_UNIX=$(( TTL_INT * 3600 )) 
+				D_DATE=$(( TTL_UNIX + DATE_UNIX)) ;;
+
+			D)	SNAPNAME=$(date +%Y-%m-%d_Daily)
+				TTL_UNIX=$(( TTL_INT * 3600 * 24 )) 
+				D_DATE=$(( TTL_UNIX + DATE_UNIX)) ;;
+
+			W)	SNAPNAME=$(date +%Y-%m_Weekly)
+				TTL_UNIX=$(( TTL_INT * 3600 * 24 * 7 )) 
+				D_DATE=$(( TTL_UNIX + DATE_UNIX)) ;;
+
+			Y)	SNAPNAME=$(date +%Y_Annual)
+				TTL_UNIX=$(( TTL_INT * 365 )) 
+				D_DATE=$(( TTL_UNIX + DATE_UNIX)) ;;
+		esac
+	else
+		SNAPNAME=$(date +%b%d_%H:%M)
+	fi
+}
+
+list_datasets() {
+	if [ "$LIST" != "snapshot" ] ; then
+		printf "%b" "\nDATASET_NAME QUBSD:AUTOSNAP QUBSD:BACKUP-LOC\n" \
+				  "$ZSOURCE_C" "\n" | column -t
+		echo ""
+	fi
+	
+	if [ "$LIST" != "dataset" ] ; then
+		printf "%b" "\nSNAPSHOT_NAME QUBSD:TIME-TO-LIVE QUBSD:DESTROY-DATE\n" \
+				  "$ZSNAPS_C" "\n" | column -t
+		echo ""
+	fi
+	exit 0	
+}		
+
+zfs_destroy() {
+	# Thin snapshots older than their time-to-live 
+	for snap in $SNAPLIST ; do
+		snap_dd=$(zfs list -Ho qubsd:destroy-date $snap)
+		if [ "$snap_dd" -lt "$DATE_UNIX" ] ; then
+			zfs destroy "$snap"
+		fi	
+	done
+}
+
+zfs_snapshot() {
+	for dataset in $ZLIST ; do
+		# Snapshot datasets from the auto list 
+		calculate_variables
+		zfs snapshot "${dataset}@${SNAPNAME}" 
+		zfs set qubsd:autocreated=yes "${dataset}@${SNAPNAME}"
+		zfs set qubsd:autosnap="-" "${dataset}@${SNAPNAME}"
+		
+		# Set the time-to-live and destroy-date for new snapshots
+		if [ -n "$TTL" ] ; then 
+			zfs set qubsd:time-to-live="$TTL" "${dataset}@${SNAPNAME}" 
+			zfs set qubsd:destroy-date="$D_DATE" "${dataset}@${SNAPNAME}" 
+		else
+			zfs set qubsd:time-to-live="-" "${dataset}@${SNAPNAME}" 
+			zfs set qubsd:destroy-date="-" "${dataset}@${SNAPNAME}" 
+		fi
+	done
+}
+
+main() {
+	define_errors
+	get_options "$@"
+	define_variables
+	checks
+	[ -n "$LIST" ] && list_datasets
+	[ -n "$DESTROY" ] && zfs_destroy
+	[ -n "$SNAPSHOT" ] && zfs_snapshot 
+}
+
+main "$@"
+
