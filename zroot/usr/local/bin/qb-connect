@@ -85,18 +85,6 @@ define_messages() {
 	err3="qb-connect: ERROR: Must specify a tunnel-jail to connect to"
 	err4="qb-connect: ERROR: Tunnel jail:  $tunnel is not turned on" 
 	err5="qb-connect: ERROR: [-i $IP0] is not a valid CIDR IPv4 address" 
-	warn6=$(printf "%b" "\nWARNING:  [-i] IP assignment diverges from quBSD convention." \
-				"\nDefault behavior:  $jail and $tunnel epairs connect via these IPs:" \
-				"\n$ip0_0 - $ip0_255  " \
-				"\n\nINFO: Below are quBSD IP assignment conventions:\n" \
-				"\nGATEWAY          CLIENT               IPv4(min)   IPv4(max)" \
-				"\nnicvm            net-<gateway>    10.99.99.1/24 - 10.99.99.254/24" \
-				"\nnet-<gateway>    appjail_1          10.1.0.2/30 - 10.255.0.2/30" \
-				"\nappjail_1        appjail_2          10.0.1.2/30 - 10.0.255.2/30" \
-				"\nusbvm            appjail          10.88.88.1/30 - 10.88.88.255/30" \
-				"\nnone             none                         none" \
-				"\n\n\tContinue with $IP0 anyways? (y/n):  ")
-
 	err6="qb-connect: ERROR: User opted to exit, to change [-i] specification" 
 	warn7=$(printf "%b" "\nWARNING: [-i] overlaps with an IP already in use.\n" \
 					"Continue with $IP0 anyways? (y/n): ")
@@ -166,10 +154,6 @@ checks() {
 			if [ -z "$validIPv4" ] ; then
 				ERR="$err5" ; usage
 
-			elif [ "$mismatch" ] ; then
-	               printf "%b" "$warn6" ; read resp
-	               [ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err6" && usage
-			
 			elif `printf "%b" "$all_interfaces\n$jmapIPs" | egrep -qs "$b3"` ; then 
 				printf "%b" "$warn7" ; read resp
 				[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err6" && usage
@@ -217,44 +201,16 @@ check_IPv4() {
 }
 
 find_IP() {
-	# Search for unused IP. Jail's IP assignment is based on position in the
-	# internal network. Variable indirection simplifies the while loop; and
-	# generalizes the labeling convention for future code changes/expansion
-
 	cycle=1
-	if [ -z "$tunnel" ] ; then
-		# If there is no tunnel or, it's a net-tap jail, skip the IP0 loop-search
-		cycle=256
 	
-	elif [ "$tunnel" = "net-firewall" ] ; then
-		# First part of variable indirection. Assigns the variable names
-		ip1="aa" ; ip2="bb" ; ip3="cycle" ; subnet="24"
-		aa=255 ; bb=99 
-		[ -n "$IP0" -a "10.$aa.$bb/$subnet" = "$a0.$a1.$a2/$a4" ] || mismatch="true"
-		
-	elif [ -z "${tunnel##net-*}" ] ; then
-		ip1="cycle" ; ip2="bb" ; ip3="cc" ; subnet="30"
-		bb=0 ; cc=2
-		[ -n "$IP0" -a "10.$bb.$cc/$subnet" = "$a0.$a2.$a3/$a4" ] || mismatch="true"
-
-	else
-		ip1="aa" ; ip2="cycle" ; ip3="cc" ; subnet="30"
-		aa=0 ; cc=2
-		[ -n "$IP0" -a "10.$aa.$cc/$subnet" = "$a0.$a1.$a3/$a4" ] || mismatch="true"
-	fi
-
+	# Auto IP is given form: 10.99.x.1/30 so that it's readily identifiable as temporary 
 	while [ $cycle -lt 255 ] ; do
-		# Second part of variable indirection. Uses one eval, rather than 
 		# multiple if/thens to construct the IP and loop search
-		eval "openip=10.\${$ip1}.\${$ip2}.\${$ip3}"
+		openip="10.99.${cycle}.2"
 
 		# If the IP on this cycle is not found anywhere, then it can be used
 		if ! `printf "%b" "${all_interfaces}\n${jmapIPs}" | grep -qs "$openip"` ; then
-			IP0=${IP0:-"${openip}/${subnet}"}
-
-			# Used for message generation, to inform user of quBSD internal IP conventions 
-			cycle=1 && eval "ip0_0=10.\${$ip1}.\${$ip2}.\${$ip3}/$subnet"
-			cycle=255 && eval "ip0_255=10.\${$ip1}.\${$ip2}.\${$ip3}/$subnet"
+			IP0=${IP0:-"${openip}/30"}
 			break
 		else
 			cycle=$(( cycle + 1 ))
