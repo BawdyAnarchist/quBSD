@@ -124,15 +124,14 @@ define_messages() {
 				"CIDR address\nMake sure to write the subnet in form IP.IP.IP.IP/subnet")
 
 	err7_2=$(printf "%b" "\nWARNING:  IP assignment diverges from quBSD convention." \
-				"\nDefault behavior:  $tunnel connects to client jails from:" \
-				"\n$ip0_0 - $ip0_255  " \
 				"\n\nINFO: Below are quBSD IP assignment conventions:\n" \
-				"\nGATEWAY          CLIENT               IPv4(min)   IPv4(max)" \
-				"\nnicvm            net-<gateway>    10.99.99.1/24 - 10.99.99.254/24" \
-				"\nnet-<gateway>    appjail_1          10.1.0.2/30 - 10.255.0.2/30" \
-				"\nappjail_1        appjail_2          10.0.1.2/30 - 10.0.255.2/30" \
-				"\nusbvm            appjail          10.88.88.1/30 - 10.88.88.255/30" \
-				"\nnone             none                         none" \
+				"\nJAIL              GATEWAY        IPv4 Range" \
+				"\nnet-firewall      nicvm          Router Dependent" \
+				"\nnet-<gateway>     net-firewall   10.255.x.2/30"\
+				"\nserv-jails        net-firewall   10.128.x.2/30" \
+				"\nappjails          net-<gateway>  10.1.x.2/30" \
+				"\nusbvm             variable       10.88.88.1/30" \
+				"\nadhoc created with qb-connect    10.99.x.2/30" \
 				"\n\n\tContinue with $IP0 anyways? (y/n):  ")
 
 	err7_3=$(printf "%b" "\nWARNING:  overlaps with an IPv4 already in use.\n" \
@@ -142,6 +141,9 @@ define_messages() {
 				"\n\tContinue anyways? (y/n):  ")
 
 	err7_5=$(printf "%b" "qb-edit: ERROR:  User opted to exit, for IP re-assignment")
+
+	err7_6=$(printf "%b" "qb-edit: ERROR:  Cannot automatically assign IP because it"\
+				 "\ndepends on your router. Use rc.conf inside of net-firewall.")
 
 	err8=$(printf "%b" "qb-edit:  Error: parameter $param can only be one of the " \
 				"following none | sys | all")	
@@ -213,6 +215,8 @@ checks() {
 		if [ "$IP0" = "auto" ] ; then
 			if [ "$tunnel" = "none" ] ; then
 				ERR="$err7" ; usage
+			elif [ "$jail" = "net-firewall" ] ; then
+				ERR="$err7_6" ; usage
 			else
 				IP0="$OPENIP"
 				val="$OPENIP"
@@ -276,6 +280,7 @@ checks() {
 check_IPv4() {
 	# Perhpas not as technically correct as doing a regex,
 	# but it's readable, and the a/b pairs are usable elsewhere
+	# IP address can be thought of as:  $a0.$a1.$a2.$a3/$a4   
 
 	validIPv4=""
 
@@ -302,38 +307,42 @@ find_IP() {
 	# internal network. Variable indirection simplifies the while loop; and 
 	# generalizes the labeling convention for future code changes/expansion
 
+	# IP address can be thought of in two ways, depending on variable indirection:
+	#    $a0.$a1.$a2.$a3/$a4       (from check_IPv4 function)
+	#	$ip0.$ip1.$ip2.$ip3/$ip4  (holds the variable names)
+	#    aa.bb.cc.dd/subnet        (the replacement variable name) 
+	ip0="aa" ; ip1="bb" ; ip2="cycle" ; ip3="dd" ; subnet="ee"
 	cycle=1
 
-	if [ -z "${tunnel##net-tap*}" ] ; then
-		ip1="aa" ; ip2="bb" ; ip3="cycle" ; subnet="24"
-		aa=99 ; bb=99
+	# Change naming conventions depending on the jail
+	if [ "${jail}" = "net-firewall" ] ; then
+		cycle=256
 
-		# Determines a mismatch in quBSD IP assignment convention
-		[ -n "$IP0" -a "10.$aa.$bb/$subnet" = "$a0.$a1.$a2/$a4" ] || mismatch="true"
+	elif [ -z "${jail##net-*}" ] ; then
+		aa=10 ; bb=255 ; dd=2 ; ee=30
 
-	elif [ -z "${tunnel##net*}" ] ; then
-		ip1="cycle" ; ip2="bb" ; ip3="cc" ; subnet="30"
-		bb=0 ; cc=2
-		[ -n "$IP0" -a "10.$bb.$cc/$subnet" = "$a0.$a2.$a3/$a4" ] || mismatch="true"
+	elif [ -z "${jail##serv-*}" ] ; then
+		aa=10 ; bb=128 ; dd=2 ; ee=30
 
 	elif [ -z "${tunnel##none*}" -a "$IP0" != "none" ] ; then
 		ipwithnotunnel="true" ; cycle=256
 
 	else
-		ip1="aa" ; ip2="cycle" ; ip3="cc" ; subnet="30"
-		aa=0 ; cc=2
-		[ -n "$IP0" -a "10.$aa.$cc/$subnet" = "$a0.$a1.$a3/$a4" ] || mismatch="true"
+		aa=10 ; bb=1 ; dd=2 ; ee=30
 	fi
 
+	# Check if the convention = user_input, otherwise, is mismatch
+	[ -n "$IP0" -a "$jail" != "net-firewall" \
+					-a "$aa.$bb.$dd/$ee" = "$a0.$a1.$a3/$a4" ] || mismatch="true"
+	
+	# Run through cycles to find an open IP
 	while [ $cycle -lt 255 ] ; do
-		eval "openip=10.\${$ip1}.\${$ip2}.\${$ip3}"
-		if ! `printf "%b" "${usedIPs}\n${jmapIPs}" | grep -qs "$openip"` ; then
-			OPENIP="$openip/${subnet}"
+		eval "openip=\${$ip0}.\${$ip1}.\${$ip2}.\${$ip3}"
 
-			# Used to recommend IP ranges in [-g] guided mode
-			cycle=1 && eval "ip0_0=10.\${$ip1}.\${$ip2}.\${$ip3}/$subnet"
-			cycle=255 && eval "ip0_255=10.\${$ip1}.\${$ip2}.\${$ip3}/$subnet"
+		if ! `printf "%b" "${usedIPs}\n${jmapIPs}" | grep -qs "$openip"` ; then
+			OPENIP="$openip/${ee}"
 			break
+
 		else
 			cycle=$(( cycle + 1 ))
 			if [ $cycle -gt 254 ] ; then
