@@ -17,13 +17,15 @@ USBVM
 - Auto remove password from unprivleged usbvm user     
 	
 Expand install options     
-- Can select to merge zroo and zusr with other existing dataset/mount     
+- Can select to merge zroot and zusr with other existing dataset/mount     
 
 0SERV Default and 0serv-template
-  - You will need to chown the www directory structures
   - Integrate into install script
-  - Certainly is alot of work to do on integrating this better
-      (difficult caz lots of options. Is there really a base?)
+  - www and usr diretories are quite large. Script integration:
+  	- at quBSD installation, copy files over from 0serv
+     - qb-create should in realtime copy over usr/local/etc from 0serv
+     - There might even be problems with pkg-upgrade operating on this dir
+	- Make sure to chown the directories as appropriate
 
 nicvm 
   - Make it a Linux VM so that it can use all the wireless protocols.
@@ -37,9 +39,19 @@ net-firewall
 		- This might require some thought about setting an "auto" option in the settings.
 		  because people making servers might not want an auto setting
 
+qb-autosnap 
+	- Need to add changes /etc/crontab to qubsd-installer
+	- Need to add the zfs custom props to the datasets as created (qubsd-installer)
+		- be careful. Cloned datasets should not be autosnapped
+
+qb-backup (already created in $ubin)
+	- cron to run on both sides of source and dest, with ssh hostname, to automate backups
+
 Detect changes in nic and USB so that you can rewrite the file if necessary
 
 ### BEST PRACTICES / CLEANUP
+
+/usr/local/etc/jail.conf.d  really should just be /usr/local/etc/quBSD
 
 - net-firewall pf.conf might not be fully generalized for routerIP. 
 	- basically, exec.created relies on setting the last number to "1". 
@@ -53,7 +65,8 @@ Detect changes in nic and USB so that you can rewrite the file if necessary
 - networking rework. Need to update the IP conventions - both checks and docs 
 
 qb-usbvm     
-- When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
+	- When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
+	- Need to rework usbvm automatic internet with option (due to general net rework)
 
 All files inside scripts should be made into variable references     
 
@@ -82,6 +95,12 @@ qb-rename
 
 pf.conf
 	- wgIP constant really should be called "endpointIP" or something like that
+
+Coding practices
+	shellcheck.net - need to go over all code with a fine toothed comb. fix the formatting errors (like if "$?" then ...)
+	Probably could be using `. file' to make a common library and source those commands into scripts for simplification
+	usage should be the first thing in the script. Then `case` should call it. Save space
+	
 
 ### MINOR UPGRADES
 
