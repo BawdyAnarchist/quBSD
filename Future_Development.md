@@ -50,8 +50,6 @@ Detect changes in nic and USB so that you can rewrite the file if necessary
 
 ### BEST PRACTICES / CLEANUP
 
-/usr/local/etc/jail.conf.d  really should just be /usr/local/etc/quBSD
-
 - net-firewall pf.conf might not be fully generalized for routerIP. 
 	- basically, exec.created relies on setting the last number to "1". 
      - Then it modifes pf.conf, but that might be inappropriate
@@ -66,8 +64,6 @@ Detect changes in nic and USB so that you can rewrite the file if necessary
 qb-usbvm     
 	- When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
 	- Need to rework usbvm automatic internet with option (due to general net rework)
-
-All files inside scripts should be made into variable references     
 
 column -t some of the conf files
 
@@ -97,7 +93,7 @@ pf.conf
 
 Coding practices
 	shellcheck.net - need to go over all code with a fine toothed comb. fix the formatting errors (like if "$?" then ...)
-	Probably could be using `. file' to make a common library and source those commands into scripts for simplification
+	Create libraries to simplify functions used alot. /usr/local/lib/quBSD.sh	
 	usage should be the first thing in the script. Then `case` should call it. Save space
 	
 
@@ -118,15 +114,7 @@ qb-cam/mic - webcam and mic get brought up with script
 
 qb-update - Update rootjails, create snapshots
 
-qb-snap 
-	- Add an option for snapshotting host before an update
-	- usrlocal in 0serv jails needs to automatically added to qb-snap
-
 qb-create - While in guided mode, add option to enter "auto" for IP assignment 
-
-qb-stat 
-	- Experiment with sort and colors
-	- VM add functionality like "on" IP addy, etc
 
 qb-list
 	- extra options for seeing snapshots of jails
@@ -140,13 +128,10 @@ qb-disp - Need to make sure that you're incrementing with a DISP number, so that
 
 usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
 
-startup.conf and startup.sh - Config file that maps workspaces to GUI apps; script to launch apps startx
-
 add autostart option to jailmap.conf, and a service startup script for autostart
 
 Crons
 - Popup warning if zpool errors are discovered
 - Popup warning if host has been network connected for too long
-- that manage ZFS snapshots
 - Run checks for any other problems. Like ...?
 
