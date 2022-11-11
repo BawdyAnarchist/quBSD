@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Starts bhyve virtual machine with pci passthrough for usbvm
+# Starts bhyve virtual machine with pci passthrough for pci0:71:0:1 and pci0:71:0:3
 # Virtual interface on tap1 for connectivity
 
 # PROVIDE: usbvm 
@@ -17,9 +17,10 @@ stop_cmd="${name}_stop"
 statys_cmd="${name}_status"
 
 usbvm_start() {
-	ppt_usb1=$(sed -nE "s:ppt_usb1[[:blank:]]+:: p" /usr/local/etc/jail.conf.d/quBSD.conf)
-	ppt_usb2=$(sed -nE "s:ppt_usb2[[:blank:]]+:: p" /usr/local/etc/jail.conf.d/quBSD.conf)
-	zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
+	QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+	ppt_usb1=$(sed -nE "s:ppt_usb1[[:blank:]]+:: p" $QBCONF) 
+	ppt_usb2=$(sed -nE "s:ppt_usb2[[:blank:]]+:: p" $QBCONF) 
+	zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $QBCONF) 
 
 	bhyveload -c stdio -m 1G -d /dev/zvol/${zroot}/usbvm -S usbvm > /dev/null 2>&1 
 
