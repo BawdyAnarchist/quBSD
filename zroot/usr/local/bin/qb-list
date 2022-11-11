@@ -24,29 +24,32 @@ m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 usage() {
 	[ "$quiet" ] && exit 1
 	[ "$ERR" ] && printf "%b" "\n$ERR\n"
-	echo ""
-	echo "qb-list:  Lists jail properties contained in jailmap"
-	echo ""
-	echo "Usage: qb-list [-j <jail>] [-p <parameter>]"
-	echo "Usage: qb-list [-a] [-h] [-q] [-z] [-j <jail>] [-p <parameter>]"
-	echo "   -a: (a)ll:  List all jails. Combine with [-z] for all zfs data" 
-	echo "   -h: (h)elp:  Outputs this help message"
-	echo "   -j: (j)ail:  Show all settings for <jail>" 
-	echo "   -p: (p)arameter:  Shows setting of PARAMETER for all jails" 
-	echo "   -q: (q)uiet:  Suppress all output an only return an exit status" 
-	echo "   -z: (z)fs:  List all zfs datasets associated with <jail>" 
-	echo ""
-	echo "PARAMETERS    saved at /usr/local/etc/quBSD/jailmap.conf"
-	echo "    class:    appjail, dispjail, or rootjail"
-	echo "    cpuset:   CPUs a jail may use, or \`none' for no limit"
-	echo "    schg:     Directories to receive schg flags: all|sys|none"
-	echo "    maxmem:   RAM maximum allocation, or \'none' for no limit" 
-	echo "    rootjail: Which rootjail (system jail) to clone for <jail>"
-	echo "    seclvl:   kern.securelevel to protect <jail>: -1|0|1|2|3"
-	echo "    template: Only for dispjail, which is cloned from template" 
-	echo "    tunnel:   Gateway for <jail> to receive network connectivity"
-	echo "    devfs_ruleset=  Provided for reference. See /etc/jail.conf" 
-	echo ""
+cat << EOF
+
+qb-list:  Lists jail properties contained in jailmap
+
+Usage: qb-list [-j <jail>] [-p <parameter>]
+Usage: qb-list [-a] [-h] [-q] [-z] [-j <jail>] [-p <parameter>]
+   -a: (a)ll:  List all jails. Combine with [-z] for all zfs data 
+   -h: (h)elp:  Outputs this help message
+   -j: (j)ail:  Show all settings for <jail>
+   -p: (p)arameter:  Shows setting of PARAMETER for all jails
+   -q: (q)uiet:  Suppress all output an only return an exit status
+   -z: (z)fs:  List all zfs datasets associated with <jail>
+
+PARAMETERS    saved at /usr/local/etc/quBSD/jailmap.conf
+   autostart:  appjail, dispjail, or rootjail
+   class:      appjail, dispjail, or rootjail
+   cpuset:     CPUs a jail may use, or \`none' for no limit
+   schg:       Directories to receive schg flags: all|sys|none
+   maxmem:     RAM maximum allocation, or \'none' for no limit 
+   rootjail:   Which rootjail (system jail) to clone for <jail>
+   seclvl:     kern.securelevel to protect <jail>: -1|0|1|2|3
+   template:   Only for dispjail, which is cloned from template
+   tunnel:     Gateway for <jail> to receive network connectivity
+   devfs_ruleset=  Provided for reference. See /etc/jail.conf
+
+EOF
 	exit 1
 }
 
