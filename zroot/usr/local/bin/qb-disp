@@ -10,70 +10,92 @@ shift $(( OPTIND - 1 ))
 
 QBCONF="/usr/local/etc/quBSD/quBSD.conf"
 JMAP="/usr/local/etc/quBSD/jailmap.conf"
+JCONF="/etc/jail.conf"
 
 # Get datasets and mountpoints
 zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
 m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
 jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
-m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
+m_jails=$(zfs get -H mountpoint $JAILs_zfs | awk '{print $3}')
 
 # Define script variables
-jail="$1"
-newjail="DISP-${jail}"
+JAIL="$1"
 datetime=$(date +%b%d_%H%M)
-newsnap="${zusr_zfs}/${jail}@${datetime}"
+NEWSNAP="${zusr_zfs}/${JAIL}@${datetime}"
 
-usage() {
-	echo "qb-disp: Creates a disposable jail, using <jail> as a template,"
-	echo "and then launches a floating terminal from inside that jail"
-	echo "The disposable jail is destroyed when the terminal is closed"
-	echo ""
-	echo "Use this for opening questionable files or conducting risky operations"
-	echo ""
-	echo "Usage: qb-disp [-h][-i <ip_addr>] -r <existing_jail> <run_cmd>"
-	echo "Usage: qb-disp -p" 
-	echo "         -h: outputs this usage message"
-	exit 1
+usage() { cat << EOF
+qb-disp: Creates a disposable jail, using <jail> as a template,
+and then launches a floating terminal from inside that jail
+The disposable jail is destroyed when the terminal is closed
+
+Use this for opening questionable files or conducting risky operations
+
+Usage: qb-disp [-h][-i <ip_addr>] -r <existing_jail> <run_cmd>
+Usage: qb-disp -p 
+   -h: outputs this usage message
+
+EOF
+exit 0
 }
 
 checks() {
 	if [ "$help" ] ; then 
 		usage
 
-	elif [ -z "$jail" ] ; then 
+	elif [ -z "$JAIL" ] ; then 
 		echo "qb-disp: Error: Must specify a <jail> to clone for dispjail"
 		usage 
 
-	elif ! `qb-list -qj "$jail"` ; then
-		printf "%b" "qb-disp: Error: clone for dispjail $jail" \
+	elif ! `qb-list -qj "$JAIL"` ; then
+		printf "%b" "qb-disp: Error: clone for dispjail $JAIL" \
 				"is not properly configured or does not exist"
 		usage
 	fi
 }
 
+NEWJAIL_name() {
+	NEWJAIL="DISP-${JAIL}"
+	cycle=''
+
+	# If DISP-jail exists (even partially), increment the ending number and try again 
+	while `zfs list -rt all | grep -Eqs "^${jails_zfs}/$NEWJAIL[[:blank:]]"` || \
+			`zfs list -rt all | grep -Eqs "^${zusr_zfs}/$NEWJAIL[[:blank:]]"` || \
+			`grep -Eqs "^$NEWJAIL[[:blank:]]" $JMAP` || \
+			`grep -Eqs "^$NEWJAIL[[:blank:]]" $JCONF` 
+	do
+		cycle=$(( cycle + 1 ))	
+		NEWJAIL="DISP-${JAIL}_${cycle}"
+	done	
+}
+
 main() {
-	# Will need a snapshot for the dispjail. Trap to destroy it later
-	zfs snapshot $newsnap
-		trap 'zfs destroy -rRf $newsnap' SIGINT SIGTERM SIGHUP SIGKILL SIGQUIT EXIT
+	# Will need a snapshot for the dispjail. First check if it already exists. 
+	if	! zfs list -t snapshot $NEWSNAP > /dev/null 2>&1 
+	then zfs snapshot $NEWSNAP
+	fi
+
+	#Trap to destroy snapshot after use.
+	trap 'zfs destroy -rRf $NEWSNAP' SIGINT SIGTERM SIGHUP SIGKILL SIGQUIT EXIT
 
 	# Create dispjail and edit no_destroy flag
-	qb-create -c dispjail -t none -i none -T $jail $newjail 
-		trap	'destroy_dispjail' SIGINT SIGTERM SIGHUP SIGKILL SIGQUIT EXIT
+	qb-create -c dispjail -t none -i none -T $JAIL $NEWJAIL 
+	trap	'destroy_dispjail' SIGINT SIGTERM SIGHUP SIGKILL SIGQUIT EXIT
 
 	# Launch a floating terminal for the dispjail
-	xterm -e csh -c "i3-msg -q floating enable, move position center; qb-cmd $newjail"
+	xterm -e csh -c "i3-msg -q floating enable, move position center; qb-cmd $NEWJAIL"
 }
 
 destroy_dispjail() {
-	jail -r $newjail
+	jail -r $NEWJAIL
 
-	zfs destroy -rRf ${jails_zfs}/$newjail
-	zfs destroy -rRf ${zusr_zfs}/$newjail
-	zfs destroy $newsnap
-	sed -i '' -E "/^${newjail}[[:blank:]]/d" $JMAP
-	sed -i '' -E "/^${newjail}(\{|[[:blank:]])/,/^}/d" /etc/jail.conf 
+	zfs destroy -rRf ${jails_zfs}/$NEWJAIL
+	zfs destroy -rRf ${zusr_zfs}/$NEWJAIL
+	zfs destroy $NEWSNAP
+	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $JMAP
+	sed -i '' -E "/^${NEWJAIL}(\{|[[:blank:]])/,/^}/d" /etc/jail.conf 
 }
 
 checks
+NEWJAIL_name
 main
 
