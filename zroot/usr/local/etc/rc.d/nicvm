@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Starts bhyve virtual machine with PCI passthrough for nicvm 
+# Starts bhyve virtual machine with PCI passthrough for nicvm at pci0:68:0:0 
 # Virtual interface on tap0 for connectivity 
 
 # PROVIDE: nicvm 
@@ -16,8 +16,9 @@ stop_cmd="${name}_stop"
 status_cmd="${name}_status"
 
 nicvm_start() {
-	ppt_nic=$(sed -nE "s:ppt_nic[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
-	zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" /usr/local/etc/jail.conf.d/quBSD.conf)
+	QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+	ppt_nic=$(sed -nE "s:ppt_nic[[:blank:]]+::p" $QBCONF)
+	zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $QBCONF)
 
 	bhyveload -c stdio -m 600M -d /dev/zvol/${zroot}/nicvm -S nicvm > /dev/null 2>&1
 
