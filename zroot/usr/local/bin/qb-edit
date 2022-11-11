@@ -1,393 +1,226 @@
 #!/bin/sh
 
-while getopts fhir o ; do
-	case $o in
-		f) force="true" ;;
-		h) help="true" ;;
-		i) param="IP0" ; val="auto" ;;
-		r) restart="true" ;;
-	esac
-done
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-edit.sh
 
-shift $(( OPTIND - 1 ))
-
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//' $JMAP  #remove blanks at end of lines
-
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
-m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
-m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
-
-# Define script variables
-jail="${jail:-"$1"}"
-param="${param:-"$2"}"
-val="${val:-"$3"}"
-
-define_variables() {
-	# Valid template jails must have JMAP entries and ${zusr_zfs} dataset 
-	JMAP_appjs=$(qb-list -p class | awk '{print $1}' | uniq)
-	zusrlist=$(zfs list -r ${zusr_zfs} | awk '{print $1}')
-	for j in $JMAP_appjs ; do
-		if `echo "$zusrlist" | egrep -qs "^${zusr_zfs}/$j\$"` ; then
-			validtemplatejs=$(printf "%b" "$j" "\n" "$validtemplatejs" | sort)
-		fi
+get_options() {
+	local OPTIND
+	while getopts fhir opts ; do
+		case $opts in
+			f) FORCE="true" ;;
+			h) get_msg_qb_edit "none" "usage_0" ;; 
+			i) PARAM="IP0" ; VAL="auto" ;;
+			r) RESTART="true" ;;
+		esac
 	done
 
-	# Valid rootjails must have JMAP entries and ${jails_zfs} dataset 
-	JMAP_rootjs=$(qb-list -p class | grep rootjail | awk '{print $1}')
-	for j in $JMAP_rootjs ; do
-		tmpj=$(zfs list -ro name,used ${jails_zfs} | egrep "^${jails_zfs}/$j[[:blank:]]")
-		validrootjs=$(printf "%b" "$tmpj" "\n" "$validrootjs")
-	done
-
-	# Additional parameters for later use with tests and messages
-	JMAPIPs=$(qb-list -p IP0 | sort -k3)
-	usedIPs=$(qb-connect -l | grep "inet" | sort -k3)
-	netjails=$(echo "$validtemplatejs" | egrep "^net-")
+	shift $(( OPTIND - 1 ))
 	
-	validcpuset=$(cpuset -g | sed "s/pid -1 mask: //" | sed "s/pid -1 domain.*//")
-	oldsetting=$(sed -nE "s@^${jail}[[:blank:]]+${param}[[:blank:]]+@@p" $JMAP)
-	tunnel=$(sed -nE "s/^${jail}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
-}
-
-usage() {
-	[ "$ERR" ] && printf "%b" "\n$ERR\n"
-	echo ""
-	echo "qb-edit:  Modify jail parameters in jailmap.conf"
-	echo "Checks to ensure a valid arguments were given. If user needs to"
-	echo "modify despite errors, edit jailmap.conf directly or use [-f]"
-	echo ""
-	echo "Usage: qb-edit <jail> <parameter> <value>"
-	echo "       qb-edit [-f][-h][-i][-r] <jail> <parameter> <value>"
-	echo ""
-	echo "   -f: (f)orce:  Modify jailmap, ignore errors" 
-	echo "   -h: (h)elp:  Outputs this help message"
-	echo "   -i: (i)pv4:  Auto-assign IP address along quBSD conventions"
-	echo "   -r: (r)estart the required jails for changes to take effect"
-	echo ""
-	echo "PARAMETERS    saved at /usr/local/etc/jail.conf.d/jailmap.conf"
-	echo "    class:    What type of jail this is: appjail|dispjail|rootjail"
-	echo "    rootjail: Which rootjail system to clone for <jail> . If <jail>" 
-	echo "              is a rootjail; then this entry is self referential," 
-	echo "              but important for script funcitonality." 
-	echo "    template: Only applicable for dispjail. Designates jail to" 
-	echo "              clone (including /home) for dispjail" 
-	echo "    tunnel:   Gateway for <jail> to receive network connectivity"
-	echo "    IP0:      IPv4 address for the jail."
-	echo "    maxmem:   RAM maximum allocation:  <integer><G|M|K>  "
-	echo "              For example: 4G or 3500M, or \'none' for no limit" 
-	echo "    cpuset:   CPUs a jail may use. Comma separated integers, or a"
-	echo "              range.  For example: 0,1,2,3 is the same as 0-3"
-	echo "              \`none' places no restrictions on jail's CPU access" 
-	echo "    schg:     Directories to receive schg flags: all|sys|none"
-	echo "              \`sys' are files like: /boot /bin /lib , and others"
-	echo "              \`all includes /usr and /home as well"
-	echo "    seclvl:   kern.securelevel to protect <jail>: -1|0|1|2|3"
-	echo "              \`1' or higher is required for schg to take effect" 
-	echo "    no_destroy  Prevents accidental destruction of <jail>"
-	echo "                Change to \`false' in order to use qb-destroy"
-	echo ""
-	exit 1
-}
-
-define_messages() {
-
-	err1="qb-edit: Error: missing argument, must specify jail and parameter" 
-
-	err2=$(printf "%b" "qb-edit: Error: Combination of $jail $param " \
-			"doesnt exist in jailmap.conf")
-
-	err3=$(printf "%b" "qb-edit: Error: parameter $param can only be one of the "\
-			"following rootjail | appjail | dispjail")
-
-	err4=$(printf "%b" "qb-create: ERROR:  You must specify a VALID rootjail."\
-				"\nHere is a list of valid possibilities from ${jails_zfs} \n\n$validrootjs\n" \
-				"\nIf you expected to see another rootjail, check that it's in jailmap.conf" \
-				"\nand a zfs ${jails_zfs}/<jailname> is an original dataset (not a child).")
-
-	err5=$(printf "%b" "qb-create: ERROR:  Must specify a VALID template")
-
-	w6=$(printf "%b" "\nqb-create: WARNING: $tunnel (tunnel_jail) is not fully configured." \
-				"\nHere is a list of valid tunnel possibilities:\n\n$validtemplatejs\n" \
-				"\n\tContinue anyways? (y/n):  ")
-
-	err6=$(printf "%b" "qb-create: ERROR:  User opted to exit, tunnel has incomplete config" \
-				"\nHere are a list of all net-jails:\n\n$netjails\n")
-
-	err7=$(printf "%b" "qb-edit: Error:  User selected auto IP assignment, but jail's tunnel" \
-				"\nis \`none' . First assign a tunnel jail, then the script will know which" \
-				"\nIP address range to select from, along quBSD conventions.")
-
-	err7_1=$(printf "%b" "qb-edit: Error:  IP entered is not a properly formatted IPv4 " \
-				"CIDR address\nMake sure to write the subnet in form IP.IP.IP.IP/subnet")
-
-	err7_2=$(printf "%b" "\nWARNING:  IP assignment diverges from quBSD convention." \
-				"\n\nINFO: Below are quBSD IP assignment conventions:\n" \
-				"\nJAIL              GATEWAY        IPv4 Range" \
-				"\nnet-firewall      nicvm          Router Dependent" \
-				"\nnet-<gateway>     net-firewall   10.255.x.2/30"\
-				"\nserv-jails        net-firewall   10.128.x.2/30" \
-				"\nappjails          net-<gateway>  10.1.x.2/30" \
-				"\nusbvm             variable       10.88.88.1/30" \
-				"\nadhoc created with qb-connect    10.99.x.2/30" \
-				"\n\n\tContinue with $IP0 anyways? (y/n):  ")
-
-	err7_3=$(printf "%b" "\nWARNING:  overlaps with an IPv4 already in use.\n" \
-				"Do you really want to do this? (y/n): ")
-
-	err7_4=$(printf "%b" "\nqb-edit:  WARNING: Valid IPv4 ($IP0), but tunnel is \`none'" \
-				"\n\tContinue anyways? (y/n):  ")
-
-	err7_5=$(printf "%b" "qb-edit: ERROR:  User opted to exit, for IP re-assignment")
-
-	err7_6=$(printf "%b" "qb-edit: ERROR:  Cannot automatically assign IP because it"\
-				 "\ndepends on your router. Use rc.conf inside of net-firewall.")
-
-	err8=$(printf "%b" "qb-edit:  Error: parameter $param can only be one of the " \
-				"following none | sys | all")	
-
-	err9="qb-edit: Error:  $param must be one of the following: -1|0|1|2|3" 
-
-	err10=$(printf "%b" "qb-create: ERROR:  maximum memory must be of " \
-				"VALID format. <integer><G|M|K>\n")
-
-	err11=$(printf "%b" "ERROR: qb-create:  cpuset must be of a VALID format," \
-				"\nand the CPUs must exist. For example:  0,1,2,3  OR  0-3 \n" \
-				"List of valid CPUs:  $validcpuset\n")
-
-	err12="qb-edit: Error: parameter $param must be either true or false" 
-
-	msg13="qb-edit: ALERT: The new value entered is the same as the old value\n" 
-	
-	msg14="qb-edit: New settings won't take effect until $jail is restarted" 
-
-	msg15=$(printf "%b" "qb-edit: Restarting:  $tunnel") 
-
-	msg16=$(printf "%b" "qb-edit: Restarting:  $jail") 
-
-	msg17=$(printf "%b" "qb-edit: ALERT: In order for new connection settings to take effect," \
-				"\nthe following jail(s) must be restarted: ")
+	# Script variables 
+	JAIL="$1"
+	PARAM="${PARAM:-"$2"}"
+	VAL="${VAL:-"$3"}"
+	OLDSETTING=$(sed -nE "s@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+@@p" $JMAP)
 }
 
 checks() {
-	if [ "$help" ] ; then
-		usage
-
-	elif [ -z "$jail" -o -z "$param" ] ; then
-		ERR="$err1" ; usage
-
-	elif ! `egrep -qs "^$jail[[:blank:]]+$param[[:blank:]]+" $JMAP` ; then
-		ERR="$err2" ; usage
+	# Check for required inputs
+	if [ -z "$JAIL" -o -z "$PARAM" -o -z "$VAL" ] ; then
+echo "$JAIL" ; echo "$PARAM" ; echo "$VAL"
+		# Only exception to missing input, is for [-i] auto assign IP 
+		[ -z "$AUTO_IP" ]  &&  get_msg_qb_edit "_1" "usage_1"
 	
-	elif [ "$force" ] ; then :
+	elif ! grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP ; then
 
-	elif [ "$param" = "class" ] ; then 
-		if [ "$val" != "rootjail" -a "$val" != "appjail" -a "$val" != "dispjail" ] ; then
-			ERR="$err3" ; usage
-		fi
-		
-	elif [ "$param" = "rootjail" ] ; then
-		if ! `echo "$validrootjs" | egrep -qs "^${jails_zfs}/$val[[:blank:]]"` ; then
-			ERR="$err4" ; usage
-		fi	
+		# Doesn't exist in jmap (thus, can't be edited)
+		get_msg_qb_edit "_2" "usage_1"
 
-	elif [ "$param" = "template" ] ; then 
-		if ! `echo "$validtemplatejs" | egrep -qs "^$val\$"` ; then
-			ERR="$err5" ; usage
-		fi
+	elif [ "$VAL" == "$OLDSETTING" ] ; then
+		# New value is unchanged from old value 
+		get_msg_qb_edit "_3" "usage_0"
 
-	elif [ "$param" = "tunnel" -a "$val" != "none" ] ; then
-		if ! `echo "$validtemplatejs" | egrep -qs "^$val\$"` ; then
-			printf "%b" "$w6" ; read resp
-			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err6" && usage
-		else
-			validtunnel="true"
-		fi
+	fi	
 
-	elif [ "$param" = "IP0" ] ; then 
-		IP0="$val"	
-		check_IPv4
-		find_IP
-		define_messages
+	# Sanity checks to make sure values are reasonable
+	case $PARAM in
+		autostart|no_destroy)
+				[ "$VAL" == "true" -o "$VAL" == "false" ] || get_msg_qb_edit "_7" "usage_1"
+		;;
+		class)
+				get_msg_qb_edit "_4" "usage_1"
+		;;
+		cpuset)
+				check_isvalid_cpuset "$VAL"  ||  get_msg_qb_edit "_5" "usage_1" 
+		;;
+		maxmem)
+				check_isvalid_maxmem "$VAL"  ||  get_msg_qb_edit "_6" "usage_1" 
+		;;
+		rootjail)
+				# Check that rootjail has jmap and zroot zfs 
+				check_isvalid_root "$VAL"  ||  get_msg_qb_edit "_8" "exit_1"
+		;;
+		schg) 
+				check_isvalid_schg "$VAL"  ||  get_msg_qb_edit "_9" "usage_1" 
+		;;	
+		seclvl)		
+				check_isvalid_seclvl "$VAL"  ||  get_msg_qb_edit "_10" "usage_1" 
+		;;
+		template)
+				# Check that template jail has jmap and zusr zfs 
+				check_isvalid_template "$VAL"  ||  get_msg_qb_edit "_11" "exit_1"
+		;;
+		tunnel)  
+				# Check that tunnel has jmap, zusr, is `none', and starts with `net-'
+				check_isvalid_tunnel "$VAL" "$JAIL"
 
-		if [ "$IP0" = "auto" ] ; then
-			if [ "$tunnel" = "none" ] ; then
-				ERR="$err7" ; usage
-			elif [ "$jail" = "net-firewall" ] ; then
-				ERR="$err7_6" ; usage
+				case "$_validTunnel" in
+					# Alert and exit if tunnel doesn't have the form `net-'
+					firewall)  get_msg_qb_edit "_19" "exit_1" ;;
+
+					net)	get_msg_qb_edit "_12" "exit_1" ;;
+
+					# Warn and exit tunnel doesn't zusr zfs config  
+					jmap)	get_msg_qb_edit "_13" "usage_1" ;;
+
+					# Warn and exit tunnel doesn't zusr zfs config  
+					zusr)	get_msg_qb_edit "_13_1" "usage_1" ;;
+
+				esac
+		;;
+
+		# IP0 is the most complicated. Save it for last, just for code organization
+		IP0)
+			# function returns 1 if it's acting on net-firewall. All else returns 0 
+			if define_ipv4_convention ; then
+
+				# Get a list of all IP in use by running jails. Assigns: $_USED_IPS
+				get_used_ips
+
+				if [ "$VAL" == "auto" ] ; then 
+					# IP discovery doesn't require additional checks
+					VAL=$(discover_open_ipv4)  ||  get_msg_qb_edit "_14" "usage_1"
+
+				else
+					# Invalid IPs should throw an error
+					check_isvalid_ipv4 "$VAL"  ||  get_msg_qb_edit "_15" "usage_1" 
+					
+					# quBSD IP conventions check. Returns: $_isqubsd_ipv4
+					check_isqubsd_ipv4 "$VAL" 
+					[ -n "$_isoverlap" ]  &&  get_msg_qb_edit "_16" "exit_1" 
+					[ -n "$_ismismatch" ] &&  get_msg_qb_edit "_17" "exit_1" 
+				fi
+				
+			# Special handling for net-firewall 
 			else
-				IP0="$OPENIP"
-				val="$OPENIP"
+				# Define variable to switch in main()
+				_firewall="true"
+
+				if [ "$VAL" == "auto" ] ; then 
+					# Auto IP assignment for net-firewall implies DHCP - handled in main()
+					VAL="DHCP" 
+				else
+					# If user provided IP, check that it's valid
+					check_isvalid_ipv4 "$VAL"  ||  get_msg_qb_edit "_15" "usage_1" 
+				fi
 			fi
 
-		elif [ "$validIPv4" != "true" -a "$val" != "none" ] ; then
-			ERR="$err7_1" ; usage
+			# Check the tunnel associated with JAIL's IP0 change
+			TUNNEL=$(sed -nE "s/^${JAIL}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
+			check_isvalid_tunnel
 
-		elif [ "$mismatch" -a "$val" != "none" ] ; then
-			printf "%b" "$err7_2" ; read resp
-			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err7_5" && usage
+			case "$_validTunnel" in
+				# Error that net-firewall must be a tap tunnel
+				firewall)  get_msg_qb_edit "_19" "exit_1"  ;;
 
-		elif `printf "%b" "$usedIPs\n$JMAPIPs" | egrep -qs "$b3"` \
-			&& [ "$oldsetting" != "$IP0" -a "$val" != "none" ] ; then
+				# Alert that tunnel doesn't have a zusr zfs config
+				jmap)	get_msg_qb_edit "_13"  ;;
 
-			printf "%b" "$err7_3" ; read resp
-			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err7_5" && usage
+				# Alert that exit tunnel doesn't zusr zfs config  
+				zusr)	get_msg_qb_edit "_13_1"  ;;
 
-		elif [ "$ipwithnotunnel" ] ; then
-			printf "%b" "$err7_4" ; read resp
-			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$err7_5" && usage
-		fi
+				# Alert that user is assigning an IP to a jail with no tunnel
+				none)	get_msg_qb_edit "_18"  ;;
 
-	elif [ "$param" = "schg" ] ; then 
-		if [ "$val" != "none" -a "$val" != "sys" -a "$val" != "all" ] ; then
-			ERR="$err8" ; usage
-		fi
+			esac
+		;; # /IP0
 
-	elif [ "$param" = "seclvl" ] ; then 
-		if ! [ "$val" -ge -1 -a "$val" -le 3 ] ; then  
-			ERR="$err9" ; usage
-		fi
+		# Catch all. Any other entries for $PARAM return an error (really should be necessary).
+		*)	get_msg_qb_edit "_20" "usage_1"  ;;
 
-	elif [ "$param" = "maxmem" -a "$val" != "none" ] ; then
-		if ! `echo "$val" | egrep -qs "^[[:digit:]]+(G|M|K|g|m|k)\$"` ; then
-			ERR="$err10" ; usage
-		fi
-
-	elif [ "$param" = "cpuset" -a "$val" != "none" ] ; then
-		cpuset_mod=$(echo $val | sed -E "s/(,|-)/ /g") 
-		for c in $cpuset_mod ; do
-			# Every number is followed by a comma except the last one
-			`echo $validcpuset | egrep -qs "$c,|$c\$"` || badcpu="true"
-		done
-
-		if [ "$badcpu" ] ; then
-			ERR="$err11" ; usage 
-		fi
-		
-	elif [ "$param" = "no_destroy" ] ; then 
-		if [ "$val" != "true" -a "$val" != "false" ] ; then
-			ERR="$err12" ; usage
-		fi
-	fi
-
-	if [ "$val" = "$oldsetting" -a -z "$force" ] ; then
-		printf "%b" "\n$msg13"
-	fi
-}
-
-check_IPv4() {
-	# Perhpas not as technically correct as doing a regex,
-	# but it's readable, and the a/b pairs are usable elsewhere
-	# IP address can be thought of as:  $a0.$a1.$a2.$a3/$a4   
-
-	validIPv4=""
-
-     a0=${IP0%%.*.*.*/*}
-     a4=${IP0##*.*.*.*/}
-          b1=${IP0#*.*}
-          a1=${b1%%.*.*/*}
-               b2=${IP0#*.*.*}
-               a2=${b2%%.*/*}
-                    b3=${IP0%/*}
-                    a3=${b3##*.*.*.}
-
-        if   [ "$a0" -ge 0 -a "$a0" -le 255 -a "$a1" -ge 0 -a "$a1" -le 255 \
-            -a "$a2" -ge 0 -a "$a2" -le 255 -a "$a3" -ge 0 -a "$a3" -le 255 \
-            -a "$a4" -ge 0 -a "$a4" -le 31 ] >> /dev/null 2>&1
-        then
-                echo "$IP0" | egrep -qs "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+"
-                [ "$?" = "0" ] && validIPv4="true"
-        fi
-}
-
-find_IP() {
-	# Search for unused IP. Jail's IP assignment is based on position in the
-	# internal network. Variable indirection simplifies the while loop; and 
-	# generalizes the labeling convention for future code changes/expansion
-
-	# IP address can be thought of in two ways, depending on variable indirection:
-	#    $a0.$a1.$a2.$a3/$a4       (from check_IPv4 function)
-	#	$ip0.$ip1.$ip2.$ip3/$ip4  (holds the variable names)
-	#    aa.bb.cc.dd/subnet        (the replacement variable name) 
-	ip0="aa" ; ip1="bb" ; ip2="cycle" ; ip3="dd" ; subnet="ee"
-	cycle=1
-
-	# Change naming conventions depending on the jail
-	if [ "${jail}" = "net-firewall" ] ; then
-		cycle=256
-
-	elif [ -z "${jail##net-*}" ] ; then
-		aa=10 ; bb=255 ; dd=2 ; ee=30
-
-	elif [ -z "${jail##serv-*}" ] ; then
-		aa=10 ; bb=128 ; dd=2 ; ee=30
-
-	elif [ -z "${tunnel##none*}" -a "$IP0" != "none" ] ; then
-		ipwithnotunnel="true" ; cycle=256
-
-	else
-		aa=10 ; bb=1 ; dd=2 ; ee=30
-	fi
-
-	# Check if the convention = user_input, otherwise, is mismatch
-	[ -n "$IP0" -a "$jail" != "net-firewall" \
-					-a "$aa.$bb.$dd/$ee" = "$a0.$a1.$a3/$a4" ] || mismatch="true"
-	
-	# Run through cycles to find an open IP
-	while [ $cycle -lt 255 ] ; do
-		eval "openip=\${$ip0}.\${$ip1}.\${$ip2}.\${$ip3}"
-
-		if ! `printf "%b" "${usedIPs}\n${JMAPIPs}" | grep -qs "$openip"` ; then
-			OPENIP="$openip/${ee}"
-			break
-
-		else
-			cycle=$(( cycle + 1 ))
-			if [ $cycle -gt 254 ] ; then
-				ERR="$e32"
-			fi
-		fi
-	done
+	# /PARAM
+	esac
 }
 
 main() {
-	# Modify jailmap.conf
-	sed -i '' -E "\@^${jail}[[:blank:]]+${param}@s@[^[:blank:]]+\$@${val}@" $JMAP 
-	newJMAP=$(cat $JMAP | column -t)
-	echo "$newJMAP" > $JMAP
+	# Modify JMAP
+	sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VAL}@" $JMAP
 
-	printf "%b" "\nSettings for:  $jail\n"
-	qb-list -j $jail -p $param
+	# Clean up the columns 
+	_newJMAP=$(column -t $JMAP)
+	echo "$_newJMAP" > $JMAP
 
-	if [ "$restart" ] ; then
-		if [ $param = "IP0" -o $param = "tunnel" ] ; then
-			printf "%b" "\n$msg15\n"
-			`jls | egrep -qs " $jail "` && qb-off $tunnel
-			jail -c $tunnel
+	# Special handling case for net-firewall, to modify rc.conf 
+	if [ "$_firewall" == "true" ] ; then
+		_rcconf="${M_JAILS}/net-firewall/rw/etc/rc.conf"
+
+		if [ "$VAL" == "DHCP" ] ; then
+			sed -i '' -E "s/ifconfig_tap0.*/ifconfig_${TUNNEL}=\"DHCP\"/" $_rcconf
+			sed -i '' -E "/defaultrouter=/ d" $_rcconf
+
 		else
-			printf "%b" "\n$msg16\n"
-			`jls | egrep -qs " $jail "` && qb-off $jail 
-			jail -c $jail
-		fi
-	else
-		if [ $param = "IP0" -o $param = "tunnel" ] ; then
-			# A bit of a hack, but it prevents saying that "none" needs to be restarted
-			[ "$tunnel" = "none" ] && tunnel=""
-
-			printf "%b" "${msg17} ${jail} ${tunnel}\n\n"
-
-		elif [ "$param" != "no_destroy" ] ; then
-			printf "%b" "$msg14\n\n"
+			# Using `#' as sed separator, because `/' interferes with variable expansion
+			sed -i '' -E "s#ifconfig_tap0.*#ifconfig_${TUNNEL}=\"inet ${VAL}\"#g" $_rcconf
+			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
+			sed -i '' -E "/^ifconfig_tap.*/ a\\
+defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
 		fi
 	fi
+
+	# Print new settings
+	echo "Success"
+	qb-list -j $JAIL -p $PARAM
 }
 
-define_variables
-define_messages
+handle_restarts() {
+	# Define which jails need to be restarted
+	case $PARAM in 
+		cpuset|maxmem|rootjail|schg|seclvl|template)
+			_restarts="       $JAIL" ;;
+		IP0|tunnel)
+			# This prevents `none' and `tap0' from being flagged for restart 
+			[ "$PARAM" == "tunnel" ] && TUNNEL="$VAL"
+			if [ "$TUNNEL" == "none" ] || [ -z "${tunnel##tap[[:digit:]]}" ] ; then
+				_restarts="       $JAIL" 
+			else	
+				_restarts=$(printf "%b" "       $JAIL\n       $TUNNEL")
+			fi
+		;;	
+	esac
+
+	# If there are no jails to restart, exit
+	[ -z "$_restarts" ] && exit 0
+	
+	# Query user to restart jails 
+	if [ -z "$RESTART" ] ; then
+		get_msg_qb_edit "_21"
+		get_user_response || exit 0 
+	fi
+	
+# Restart jails (otherwise, would've already exited)	
+	for _jail in $_restarts ; do
+		[ "$_jail" == "none" ]  ||  restart_jail "$_jail"
+	done
+}
+
+get_global_variables 
+
+get_options "$@"
+
 checks
+
 main
+
+handle_restarts
+
 
 
