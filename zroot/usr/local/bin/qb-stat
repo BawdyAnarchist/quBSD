@@ -13,12 +13,13 @@ shift $(( OPTIND - 1 ))
 
 # Get datasets, mountpoints; and define files.
 JCONF="/usr/local/etc/quBSD/quBSD.conf"
+JMAP="/usr/local/etc/quBSD/jailmap.conf"
+
 zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $JCONF) 
 zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $JCONF) 
 jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $JCONF) 
 
 # Define script variables
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
 tmp="/tmp/qb-stat.txt"
 tmp2="/tmp/qb-stat2.txt"
 col="${col:=6,6}"
@@ -164,7 +165,7 @@ main() {
 		get_jails_loop
 		clear
 		(head -n 1 $tmp && tail -n +2 $tmp | sort -k $col | cut -f1,2,3,4,5,7,8,9) >> $tmp2
-		cat $tmp2 | column -t
+		column -t $tmp2
 		print_alerts
 		sleep 1
 	done
