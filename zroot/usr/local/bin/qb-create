@@ -20,6 +20,7 @@ done
 shift $(( OPTIND - 1 ))
 
 QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+JCONF="/etc/jail.conf"
 JMAP="/usr/local/etc/quBSD/jailmap.conf"
 sed -i '' -e 's/[[:blank:]]*$//g' $JMAP    # Removes blanks at EOL, prevents errors
 
@@ -60,63 +61,61 @@ define_variables() {
 
 usage() {
 	[ "$ERR" ] && printf "%b" "\n$ERR\n\nFor more info, see: qb-create -h\n\n" && exit 1
-	echo ""
-	echo "qb-create: Automates creation and configuration of new jails"
-	echo "           Checks arguments for validity. Optional guided mode"
-	echo ""
-	echo "Quick/easy ways to create a new jail:"
-	echo "Usage: qb-create [-H] -T <template_jail> <newjail>"
-	echo "       qb-create -g <newjail>"
-	echo ""
-	echo "Minimum requirements: class and rootjail. Created, but no configs:" 
-	echo "Usage: qb-create -c <class> -r <rootjail> <newjail>"
-	echo ""
-	echo "All possible options:"
-	echo "Usage: qb-create [-h] [-g] [-c <class>] [-C <cpuset>] [-f <flags>] \\" 
-	echo "                 [-i <IP0>] [-m <maxmem>] [-r <rootjail>] [-s <seclvl>] \\"
-	echo "                 [-t <tunnel_jail>] [-T <template_jail>] [-H] <newjail>"
-	echo ""
-	echo "   -h: (h)elp: Shows this message" 
-	echo "   -g: (g)uided: Informative messages guide the user through a series of"
-	echo "        input prompts for the creation of <newjail>. Any options specified" 
-	echo "        at the command line will be overwritten by user responses."
-	echo "   -T: (T)emplate: <newjail> inherits JAIL PARAMETERS of <template_jail>"
-	echo "        but can be overriden by specifying JAIL PARAMETER options"
-	echo "        All /rw files (like rc.conf, fstab, pwd) are copied and modified"
-	echo "   -H: (H)OME: ${m_zusr}/<template_jail>/home files are copied to <newjail>"
-	echo "        Only valid with [-T]"
-	echo "        Hint: Use [-H] with appjail templates like 0gui-template, to create"
-	echo "        new jails with a set of baseline user configs (eg: .cshrc, .config)"
-	echo ""
-	echo "JAIL PARAMETERS  "
-	echo "      Stored at /usr/local/etc/quBSD/jailmap.conf"
-	echo ""
-	echo "   -c: (c)lass: Classification of <newjail>"
-	echo "        Valid arguments: <appjail|rootjail|dispjail>" 
-	echo "   -C: (C)puset: Limits which CPUs <newjail> may use. For example:" 
-	echo "        0,1,2,3 and 0-3 mean the same thing. If set to \`none', no CPU"
-	echo "        limitations will be applied. See:  man 1 cpuset"
-	echo "   -f: (f)lags: schg is applied recursively to specified directory group"
-	echo "        Valid arguments: <none|sys|all>  (This is a quBSD convention)"
-	echo "        \`sys' includes: /bin /boot /lib /etc and other system files"
-	echo "        \`all' includes: All files, including /home. See man 1 chflags"
-	echo "   -i: (i)p: IPv4 of <newjail>. If [-i] is not specified, but <tunnel> " 
-	echo "        is a valid net-<jail>, an unused IPv4 address is auto applied"
-	echo "        Valid arguments:  In IPv4 CIDR notation IP.IP.IP.IP/subnet"
-	echo "   -m: (m)ax memory allocation for <newjail>"
-	echo "        Valid arguments:  <integer><G|M|K>  For example:  4G or 4000M"
-	echo "   -r: (r)ootjail: The fully installed root filesystem for <newjail>"
-	echo "        Appjails receive a fresh rootjail clone at every start/stop"
-	echo "        Rootjails can be duplicated like so:"
-	echo "           qb-create -T <0base> <newjail>" 
-	echo "                or" 
-	echo "           qb-create -c rootjail -r <0base> <JAIL PARAMETERS> <newjail>" 
-	echo "            [Bootstrapping new jails is unsupported. Use bsdinstall]"
-	echo "   -s: (s)ecurelevel: Applies \`sysctl kern.securelevel\` to <newjail>"
-	echo "        Valid arguments: <-1|0|1|2|3>. See man 7 security"
-	echo "   -t: (t)unnel: <newjail> is connected to <tunnel_jail> at jail start" 
-	echo "        Valid arguments: Must be existing appjail" 
-	echo ""
+	cat << EOF
+
+Quick/easy ways to create a new jail:
+Usage: qb-create [-H] -T <template_jail> <newjail>
+       qb-create -g <newjail>
+
+Minimum requirements: class and rootjail. Created, but no configs:
+Usage: qb-create -c <class> -r <rootjail> <newjail>"
+
+All possible options:
+Usage: qb-create [-h] [-g] [-c <class>] [-C <cpuset>] [-f <flags>] \\ 
+                 [-i <IP0>] [-m <maxmem>] [-r <rootjail>] [-s <seclvl>] \\
+                 [-t <tunnel_jail>] [-T <template_jail>] [-H] <newjail>"
+
+   -h: (h)elp: Shows this message
+   -g: (g)uided: Informative messages guide the user through a series of
+        input prompts for the creation of <newjail>. Any options specified
+        at the command line will be overwritten by user responses.
+   -T: (T)emplate: <newjail> inherits JAIL PARAMETERS of <template_jail>
+        but can be overriden by specifying JAIL PARAMETER options
+        All /rw files (like rc.conf, fstab, pwd) are copied and modified
+   -H: (H)OME: ${m_zusr}/<template_jail>/home files are copied to <newjail>
+        Only valid with [-T]
+        Hint: Use [-H] with appjail templates like 0gui-template, to create
+        new jails with a set of baseline user configs (eg: .cshrc, .config)
+
+JAIL PARAMETERS  
+       Stored at /usr/local/etc/quBSD/jailmap.conf
+   -c: (c)lass: Classification of <newjail>
+        Valid arguments: <appjail|rootjail|dispjail>
+   -C: (C)puset: Limits which CPUs <newjail> may use. For example:
+        0,1,2,3 and 0-3 mean the same thing. If set to \`none', no CPU
+        limitations will be applied. See:  man 1 cpuset
+   -f: (f)lags: schg is applied recursively to specified directory group
+        Valid arguments: <none|sys|all>  (This is a quBSD convention)
+        \`sys' includes: /bin /boot /lib /etc and other system files
+        \`all' includes: All files, including /home. See man 1 chflags
+   -i: (i)p: IPv4 of <newjail>. If [-i] is not specified, but <tunnel>  
+        is a valid net-<jail>, an unused IPv4 address is auto applied
+        Valid arguments:  In IPv4 CIDR notation IP.IP.IP.IP/subnet
+   -m: (m)ax memory allocation for <newjail>
+        Valid arguments:  <integer><G|M|K>  For example:  4G or 4000M
+   -r: (r)ootjail: The fully installed root filesystem for <newjail>
+        Appjails receive a fresh rootjail clone at every start/stop
+        Rootjails can be duplicated like so:
+           qb-create -T <0base> <newjail>
+                or
+           qb-create -c rootjail -r <0base> <JAIL PARAMETERS> <newjail>
+            [Bootstrapping new jails is unsupported. Use bsdinstall]
+   -s: (s)ecurelevel: Applies \`sysctl kern.securelevel\` to <newjail>
+        Valid arguments: <-1|0|1|2|3>. See man 7 security
+   -t: (t)unnel: <newjail> is connected to <tunnel_jail> at jail start
+        Valid arguments: Must be existing appjail
+
+EOF
 	exit 0
 }
 
@@ -759,7 +758,7 @@ change_zusr() {
 			cp -a ${m_zusr}/$template/rw ${m_zusr}/$newjail/
 		else
 			mkdir -p ${m_zusr}/$newjail/rw/etc/
-			cat /etc/fstab | head -1 > ${m_zusr}/$newjail/rw/etc/fstab
+			head -1 /etc/fstab > ${m_zusr}/$newjail/rw/etc/fstab
 
 			printf "%b" "\nqb-create: ALERT: No fstab entries, rc.conf, or pwd were " \
 				"\ncreated, because [-T template] was not specified.\n"
@@ -815,20 +814,20 @@ change_config_files() {
 
 	# jail.conf settings
 	mktemp /tmp/qb-create > /dev/null
-	sed -nE "/^${template}[[:blank:]]*\{/,/\}/p" $JMAP >> /tmp/qb-create 
+	sed -nE "/^${template}[[:blank:]]*\{/,/\}/p" $JCONF >> /tmp/qb-create 
 	sed -i '' -E "s/${template}/${newjail}/" /tmp/qb-create
 
 	if [ "$class" = "rootjail" ] ; then
-		sed -i '' -e "/# Rootjails/r /tmp/qb-create" $JMAP
+		sed -i '' -e "/# Rootjails/r /tmp/qb-create" $JCONF
 
 	elif [ -z "${newjail##net-*}" ] ; then
-		sed -i '' -e "/# Net Jails/r /tmp/qb-create" $JMAP
+		sed -i '' -e "/# Net Jails/r /tmp/qb-create" $JCONF
 
 	elif [ "$class" = "dispjail" ] ; then
-		sed -i '' -e "/# Disp Jails/r /tmp/qb-create" $JMAP
+		sed -i '' -e "/# Disp Jails/r /tmp/qb-create" $JCONF
 
 	else
-		sed -i '' -e "/# Production Jails/r /tmp/qb-create" $JMAP
+		sed -i '' -e "/# Production Jails/r /tmp/qb-create" $JCONF
 	fi
 
 	rm /tmp/qb-create
