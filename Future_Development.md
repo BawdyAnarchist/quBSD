@@ -93,15 +93,24 @@ pf.conf
 
 Coding practices
 	shellcheck.net - need to go over all code with a fine toothed comb. fix the formatting errors (like if "$?" then ...)
-	Create libraries to simplify functions used alot. /usr/local/lib/quBSD.sh	
 	usage should be the first thing in the script. Then `case` should call it. Save space
+
+Optimze scripts. Some run too slow. 
+	Disable unicode script:
+		https://tldp.org/LDP/abs/html/optimizations.html
+	Probably alot of sed's can be replaced with cut and tr
 	
+
+Create libraries 
+	/usr/local/lib/quBSD.sh	is created, but not added to the git
+
+"tunnel" should reall be changed to gateway
+
+
 
 ### MINOR UPGRADES
 
 Test out having the rootjails at high security levels when turned off.
-
-exec.created (or prestart) - can use dirname for copying the /rw files
 
 qb-dpi - make it so that a program can launch under alt dpi settings and return to normal
 	- You could even add it as an option to qb-cmd, and i3gen.sh/conf
@@ -116,19 +125,12 @@ qb-update - Update rootjails, create snapshots
 
 qb-create - While in guided mode, add option to enter "auto" for IP assignment 
 
-qb-list
-	- extra options for seeing snapshots of jails
-
 qb-edit 
 	- the -i option should be able to be applied when setting the tunnel
 	- the -r option didn't seem to restart the jails required
 	- should have a check for duplicate IP0
 
-qb-disp - Need to make sure that you're incrementing with a DISP number, so that you don't overlap when starting a new DISP more than once.
-
 usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
-
-add autostart option to jailmap.conf, and a service startup script for autostart
 
 Crons
 - Popup warning if zpool errors are discovered
