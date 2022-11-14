@@ -1,3 +1,14 @@
+### IMPORTANT NOTE ###
+
+If anyone new is coming to check out my project, just know that I'm in the middle of a significant re-write of the shell scripts. I'm writing a common library, and have significantly improved my shell/code practices since last year. For now, the installer doesn't set the new pieces in place, and half of the shell scripts depend on those pieces. 
+
+You can probably get some mileage out of the scripts in a manual sense, but as a whole, v0.2 isn't ready. 
+
+I realize now that I should've created a separate branch while leaving the main version untouched, but well, hindsight. First time using a repository management tool. Give me a month or so, and it should be significantly better.
+
+Finally, if anyone knows how to do packaging for FreeBSD ports, please let me know, because after this re-write, this should be a pretty solid project, worth adding to ports. 
+
+
 #### quBSD is wrapper for a jails/bhyve implementation of a Qubes-inspired containerization schema. Written in shell, based on zfs, and uses the underlying FreeBSD tools.
 
 The goal is to run all workloads inside of jails, and make host merely a coordinator. quBSD comes with an installer script, which creates and configures a series of jails, and even a couple VMs for PCI device isolation. There are a set of scripts which facilitate management of the entire setup.
