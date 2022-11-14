@@ -65,8 +65,6 @@ qb-usbvm
 	- When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
 	- Need to rework usbvm automatic internet with option (due to general net rework)
 
-column -t some of the conf files
-
 qb-ivpn - sed error - needs better separation of the -j option to not throw error.
         - Also an unused variable "pingfail"
 	   - Current server should be upgraded to show current settings, even if not connected
@@ -83,6 +81,8 @@ qb-create
 	- Add option for "auto" IP assignment during guided
 	- Logic on "Would you like to also .... something about /home directory of template"
 		needs fixed, because no template shouldn't ask you to copy a non existent home.
+	- autostart options
+	- autosnap options - the custom zfs props need to be set
 
 qb-rename
 	- didn't rename the subfolder under home
@@ -100,15 +100,19 @@ Optimze scripts. Some run too slow.
 		https://tldp.org/LDP/abs/html/optimizations.html
 	Probably alot of sed's can be replaced with cut and tr
 	
-
-Create libraries 
-	/usr/local/lib/quBSD.sh	is created, but not added to the git
-
 "tunnel" should reall be changed to gateway
 
+jails are being created on the basis of the most recent autosnap snapshots. That *might?* not be a good idea?
 
+exec scripts should assign qb-list parameter defaults in case some are missing, but should also throw a log/error or something.
 
 ### MINOR UPGRADES
+
+/var/log/quBSD.log
+	Creating a log files. Works nicely with quBSD.lib
+	qubsd setup script needs to include line to rm the log on startx
+
+start_jail stop_jail new functions embed the errors in the function. Review all scripts for this revision
 
 Test out having the rootjails at high security levels when turned off.
 
@@ -124,11 +128,6 @@ qb-cam/mic - webcam and mic get brought up with script
 qb-update - Update rootjails, create snapshots
 
 qb-create - While in guided mode, add option to enter "auto" for IP assignment 
-
-qb-edit 
-	- the -i option should be able to be applied when setting the tunnel
-	- the -r option didn't seem to restart the jails required
-	- should have a check for duplicate IP0
 
 usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
 
