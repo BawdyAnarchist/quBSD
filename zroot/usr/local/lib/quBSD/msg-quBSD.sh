@@ -12,6 +12,13 @@ get_msg_qubsd() {
 	_action="$2"
 	
 	case "$_message" in
+
+	_0) cat << ENDOFMSG
+
+ERROR: Missing argument. Must specify < jail >
+
+ENDOFMSG
+	;;	
 	_1) cat << ENDOFMSG
 
 ERROR: < $_jail > is invalid. Missing <class> in jailmap
@@ -63,13 +70,20 @@ ENDOFMSG
 	;;
 	_9) cat << ENDOFMSG
 
+WARNING: < $_jail > had to be forcibly stopped. For details,
+       see quBSD log:  /var/log/quBSD.log
 ENDOFMSG
 	;;
 	_10) cat << ENDOFMSG
 
-ERROR: < $_jail > had to be forcibly stopped. For details,
-       see quBSD log:  /var/log/quBSD.log
+WARNING: < $_jail > couldn't be stopped. Attempt to forcibly 
+         stop failed. For more info, see: /var/log/quBSD.log
+ENDOFMSG
+	;;
+	_11) cat << ENDOFMSG
 
+ERROR: < $_jail > could not be started. For more 
+       information, see log at: /var/log/quBSD.log
 ENDOFMSG
 	;;
 	esac
@@ -77,7 +91,7 @@ ENDOFMSG
 	case $_action in 
 		exit_0)  exit 0 ;;
 		exit_1)  exit 1 ;;
-		*) : ;;
+		pass)  return 1 ;;
 	esac
 }
 

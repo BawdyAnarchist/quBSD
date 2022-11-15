@@ -54,8 +54,7 @@ print_no_run() {
 poweroff_vm() {
 	# If VM is running, needs to shutdown before attempting to launch console 
 	if check_isrunning_vm "$_VM" ; then
-		pkill -f "bhyve: $_VM"  && 
-		get_msg_qb_vm "_3"	
+		pkill -f "bhyve: $_VM"  && get_msg_qb_vm "_3"	
 
 		_count=1
 		while check_isrunning_vm "$_VM" ; do

@@ -8,26 +8,17 @@ get_options() {
 		case $opts in
 			d) ACTION="down" ;;
 			h) get_msg_qb_hostnet "none" "usage_0" ;;
-			u) [ -z "$ACTION" ] && ACTION="up" || get_msg_qb_hostnet "_2" "usage_1" 
+			u) [ -z "$ACTION" ] && ACTION="up" || get_msg_qb_hostnet "_1" "usage_1" ;;
 		esac
 	done
+
+	# Did not specify an action
+	[ "$OPTIND" == 1 ] && get_msg_qb_hostnet "_2" "usage_1" 
 
 	# Define script variables
 	_jIP=$(sed -n "s/^host[[:blank:]]*IP0[[:blank:]]*//p" $JMAP)
 	TUNNEL=$(sed -nE "s/^host[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
 	MTU=$(sed -nE "s:^mtu[[:blank:]]+::p" $QBCONF) 
-}
-
-checks() {
-	if [ $OPTIND == 1 ] ; then
-		# Did not specify an action
-		get_msg_qb_hostnet "_1" "usage_1" 
-
-	elif [ "$UP" -a "$DOWN" ] ; then
-		# Cannot specify both actions
-		get_msg_qb_hostnet "_2" "usage_1" 
-
-	fi
 }
 
 main() {
@@ -41,7 +32,7 @@ main() {
 	pfctl -f /etc/pf.conf	
 	
 	# Bring up host network connection 
-	if [ -n "$UP" ] ; then 
+	if [ "$ACTION" == "up" ] ; then 
 
 		# start_jail command handles most error messages 
 		start_jail "$TUNNEL"  ||  get_msg_qb_hostnet "_3" "usage_1"
@@ -64,8 +55,6 @@ main() {
 get_global_variables
 
 get_options "$@"
-
-checks 
 
 main
 

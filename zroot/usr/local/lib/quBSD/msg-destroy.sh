@@ -13,15 +13,10 @@ get_msg_qb_destroy() {
 
 	case "$_message" in
 
-	_0) cat << ENDOFMSG
+	_1) cat << ENDOFMSG
 
 Exiting, no changes were made.
 
-ENDOFMSG
-	;;
-	_1) cat << ENDOFMSG
-
-ERROR: must specify a <jail>
 ENDOFMSG
 	;;	
 	_2) cat << ENDOFMSG
@@ -31,9 +26,7 @@ ERROR: < $JAIL > has the \`no_destroy protection flag' set in
 ENDOFMSG
 	;;	
 	_3) cat << ENDOFMSG
-
-ALERT: < $JAIL > is not a fully configured jail. 
-       Proceeding anyways. Will purge any remaining configs.
+#[[OPEN ENTRY, NO MESSAGES HERE]]
 ENDOFMSG
 	;;
 	_4) cat << ENDOFMSG

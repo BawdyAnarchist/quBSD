@@ -19,9 +19,7 @@
 # check_isvalid_maxmem
 # check_isvalid_cpuset
 
-##################################################################################
-#############################  GENERIC  FUNCTIONS  ###############################
-##################################################################################
+##########################################################################
 
 # Source error messages for library functions
 . /usr/local/lib/quBSD/msg-quBSD.sh
@@ -38,10 +36,9 @@ get_global_variables() {
 	sed -i '' -e 's/[[:blank:]]*$//' $JMAP  #remove blanks at end of lines
 
 	# Get datasets, mountpoints; and define files.
-   QBROOT_ZFS=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $QBCONF)
-	JAILS_ZFS="${QBROOT_ZFS}/jails"
 	ZUSR_ZFS=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
 	M_ZUSR=$(zfs get -H mountpoint $ZUSR_ZFS | awk '{print $3}')
+	JAILS_ZFS=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
 	M_JAILS=$(zfs get -H mountpoint $JAILS_ZFS | awk '{print $3}')
 } 
 
@@ -70,121 +67,12 @@ get_user_response() {
 	esac
 }
 
-##################################################################################
-#####################  FUNCTIONS RELATED TO JAILS HANDLING #######################
-##################################################################################
-
-get_onjails(){
-	# Prints a list of all jails that are currently running; or returns 1
-	jls | awk '{print $2}' | tail -n +2 || return 1
-}
-
-restart_jail() {
-	# Restarts jail. Passes postional parameters, so checks are not missed
-	local _jail
-	_jail="$1"
-
-	stop_jail "$_jail" "$2"  &&  start_jail "$_jail" "$2"
-}
-
-start_jail() {
-	# Performs required checks on a jail, starts if able, returns 0.
-
-	# Caller may pass positional: $2 , to dictate action on failure.
-		# Default, or if no $2 provided, will return 1 silently.
-		# If caller desires msg and exit on failure; pass $2 = "exit_1"
-
-	local _jail
-	_jail="$1"
-
-	# Action to take on failure. Default is return 1 to caller function
-	local _action
-	[ -z "$2" ] && _action="return 1" || _action="get_msg_qubsd"
-
-	# Check that JAIL was provided in the first place
-	[ -z "$_jail" ] && eval "$_action" "_0" "$2"
-
-	# Check to see if _jail is already running 
-	if	! check_isrunning_jail "$_jail" ; then
-
-		# Run prelim checks on jail 
-		if check_isvalid_jail "$_jail" "$2" ; then
-			
-			# Start jail if checks are good
-			echo "Starting < $_jail >" | tee -a $QBLOG
-			jail -c "$_jail"  >> $QBLOG  ||  eval "$_action" "_11" "$2"
-
-		fi
-
-		# Jail was already on.
-		# Would return 0 anyways, but adding for completeness/clarity
-		return 0
-	fi
-}
-
-stop_jail() {
-	# If jail is running, remove it. Return 0 on success; return 1 if fail.	
-	# Unfortunately, due to the way mounts are handled during jail -r, the
-	# command will exit 1, even if it removed the jail successfully. 
-	# Extra logic has to be embedded to handle this problem.
-
-	# Caller may pass positional: $2 , to dictate action on failure.
-		# Default, or if no $2 provided, will return 1 silently.
-		# If caller desires msg and exit on failure; pass $2 = "exit_1"
-
-	local _jail
-	[ -n "$1" ] && _jail="$1" || _jail="$JAIL"
-
-	local _action
-	# Action to take on failure. Default is return 1 to caller function
-	[ -z "$2" ] && _action="return 1" || _action="get_msg_qubsd"
-
-	# Error if $_jail provided is empty
-	[ -z "$_jail" ] && eval "$_action _0 $2" 
-
-	# Check if jail is on, if so remove it 
-	if check_isrunning_jail "$_jail" ; then	
-
-		# TRY TO REMOVE JAIL NORMALLY 
-		echo "ATTEMPTING O REMOVE $_jail" >> $QBLOG
-		jail -vr "$_jail"  >> $QBLOG 
-		
-		# Extra logic to check if jail removal was successful 
-		if check_isrunning_jail "$_jail" ; then 		
-
-			# FORCIBLY REMOVE JAIL  
-			echo "FORCIBLY REMOVING $_jail" >> $QBLOG
-			jail -vR "$_jail"  >> $QBLOG 
-			
-			# Extra logic (same problem) to check jail removal success/fail 
-			if check_isrunning_jail "$_jail" ; then 		
-
-				# Print warning about failure to forcibly remove jail
-				eval "$_action" "_10" "$2" 
-			else
-				# Run exec.poststop to clean up mounts, and print warning
-				sh ${QBDIR}/exec.poststop "$_jail"
-				get_msg_qubsd "_9" "$2" 
-			fi
-		fi
-	else
-		# Jail was already off
-		# Would return 0 anyways, adding for completeness/clarity
-		return 0
-	fi
-}
-
-
-##################################################################################
-#######################  CHECKS ON JAILS and PARAMETERS  #########################
-##################################################################################
-
 check_isrunning_jail() {
 	# Return 0 if jail is running; return 1 if not. 
 
 	# Input can be positional variable: $1 ; else use global $JAIL
 	local _jail
-	[ -n "$1" ] && _jail="$1" || return 1 
+	[ -n "$1" ] && _jail="$1" || _jail="$JAIL"
 
 	# Check if jail is running 
 	jls -j "$_jail" > /dev/null 2>&1  || return 1 
@@ -252,145 +140,94 @@ check_isvalid_jail() {
 	esac
 }
 
-check_isvalid_root() {
-	# Return 0 if proposed rootjail is valid ; return 1 if invalid
-	# Assigns _validRoot=true|false ; available to caller function 
+start_jail() {
+	# Performs required checks on a jail, starts if able, returns 0.
 
-	local _rootjail
-	_rootjail="$1"
+	# Caller may pass positional: $2 , to dictate action on failure.
+		# Default, or if no $2 provided, will return 1 silently.
+		# If caller desires msg and exit on failure; pass $2 = "exit_1"
 
-	# Checks that the jail has a zroot dataset, and in jailmap.conf as rootjail
-	if zfs list ${JAILS_ZFS}/${_rootjail} > /dev/null 2>&1 \
-					&& grep -Eqs "^${_rootjail}[[:blank:]]+rootjail" $JMAP ; then 
-		_validRoot=true
-		return 0
-	else
-		_validRoot=false
-		return 1
-	fi
-}
-
-check_isvalid_template() {
-	# Return 0 if proposed template is valid ; return 1 if invalid
-	# Assigns _validTemplate=true|false ; available to caller function 
-
-	local template
-	_template="$1"
-
-	# Checks that the jail has a zusr dataset, and in jailmap.conf as appjail
-	if zfs list ${ZUSR_ZFS}/${_template} > /dev/null 2>&1 \
-		&& grep -Eqs "^${_template}[[:blank:]]+class[[:blank:]]+appjail" $JMAP ; then 
-
-		_validTemplate=true
-		return 0
-	else
-		_validTemplate=false
-		return 1
-	fi
-}
-
-check_isvalid_tunnel() {
-	# Return 0 if proposed tunnel is valid ; return 1 if invalid
-	# Assigns _validTemplate=none|true|alert|false ; available to caller func 
-
-	# Input can be positional variable: $1 ; else use global $TUNNEL
-	local _tunnel
-	[ -n "$1" ] && _tunnel="$1" || _tunnel="$TUNNEL"
-
-	# Input can be positional variable: $2 ; else use global $JAIL
 	local _jail
-	[ -n "$2" ] && _jail="$2" || _jail="$JAIL"
+	_jail="$1"
 
-	# net-firewall has special requirements for tunnel. Must be tap interface
-	if [ "$_jail" == "net-firewall" ] ; then
-			# NOTE: This isn't robust. It fails after tap0 to tap9
-		if [ -z "${_tunnel##tap[[:digit:]]}" ]  ; then
-			return 0
-		else
-			_validTunnel="firewall" ; return 1
+	# Action to take on failure. Default is return 1 to caller function
+	local _action
+	[ -z "$2" ] && _action="return 1" || _action="get_msg_qubsd"
+
+	# Check that JAIL was provided in the first place
+	[ -z "$_jail" ] && eval "$_action" "_0" "$2"
+
+	# Check to see if _jail is already running 
+	if	! check_isrunning_jail "$_jail" ; then
+
+		# Run prelim checks on jail 
+		if check_isvalid_jail "$_jail" "$2" ; then
+			
+			# Start jail if checks are good
+			echo "Starting < $_jail >" | tee -a $QBLOG
+			jail -c "$_jail"  >> $QBLOG  ||  eval "$_action" "_11" "$2"
+
 		fi
 	fi
-	
-	# `none' is a valid tunnel for all other jails
-	if	[ "$_tunnel" == "none" ]  
-		then _validTunnel="none" ; return 0
+}
 
-	# Jail is missing zusr dataset
-	elif ! zfs list ${ZUSR_ZFS}/${_tunnel} > /dev/null 2>&1
-		then _validTunnel="zusr" ; return 1
+stop_jail() {
+	# If jail is running, remove it. 
 
-	# Jail is missing JMAP entries
-	elif ! grep -Eqs "^${_tunnel}[[:blank:]]+class[[:blank:]]+appjail" $JMAP 
-		then _validTunnel="jmap" ; return 1
+	# Caller may pass positional: $2 , to dictate action on failure.
+		# Default, or if no $2 provided, will return 1 silently.
+		# If caller desires msg and exit on failure; pass $2 = "exit_1"
 
-	# Checks that tunnel starts with `net-'
-	elif [ -n "${_tunnel##net-*}" ] 
-		then _validTunnel="net" ; return 0
+	local _jail
+	[ -n "$1" ] && _jail="$1" || _jail="$JAIL"
+
+	# Action to take on failure. Default is return 1 to caller function
+	local _action
+	[ -z "$2" ] && _action="return 1" || _action="get_msg_qubsd"
+
+	# Error if $_jail provided is empty
+	[ -z "$_jail" ] && eval "$_action _0 $2" 
+
+	# Check if jail is on, if so remove it 
+	if check_isrunning_jail "$_jail" ; then	
+
+		# TRY TO REMOVE JAIL NORMALLY 
+		echo "ATTEMPTING O REMOVE $_jail" >> $QBLOG
+		jail -vr "$_jail"  >> $QBLOG 
+		
+		# Sadly the situation with mounts when stopping jails, causes a
+		# failure return, even if jail was stopped. Manually check again.
+		if check_isrunning_jail "$_jail" ; then 		
+
+			# FORCIBLY REMOVE JAIL  
+			echo "FORCIBLY REMOVING $_jail" >> $QBLOG
+			jail -vR "$_jail"  >> $QBLOG 
+			
+			# Same problem as previously with failure due to mounts
+			if check_isrunning_jail "$_jail" ; then 		
+
+				# Print warning about failure to forcibly remove jail
+				eval "$_action" "_10" "$2" 
+			else
+				# Run exec.poststop to clean up mounts, and print warning
+				sh ${QBDIR}/exec.poststop "$_jail"
+				get_msg_qubsd "_9" "$2" 
+			fi
+		fi
 	else
-		return 0
+		# Jail was already off
+		return 1
 	fi
 }
 
-check_isvalid_schg() {
-	# Return 0 if proposed schg is valid ; return 1 if invalid
-	local _schg
-	_schg="$1"
-	
-	# Valid inputs are: none | sys | all
-	[ "$_schg" = "none" -o "$_schg" = "sys" -o "$_schg" = "all" ] \
-															&& return 0 || return 1 
+
+restart_jail() {
+	# Restarts jail
+	local _jail
+	_jail="$1"
+
+	stop_jail "$_jail" "$2"  &&  start_jail "$_jail" "$2"
 }
-
-check_isvalid_seclvl() {
-	# Return 0 if proposed schg is valid ; return 1 if invalid
-	local _seclvl
-	_seclvl="$1"
-
-	# Security defines levels from lowest == -1 to highest == 3
-	[ "$_seclvl" -ge -1 -a "$_seclvl" -le 3 ] && return 0 || return 1
-}
-
-check_isvalid_maxmem() {
-	# Return 0 if proposed schg is valid ; return 1 if invalid
-
-	local _maxmem
-	local g
-	local G
-	local m
-	local M
-	local k
-	local K
-	_maxmem="$1"
-
-	[ -z ${_maxmem##none} ] && return 0
-	
-	# Per man 8 rctl, user can assign units: G|g|M|m|K|k
-   echo "$_maxmem" | grep -Eqs "^[[:digit:]]+(G|g|M|m|K|k)\$" \
-															&& return 0 || return 1
-	# IMPROVEMENT IDEA - check that proposal isn't greater than system memory
-}
-
-check_isvalid_cpuset() {
-	# Return 0 if proposed schg is valid ; return 1 if invalid
-	local _cpuset
-	_cpuset="$1"
-
-	[ -z ${_cpuset##none} ] && return 0
-	
-	# Get the list of CPUs on the system, and edit for searching	
-	_validcpuset=$(cpuset -g | sed "s/pid -1 mask: //" | sed "s/pid -1 domain.*//")
-	_cpuset_mod=$(echo $_cpuset | sed -E "s/(,|-)/ /g")
-
-	for _cpu in $_cpuset_mod ; do
-		# Every number is followed by a comma except the last one
-		echo $_validcpuset | grep -Eq "${_cpu},|${_cpu}\$" || return 1
-	done
-}
-
-
-##################################################################################
-#######################  FUNCTIONS RELATED TO NETWORKING #########################
-##################################################################################
 
 define_ipv4_convention() {
 	# Defines the quBSD internal IP assignment convention.
@@ -563,51 +400,140 @@ check_isqubsd_ipv4() {
 																|| _ismismatch="true"
 }
 
-remove_tap() {
-	# If TAP is not already on host, find it and bring it to host
-	# Return 1 on failure, otherwise return 0 (even if tap was already on host)
+check_isvalid_root() {
+	# Return 0 if proposed rootjail is valid ; return 1 if invalid
+	# Assigns _validRoot=true|false ; available to caller function 
 
-	# Assign name of tap
-	[ -n "$1" ] && _tap="$1" || return 1
-	
-	# Check if it's already on host
-	ifconfig "$_tap" > /dev/null 2>&1  &&  return 0
-	
-	# First find all jails that are on
-	for _jail in $(get_onjails) ; do
-		if `jexec -l -U root $o ifconfig -l | egrep -qs "$tap"` ; then
-			ifconfig $tap -vnet $o
-			ifconfig $tap down
+	local _rootjail
+	_rootjail="$1"
+
+	# Checks that the jail has a zroot dataset, and in jailmap.conf as rootjail
+	if zfs list ${JAILS_ZFS}/${_rootjail} > /dev/null 2>&1 \
+					&& grep -Eqs "^${_rootjail}[[:blank:]]+rootjail" $JMAP ; then 
+		_validRoot=true
+		return 0
+	else
+		_validRoot=false
+		return 1
+	fi
+}
+
+check_isvalid_template() {
+	# Return 0 if proposed template is valid ; return 1 if invalid
+	# Assigns _validTemplate=true|false ; available to caller function 
+
+	local template
+	_template="$1"
+
+	# Checks that the jail has a zusr dataset, and in jailmap.conf as appjail
+	if zfs list ${ZUSR_ZFS}/${_template} > /dev/null 2>&1 \
+		&& grep -Eqs "^${_template}[[:blank:]]+class[[:blank:]]+appjail" $JMAP ; then 
+
+		_validTemplate=true
+		return 0
+	else
+		_validTemplate=false
+		return 1
+	fi
+}
+
+check_isvalid_tunnel() {
+	# Return 0 if proposed tunnel is valid ; return 1 if invalid
+	# Assigns _validTemplate=none|true|alert|false ; available to caller func 
+
+	# Input can be positional variable: $1 ; else use global $TUNNEL
+	local _tunnel
+	[ -n "$1" ] && _tunnel="$1" || _tunnel="$TUNNEL"
+
+	# Input can be positional variable: $2 ; else use global $JAIL
+	local _jail
+	[ -n "$2" ] && _jail="$2" || _jail="$JAIL"
+
+	# net-firewall has special requirements for tunnel. Must be tap interface
+	if [ "$_jail" == "net-firewall" ] ; then
+			# NOTE: This isn't robust. It fails after tap0 to tap9
+		if [ -z "${_tunnel##tap[[:digit:]]}" ]  ; then
+			return 0
+		else
+			_validTunnel="firewall" ; return 1
 		fi
-	done
-
-	# Bring tap down for host/network safety 
-	ifconfig $_tap down 
-}
-
-##################################################################################
-#######################  FUNCTIONS RELATED TO VM HANDLING ########################
-##################################################################################
-
-check_isrunning_vm() {
-	# Return 0 if bhyve VM is a running process; return 1 if not.	
+	fi
 	
-	local _VM
-	[ -n "$1" ] && _VM="$1" || return 1 
+	# `none' is a valid tunnel for all other jails
+	if	[ "$_tunnel" == "none" ]  
+		then _validTunnel="none" ; return 0
 
-	pgrep -qf "bhyve: $_VM"  >>  /dev/null 2>&1  ||  return 1
-	pgrep -f "bhyve: $_VM"  ||  return 1
+	# Jail is missing zusr dataset
+	elif ! zfs list ${ZUSR_ZFS}/${_tunnel} > /dev/null 2>&1
+		then _validTunnel="zusr" ; return 1
+
+	# Jail is missing JMAP entries
+	elif ! grep -Eqs "^${_tunnel}[[:blank:]]+class[[:blank:]]+appjail" $JMAP 
+		then _validTunnel="jmap" ; return 1
+
+	# Checks that tunnel starts with `net-'
+	elif [ -n "${_tunnel##net-*}" ] 
+		then _validTunnel="net" ; return 0
+	else
+		return 0
+	fi
 }
 
-poweroff_vm() {
-
+check_isvalid_schg() {
+	# Return 0 if proposed schg is valid ; return 1 if invalid
+	local _schg
+	_schg="$1"
+	
+	# Valid inputs are: none | sys | all
+	[ "$_schg" = "none" -o "$_schg" = "sys" -o "$_schg" = "all" ] \
+															&& return 0 || return 1 
 }
 
+check_isvalid_seclvl() {
+	# Return 0 if proposed schg is valid ; return 1 if invalid
+	local _seclvl
+	_seclvl="$1"
 
+	# Security defines levels from lowest == -1 to highest == 3
+	[ "$_seclvl" -ge -1 -a "$_seclvl" -le 3 ] && return 0 || return 1
+}
 
+check_isvalid_maxmem() {
+	# Return 0 if proposed schg is valid ; return 1 if invalid
 
+	local _maxmem
+	local g
+	local G
+	local m
+	local M
+	local k
+	local K
+	_maxmem="$1"
 
+	[ -z ${_maxmem##none} ] && return 0
+	
+	# Per man 8 rctl, user can assign units: G|g|M|m|K|k
+   echo "$_maxmem" | grep -Eqs "^[[:digit:]]+(G|g|M|m|K|k)\$" \
+															&& return 0 || return 1
+	# IMPROVEMENT IDEA - check that proposal isn't greater than system memory
+}
 
+check_isvalid_cpuset() {
+	# Return 0 if proposed schg is valid ; return 1 if invalid
+	local _cpuset
+	_cpuset="$1"
+
+	[ -z ${_cpuset##none} ] && return 0
+	
+	# Get the list of CPUs on the system, and edit for searching	
+	_validcpuset=$(cpuset -g | sed "s/pid -1 mask: //" | sed "s/pid -1 domain.*//")
+	_cpuset_mod=$(echo $_cpuset | sed -E "s/(,|-)/ /g")
+
+	for _cpu in $_cpuset_mod ; do
+		# Every number is followed by a comma except the last one
+		echo $_validcpuset | grep -Eq "${_cpu},|${_cpu}\$" || return 1
+	done
+}
 
 
 
