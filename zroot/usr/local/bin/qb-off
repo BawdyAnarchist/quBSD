@@ -1,79 +1,83 @@
 #!/bin/sh
 
-while getopts aehr o ; do
-	case $o in
-		a) all="true" ;;
-		e) exclude="true" ;;
-		h) help="true" ;;
-		r) restart="true" ;;
-	esac
-done
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-off.sh
 
-shift $(( OPTIND - 1 ))
-args="$@"
-onjails=$(jls | sed 1d | awk '{print $2}' )
+get_options() {
+	while getopts aehr opts ; do
+		case $opts in
+			a) ALL="true" ;;
+			e) EXCLUDE="true" ;;
+			h) get_msg_qb_off "none" "usage_0" ;; 
+			r) RESTART="true" ;;
+		esac
+	done
 
-usage() {
-	echo ""
-	echo "qb-off: Shut down multiple jails at once" 
-	echo "If no option is specified: Shuts down only the jails listed"
-	echo ""
-	echo "Usage: qb-off <jail_name>"
-	echo "Usage: qb-off [-h] [-a|-e] <jail_name> <jail_name> ... <jail_name>"
-	echo "   -a: (a)ll:  Shutdown all jails"
-	echo "   -e: (e)xcept:  Shutdown all jails except for those listed"
-     echo "   -h: (h)elp:  Outputs this help message"
-	echo "   -r: (r)estart:  Removes and restarts the jail"
-	echo ""
-	exit 1
+	shift $(( OPTIND - 1 ))
+	
+	_JAILS="$@"
+	ONJAILS=$(jls | sed 1d | awk '{print $2}' )
 }
 
 checks() {
-	if [ "$help" ] ; then
-		usage
+	if [ -z "$ALL" -a -z "$EXLUDE" -a -z "$_JAILS" ] ; then
+		# Did not specify an action
+		get_msg_qb_off "_1" "usage_1"
 
-	elif [ -z "$all" -a -z "$exclude" -a -z "$args" ] ; then
-		echo "qb-off: Error: Must provide an option or argument"
-		usage
+	elif [ "$ALL" -a "$EXCLUDE" ] ; then
+		# Mutually exclusive actions
+		get_msg_qb_off "_2" "usage_1"
 
-	elif [ "$all" -a "$exclude" ] ; then
-		echo "qb-off: Error: Conflicting options. Cannot select both [-a] and [-e]" 
-		usage
 	fi
 }
 
 remove_list() {
-	if [ "$all" ] ; then 
-		remove="$onjails"
+	if [ -n "$ALL" ] ; then 
+		# _remove list is the same as all jails that are on
+		_remove="$ONJAILS"
 
-	elif [ "$exclude" ] ; then
-		for a in $args ; do
-			remove=$(echo $onjails | sed "s/$a//")
+	elif [ -n "$EXCLUDE" ] ; then
+		# Remove jails presentin the user input exclude list
+		for _jail in $_JAILS ; do
+			_remove=$(echo $ONJAILS | sed "s/$_jail//")
 		done
 
 	else	
-		remove="$args"
+		# Default action is to remove the user input jail list
+		_remove="$_JAILS"
 	fi
 }
 
 remove() {
-	for r in $remove; do
-		if ` jls | grep -qs " $r "` ; then
-			jailnum=$(jls | grep " $r " | awk '{print $1}')
-			jail -r $r
+	for _jail in $_remove; do
 
-			# Run a hard remove "-R" if the previous -r failed 
-			`jls | grep -qs " $r "` && jail -R $jailnum
-			[ "$restart" ] && jail -c $r >> /dev/null
+		# Ensure that _jail is running 
+		if check_isrunning_jail "$_jail" ; then 
+
+			if [ "$RESTART" ] ; then 
+				# Positional $2 as "pass" will print errors, but continue execution 
+				restart_jail "$_jail" "pass" 
+			else
+				stop_jail "$_jail"
+			fi
+
 		else
-			echo "Jail $jail does not exist. Skipping." 
+			# Jail was not running
+			get_msg_qb_off "_4" 
 		fi	
+
 	done
 }
 
 
+get_global_variables
+
+get_options "$@"
+
 checks 
+
 remove_list
+
 remove
 
 

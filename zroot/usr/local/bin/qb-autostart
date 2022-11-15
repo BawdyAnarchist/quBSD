@@ -1,0 +1,37 @@
+#!/bin/sh
+
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-autostart.sh
+
+
+jautostart_start() {
+
+	# Find all jails in JMAP flagged for autostart
+	AUTOSTART=$(grep -E "autostart[[:blank:]]+true" $JMAP | awk '{print $1}')
+	
+	for _jail in $AUTOSTART ; do
+
+		# Jails with a tunnel not yet started, will need to wait for tunnel to start 
+		_tunnel=$(sed -nE "s/^${_jail}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
+
+		# Switch on the basis of whether tunnel is running
+		if jls -j "$_tunnel" > /dev/null 2>&1 ; then
+
+			# Start jail, send start process to background, and move to next
+			jail -c $_jail & 
+
+		else	
+
+			# Start jail and wait for completion
+			jail -c $_jail 
+		fi
+	done
+}
+
+
+get_global_variables
+
+get_options "$@"
+
+
+

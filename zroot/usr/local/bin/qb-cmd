@@ -1,88 +1,75 @@
 #!/bin/sh
 
-while getopts hnrv o ; do
-	case $o in
-		h) help="true" ;;
-		n) newwind="true" ;;
-        	r) user="root" ;;
-		v) verbose="true" ;;
-	esac
-done
+# Options and X11 window determine variables; incorporated by a single `eval` at the end
 
-shift $(( OPTIND - 1 ))
-jail="$1" ; shift
-user="${user:=$jail}"
-cmd="$@"
-xstarted=$(ps aux | grep "/bin/startx" | sed '$ d')
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-cmd.sh
 
-usage() {
-	[ -n "$ERR" ] && echo "$ERR"
-	echo ""
-	echo "qb-cmd: Runs command in a jail"
-	echo "If no command is specified, default is /bin/csh"
-	echo "Applies jexec -l option wih all commands"
-	echo ""
-	echo "Usage: qb-cmd <jailname>"
-	echo "       qb-cmd [-n][-r][-v] <jailname> <command>"
-	echo ""
-	echo "   -h: (h)elp:  Outputs this help message"
-	echo "   -n: (n)ew window:  Run command in new window. If jail is not" 
-	echo "        specified, default environment is current active window" 
-	echo "   -r: (r)oot:  Run cmd as root. Default is unprivileged user"
-	echo "   -v: (v)erbose:  Output of <command> will print to stdio."
-	echo "        Default behavior sends output to /dev/null"
-	echo ""
-	exit 1
-}
+get_options() {
+	while getopts hnru:v opts ; do
+		case $opts in
+			h) get_msg_qb_cmd "none" "usage_0" ;;
+			n) _NEWWIND="xterm -e" ;;
+        	r) _USER="root" ;;
+			u) _USER="${OPTARG}" ;;
+			v) _REDIRECT='' ;;
+		esac
+	done
 
-checks() {
-	if [ "$help" ] ; then
-		usage
-	elif [ "$jail" -a "$jail" != `hostname` ] && ! `qb-list -qj "$jail"` ; then
-		ERR="qb-cmd: Error: $j is an invalid jailname or has incomplete jail setup"
-		usage
-	fi
-}
+	shift $(( OPTIND - 1 ))
 
-get_window() {
-	if [ "$xstarted" ] ; then
-		id=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
-		window=$(xprop -id $id | grep "WM_CLIENT_MACHINE" \
-					| sed "s/WM_CLIENT_MACHINE(STRING) = \"//")
-		window="${window%\"}"
+	JAIL="$1" ; shift
+	_CMD="$@"
 
-		if ! [ "$window" = `hostname` ] ; then
-			# If a jail wasn't specifeid, use the jail of the active window
-			jail="${jail:=$window}"
-			user="${user:=$jail}"
-		fi
-	fi
-}
+	# Passing commands through another terminal is always tricky
+	if [ -z "$_CMD" ] ; then
 
-launch() {
-	if ! `jls | grep -qs " $jail "` && [ "$jail" != `hostname` ]; then 
-		echo "Starting jail:  $jail"
-		jail -c $jail > /dev/null 
-	fi
+		# No command is provided. Default to /bin/csh. Quotation not required
+		_CMD="${_CMD:=/bin/csh}"
 
-	if [ "$newwind" ] ; then
-		if [ -z "$jail" ] ; then
-			xterm &
-		else
-			jexec -l -U $jail $jail csh -c 'xterm -e "/bin/csh"' > /dev/null 2>&1 &
-		fi
-	fi
-
-	if [ -z "$cmd" -a -z "$newwind" ] ; then
-		jexec -l -U $user $jail /bin/csh 
-
-	elif [ "$verbose" ] ; then
-		jexec -l -U $user $jail $cmd 
+		# Redirect not desired. Switching to JAIL csh, on host xterm (need to see stdout) 
+		_REDIRECT=''
 
 	else
-		jexec -l -U $user $jail csh -c "$cmd &" > /dev/null 2>&1 &
+		# Quotations are required to pass multiple arguments to jail, through jexec 
+		_CMD="'${_CMD}'"
+		
+		# Unless [-v] is specified suppress output of command
+		_REDIRECT="${_REDIRECT- > /dev/null 2>&1 &}"
 	fi
 }
-get_window
-checks
-launch
+
+main() {
+	# Finds out which jail is running the active window, and sets the JAIL var
+	# Only get window if Xorg is running 
+	if pgrep -q Xorg ; then
+		_id=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
+		_window=$(xprop -id "$_id" | grep "WM_CLIENT_MACHINE" \
+					| sed "s/WM_CLIENT_MACHINE(STRING) = \"//")
+		_window="${_window%\"}"
+	fi
+	
+	# Unless already specified, JAIL and USER should be set to the active window 
+	JAIL="${JAIL:=$_window}"
+	_USER="${_USER:=$JAIL}"
+
+	if [ -z "$JAIL" ] || [ "$JAIL" == `hostname` ] ; then
+		# If JAIL is still not assigned, assume user wants a host xterm
+		xterm &
+		exit 0
+	fi
+
+	# Function handles all checks to see if jail needs to (and can) be started
+	start_jail "$JAIL" "exit_1"
+
+	# Final evaluation statement. Launches the window/commands 
+	eval jexec -l -U $_USER $JAIL csh -c $_NEWWIND $_CMD $_REDIRECT
+}
+
+get_global_variables
+
+get_options "$@"
+
+main
+
+

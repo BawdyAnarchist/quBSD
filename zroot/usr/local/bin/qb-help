@@ -1,25 +1,45 @@
 #!/bin/sh
 
-# Quick referenc script for which commands do what actions
+cat << ENDOFUSAGE
 
-printf "%b"	  "\nqb-cmd:      Runs a command inside of a jail - starts the jail if off" \
-			"\n\nqb-connect:  Creates/destroys epairs between jails. Options for" \
-			  "\n             auto-configuration for immediate internet connectivity" \
-			"\n\nqb-create:   Automates creation of new jails. Options exist to clone" \
-			  "\n             an existing jail, initialize/cofigure from scratch," \
-			  "\n             or a guided mode with descriptive help and input prompts" \
-			"\n\nqb-destroy:  Destroys jail and removes all lingering pieces" \
-			"\n\nqb-edit:     Edit jailmap. Checks performed to ensure valid entry" \
-			"\n\nqb-flags:    Remove or re-apply schg flags from all jail files," \
-			"\n\nqb-hostnet:  Create/destroy epair and internet connectivity for host" \
-			"\n\nqb-ivpn:     Change ivpn servers for tunnel jail" \
-			"\n\nqb-list:     List jailmap settings for a particular jail or parameter" \
-			"\n\nqb-nicvm:    Manage nicvm, off/on, or console mode for troubleshooting" \
-			"\n\nqb-off:      Remove/restart specified jails. Options for -all and -except" \
-			"\n\nqb-pefs:     Creation pefs directory, mount, or decrypt pefs-kmod in jail" \
-			"\n\nqb-rename:   Renames a jail. Option to update downstream dependencies" \
-			"\n\nqb-snap:     Create jail snapshot. Necessary for rootjails and dispjails" \
-			"\n\nqb-stat:     Continuously running status script for quBSD and jail status" \
-			"\n\nqb-usbvm:    Manage usbvm, off/on, or console mode for troubleshooting" \
-			  "\n             Option to automate epair connection from usbvm to jail\n\n"
+qb-autosnap: Tool to automate the creation, management, and thinning
+             of ZFS snapshots. Works in combination with /etc/crontab.
+
+qb-cmd:      Runs a command inside of a jail - starts the jail if off
+
+qb-connect:  Creates/destroys epairs between jails. Options for
+             auto-configuration for immediate internet connectivity
+
+qb-create:   Automates creation of new jails. Options exist to clone
+             an existing jail, initialize/cofigure from scratch,
+             or a guided mode with descriptive help and input prompts
+
+qb-destroy:  Destroys jail and removes all lingering pieces
+
+qb-edit:     Edit jailmap. Checks performed to ensure valid entry
+
+qb-flags:    Remove or re-apply schg flags from all jail files,
+
+qb-hostnet:  Create/destroy epair and internet connectivity for host
+
+qb-ivpn:     Change ivpn servers for tunnel jail
+
+qb-list:     List jailmap settings for a particular jail or parameter
+
+qb-nicvm:    Manage nicvm, off/on, or console mode for troubleshooting
+
+qb-off:      Remove/restart specified jails. Options for -all and -except
+
+qb-pefs:     Creation pefs directory, mount, or decrypt pefs-kmod in jail
+
+qb-rename:   Renames a jail. Option to update downstream dependencies
+
+qb-snap:     Create jail snapshot. Necessary for rootjails and dispjails
+
+qb-stat:     Continuously running status script for quBSD and jail status
+
+qb-usbvm:    Manage usbvm, off/on, or console mode for troubleshooting
+             Option to automate epair connection from usbvm to jail
+
+ENDOFUSAGE
 

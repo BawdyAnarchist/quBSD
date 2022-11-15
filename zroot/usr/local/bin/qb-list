@@ -1,140 +1,72 @@
 #!/bin/sh
 
-while getopts ahqzj:p: o ; do
-	case $o in
-		a) all="true" ;;
-		h) help="true" ;;
-		j) jail="${OPTARG}" ;;
-		p) param="${OPTARG}" ;;
-		q) quiet="true" ;; 
-		z) zfslist="true" ;; 
-	esac
-done
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-list.sh
 
-shift $(( OPTIND - 1 ))
-
-# Get datasets, mountpoints; and define files.
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
-m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
-m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
-
-usage() {
-	[ "$quiet" ] && exit 1
-	[ "$ERR" ] && printf "%b" "\n$ERR\n"
-cat << EOF
-
-qb-list:  Lists jail properties contained in jailmap
-
-Usage: qb-list [-j <jail>] [-p <parameter>]
-Usage: qb-list [-a] [-h] [-q] [-z] [-j <jail>] [-p <parameter>]
-   -a: (a)ll:  List all jails. Combine with [-z] for all zfs data 
-   -h: (h)elp:  Outputs this help message
-   -j: (j)ail:  Show all settings for <jail>
-   -p: (p)arameter:  Shows setting of PARAMETER for all jails
-   -q: (q)uiet:  Suppress all output an only return an exit status
-   -z: (z)fs:  List all zfs datasets associated with <jail>
-
-PARAMETERS    saved at /usr/local/etc/quBSD/jailmap.conf
-   autostart:  appjail, dispjail, or rootjail
-   class:      appjail, dispjail, or rootjail
-   cpuset:     CPUs a jail may use, or \`none' for no limit
-   schg:       Directories to receive schg flags: all|sys|none
-   maxmem:     RAM maximum allocation, or \'none' for no limit 
-   rootjail:   Which rootjail (system jail) to clone for <jail>
-   seclvl:     kern.securelevel to protect <jail>: -1|0|1|2|3
-   template:   Only for dispjail, which is cloned from template
-   tunnel:     Gateway for <jail> to receive network connectivity
-   devfs_ruleset=  Provided for reference. See /etc/jail.conf
-
-EOF
-	exit 1
-}
-
-get_variables () {
-	JMAP_all=$(cat $JMAP | uniq)
-
-	# List of only uniq containers (jails and VMs)	
-	JMAP_list=$(egrep "^[^[:blank:]]+[[:blank:]]" $JMAP | awk '{print $1}' | tail +3 | uniq)
-
-	# This adds the devfs ruleset from /etc/jail.conf to JMAP_all 
-	for j in $JMAP_list ; do
-		jail_conf=$(sed -nE "/^${j}[[:blank:]]*\{/,/\}/p" /etc/jail.conf | \
-								grep "devfs_ruleset")
-		[ -n "$jail_conf" ] && JMAP_all=$(printf "%b" "$JMAP_all\n$j\t$jail_conf")
+get_options() {
+	while getopts hj:lp:z opts ; do
+		case $opts in
+			h) get_msg_qb_list "none" "usage_0" ;;
+			j) JAIL="${OPTARG}" ;;
+			l) LIST="true" ;;
+			p) PARAM="${OPTARG}" ;;
+			z) ZFSLIST="true" ;; 
+		esac
 	done
 
-	# Filters for the jail; the parameter; or the single line combo of jail/param if both were specified
-	JMAP_param=$(echo "$JMAP_all" | egrep "(^[^[:blank:]]+[[:blank:]]+"$param")|(^CONTAINER)" | column -t)
-	JMAP_jail=$(echo "$JMAP_all" | egrep "(^${jail}[[:blank:]]+)|^CONTAINER" | column -t) 
-	JMAP_jail_param=$(echo "$JMAP_jail" | egrep "(^CONTAINER)|($param)" | column -t)
-
-	# Gets all of the zfs data for both zroot and ${zusr_zfs}
-	zroot_all=$(zfs list -rt all -o name,used,origin, ${jails_zfs})
-	zusr_all=$(zfs list -Hrt all -o name,used,origin, ${zusr_zfs})
-	zfs_all=$(printf "%b" "\n" "$zroot_all\n$zusr_all\n" | column -t)
-	zfs_jail=$(echo "$zfs_all" | egrep "(^NAME)|($jail(@|[[:blank:]]))" | column -t)
+	shift $(( OPTIND - 1 ))
+	
+	[ "$1" ] && get_msg_qb_list "_6" "usage_1"
 }
 
-checks() {
-	if [ "$help" ] ; then 
-		usage
+main() {
+	if [ -z "$JAIL" ] && [ -z "$PARAM" ] && [ -z "$ZFSLIST" ] || [ "$LIST" ] ; then
+		# None listed. Pulls just the list of container names 
+		_result=$(grep -v "host" $JMAP | tail -n +2 | awk '{print $1}' | uniq)
 
-	elif [ -z "$jail" -a -z "$param" -a -z "$all" ] ; then
-		ERR="qb-list: ERROR: must specify a jail or parameter"
-		usage
+	elif [ "$JAIL" ] && [ -z "$PARAM" ] && [ -z "$ZFSLIST" ] ; then
+		# JAIL only. All JMAP entries for JAIL.
+		_result=$(grep -E "^${JAIL}[[:blank:]]+" $JMAP) \
+											|| get_msg_qb_list "_2" "usage_1"
+	
+	elif [ -z "$JAIL" ] && [ "$PARAM" ] && [ -z "$ZFSLIST" ] ; then
+		# PARAM only. All JMAP entries matching PARAM. 
+		_result=$(grep -E "^[^[:blank:]]+[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP) \
+											|| get_msg_qb_list "_3" "usage_1"
+
+	elif [ -z "$JAIL" ] && [ -z "$PARAM" ] && [ "$ZFSLIST" ] ; then
+		# ZFS list only. All datasets relevant to quBSD jails.
+		_result=$(zfs list -r "$JAILS_ZFS" ; zfs list -r "$ZUSR_ZFS")
+
+	elif [ "$JAIL" ] && [ "$PARAM" ] && [ -z "$ZFSLIST" ] ; then
+		# Combination of JAIL and PARAM 
+		_result=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $JMAP) \
+											|| get_msg_qb_list "_4" "usage_1"
+
+	elif [ "$JAIL" ] && [ -z "$PARAM" ] && [ "$ZFSLIST" ] ; then
+		# All ZFS datasets related to JAIL 
+		_result=$(zfs list -rt all -Ho name,used,mountpoint,origin "${JAILS_ZFS}/${JAIL}"\
+		; zfs list -rt all -Ho name,used,mountpoint,origin "${ZUSR_ZFS}/${JAIL}") 
+
+	else
+		get_msg_qb_list "_5" "usage_1"
+
 	fi
 
-	if [ -n "$jail" ] && ! `echo "$JMAP_all" | egrep -qs "^$jail[[:blank:]]"` ; then
-		ERR="qb-list: ERROR: Jail doesn't exist or is not configured properly"
-		usage 
+	# Print results with a nice formatted header 
+	echo ''
+	if [ "$ZFSLIST" ] ; then
+		printf "%b" "\nNAME USED MOUNTPOINT ORIGIN\n${_result}\n\n" | column -t
+	else		
+		printf "%b" "\nCONTAINER   PARAMETER   VALUE\n${_result}\n\n" | column -t 
 	fi
-
-	if [ -n "$param" ] && ! `echo "$JMAP_all" | awk '{print $2}' | egrep -qs "$param"` ; then
-		ERR="qb-list: ERROR: The parameter "$param" doesn't exist" 
-		usage 
-	fi
-
-	if [ "$jail" -a "$param" ] ; then
-		if [ -z "$JMAP_jail_param" ] ; then
-			ERR=$(printf "%b" "qb-list ERROR: The combination of ${jail}" \
-				" ${param} does not exist in jailmap.conf")
-			usage
-		fi
-	fi
-
-	if [ "$quiet" ] ; then
-		exit 0
-	fi
-}
-
-print_settings() {
-	if [ "$zfslist" ] ; then
-		if [ "$all" ] ; then
-			printf "%b" "\n$zfs_all\n" 
-		elif [ "$jail" ] ; then
-			printf "%b" "\n$zfs_jail\n" | sort
-		fi
-
-	elif [ "$all" ] ; then
-		printf "%b" "\n$JMAP_list\n\n" | sort
-
-	elif [ "$jail" -a "$param" ] ; then
-		printf "%b" "\n$JMAP_jail_param\n\n" 
-
-	elif [ "$jail" ] ; then
-		printf "%b" "\n$JMAP_jail\n\n" 
-
-	elif [ "$param" ] ; then
-		printf "%b" "\n$JMAP_param\n\n" 
-	fi
+	echo ''
 }
 
 
-get_variables
-checks
-print_settings
+get_global_variables
 
+get_options "$@"
+
+main
 

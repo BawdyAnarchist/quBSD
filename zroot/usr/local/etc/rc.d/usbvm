@@ -46,6 +46,9 @@ usbvm_start() {
         		-s 4:0,passthru,"${ppt_usb1}${ppt_usb2}" \
         		usbvm > /dev/null 2>&1 &
 	fi
+
+	# Make sure that tap1 is down if it remains on host	
+	ifconfig tap1 down
 }
 
 usbvm_stop() {

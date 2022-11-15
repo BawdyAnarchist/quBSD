@@ -1,65 +1,53 @@
 #!/bin/sh
 
-# See notes on the bottom for description of why 
-# the "pass" option is required for this script to work
+# This script is useful with quick-keys. Creates a popup xterm to receive a command to
+# to be run in a jail. However, passing commands to xterm subshell is not versatile 
+# (eg - won't store a `read` variable). So first, the xterm popup is launched; then 
+# qb-floatcmd is run again with [-x] option, which receives and runs the user command. 
 
-while getopts hrx o ; do
-	case $o in
-		h) help="true" ;;
-		r) user="root" ; root="-r" ;;
-		x) pass="true" ;;
-	esac
-done
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-floatcmd.sh
 
-shift $(( OPTIND - 1 ))
-jail="$1"
-user="${user:=$jail}"
+get_options(){
+	while getopts hru:x opts ; do
+		case $opts in
+			h) get_msg_qb_floatcmd "none" "usage_0" ;;
+			r) _USER="root" ; ROOT="-r" ;;
+			u) _USER="$OPTARG" ;;
+			x) PASS="true" ;;
+		esac
+	done
 
-usage() {
-	echo "Desc: Window popup to enter command which executes in the jail"
-	echo "Usage: qb-float-cmd [-h ] [-r] [-x] <jail>"
-	echo "	-h: shows this usage message" 
-	echo "	-r: run command in jail as root" 
-	echo "	-x: DO NOT USE!! special option internal to script. DO NOT USE!!"
-	exit 1
+	shift $(( OPTIND - 1 ))
+	JAIL="$1"
+	_USER="${_USER:=$JAIL}"
 }
 
-checks() {
-	if [ "$help" ] ; then
-		usage
-	elif ! `qb-list -qj "$jail"` ; then
-		echo "qb-floatcmd: Error: jail $jail doesn't exist or isn't configured properly"
-		usage
+main() {
+	
+	if [ "$PASS" ] ; then
+		
+		start_jail "$JAIL" "exit_1" 
+
+		# Script is now running on the new xterm, and can properly read in a command 
+		echo -e "Enter Command for. Popup will close automatically" 
+		read -p "${_USER}@${JAIL} # " _CMD
+		
+		# nohup is required, or the launched command will die with the xterm shell
+		nohup qb-cmd $ROOT $JAIL $_CMD 
+
+	else	
+
+		# First push a xterm subshell, and run this script again with [-x] option
+		xterm -e csh -c "i3-msg -q floating enable, move position center; \
+						/bin/csh -c 'qb-floatcmd -x $JAIL'"
 	fi
 }
 
-popup() {
-	xterm -e csh -c "i3-msg -q floating enable, move position center; \
-						/bin/csh -c 'qb-floatcmd -x $jail'"
-}
+get_global_variables
 
-run_cmd() {
-	echo -e "Enter Command for jail ${jail}" 
-	read -p "${user}@${jail} # " cmd
-	nohup qb-cmd $root $jail $cmd >/dev/null   
-}
+get_options "$@"
+
+main
 
 
-checks
-
-if [ "$pass" ] ; then
-	run_cmd	
-else
-	popup	
-fi
-
-
-
-# DESCRIPTION
-# The usage of csh -c 'command1 ; command2;' is not versatile.
-# For example, the `read` command does not store variables when used inside of csh -c 'read x'
-# This presents problems when trying to pass user input to a jail command  
-# Instead, the popup subshell runs the script again with special variable `-x'
-# This variable calls the secondary function `run_cmd', to accept user input and pass to jcmd
-
-# Slightly hacky, but it works

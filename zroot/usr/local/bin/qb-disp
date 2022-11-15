@@ -1,84 +1,59 @@
 #!/bin/sh
 
-while getopts h o ; do
-	case $o in
-		h) help="true" ;;
-	esac
-done
+# IMPROVEMENT: Make it so that a command can be run immediately at terminal launch.
+# IMPROVEMENT: Add option for automatic network connection (tunnel). Auto IP.  
 
-shift $(( OPTIND - 1 ))
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-disp.sh
 
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
-JCONF="/etc/jail.conf"
+get_options() {
+	while getopts h opts ; do
+		case $opts in
+			h) get_msg_qb_disp "none" "usage_0" ;;
+		esac
+	done
 
-# Get datasets and mountpoints
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
-m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
-m_jails=$(zfs get -H mountpoint $JAILs_zfs | awk '{print $3}')
+	shift $(( OPTIND - 1 ))
 
-# Define script variables
-JAIL="$1"
-datetime=$(date +%b%d_%H%M)
-NEWSNAP="${zusr_zfs}/${JAIL}@${datetime}"
-
-usage() { cat << EOF
-qb-disp: Creates a disposable jail, using <jail> as a template,
-and then launches a floating terminal from inside that jail
-The disposable jail is destroyed when the terminal is closed
-
-Use this for opening questionable files or conducting risky operations
-
-Usage: qb-disp [-h][-i <ip_addr>] -r <existing_jail> <run_cmd>
-Usage: qb-disp -p 
-   -h: outputs this usage message
-
-EOF
-exit 0
+	# Define script variables
+	JAIL="$1"
+	DATETIME=$(date +%b%d_%H%M)
+	NEWSNAP="${ZUSR_ZFS}/${JAIL}@DISP${DATETIME}"
 }
 
-checks() {
-	if [ "$help" ] ; then 
-		usage
-
-	elif [ -z "$JAIL" ] ; then 
-		echo "qb-disp: Error: Must specify a <jail> to clone for dispjail"
-		usage 
-
-	elif ! `qb-list -qj "$JAIL"` ; then
-		printf "%b" "qb-disp: Error: clone for dispjail $JAIL" \
-				"is not properly configured or does not exist"
-		usage
-	fi
-}
-
-NEWJAIL_name() {
+newjail_name() {
+	# Just one check. No need for a separate function
+	check_isvalid_jail "$JAIL" "pass" || get_msg_qb_disp "none" "usage_1"
+	
+	# Make name visually easy to identify
 	NEWJAIL="DISP-${JAIL}"
-	cycle=''
+	_cycle=''
 
 	# If DISP-jail exists (even partially), increment the ending number and try again 
-	while `zfs list -rt all | grep -Eqs "^${jails_zfs}/$NEWJAIL[[:blank:]]"` || \
-			`zfs list -rt all | grep -Eqs "^${zusr_zfs}/$NEWJAIL[[:blank:]]"` || \
-			`grep -Eqs "^$NEWJAIL[[:blank:]]" $JMAP` || \
-			`grep -Eqs "^$NEWJAIL[[:blank:]]" $JCONF` 
+	while zfs list -rt all | grep -Eqs "^${JAILS_ZFS}/$NEWJAIL[[:blank:]]" || \
+			zfs list -rt all | grep -Eqs "^${ZUSR_ZFS}/$NEWJAIL[[:blank:]]" || \
+			grep -Eqs "^$NEWJAIL[[:blank:]]" $JMAP || \
+			grep -Eqs "^$NEWJAIL[[:blank:]]" $JCONF 
 	do
-		cycle=$(( cycle + 1 ))	
-		NEWJAIL="DISP-${JAIL}_${cycle}"
+		_cycle=$(( _cycle + 1 ))	
+		NEWJAIL="DISP-${JAIL}_${_cycle}"
 	done	
+
+	echo "$NEWJAIL"
 }
 
 main() {
-	# Will need a snapshot for the dispjail. First check if it already exists. 
-	if	! zfs list -t snapshot $NEWSNAP > /dev/null 2>&1 
-	then zfs snapshot $NEWSNAP
-	fi
+	# New snapshot ensures the most up-to-date version of the template jail
+	zfs snapshot $NEWSNAP
 
 	#Trap to destroy snapshot after use.
 	trap 'zfs destroy -rRf $NEWSNAP' SIGINT SIGTERM SIGHUP SIGKILL SIGQUIT EXIT
 
 	# Create dispjail and edit no_destroy flag
 	qb-create -c dispjail -t none -i none -T $JAIL $NEWJAIL 
+	qb-edit -f $NEWJAIL no_destroy false
+
+	#Trap to ensure DISP doesn't remain after use
 	trap	'destroy_dispjail' SIGINT SIGTERM SIGHUP SIGKILL SIGQUIT EXIT
 
 	# Launch a floating terminal for the dispjail
@@ -86,16 +61,21 @@ main() {
 }
 
 destroy_dispjail() {
-	jail -r $NEWJAIL
-
-	zfs destroy -rRf ${jails_zfs}/$NEWJAIL
-	zfs destroy -rRf ${zusr_zfs}/$NEWJAIL
+	stop_jail "$NEWJAIL"
+	zfs destroy -rRf ${JAILS_ZFS}/$NEWJAIL
+	zfs destroy -rRf ${ZUSR_ZFS}/$NEWJAIL
 	zfs destroy $NEWSNAP
 	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $JMAP
-	sed -i '' -E "/^${NEWJAIL}(\{|[[:blank:]])/,/^}/d" /etc/jail.conf 
+	sed -i '' -E "\@${NEWJAIL}[[:blank:]]*\{@,\@^[[:blank:]]*\}[[:blank:]]*\$@d" $JCONF
 }
 
-checks
-NEWJAIL_name
+get_global_variables
+
+get_options "$@"
+
+newjail_name
+
 main
+
+
 

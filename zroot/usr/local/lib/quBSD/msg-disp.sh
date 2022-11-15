@@ -1,41 +1,26 @@
 #!/bin/sh
 
-get_msg_qb_() { 
+get_msg_qb_disp() { 
 	# _message determines which feedback message to call.
 	# Just call "none" in the case you want no message to match.
 	# _action is optional, and can be used to exit and/or show usage
 
-	local _message
-	local _action
+   local _message
+   local _action
+
 	_message="$1"
 	_action="$2"
-
 	case "$_message" in
 	_1) cat << ENDOFMSG
 
-
+ERROR: Must specify a < jail > to clone for dispjail
 ENDOFMSG
 	;;	
 	_2) cat << ENDOFMSG
 
-
+ERROR: < $JAIL > is not properly configured or does not exist
 ENDOFMSG
 	;;	
-	_3) cat << ENDOFMSG
-
-
-ENDOFMSG
-	;;
-	_4) cat << ENDOFMSG
-
-
-ENDOFMSG
-	;;
-	_5) cat << ENDOFMSG
-
-
-ENDOFMSG
-	;;
 	esac
 
 	case $_action in 
@@ -49,9 +34,14 @@ ENDOFMSG
 
 usage() { cat << ENDOFUSAGE
 
-qb-
+qb-disp: Creates a disposable jail, using snapshot of existing  
+         <jail>. Launches terminal inside new DISP-jail, which
+         is destroyed upon closing the terminal.
 
-Usage: qb-
+         **Use dispjails for conducting risky operations**
+
+Usage: qb-disp [-h]|<existing_jail> 
+Usage: qb-disp -p 
    -h: outputs this usage message
 
 ENDOFUSAGE

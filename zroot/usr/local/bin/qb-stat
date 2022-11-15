@@ -1,65 +1,51 @@
 #!/bin/sh
 
-# Realtime 1-sec updates on the status of all containers
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-stat.sh
 
-while getopts c:h o ; do
-	case $o in
-		c) col="$OPTARG" ;;
-		h) help="true" ;;
-	esac
-done
+get_options() {
+	while getopts c:h opts ; do
+		case $opts in
+			c) COL="$OPTARG" ;;
+			h) get_msg_qb_stat "none" "usage_0" ;;
+		esac
+	done
 
-shift $(( OPTIND - 1 ))
-
-# Get datasets, mountpoints; and define files.
-JCONF="/usr/local/etc/quBSD/quBSD.conf"
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
-
-zroot=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $JCONF) 
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $JCONF) 
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $JCONF) 
-
-# Define script variables
-tmp="/tmp/qb-stat.txt"
-tmp2="/tmp/qb-stat2.txt"
-col="${col:=6,6}"
-
-# Define colors 
-# NOTE: printf counts ANSI color escapes with \tabs in alignment
-#       As a result, any color used for jails/VMs must have same length escapes
-COL_OFF='\033[0m'	     # Turn off color	
- NORMAL='\033[0;39m'     # Default terminal settings 
-  GREEN='\033[1;7;32m'   # Green, inverted, for active window alert 
-    RED='\033[1;31m'     # Bold Red
-   BRED='\033[1;5;31m'   # Blinking bold red, for hostnet connection alert
-   BLUE='\033[0;34m'     # Blue - server jails 
-   GRAY='\033[0;90m'     # Gray - system, templates, host, VMs, misc jails 
- YELLOW='\033[0;33m'     # Yellow - net jails 
-  HILIT='\033[7;39m'     # Highlighted top line
-
-trap "{ rm $tmp > /dev/null 2>&1 ; rm $tmp2 > /dev/null 2>&1 ; exit 0 ; }" SIGINT SIGTERM EXIT
-
-usage() {
-	echo ""
-	echo "qb-stat: Lists status of all jails"
-	echo "Usage: qb-stat [-c <column>] [-h]"
-	echo "   -c: (c)olumn to column to sort by"
-	echo "   -h: (h)elp:  Outputs this help message"
-	echo ""
-	exit 1
+	shift $(( OPTIND - 1 ))
 }
 
-checks() {
-	[ "$help" ] && usage
+define_script_files() {
+	QBROOT=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $QBCONF) 
+	TMP="/tmp/qb-stat.txt"
+	TMP2="/tmp/qb-stat2.txt"
+	COL="${COL:=6,6}"
+
+	# Trap to remove TMP files when exiting
+	trap "{ rm $TMP > /dev/null 2>&1 ; rm $TMP2 > /dev/null 2>&1 \
+																exit 0 ; }" SIGINT SIGTERM EXIT
+}
+
+define_colors() {
+	# NOTE: printf counts ANSI color escapes with \tabs in alignment
+	# As a result, any color used for jails/VMs must have same length escapes
+	COL_OFF='\033[0m'	       # Turn off color	
+	 NORMAL='\033[0;39m'     # Default terminal settings 
+     GREEN='\033[1;7;32m'   # Green, inverted, for active window alert 
+       RED='\033[1;31m'     # Bold Red
+      BRED='\033[1;5;31m'   # Blinking bold red, for hostnet connection alert
+      BLUE='\033[0;34m'     # Blue - server jails 
+      GRAY='\033[0;90m'     # Gray - system, templates, host, VMs, misc jails 
+    YELLOW='\033[0;33m'     # Yellow - net jails 
+     HILIT='\033[7;39m'     # Highlighted top line
 }
 
 assemble_header() {
-	[ -e "$tmp" ] && rm $tmp 
-	[ -e "$tmp2" ] && rm $tmp2
-	mktemp $tmp > /dev/null
-	mktemp $tmp2 > /dev/null
+	[ -e "$TMP" ] && rm $TMP 
+	[ -e "$TMP2" ] && rm $TMP2
+	mktemp $TMP > /dev/null
+	mktemp $TMP2 > /dev/null
 
-	printf "%b" "${HILIT}CONTAINER\tJID\tTUNNEL\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" >> $tmp
+	printf "%b" "${HILIT}CONTAINER\tJID\tTUNNEL\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" >> $TMP
 }
 
 define_variables() {
@@ -78,46 +64,47 @@ define_variables() {
 	mic=$(service virtual_oss onestatus | grep -o "virtual_oss is running")
 
 	# Host connected
-	interfaces=$(ifconfig -l | sed "s/lo0//")
+	interfaces=$(ifconfig -l | sed "s/lo0//g")
+	[ -z "$interfaces" ] && hostnet=""
+
 	for i in $interfaces ; do
-		ifconfig $i inet | egrep -qs "^[[:blank:]]*inet"
-		[ "$?" = "0" ] && hostnet="true" || hostnet=""
+		$(ifconfig $i inet | egrep -qs "^[[:blank:]]*inet") && hostnet="true" || hostnet=""
 	done
 }
 
 get_jails_loop() {
-	for j in $jails ; do
-		class=$(sed -nE "s/^${j}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+	for _j in $jails ; do
+		class=$(sed -nE "s/^${_j}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
 		class="${class%jail}"
-		tunnel=$(sed -nE "s/^${j}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
+		tunnel=$(sed -nE "s/^${_j}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
 		tunnel="${tunnel:--}"
-		rootjail=$(sed -nE "s/^${j}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP)
+		rootjail=$(sed -nE "s/^${_j}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP)
 		rootjail="${rootjail:--}"
 		disk="-"
 		jid="-"
 		cpu="-"
 		ram="-"
 		
-		if `jls | grep -qs " $j "` ; then
-			jid=$(jls -j $j -n jid | sed "s/jid=//") 
-			cpu=$(ps au -J $j | awk '{sum+=$3;} END {print sum;}')
-			ram=$(ps au -J $j | awk '{sum+=$4;} END {print sum;}')
+		if `jls | grep -qs " $_j "` ; then
+			jid=$(jls -j $_j -n jid | sed "s/jid=//") 
+			cpu=$(ps au -J $_j | awk '{sum+=$3;} END {print sum;}')
+			ram=$(ps au -J $_j | awk '{sum+=$4;} END {print sum;}')
 		fi	
 
-		if [ "$class" = "root" -o -z "${j##0*template}" ] ; then 
-			disk=$(echo "$zfs_list" | sed -nE "s#^${jails_zfs}/${j}[[:blank:]]+##p")
+		if [ "$class" = "root" -o -z "${_j##0*template}" ] ; then 
+			disk=$(echo "$zfs_list" | sed -nE "s#^${JAILS_ZFS}/${_j}[[:blank:]]+##p")
 			sub=4
 
 		elif [ "$class" = "VM" ] ; then 
 			# Future functionality - bhyvectl or ping test for on/connected
-			disk=$(echo "$zfs_list" | sed -nE "s#^${zroot}/${j}[[:blank:]]+##p")
+			disk=$(echo "$zfs_list" | sed -nE "s#^${QBROOT}/${_j}[[:blank:]]+##p")
 			sub=5
 		else 
-			disk=$(echo "$zfs_list" | sed -nE "s#^${zusr_zfs}/${j}[[:blank:]]+##p")
+			disk=$(echo "$zfs_list" | sed -nE "s#^${ZUSR_ZFS}/${_j}[[:blank:]]+##p")
 
-			if [ -z "${j##net*}" ] ; then sub="3"
-			elif [ -z "${j##serv*}" ] ; then sub="2"
-			elif [ -z "${j##host*}" ] ; then sub="6" 
+			if [ -z "${_j##net*}" ] ; then sub="3"
+			elif [ -z "${_j##serv*}" ] ; then sub="2"
+			elif [ -z "${_j##host*}" ] ; then sub="6" 
 			else sub="1"
 			fi
 		fi
@@ -138,7 +125,7 @@ get_jails_loop() {
 
 		esac
 
-		printf "%b" "${TEMPCOL}$j\t" "$jid\t" "$tunnel\t" "$class\t" "$rootjail\t" "$sub\t" "$disk\t" "$ram\t" "${cpu}${COL_OFF}\n" >> $tmp
+		printf "%b" "${TEMPCOL}$_j\t" "$jid\t" "$tunnel\t" "$class\t" "$rootjail\t" "$sub\t" "$disk\t" "$ram\t" "${cpu}${COL_OFF}\n" >> $TMP
 	done
 }
 
@@ -164,16 +151,22 @@ main() {
 		define_variables
 		get_jails_loop
 		clear
-		(head -n 1 $tmp && tail -n +2 $tmp | sort -k $col | cut -f1,2,3,4,5,7,8,9) >> $tmp2
-		column -t $tmp2
+		(head -n 1 $TMP && tail -n +2 $TMP | sort -k $COL | cut -f1,2,3,4,5,7,8,9) >> $TMP2
+		column -t $TMP2
 		print_alerts
 		sleep 1
 	done
 }
 
+get_global_variables
 
-checks
+get_options "$@"
+
+define_script_files
+
+define_colors
+
 define_variables
-main
 
+main
 

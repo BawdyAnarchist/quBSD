@@ -1,71 +1,74 @@
 #!/bin/sh
 
-while getopts dhu o ; do
-	case $o in
-		d) DOWN="true" ;;
-		h) HELP="true" ;;
-		u) UP="true" ;; 
-	esac
-done
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-flags.sh
 
-shift $(( OPTIND - 1 ))
+get_options() {
+	while getopts dhru opts ; do
+		case $opts in
+			d) DOWN="true" ;;
+			h) get_msg_qb_flags "none" "usage_0" ;;
+			u) UP="true" ;; 
+			r) RESTORE="true" ;; 
+		esac
+	done
 
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $JMAP    # Removes blanks at EOL, prevents errors
+	shift $(( OPTIND - 1 ))
 
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF) 
-m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF) 
-m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
-
-
-# Define script variables
-JAIL="$1"
-
-usage() {
-	echo ""
-	echo "qb-flags: Toggles schg/noschg for the indicated jail"
-	echo ""
-	echo "Usage: qb-flags [-h] [-d|-u] <jail>"	
-	echo "   -d: (d)own: recursive noschg flags for target jail"
-	echo "   -u: (u)p: re-applies jailmap settings to target jail"
-   echo "   -h: (h)elp: Outputs this help message"
-	echo ""
-	exit 1
+	JAIL="$1"
 }
 
 checks() {
-	if [ "$HELP" ] ; then
-		usage
+	if [ -z "$DOWN" ] && [ -z "$UP" ] && [ -z "$RESTORE" ] ; then
+		# User didn't specify an action 
+		get_msg_qb_flags "_1" "usage_1"
 
-	elif [ -z "$DOWN" -a -z "$UP" ] ; then
-		echo "qb-flags: ERROR: must specify -d (down) or -u (up) for flags" 
-		usage
-
-	elif [ "$DOWN" -a "$UP" ] ; then
-		echo "qb-flags: ERROR: must specify only one option, [-d or -u], not both" 
-		usage
+	elif echo "${DOWN}${UP}${RESTORE}" | grep -Eqs "truetrue" ; then
+		# Can't specify multiple actions 
+		get_msg_qb_flags "_2" "usage_1"
 
 	elif [ -z "$JAIL" ] ; then
-		echo "qb-flags: ERROR: must specify a target jail" 
-		usage
+		# Must have a jail to operate on 
+		get_msg_qb_flags "_3" "usage_1"
 
-	elif ! `qb-list -qj "$JAIL"` ; then
-		echo "qb-flags: ERROR: $JAIL does not exist or is not configured properly"
-		usage
+	fi
+
+	# Error messages for invalid jails come embedded with the check 
+	check_isvalid_jail "$JAIL" "exit_1" 
+}
+
+main() {
+	if [ "$DOWN" ] ; then
+		chflags -R noschg ${M_JAILS}/$JAIL
+		chflags -R noschg ${M_ZUSR}/$JAIL
+
+	elif [ "$UP" ] ; then
+		# schg for all user files
+		chflags -R schg ${M_ZUSR}/$JAIL
+
+		# Want to avoid errors of trying to set schg on /dev and other invalid locations 
+		jdir="/bin /sbin /boot /etc /home /lib /libexec /root /rw /usr"
+
+		# Cycle through directories above and recursively schg  
+	   for _dir in $jdir; do
+			chflags -R schg "${M_JAILS}/${JAIL}${_dir}" > /dev/null 2>&1
+		done
+
+	elif [ "$RESTORE" ] ; then
+		# Jails might have different chflag settings if started or stopped
+		check_isrunning_jail "$JAIL" \
+									&& ${QBDIR}/exec.poststart \
+																|| ${QBDIR}/exec.poststop
 	fi
 }
 
+
+get_global_variables
+
+get_options "$@"
+
 checks
 
-if [ "$DOWN" ] ; then
-	chflags -R noschg ${m_jails}/$JAIL
-	chflags -R noschg ${m_zusr}/$JAIL
-
-elif [ "$UP" ] ; then
-	/usr/local/etc/quBSD/exec.poststart $JAIL
-fi
+main
 
 

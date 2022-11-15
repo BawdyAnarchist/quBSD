@@ -26,12 +26,10 @@ get_options() {
 checks() {
 	# Check for required inputs
 	if [ -z "$JAIL" -o -z "$PARAM" -o -z "$VAL" ] ; then
-echo "$JAIL" ; echo "$PARAM" ; echo "$VAL"
 		# Only exception to missing input, is for [-i] auto assign IP 
 		[ -z "$AUTO_IP" ]  &&  get_msg_qb_edit "_1" "usage_1"
 	
 	elif ! grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP ; then
-
 		# Doesn't exist in jmap (thus, can't be edited)
 		get_msg_qb_edit "_2" "usage_1"
 
@@ -90,11 +88,13 @@ echo "$JAIL" ; echo "$PARAM" ; echo "$VAL"
 
 		# IP0 is the most complicated. Save it for last, just for code organization
 		IP0)
-			# function returns 1 if it's acting on net-firewall. All else returns 0 
+			# Function returns 1 if it's acting on net-firewall. 
+			# All else returns 0, and assigns globals for IP0 checks in other functions 
 			if define_ipv4_convention ; then
 
-				# Get a list of all IP in use by running jails. Assigns: $_USED_IPS
-				get_used_ips
+				# Get a list of all IP in use by running jails (assigns $_USED_IPS)
+				# IP0 of 'non' doesn't need to check against used IPs
+				[ "$VAL" == "none" ] || get_used_ips
 
 				if [ "$VAL" == "auto" ] ; then 
 					# IP discovery doesn't require additional checks
@@ -198,7 +198,7 @@ handle_restarts() {
 	esac
 
 	# If there are no jails to restart, exit
-	[ -z "$_restarts" ] && exit 0
+	[ -z "$_restarts" -o -n "$FORCE" ] && exit 0
 	
 	# Query user to restart jails 
 	if [ -z "$RESTART" ] ; then

@@ -1,118 +1,88 @@
 #!/bin/sh
 
-while getopts ch o ; do
-	case $o in
-		c) clean="true" ;;
-		h) help="true" ;;
-	esac
-done
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-destroy.sh
 
-shift $(( OPTIND - 1 ))
+get_options() {
+	while getopts ch o ; do
+		case $o in
+			h) get_msg_qb_destroy "none" "usage_0" ;;
+		esac
+	done
 
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $JMAP   # Remove blanks at EOL, prevents errors
+	shift $(( OPTIND - 1 ))
 
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
+	# Define script variables
+	JAIL="$1"
+}
 
-# Define script variables
-jail="$1"
-
-get_variables() {
-	class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
-	no_destroy=$(sed -nE "s/^$jail[[:blank:]]+no_destroy[[:blank:]]+//p" $JMAP) 
-	offjails=$(zfs list -o name,origin | egrep "$jail\@.*\$" \
+define_variables() {
+	CLASS=$(sed -nE "s/^${JAIL}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+	NO_DESTROY=$(sed -nE "s/^$JAIL[[:blank:]]+no_destroy[[:blank:]]+//p" $JMAP) 
+	OFFJAILS=$(zfs list -o name,origin | grep -E "$JAIL\@.*\$" \
 									| awk '{print $1}' | sed "s@.*/@@")
-	
+
 	# Get sizes of datasets to be destroyed, and simulation messages from zfs 
-	zfs list ${zusr_zfs}/$jail >> /dev/null 2>&1 
-	if [ "$?" = "0" ] ; then
-		zusrdata=$(zfs list -o used ${zusr_zfs}/$jail | tail -1) 
-		destzusr=$(zfs destroy -nvrRf ${zusr_zfs}/$jail)
+	if zfs list ${ZUSR_ZFS}/${JAIL} >> /dev/null 2>&1 ; then 
+		zusrSize=$(zfs list -o used ${ZUSR_ZFS}/${JAIL} | tail -1) 
+		zusrDestroy=$(zfs destroy -nvrRf ${ZUSR_ZFS}/${JAIL} | grep -v "${JAIL}\@")
 	fi
 
-	zfs list ${jails_zfs}/$jail >> /dev/null 2>&1 
-	if [ "$?" = "0" ] ; then
-		zrootdata=$(zfs list -o used ${jails_zfs}/$jail | tail -1)
-		destzroot=$(zfs destroy -nvrRf ${jails_zfs}/$jail)
+	if	zfs list ${JAILS_ZFS}/$JAIL >> /dev/null 2>&1 ; then
+		zrootSize=$(zfs list -o used ${JAILS_ZFS}/${JAIL} | tail -1)
+		zrootDestroy=$(zfs destroy -nvrRf ${JAILS_ZFS}/${JAIL} | grep -v "${JAIL}\@")
 	fi
-
-}
-
-define_messages () {
-
-	err1=$(printf "%b" "qb-destroy: ERROR: must specify a <jail>") 
-	err2=$(printf "%b" "qb-destroy: ERROR: jail $jail has the \`no_destroy flag' set in" \
-					"\njailmap.conf.  Change flag to \`false' to destroy this jail")
-	err3=$(printf "%b" "qb-destroy: ERROR: $jail does not exist, or is partially configured" \
-					"\nUse the [-c] option to clean out any remaining pieces of a jail")
-	warn4=$(printf "%b" "WARNING! $jail is a ROOTJAIL") 
-	warn5=$(printf "%b" "$destzroot   With $zrootdata of ondisk data")
-	warn6=$(printf "%b" "$destzusr  With $zusrdata of ondisk data" \
-								"\n\n\tTo continue, type yes:  ")
-	err7=$(printf "%b" "Exiting, no changes made")
-}
-
-usage () {
-	[ "$ERR" ] && printf "%b" "\n$ERR\n"
-	echo ""
-	echo "qb-destroy:  Destroys <jail> and deletes all configurations and datasets"
-	echo "Protection mechanism: jailmap.conf parameter \`no_destroy' must false" 
-	echo ""
-	echo "Usage: qb-destroy [-h] <jail>"
-	echo "   -h: (h)elp:  Outputs this help message"
-	echo "   -c: (c)clean: Ignore any warnings and clean remaining parts of a jail" 
-	echo ""
-	[ "$ERR" ] && exit 1 || exit 0
 }
 
 checks() {
-	if [ "$help" ] ; then 
-		usage
+	# Alert that the jail is invalid, but proceed anyways (`pass' option)
+	check_isvalid_jail "$JAIL" "pass" 
 
-	elif [ -z "$jail" ] ; then
-		ERR="$err1" ; usage
+	# no_destroy protection flag still active
+	[ "$NO_DESTROY" = "true" ] && get_msg_qb_destroy "_2" "usage_1"	
 
-	elif [ "$no_destroy" = "true" ] ; then
-		ERR="$err2" ; usage
+	# Extra reminder that they're destorying a rootjail
+	[ "$CLASS" = "rootjail" ] && get_msg_qb_destroy "_4" 
 
-	elif ! `qb-list -qj "$jail"` && [ -z "$clean" ] ; then
-		ERR="$err3" ; usage
-	fi
+	# Print the datasets and amount of data to be destroyed
+	get_msg_qb_destroy "_5" 
+	[ -n "$zrootDestroy" ] && get_msg_qb_destroy "_6" 
+	[ -n "$zusrDestroy" ] && get_msg_qb_destroy "_7"
 
-	if [ "$class" = "rootjail" ] ; then
-		printf "%b" "$warn4\n"
-	fi
+	# Solicit user response. 
+	get_msg_qb_destroy "_8"
 
-	printf "%b" "\nWARNING! This will destroy the following datasets:\n" 
-	[ "$destzroot" ] && printf "%b" "\n$warn5\n"
-	[ "$destzusr" ] && printf "%b" "\n$warn6"
-	printf "%b" "\nType \"yes\" to continue:  "
-
-	read opt
-	[ "$opt" != "yes" ] && printf "%b" "\n$err7\n" && exit 0
+	# "severe" requires a full `yes' to be typed
+	get_user_response "severe" || get_msg_qb_destroy "_1" "exit_0"
 }
 
 main() {
-	offjails="$offjails $jail"
-	for j in $offjails ; do
-		if `jls | grep -qs " $j "` ; then
-			jail -r $j
-			[ "$?" = "0" ] || jail -R $j
-		fi
-	done
+	# Add current jail to the list of jails to be destroyed. 
+	OFFJAILS="$OFFJAILS $JAIL"
 
-	[ "$destzroot" ] && zfs destroy -rRf ${jails_zfs}/$jail
-	[ "$destzusr" ] && zfs destroy -rRf ${zusr_zfs}/$jail
-	sed -i '' -E "/^${jail}[[:blank:]]/d" $JMAP
-	sed -i '' -E "/^${jail}(\{|[[:blank:]])/,/^}/d" $jconf
+	# Turn off all jails before applying changes 
+	for _jail in $OFFJAILS ; do
+		stop_jail "$_jail"
+	done
+	
+	# Destroy datasets
+	[ "$zrootDestroy" ] && zfs destroy -rRf ${JAILS_ZFS}/${JAIL}
+	[ "$zusrDestroy" ] && zfs destroy -rRf ${ZUSR_ZFS}/${JAIL}
+	
+	# Modify Files
+	sed -i '' -E "/^${JAIL}[[:blank:]]/d" $JMAP
+	sed -i '' -E "/^${JAIL}(\{|[[:blank:]])/,/^}/d" $JCONF
 }
 
-get_variables
-define_messages
+
+get_global_variables
+
+get_options "$@"
+
+define_variables
+
 checks
+
 main
 
 

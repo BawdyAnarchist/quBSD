@@ -1,0 +1,59 @@
+#!/bin/sh
+
+# Starts bhyve virtual machine with pci passthrough for pci0:71:0:1 and pci0:71:0:3
+# Virtual interface on tap1 for connectivity
+
+# PROVIDE: jautostart
+# REQUIRE: netif jail nicvm
+# AFTER: login
+
+. /etc/rc.subr
+. /usr/local/lib/quBSD/quBSD.sh
+
+name="jautostart"
+desc="Starts bhyve VM for usb virtual machine with virtual interface to isolate flash devices"
+rcvar="${name}_enable"
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+
+jautostart_start() {
+
+	# Find all jails in JMAP flagged for autostart
+	AUTOSTART=$(grep -E "autostart[[:blank:]]+true" $JMAP | awk '{print $1}')
+	
+	for _jail in $AUTOSTART ; do
+
+		# Jails with a tunnel not yet started, will need to wait for tunnel to start 
+		_tunnel=$(sed -nE "s/^${_jail}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
+
+		# Switch on the basis of whether tunnel is running
+		if check_isrunning_jail "$_tunnel" ; then
+
+			# Start jail and send process to background	
+			jail -c $_jail & 
+
+		else	
+
+			# Start jail and wait for completion
+			jail -c $_jail 
+		fi
+	done
+}
+
+jautostart_stop() {
+	# Assemble list of running jails
+	ONJAILS=$(jls | awk '{print $2}' | tail -n +2)
+
+	for _jail in $ONJAILS ; do
+		
+		# Try to stop jail gracefully; force stop if unable. 
+		stop_jail "$_jail" &
+
+	done
+}
+
+load_rc_config $name
+run_rc_command "$1"
+
+
+

@@ -1,16 +1,46 @@
 #!/bin/sh
 
-# Quick way of changing the DPI of the system
+. /usr/local/lib/quBSD/msg-dpi.sh
 
-dpi="$1"
+get_options() { 
+	while getopts hr: opts ; do
+		case $opts in
+			h) get_msg_qb_dpi "none" "usage_0" ;;
+			r) REVERT="$OPTARG" ;;
+		esac
+	done
 
-if [ $dpi -lt 50 ] ; then
-	echo "DPI of $dpi is too low, exiting" && exit 1
+	shift $(( OPTIND - 1 ))
 
-elif [ $dpi -gt 350 ] ; then
-	echo "DPI of $dpi is too high, exiting" && exit 1
+	_NEW_DPI="$1" 
+	DEFAULT_DPI=$(xrdb -query | sed -nE "s/Xft.dpi:[[:blank:]]+//gp")
+	SCALE=96
+}
 
-else
-	echo "Xft.dpi: $dpi" | xrdb -merge
+checks() {
+	# DPI between 4 and 48 is too high to be scaled; too low to be raw
+	echo "$_NEW_DPI" | grep -E "0\.[04 -lt 0.5 ] && get_msg_qb_dpi "_1" "exit 1"
 
-fi
+	# DPI between 4 and 48 is too high to be scaled; too low to be raw
+	[ "$_NEW_DPI" -gt 4 ] && [ "$_NEW_DPI" -lt 48 ] && get_msg_qb_dpi "_2" "exit 1"
+
+	# DPI above 386 is too high for an automated script 
+	[ "$_NEW_DPI" -gt 386 ] && get_msg_qb_dpi "_3" "exit 1"
+}
+
+main() {
+	# Convert a relative scaled entry to raw entry
+	[ "$_NEW_DPI" -ge 0.5 ] && [ "$_NEW_DPI" -le 4 ] \
+				&& $_NEW_DPI=$(echo "$_NEW_DPI * $SCALE" | bc | grep -o "^[[:digit:]]*")
+
+	echo "Xft.dpi: $_NEW_DPI" #| xrdb -merge
+
+	sleep $REVERT && echo "Xft.dpi: $DEFAULT_DPI" | xrdb -merge
+}
+
+get_options "$@"
+
+checks 
+
+main
+

@@ -1,72 +1,73 @@
 #!/bin/sh
 
-while getopts dhu o ; do
-	case $o in
-		d) down="true" ;;
-		h) help="true" ;;
-		u) up="true" ;;
-	esac
-done
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-hostnet.sh
 
-# Define files
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//' $JMAP   #removes blanks at end of lines
+get_options() {
+	while getopts dhu opts ; do
+		case $opts in
+			d) ACTION="down" ;;
+			h) get_msg_qb_hostnet "none" "usage_0" ;;
+			u) [ -z "$ACTION" ] && ACTION="up" || get_msg_qb_hostnet "_2" "usage_1" 
+		esac
+	done
 
-# Define script variables
-jIP=$(sed -n "s/^host[[:blank:]]*IP0[[:blank:]]*//p" $JMAP)
-tunnel=$(sed -nE "s/^host[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
-mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" $QBCONF) 
-
-usage() {
-	[ -n "$ERR" ] && echo "$ERR"
-	echo ""
-	echo "qb-hostnet: Connect host to tunnel, as specified in jailmap"
-	echo "Usage: hostnet [-h] [-d|-u]"
-	echo "   -h: (h)elp: Outputs this help message"
-	echo "   -d: (d)own: Removes host connectivity, pf blocks all traffic"	
-	echo "   -u: (u)p: Creates epair interface to connect host to tunnel"
-	echo ""
-	exit 1
+	# Define script variables
+	_jIP=$(sed -n "s/^host[[:blank:]]*IP0[[:blank:]]*//p" $JMAP)
+	TUNNEL=$(sed -nE "s/^host[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
+	MTU=$(sed -nE "s:^mtu[[:blank:]]+::p" $QBCONF) 
 }
 
 checks() {
-	if [ "$help" ] ; then
-		usage
-	elif [ $OPTIND = 1 ] ; then
-		ERR="hostnet: Error: must provide an option" 
-		usage
-	elif [ "$up" -a "$down" ] ; then
-		ERR="hostnet: Error: conflicting options, cannot use both [-d] and [-u]"
-		usage
+	if [ $OPTIND == 1 ] ; then
+		# Did not specify an action
+		get_msg_qb_hostnet "_1" "usage_1" 
+
+	elif [ "$UP" -a "$DOWN" ] ; then
+		# Cannot specify both actions
+		get_msg_qb_hostnet "_2" "usage_1" 
+
 	fi
 }
 
-hostnet_down() {
+main() {
+	# Regardless of [-u] or [-d], first remove all interfaces, 
+	# to ensure that host is in a known good state.
+		
+	# Find all epairs and destroy them. 
 	ifconfig -l | grep -o "epair[[:digit:]]*[a,b]" | xargs -I@ ifconfig @ destroy
+	
+	# Set pf.conf, which is simply: "block all"
 	pfctl -f /etc/pf.conf	
+	
+	# Bring up host network connection 
+	if [ -n "$UP" ] ; then 
+
+		# start_jail command handles most error messages 
+		start_jail "$TUNNEL"  ||  get_msg_qb_hostnet "_3" "usage_1"
+	
+		# Create epair, and set it up inside the gateway
+		_epair=$(ifconfig epair create)
+		ifconfig "${_epair%?}a" vnet $TUNNEL
+		jexec -l $TUNNEL ifconfig "${_epair%?}a" inet ${_jIP%.*/*}.1/${_jIP#*/} mtu $MTU up
+
+		# Configure epair on the host side
+		ifconfig "${_epair%?}b" inet $_jIP mtu $MTU up
+		route add default "${_jIP%.*/*}.1"
+
+		# Change pf to file that passes internet from host to outside. 
+		pfctl -f /etc/pf_pass.conf
+
+	fi
 }
 
-hostnet_up () {
-	! `jls | grep -qs " $tunnel "` && jail -c $tunnel 
-	epair=$(ifconfig epair create)
+get_global_variables
 
-	ifconfig "${epair%?}a" vnet $tunnel
-	jexec -l $tunnel ifconfig "${epair%?}a" inet ${jIP%.*/*}.1/${jIP#*/} mtu $mtu up
-
-	ifconfig "${epair%?}b" inet $jIP mtu $mtu up
-	route add default "${jIP%.*/*}.1"
-
-	# It seemed that simply loading a fully separate pf.conf was better than sed
-	pfctl -f /etc/pf_pass.conf
-}
-
+get_options "$@"
 
 checks 
-hostnet_down 
-if [ "$up" ] ; then
-	hostnet_up
-fi
+
+main
 
 
 

@@ -789,13 +789,13 @@ change_config_files() {
 	sed -nE "/^$template[[:blank:]]+/s/^$template/$newjail/p" $JMAP >> $JMAP
 
 	# Any parameters that are non-blank, were specified and should be changed
-	qb-edit $newjail class $class 		>> /dev/null
-	qb-edit $newjail cpuset $cpuset		>> /dev/null
-	qb-edit $newjail schg $schg			>> /dev/null
+	qb-edit -f $newjail class $class		>> /dev/null
+	qb-edit -f $newjail cpuset $cpuset	>> /dev/null
+	qb-edit -f $newjail schg $schg		>> /dev/null
 	qb-edit -f $newjail IP0 $IP0			>> /dev/null
-	qb-edit $newjail maxmem $maxmem 		>> /dev/null
-	qb-edit $newjail seclvl $seclvl 		>> /dev/null 
-	qb-edit -f $newjail tunnel $tunnel 	>> /dev/null 
+	qb-edit -f $newjail maxmem $maxmem	>> /dev/null
+	qb-edit -f $newjail seclvl $seclvl	>> /dev/null 
+	qb-edit -f $newjail tunnel $tunnel	>> /dev/null 
 
 	# New rootjails need to redirect the rootjail line to self
 	if [ "$class" = "rootjail" ] ; then 
