@@ -15,9 +15,6 @@ USBVM
 - Create a proper unprivileged user with devd.conf and automounts     
 - Auto remove password from unprivleged usbvm user     
 	
-Expand install options     
-- Can select to merge zroot and zusr with other existing dataset/mount     
-
 0SERV Default and 0serv-template
   - Integrate into install script
   - www and usr diretories are quite large. Script integration:
@@ -39,14 +36,25 @@ net-firewall
 		  because people making servers might not want an auto setting
 
 qb-autosnap 
-	- Need to add changes /etc/crontab to qubsd-installer
 	- Need to add the zfs custom props to the datasets as created (qubsd-installer)
-		- be careful. Cloned datasets should not be autosnapped
 
 qb-backup (already created in $ubin)
 	- cron to run on both sides of source and dest, with ssh hostname, to automate backups
 
 Detect changes in nic and USB so that you can rewrite the file if necessary
+
+qubsd_installer
+	- Autosnap 
+		/etc/crontab
+		zfs datasets need to be tagged 	
+
+	- Autostart
+		/etc/rc.conf
+		/rc.d/jautostart 
+
+	Expand install options     
+		Can select to merge zroot and zusr with other existing dataset/mount     
+
 
 ### BEST PRACTICES / CLEANUP
 
@@ -58,8 +66,6 @@ Detect changes in nic and USB so that you can rewrite the file if necessary
 	- The pass in from clients would also let servers do it
   		- Segregate the servers from clients more carefully
 		- Maybe even segregate the wg gateways from clients as well
-
-- networking rework. Need to update the IP conventions - both checks and docs 
 
 qb-usbvm     
 	- When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
@@ -81,12 +87,10 @@ qb-create
 	- Add option for "auto" IP assignment during guided
 	- Logic on "Would you like to also .... something about /home directory of template"
 		needs fixed, because no template shouldn't ask you to copy a non existent home.
-	- autostart options
+	- autostart option
 	- autosnap options - the custom zfs props need to be set
-
-qb-rename
-	- didn't rename the subfolder under home
-	- requires that you bring flags down for the jail in quesiton first (specifically the fstab was protected)
+		- be careful. Cloned datasets should not be autosnapped
+	- While in guided mode, add option to enter "auto" for IP assignment 
 
 pf.conf
 	- wgIP constant really should be called "endpointIP" or something like that
@@ -112,9 +116,7 @@ exec scripts should assign qb-list parameter defaults in case some are missing, 
 	Creating a log files. Works nicely with quBSD.lib
 	qubsd setup script needs to include line to rm the log on startx
 
-start_jail stop_jail new functions embed the errors in the function. Review all scripts for this revision
-
-Test out having the rootjails at high security levels when turned off.
+Test having the rootjails at high security levels when turned off.
 
 qb-dpi - make it so that a program can launch under alt dpi settings and return to normal
 	- You could even add it as an option to qb-cmd, and i3gen.sh/conf
@@ -126,8 +128,6 @@ qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 qb-cam/mic - webcam and mic get brought up with script
 
 qb-update - Update rootjails, create snapshots
-
-qb-create - While in guided mode, add option to enter "auto" for IP assignment 
 
 usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
 
