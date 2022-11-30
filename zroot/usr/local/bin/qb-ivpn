@@ -1,235 +1,395 @@
 #!/bin/sh
 
-while getopts hjl o ; do
-     case $o in
-     	h) help="true" ;;
-     	j) pass="true" ;;  
-		l) list='-l' ;;
-     esac
-done
+# Seamless handling of seclvl and chflags requires straddling host and <jail>
+# A single script simplifies the UX frontend, but adds complexity in the script backend.
+# To help simplify, get_msg_qb_ivpn and usage functions, are integrated into the script.
 
-shift $(( OPTIND - 1 ))
+get_msg_qb_ivpn() { 
+	# _message determines which feedback message to call.
+	# Just call "none" in the case you want no message to match.
+	# _action is optional, and can be used to exit and/or show usage
 
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+	local _message
+	local _action
+	_message="$1"
+	_action="$2"
 
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF) 
-m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF) 
-m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
+	case "$_message" in
+	_1) cat << ENDOFMSG
 
-# Define script variables
-jail="$1"
+ERROR: Unable to start jail. Cannot modify IVPN. 
+ENDOFMSG
+	;;	
+	_1_1) cat << ENDOFMSG
+
+ERROR: Invalid port.  
+ENDOFMSG
+	;;	
+	_2) cat << ENDOFMSG
+
+ERROR: Script is running inside jail, but kern. securelevel is 
+       elevated and/or schg is applied to one or more files 
+       that need to be modified in order to switch VPN servers. 
+       Re-run this script from host, in order to modify iVPN.
+ENDOFMSG
+	;;	
+	_3) cat << ENDOFMSG
+
+WARNING: Failed to establish ping to outside internet. 
+         Will use existing json files for modifying wg0.conf.
+         {Enter to continue}
+ENDOFMSG
+	;;
+	_4) cat << ENDOFMSG
+Downloading server data from api.ivpn.net , wait a moment.
+ENDOFMSG
+	;;
+	_4_1) cat << ENDOFMSG
+
+CURRENT IVPN SERVER INFO.  {Enter to continue}
+ENDOFMSG
+	;;
+	_5) cat << ENDOFMSG
+
+WARNING: Failed to download fresh server stats.
+         Will use existing json files for modifying wg0.conf.
+			{Enter to continue}
+ENDOFMSG
+	;;
+	_6) cat << ENDOFMSG
+
+WARNING: Failed to download fresh server stats.
+ENDOFMSG
+	;;
+	_7) cat << ENDOFMSG
+
+AVAILABLE COUNTRIES ARE AS FOLLOWS:
+$countries 
+
+ENDOFMSG
+echo -e "Select Country (enter number): \c"
+	;;
+	_8) cat << ENDOFMSG
+
+AVAILABLE CITIES ARE AS FOLLOWS:
+$cities 
+
+ENDOFMSG
+echo -e "Select City (enter number): \c"
+	;;
+	_9) cat << ENDOFMSG
+
+AVAILABLE SERVERS ARE AS FOLLOWS:
+$servers 
+
+ENDOFMSG
+echo -e "Select Server (enter number): \c"
+	;;
+	_10) cat << ENDOFMSG
+
+WARNING: Files are modified with data for new ivpn server, but
+         jail must be restarted for changes to take effect.
+
+WARNING: Can't modify wg0.conf due to schg flags
+         Recommend running qb-ivpn from host instead
+ENDOFMSG
+	;;
+	_11) cat << ENDOFMSG
+
+WARNING: Can't modify pf.conf due to schg flags
+         Recommend running qb-ivpn from host instead
+ENDOFMSG
+	;;
+
+	esac
+
+	case $_action in 
+		usage_0) usage ; exit 0 ;;
+		usage_1) usage ; exit 1 ;;
+		exit_0)  exit 0 ;;
+		exit_1)  exit 1 ;;
+		*) : ;;
+	esac
+}
+
+usage(){ cat << ENDOFUSAGE
+
+qb-ivpn: Mange vpn connection for IVPN, specifically.
+         Fetches server data and provides guided selection
+         for VPN server. Attempts to manage permissions.
+
+WARNING: Can run from inside of jail, but if schg or seclvl
+         are elevated, modification might not be possible.
+         In that case, run this script from host. 
+
+FROM INSIDE OF JAIL
+Usage: qb-ivpn [-h|-l]
+
+FROM HOST 
+Usage: qb-ivpn [-h|-l|-p] <jail>
+
+OPTIONS:
+   -h: (h)elp. Shows this message
+   -l: (l)ist the current IVPN server connection, and exit
+   -p: (p)ort. Change the port used by wireguard / ivpn 
+   -x: DO NOT USE. Internal to script. 
+
+ENDOFUSAGE
+}
+
+get_options() {
+	while getopts hlp:x opts ; do
+  	   case $opts in
+  	   	h) get_msg_qb_ivpn "none" "usage_0" ;;
+			l) LIST="true" ;;
+			p) PORT="$OPTARG" ;;
+			x) CALLED="true" ;;
+  	   esac
+	done
+
+	shift $(( OPTIND - 1 ))
+
+	JAIL="$1"
+	ACTION="get_msg_qubsd"
+	
+	# Operating on host vs inside jail is a crucial distinction. 
+	ps -o pid 0 > /dev/null 2>&1 && INJAIL="false" || INJAIL="true"
+}
 
 define_variables() {
-	serv_stats="/rw/usr/local/etc/wireguard/serv_stats_ivpn"
-	serv_ips="/rw/usr/local/etc/wireguard/serv_ips_ivpn"
-	serv_current="/rw/usr/local/etc/wireguard/serv_current_ivpn"
-	port="30587"
-	wg0="/rw/usr/local/etc/wireguard/wg0.conf"
+	# File locations
+	WIREGRD="/rw/usr/local/etc/wireguard"
+	SERVERS="${WIREGRD}/serv_stats_ivpn"
+	SRV_IPS="${WIREGRD}/serv_ips_ivpn"
+	CURRENT="${WIREGRD}/serv_current_ivpn"
+	WG0CONF="${WIREGRD}/wg0.conf"
+	PFCONF="/rw/etc/pf.conf"
+	
+	# IVPN API for fetching info
+	_GET_CURRENT="https://api.ivpn.net/v4/geo-lookup"
+	_GET_SERVERS="https://api.ivpn.net/v4/servers/stats"
+	_GET_SRV_IPS="https://api.ivpn.net/v4/servers.json"
 
-	# Securelevel query syntax depends on if script is running inside the jail or not 
-	if [ "$jail" ] && `jls | grep -qs " $jail "` ; then
+	if [ "$INJAIL" == "false" ] ; then 
+		# Source quBSD library, and get variables (only available for host)
+		. /usr/local/lib/quBSD/quBSD.sh
+		get_global_variables
 
-		if [ -z "$list" -a "$jail" != `hostname` ] ; then
-			seclvl=$(jexec -l -U root $jail sysctl kern.securelevel \
-											| sed "s/kern.securelevel: //")
-		fi	
+		# These variables reduce the need for if/then branches. Can combine commands.
+		PATHMOD="${M_ZUSR}/${JAIL}"
+		_CMDMOD="jexec -l -U root $JAIL"
 
-	elif [ -z "$jail" -a "$pass" ] ; then
-		seclvl=$(sysctl kern.securelevel | sed "s/kern.securelevel: //")
+		# Handle case where jail is off 
+		check_isrunning_jail $JAIL || handle_if_off
 	fi
 
-	# Restart flag if seclvl is 3	
-	[ "$seclvl" = "3" -a -z "$list" ] && restart="true"
+	# Define PORT 
+	PORT="${PORT:=$(sed -nE "s/Endpoint.*://p" ${PATHMOD}/${WG0CONF})}"
+
+	[ "$PORT" -gt 0 ] && [ "$PORT" -le 65535 ] || get_msg_qb_ivpn "_1" "usage_1"
 }
 
-define_messages() {
-     err1=$(printf "%b" "qb-ivpn: ERROR: Must specify a jail") 
-     err1_1=$(printf "%b" "qb-ivpn: ERROR: Jail not specified. If not running from host," \
-					"but running from inside jail, specify the [-j] option")
-     err2=$(printf "%b" "qb-ivpn: ERROR: $jail does not exist or is not fully configured")
-     msg3=$(printf "%b" "qb-ivpn: $jail is off. Starting jail ...")
-     err4=$(printf "%b" "qb-ivpn: ERROR: Failed to start $jail. Exiting") 
-     msg5_1=$(printf "%b" "Downloading latest server data from api.ivpn.net , wait a moment.")
-     msg5_2=$(printf "%b" "Currently connected to the following IVPN server:")
-     warn6_1=$(printf "%b" "qb-ivpn: WARNING: Failed ping IVPN server.")
-     warn6_2=$(printf "%b" "Will use existing json files for modifying wg0.conf.")
-     warn7=$(printf "%b" "qb-ivpn: WARNING: Security level of jail is 3, unable to" \
-					"\nchage pf settings. Restart for new server to take effect.")
-     err8=$(printf "%b" "qb-ivpn: WARNING: Can't modify wg0.conf due to schg flags" \
-					"\nRecommend running qb-ivpn from host instead")
-     err9=$(printf "%b" "qb-ivpn: WARNING: Can't modify pf.conf due to schg flags" \
-					"\nRecommend running qb-ivpn from host instead")
-}
+handle_if_off() {
 
-usage() {
-	[ "$ERR" ] && printf "%b" "\n$ERR\n"
-	echo ""
-	echo "qb-ivpn: Fetch IVPN server data, or change servers" 
-	echo "Running from host will automate schg flag, seclvl, and restart" 
-	echo "and <jail> will be restarted automatically if needed."
-	echo "Can run from inside jail, but might cause permissions errors."
-	echo ""
-	echo "Usage: qb-ivpn"
-	echo "Usage: qb-ivpn [-h] [-l] <net-jail>"
-	echo ""
-	echo "   -h: (h)elp: Shows this message" 
-	echo "   -j: (j)ail: Use this option if running from inside jail" 
-	echo "   -l: (l)ist: IVPN server/stats, and exit" 
-	echo ""
-	exit 1
-}
+	# Jail must be valid
+	check_isvalid_jail "$JAIL" "$ACTION" || get_msg_qb_ivpn "none" "usage_1" 
 
-checks() {
-	if [ "$help" ] ; then
-		usage
+	# Will restore original SECLVL later on, after applying ivpn changes
+	SEC_orig=$(sed -En "s/^${JAIL}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
 
-	elif [ -z "$jail" -a -z "$pass" ] ; then
-		ERR="$err1_1" ; usage
-
-	elif [ "$jail" ] ; then
-		if ! `qb-list -qj "$jail"` ; then
-			ERR="$err2" ; usage
-
-		elif ! `jls | grep -qs " $jail "` ; then
-			printf "%b" "\n$msg3\n"
-			jail -c $jail >> /dev/null 2>&1
-			[ "$?" != "0" ] && ERR="$err4" && usage
-		fi
+	# Modify seclvl to -1. Trap and restore original if exit before finish
+	# If we're only turning on the jail to LIST its connection, don't mod seclvl
+	if [ "$SEC_orig" -ge 0 ] && [ -z "$LIST" ] ; then
+		trap 'qb-edit -qf $JAIL seclvl $SEC_orig' INT TERM HUP QUIT EXIT
+		qb-edit -fq $JAIL seclvl -1 
 	fi
+		
+	start_jail "$JAIL" "$ACTION" || get_msg_qb_ivpn "_1" "exit_1"
 }
 
-pre_jail() {
-	# Ensure that schg flags don't prevent API update 
-	chflags -R noschg ${m_jails}/${jail}/usr/local/etc/wireguard
-	chflags -R noschg ${m_jails}/${jail}/rw/usr/local/etc/wireguard
+fetch_connection() {
+	# Print info message while fetching latest data
+	get_msg_qb_ivpn "_4"
 
-	# If changing servers, securelevel and pf.conf schg flags must be managed 
-	if [ -z "$list" ] ; then 
-		chflags -R noschg ${m_jails}/${jail}/etc
-		chflags -R noschg ${m_zusr}/${jail}/rw/etc
-	fi
-}
+	if [ "$INJAIL" == "true" ] ; then
+		fetch -qT 7 -o - "$_GET_CURRENT" | jq 
 
-post_jail() {
-	if [ "$restart" ] ; then
-		qb-off -r $jail
 	else
-		sh /usr/local/etc/jail.conf.d/exec.poststart $jail
+		# Use of jq requires a here-command, so jq runs inside the <jail>
+		jexec -l -U root $JAIL << EOF
+			fetch -qT 7 -o - "$_GET_CURRENT" | jq
+EOF
 	fi
+}
+
+get_security() {
+	# Get state of flags and securelevel of jail  
+	if ls -lo ${PATHMOD}/${WIREGRD} | grep -qs "schg" \
+			|| ls -lo ${PATHMOD}/${PFCONF}  | grep -qs "schg" ; then 
+		SCHG="true"
+	else
+		SCHG="false"	
+	fi
+	
+	SECLVL=$(eval $_CMDMOD sysctl -n kern.securelevel)
+}
+
+flags_down() {
+	# Ensure that schg flags don't prevent API update. -L follows symlinks
+	chflags -RL noschg ${PATHMOD}/${WIREGRD}/.*
+	chflags -RL noschg ${PATHMOD}/${PFCONF}
+	
+	# Make sure that qb-ivpn can be copied to the jail
+	chflags -R noschg "${M_JAILS}/${JAIL}/usr/local/bin"
 }
 
 update_api() {
-	ping -Qot 6 api.ivpn.net 
-	if [ "$?" = "0" ] ; then
-		# Update API if ping is successful
-		printf "%b" "\n$msg5_1\n"
-		fetch -qT 10 -o - https://api.ivpn.net/v4/geo-lookup     > $serv_current
-		fetch -qT 10 -o - https://api.ivpn.net/v4/servers/stats  > $serv_stats
-		fetch -qT 10 -o - https://api.ivpn.net/v4/servers.json   > $serv_ips 
-		printf "%b" "\n$msg5_2\n"
-		cat $serv_current | jq
-	else
-		printf "%b" "\n$warn6_1\n"
-		[ -z "$list" ] && printf "%b" "$warn6_2\n"
-		pingfail="true"
-	fi
+# Fetch API if ping is successful
+	if ping -Qot 6 1.1.1.1  > /dev/null 2>&1 ; then
 
-	# Exit if list option was specified
-	[ "$list" ] && exit 0
+		get_msg_qb_ivpn "_4"	
+
+		fetch -qT 10 -o - "$_GET_CURRENT"  > $CURRENT || get_msg_qb_ivpn "_5"
+		fetch -qT 10 -o - "$_GET_SERVERS"  > $SERVERS || get_msg_qb_ivpn "_5"
+		fetch -qT 10 -o - "$_GET_SRV_IPS"  > $SRV_IPS || get_msg_qb_ivpn "_5"
+
+		cat $CURRENT | jq  
+		get_msg_qb_ivpn "_4_1" 
+		read wait ; clear
+	else
+
+		get_msg_qb_ivpn "_3"
+		read wait ; clear
+	fi
 }
 
 national() {
-	countries=$(cat "$serv_stats" \
-			| jq '[.servers[] | .country] | unique' | sed 1d | sed '$d' | nl) 
+	countries=$(jq '[.servers[] | .country] | unique' $SERVERS \
+			| sed 1d | sed '$d' | nl) 
 
-	echo "$countries"
-	read -p "Select Country (enter number): " c
+	get_msg_qb_ivpn "_7" ; read _c ; clear
 
-	country=$(echo "$countries" | sed -n ${c}p \
+	country=$(echo "$countries" | sed -n ${_c}p \
 			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed "s/[^[:alnum:]]*$//")
 }
 
 town() {
-	cities=$(cat "$serv_stats" | jq --arg COUNTRY "$country" \
-			'[.servers[] | select(.country==$COUNTRY) | .city] | unique' | sed 1d | sed '$d' | nl)
+	cities=$(jq --arg COUNTRY "$country" \
+			'[.servers[] | select(.country==$COUNTRY) | .city] | unique' $SERVERS | sed 1d | sed '$d' | nl)
 
-	echo "$cities"
-	read -p "Select City (enter number):" i
+	get_msg_qb_ivpn "_8" ; read _i ; clear
 
-	city=$(echo "$cities" | sed -n ${i}p \
+	city=$(echo "$cities" | sed -n ${_i}p \
 			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed "s/[^[:alnum:]]*$//")
 }
 
 server() {
-	cat "$serv_stats" | jq --arg CITY "$city" '[.servers[] | select(.city==$CITY) | {City: .city, pubkey: .wg_public_key, Gateway: .hostnames.wireguard, ISP: .isp, Active: .is_active, Load: .load}]'
 
-	servers=$(cat $serv_stats | jq --arg CITY "$city" \
-			'[.servers[] | select(.city==$CITY) | .wg_public_key]' | sed 1d | sed '$d' | nl)
+	jq --arg CITY "$city" '[.servers[] | select(.city==$CITY) | {City: .city, pubkey: .wg_public_key, Gateway: .hostnames.wireguard, ISP: .isp, Active: .is_active, Load: .load}]' $SERVERS
 
-	echo "$servers" 
-	read -p "Select Server (enter number): " e
+	_servers=$(jq --arg CITY "$city" \
+			'[.servers[] | select(.city==$CITY) | .wg_public_key]' $SERVERS | sed 1d | sed '$d' | nl)
 
-	publickey=$(echo "$servers" | sed -n ${e}p \
+	get_msg_qb_ivpn "_9" ; read _e ; clear
+
+	publickey=$(echo "$_servers" | sed -n ${_e}p \
 			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed 's/\".*$//')
 
-	endip=$(cat $serv_ips | jq --arg PUB "$publickey" \
-			'.wireguard | .[] | .hosts | .[] | select(.public_key==$PUB) | .host' \
-			| sed 's/^.//' | sed 's/\".*$//')
+	endip=$(jq --arg PUB "$publickey" \
+			'.wireguard | .[] | .hosts | .[] | select(.public_key==$PUB) | .host' $SRV_IPS | sed 's/^.//' | sed 's/\".*$//')
 
-	endpoint=$(printf "%b" "${endip}:${port}")
+	endpoint=$(printf "%b" "${endip}:${PORT}")
 }
 
-update_wg0() {
-	#Checks for schg flags. Modifies wg0.conf if able, warns if not
-	if [ `ls -lo $wg0 | awk '{print $5}'` = "schg" ] ; then
-		printf "%b" "$err8"
-	else
-		sed -i '' -e "s#PublicKey[[:blank:]]*=.*#PublicKey = $publickey#" $wg0
-		sed -i '' -e "s#Endpoint[[:blank:]]*=.*#Endpoint = $endpoint#" $wg0
-	fi
+modify_network() {
+	# Modify wg0.conf 
+	sed -i '' -E "s#PublicKey[[:blank:]]*=.*#PublicKey = $publickey#" $WG0CONF
+	sed -i '' -E "s#Endpoint[[:blank:]]*=.*#Endpoint = $endpoint#" $WG0CONF
 
-	#Checks for schg flags. Modifies pf.conf able, warns if not
-	if [ `ls -lo /etc/pf.conf | awk '{print $5}'` = "schg" ] ; then
-		printf "%b" "$err9"
-	else
-		sed -i '' -e "s#^wgIP[[:blank:]]*=.*#wgIP = \"$endip\"#" /rw/etc/pf.conf 
-		sed -i '' -e "s#^wgPort[[:blank:]]*=.*#wgPort = \"$port\"#" /rw/etc/pf.conf 
-	fi
+	# A bit of a hacky decision tree. Problem arises when removing schg from host 
+	if [ -z "$CALLED" ] ; then
 
-	if [ -z "$restart" ] ; then	
+		# If run inside jail; script already checked that network can be modified. 
+		sed -i '' -E "s#^Endpoint[[:blank:]]*=.*#Endpoint = \"$endip\"#" $PFCONF 
+		sed -i '' -E "s#^wgPorts[[:blank:]]*=.*#wgPorts = \"$PORT\"#" $PFCONF 
 		wg-quick down wg0
-		sleep 1
+		service pf restart
 		wg-quick up wg0
-		pfctl -f /etc/pf.conf
 	else
-		[ -z "$pass" ] && printf "%b" "\n$warn7"
+
+		# If run from host, flags may have been dropped  
+		sed -E "s#^Endpoint[[:blank:]]*=.*#Endpoint = \"$endip\"#" $PFCONF > $WIREGRD/pf.conf
+		sed -i '' -E "s#^wgPorts[[:blank:]]*=.*#wgPorts = \"$PORT\"#" $WIREGRD/pf.conf
 	fi
+}
+
+modify_ivpn() {
+	update_api
+	national
+	town
+	server
+	modify_network
 }
 
 main() {
-	if [ "$jail" -a "$jail" != `hostname` ] ; then
-		pre_jail
-		# The functional part of the script must be executed from inside the jail
-		jexec -l -U root $jail qb-ivpn $list -j
-		post_jail
 
-	elif [ -z "$jail" -a "$pass" ] ; then
-		update_api
-		national
-		town
-		server
-		update_wg0
+	# List is the simplest, just fetch connection and exit. No further logic required 
+	[ -n "$LIST" ] && fetch_connection && exit 0
+
+	# Check flags 	
+	get_security
+
+	# If script was called, checks/flags were already done. Don't double check
+	if [ -z "$CALLED" ] ; then	
+
+		# Order matters! Reduces line space to overlap but order properly. 
+		case "${INJAIL}_${SCHG}_${SECLVL}" in
+
+			# Flags can't be lowered from inside jail. Send error	and exit.
+			true_true_*|true_false_3)
+				get_msg_qb_ivpn "_2" "exit_1"
+			;;	
+			# Flags lowered from host. Restart required for network changes. 
+			false_true_3|false_false_3)
+				flags_down
+				RESTART="true"
+			;;
+			# Flags can be lowered, no restart required since seclvl < 3
+			false_true_*)
+				flags_down
+			;;
+		esac				
 	fi
-}
 
+	# API to IVPN must be done from inside jail (network access).
+	if [ "$INJAIL" == "true" ] ; then 
 
-define_messages
-checks
-define_variables
+		# Primary function that implements changes inside jail
+		modify_ivpn 
+
+	else
+		# Copy qb-ivpn to ensure jail is operating off the most recent version
+		cp /usr/local/bin/qb-ivpn "${M_JAILS}/${JAIL}/usr/local/bin/qb-ivpn"
+
+		# Re-run script in jail to modify ivpn 
+		jexec -l -U root $JAIL qb-ivpn -x -p $PORT
+
+		# The flags applied somehow still prevent moving until jail is stopped.
+		stop_jail "$JAIL" "$ACTION"
+
+		# Completion of hack. Move modified pf.conf to rw/etc 
+		mv ${PATHMOD}/${WIREGRD}/pf.conf ${PATHMOD}/rw/etc/pf.conf
+
+		# Dont always need restart, but not worth the code/logic to branch.
+		start_jail "$JAIL" "$ACTION"
+	fi
+}		
+
+get_options "$@"
+
+define_variables 
+
 main
-
 
 
 

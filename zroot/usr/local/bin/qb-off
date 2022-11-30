@@ -22,7 +22,7 @@ get_options() {
 }
 
 checks() {
-	if [ -z "$ALL" -a -z "$EXLUDE" -a -z "$_JAILS" ] ; then
+	if [ -z "${ALL}${EXLUDE}${_JAILS}" ] ; then
 		# Did not specify an action
 		get_msg_qb_off "_1" "usage_1"
 
@@ -53,21 +53,13 @@ remove_list() {
 remove() {
 	for _jail in $_remove; do
 
-		# Ensure that _jail is running 
-		if check_isrunning_jail "$_jail" ; then 
+		if [ "$RESTART" ] ; then 
 
-			if [ "$RESTART" ] ; then 
-				# Positional $2 as "pass" will print errors, but continue execution 
-				restart_jail "$_jail" "pass" 
-			else
-				stop_jail "$_jail"
-			fi
-
+			restart_jail "$_jail" "$ACTION"
 		else
-			# Jail was not running
-			get_msg_qb_off "_4" 
-		fi	
 
+			stop_jail "$_jail" "$ACTION"
+		fi
 	done
 }
 

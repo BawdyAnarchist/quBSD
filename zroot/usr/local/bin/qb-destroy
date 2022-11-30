@@ -12,11 +12,12 @@ get_options() {
 
 	shift $(( OPTIND - 1 ))
 
-	# Define script variables
 	JAIL="$1"
+	ACTION="${ACTION:=get_msg_qubsd}"
 }
 
 define_variables() {
+	# Important parameters for checks 
 	CLASS=$(sed -nE "s/^${JAIL}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
 	NO_DESTROY=$(sed -nE "s/^$JAIL[[:blank:]]+no_destroy[[:blank:]]+//p" $JMAP) 
 	OFFJAILS=$(zfs list -o name,origin | grep -E "$JAIL\@.*\$" \
@@ -35,14 +36,14 @@ define_variables() {
 }
 
 checks() {
-	# Alert that the jail is invalid, but proceed anyways (`pass' option)
-	check_isvalid_jail "$JAIL" "pass" 
+	# Alert that the jail is invalid, but do not error and exit
+	check_isvalid_jail "$JAIL" "$ACTION"
 
 	# no_destroy protection flag still active
-	[ "$NO_DESTROY" = "true" ] && get_msg_qb_destroy "_2" "usage_1"	
+	[ "$NO_DESTROY" == "true" ] && get_msg_qb_destroy "_2" "usage_1"	
 
 	# Extra reminder that they're destorying a rootjail
-	[ "$CLASS" = "rootjail" ] && get_msg_qb_destroy "_4" 
+	[ "$CLASS" == "rootjail" ] && get_msg_qb_destroy "_4" 
 
 	# Print the datasets and amount of data to be destroyed
 	get_msg_qb_destroy "_5" 
@@ -62,7 +63,7 @@ main() {
 
 	# Turn off all jails before applying changes 
 	for _jail in $OFFJAILS ; do
-		stop_jail "$_jail"
+		stop_jail "$_jail" "$ACTION"
 	done
 	
 	# Destroy datasets

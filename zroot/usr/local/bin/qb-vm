@@ -10,6 +10,7 @@ get_options() {
 			d) DESTROY="true" ;;
 			h) get_msg_qb_nicvm "none" "usage_0" ;; 
 			n) NO_RUN="true" ;;
+			p) POWEROFF="true" ;;
 		esac
 	done
 
@@ -19,6 +20,8 @@ get_options() {
 }
 
 define_variables() {
+	_MEM=$(sed -nE "s/^${_VM}[[:blank:]]+memsize+//gp" $JMAP) 
+	_CPUS=$(egrep "^${_VM}[[:blank:]]+numcpus" $JMAP | awk '{print $3}')
 	_TAP=$(egrep "^${_VM}[[:blank:]]+tunnel" $JMAP | awk '{print $3}')
 ## This must be reworked for pciconf
 ##	_PPT=$(sed -nE "s:ppt_nic[[:blank:]]+::p" $QBCONF) 
@@ -45,8 +48,9 @@ print_no_run() {
 	# Prints the commands that would be run, and exit
 	# Useful for modifying VM before manual launch
 
-	[ -n "$DESTROY" ] && get_msg_qb_vm "_2" 
-	[ -n "$CONSOLE" ] && get_msg_qb_vm "_2"
+	[ -n "$POWEROFF" ] && get_msg_qb_vm "_2" 
+	[ -n "$DESTROY" ] && get_msg_qb_vm "_3" 
+	[ -n "$CONSOLE" ] && get_msg_qb_vm "_4"
 
 	exit 0
 }	

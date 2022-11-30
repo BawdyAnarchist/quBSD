@@ -27,11 +27,6 @@ ERROR: < $_jail > failed to start.
        For more info, see: /var/log/quBSD.log
 ENDOFMSG
 	;;
-	_4) cat << ENDOFMSG
-
-< $_jail > Was not running. Skipping. 
-ENDOFMSG
-	;;
 	esac
 
 	case $_action in 

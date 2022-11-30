@@ -21,17 +21,19 @@ get_options(){
 	shift $(( OPTIND - 1 ))
 	JAIL="$1"
 	_USER="${_USER:=$JAIL}"
+	ACTION="${ACTION:=get_msg_qubsd}"
 }
 
 main() {
 	
 	if [ "$PASS" ] ; then
 		
-		start_jail "$JAIL" "exit_1" 
+		start_jail "$JAIL" "$ACTION" || get_msg_qb_floatcmd "none" "exit_1"
 
 		# Script is now running on the new xterm, and can properly read in a command 
-		echo -e "Enter Command for. Popup will close automatically" 
-		read -p "${_USER}@${JAIL} # " _CMD
+		printf "%b" "Enter Command for $JAIL. Popup will close automatically" \
+					   "\n${_USER}@${JAIL} # "
+		read _CMD
 		
 		# nohup is required, or the launched command will die with the xterm shell
 		nohup qb-cmd $ROOT $JAIL $_CMD 

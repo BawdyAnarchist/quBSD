@@ -57,7 +57,7 @@ define_variables() {
 	id=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
 	active=$(xprop -id $id | grep "WM_CLIENT_MACHINE" | sed "s/WM_CLIENT_MACHINE(STRING) = \"//")
 	active="${active%\"}"
-	[ "$active" = "quBSD" ] && active="host" 
+	[ "$active" == "quBSD" ] && active="host" 
 
 	# Input devices status
 	cam=$(service webcamd onestatus | grep -o "webcamd is running")
@@ -91,11 +91,11 @@ get_jails_loop() {
 			ram=$(ps au -J $_j | awk '{sum+=$4;} END {print sum;}')
 		fi	
 
-		if [ "$class" = "root" -o -z "${_j##0*template}" ] ; then 
+		if [ "$class" == "root" -o -z "${_j##0*template}" ] ; then 
 			disk=$(echo "$zfs_list" | sed -nE "s#^${JAILS_ZFS}/${_j}[[:blank:]]+##p")
 			sub=4
 
-		elif [ "$class" = "VM" ] ; then 
+		elif [ "$class" == "VM" ] ; then 
 			# Future functionality - bhyvectl or ping test for on/connected
 			disk=$(echo "$zfs_list" | sed -nE "s#^${QBROOT}/${_j}[[:blank:]]+##p")
 			sub=5
@@ -151,7 +151,8 @@ main() {
 		define_variables
 		get_jails_loop
 		clear
-		(head -n 1 $TMP && tail -n +2 $TMP | sort -k $COL | cut -f1,2,3,4,5,7,8,9) >> $TMP2
+		# Sort -b ignores leadings spaces, -f ignores case
+		(head -n 1 $TMP && tail -n +2 $TMP | sort -fbk $COL | cut -f1,2,3,4,5,7,8,9) >> $TMP2
 		column -t $TMP2
 		print_alerts
 		sleep 1

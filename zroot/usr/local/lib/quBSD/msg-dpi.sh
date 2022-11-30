@@ -13,18 +13,18 @@ get_msg_qb_dpi() {
 	case "$_message" in
 	_1) cat << ENDOFMSG
 
-ERROR: Proposed DPI is below sanity threshold of 0.5. 
+ERROR: Proposed DPI is below sanity threshold of 0.3. 
 ENDOFMSG
 	;;	
 	_2) cat << ENDOFMSG
 
 ERROR: Proposed DPI is too high for relative (0.5 to 4); 
-       but too low to be raw (48 to 386).
+       but too low to be raw (29 to 386).
 ENDOFMSG
 	;;	
 	_3) cat << ENDOFMSG
 
-ERROR: DPI is above sanity threshold of 386.
+ERROR: DPI is above sanity threshold of 384.
 ENDOFMSG
 	;;
 	_4) cat << ENDOFMSG

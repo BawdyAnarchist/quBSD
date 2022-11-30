@@ -60,7 +60,7 @@ calculate_variables() {
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
 			Y)	SNAPNAME=$(date +%Y_Annual)
-				_ttl_unix=$(( _INT * 365 )) 
+				_ttl_unix=$(( _INT * 3600 * 24 * 365 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 		esac
 	else

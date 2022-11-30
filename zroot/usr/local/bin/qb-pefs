@@ -1,118 +1,105 @@
 #!/bin/sh
 
-while getopts chd:u o ; do
-	case $o in
-		c) create="true" ;;
-		h) help="true" ;;
-		d) directory="$OPTARG" ;;
-		u) unmount="true" ;;
-	esac
-done
+# pefs is tricky when dealing with the nullfs mounts of jails from zusr to zroot
+# addkey only affects the mount directory *even if it's nullfs mounted elsewhere*
+# In other words, the pefs addchain/remove chain will not follow the nullfs mount
+# For this reason, nullfs must be applied again, after pefs addkey, and later removed in order
 
-shift $(( OPTIND - 1 ))
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-pefs.sh
 
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
+get_options() {
+	while getopts chd:mu opts ; do
+		case $opts in
+			c) _CMD="create" ;; 
+			h) get_msg_qb_pefs "none" "usage_0" ;; 
+			d) U_FOLDER="$OPTARG" USERDIR="true" ;;
+			m) [ -z "$_CMD" ] && _CMD="mount" || get_msg_qb_pefs "_1" "usage_1" ;; 
+			u) [ -z "$_CMD" ] && _CMD="unmount" || get_msg_qb_pefs "_1" "usage_1" ;; 
+		esac
+	done
 
-# Get datasets and mountpoints
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
-m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
-m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
+	shift $(( OPTIND - 1 ))
 
-# Define script variables
-jail="$1"
+	JAIL="$1"
+	ACTION="get_msg_qubsd"
 
-define_variables() {
-	# If -z $directory, pefs_dirs will find all .pefs.db directories (for unmount)
-	rel_directory=$(echo $directory | sed "s:${m_zusr}/${jail}/usr/home/${jail}/::")
-	pefs_dirs=$(find ${m_jails}/${jail}/usr/home/${jail}/${rel_directory} -name '.pefs.db' \
-														| sed 's:/.pefs.db::g')
 	# Default directory if not defined by user
-	directory="${directory:-$2}" 
-	directory="${directory:-${m_zusr}/${jail}/usr/home/${jail}/crypt}"
-
-	# Must find rel_directory again for ops not related to unmount
-	rel_directory=$(echo $directory | sed "s:${m_zusr}/${jail}/usr/home/${jail}/::")
-}
-
-define_messages() {
-	err1=$(printf "%b" "qb-pefs: ERROR: You must enter a jailname")
-	err2=$(printf "%b" "qb-pefs: ERROR: $j is an invalid jailname or has incomplete jail setup")
-	err3=$(printf "%b" "qb-pefs ERROR: $directory not a valid" \
-					"\ndirectory, and user has not specified the [-c] option to create it")
-	err5=$(printf "%b" "qb-pefs ERROR: Failed to load pefs.ko kernel module." \
-					"Make sure that pefs-kmod pkg in installed to host")
-	msg6=$(printf "%b" "Jail must be on, starting: $jail")
-	err7=$(printf "%b" "Start jail: $jail , failed, exiting") 
-	msg8=$(printf "%b" "Decrypting container, enter passphrase one more time:")
-}
-
-usage() {
-	[ "$ERR" ] && printf "%b" "\n$ERR\n"
-	echo ""
-	echo "qb-pefs: Mounts an encrypted pefs volume inside of a running jail" 
-	echo "         Default directory is ${m_zusr}/<jail>/usr/home/<jail>/crypt"
-	echo ""
-	echo "Usage: qb-pefs <jailname>"
-	echo "Usage: qb-pefs [-h] [-d <directory>] <jailname>"
-	echo "   -c: (c)reate:  Create and configure new pefs directory" 
-	echo "   -d: (d)irectory:  Override default, and mount specified directory" 
-	echo "        <directory> must be entered based on location of HOST "
-	echo "        <directory> must be inside zusr home directory of jail"
-	echo "   -h: (h)elp:  Outputs this help message"
-	echo "   -u: (u)nmount:  Removes pefs mount from jail, encrypts files" 
-	echo ""
-	exit 1
+	U_FOLDER="${U_FOLDER:=${M_ZUSR}/${JAIL}/usr/home/${JAIL}/crypt}"
 }
 
 checks() {
-	if [ "$help" ] ; then
-		usage
+	# Must specify an action
+	[ -z "$_CMD" ] && get_msg_qb_pefs "_2" "usage_1"
 
-	elif [ -z "$jail" ] ; then
-		ERR="$err1" ; usage
+	# Must have a valid jail 
+	check_isvalid_jail "$JAIL" "$ACTION" || get_msg_qb_pefs "none" "usage_1"
 
-	elif ! `qb-list -qj "$jail"` ; then
-		ERR="$err2" ; usage
+	# If performing mount, the directory should already exist. 
+	[ "$_CMD" == "mount" ] && ! [ -d "$U_FOLDER" ] && get_msg_qb_pefs "_3" "usage_1"
 
-	elif ! [ -d "$directory" -o -n "$create" ] ; then
-		ERR="$err3" ; usage
-
-	elif ! `kldstat | grep -qs "pefs.ko"` ; then
-		kldload pefs.ko >> /dev/null 2>&1
-		if [ "$?" != "0" ] ; then
-			ERR="$err5" ; usage
-		fi
-	fi
+	# Check that U_FOLDER path is relative to the zusr mount for the jail
+	echo "$U_FOLDER" | grep -qE "^${M_ZUSR}/${JAIL}" || get_msg_qb_pefs "_4" "usage_1"
+				
+	# Make sure pefs kernel module is loaded, try to load, or exit on failure
+	kldstat -n pefs.ko > /dev/null 2>&1 || kldload pefs.ko > /dev/null 2>&1 \
+			|| get_msg_qb_pefs "_5" "exit_1"
 }
 
 main() {
-	if [ "$unmount" ] ; then
-		for p in $pefs_dirs ; do
-			umount -f $p
-		done
-		exit 0
-
-	elif ! `jls | grep -qs " $jail "` ; then
-		printf "%b" "\n$msg6\n"
-		jail -c $jail >> /dev/null 2>&1
-		[ "$?" != "0" ] && ERR="$err7" && usage
-	fi
+	# Mount also takes place in running jail. Replace zusr mount with zroot jails mount 
+	J_FOLDER=$(echo $U_FOLDER | sed "s:${M_ZUSR}:${M_JAILS}:")	
 	
-	if [ "$create" ] ; then
-		mkdir -p $directory
-		chown 1001:1001 $directory
-		pefs addchain -fZ $directory
-	fi
+	case $_CMD in 
 
-	pefs mount $directory ${m_jails}/${jail}/usr/home/${jail}/${rel_directory}
-	[ "$create" ] && printf "%b" "\n$msg8\n"
-	pefs addkey -c ${m_jails}/${jail}/usr/home/${jail}/${rel_directory}
+		create)
+			mkdir -p $U_FOLDER > /dev/null 2>&1
+			pefs addchain -fZ $U_FOLDER
+			chown 1001:1001 $U_FOLDER
+		;;
+
+		mount)
+			# Start jail if off, or exit
+			start_jail "$JAIL" "$ACTION" || exit 1
+
+			# Mount the folder and perform decryption
+			pefs mount $U_FOLDER $U_FOLDER
+			pefs addkey -c $U_FOLDER
+
+			# Must send the nullfs mount over to the jail, so inside jail can see files
+			mount_nullfs $U_FOLDER $J_FOLDER
+		;;
+
+		unmount)	
+			# If user specified directory, then unmount only that directory 
+			if [ -n "$USERDIR" ] ; then 
+
+				# The unmount must be done in reverse order. First the nullfs to the zroot/jail
+				umount -f $J_FOLDER
+				# Then the original pefs mount, which encrypts the files
+				umount -f $U_FOLDER
+			else
+
+				# Otherwise, search <jail>'s /usr/local for all pefs.db, to remove 
+				_zusr_umnt=$(find ${M_ZUSR}/${JAIL}/usr -name '.pefs.db' \
+						| sed 's:/.pefs.db::g')  
+
+				# Unmount directories  
+				for _dir in $_zusr_umnt ; do
+					umount -f $(echo $_dir | sed "s:${M_ZUSR}:${M_JAILS}:")	
+					umount -f $_dir 
+				done
+			fi
+		;;
+
+	esac
 }
 
-define_variables
-define_messages
-checks
-main
+get_global_variables
 
+get_options "$@"
+
+checks
+
+main
 

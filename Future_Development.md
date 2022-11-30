@@ -1,5 +1,9 @@
 ### UPGRADES
 
+qb-cam/mic - webcam and mic get brought up with script
+
+usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
+
 Host as Unprivileged user     
 - All jails will have an epair to an offline *Control Jail*      
 - Unprivileged user on host will pass jails SSH commands via Control Jail     
@@ -37,6 +41,8 @@ net-firewall
 
 qb-autosnap 
 	- Need to add the zfs custom props to the datasets as created (qubsd-installer)
+	- Would be good to beef up the script. If there's another snap taken within say 30sec 
+     of another one, to discard whichever the shortest timeframe was. 
 
 qb-backup (already created in $ubin)
 	- cron to run on both sides of source and dest, with ssh hostname, to automate backups
@@ -76,6 +82,7 @@ qb-ivpn - sed error - needs better separation of the -j option to not throw erro
 	   - Current server should be upgraded to show current settings, even if not connected
 	   - Need to verify how well it works when connection is down
 	   - pf.conf references the endpoint IP. Needs to be updated as well
+		- Double check the install script that it copies qb-ivpn to 0net
 
 qb-create 
 	- Really should have some trap functions set when zfs cloning
@@ -91,13 +98,13 @@ qb-create
 	- autosnap options - the custom zfs props need to be set
 		- be careful. Cloned datasets should not be autosnapped
 	- While in guided mode, add option to enter "auto" for IP assignment 
+	- You need to disallow 'none' and 'quBSD' as jailnames
 
 pf.conf
 	- wgIP constant really should be called "endpointIP" or something like that
 
 Coding practices
 	shellcheck.net - need to go over all code with a fine toothed comb. fix the formatting errors (like if "$?" then ...)
-	usage should be the first thing in the script. Then `case` should call it. Save space
 
 Optimze scripts. Some run too slow. 
 	Disable unicode script:
@@ -112,6 +119,9 @@ exec scripts should assign qb-list parameter defaults in case some are missing, 
 
 ### MINOR UPGRADES
 
+qb-help
+	Make sure to update it after changes
+
 /var/log/quBSD.log
 	Creating a log files. Works nicely with quBSD.lib
 	qubsd setup script needs to include line to rm the log on startx
@@ -125,11 +135,8 @@ qb-dpi - make it so that a program can launch under alt dpi settings and return 
 
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 
-qb-cam/mic - webcam and mic get brought up with script
-
 qb-update - Update rootjails, create snapshots
 
-usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
 
 Crons
 - Popup warning if zpool errors are discovered

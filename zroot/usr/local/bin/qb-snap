@@ -1,179 +1,130 @@
 #!/bin/sh
 
-while getopts dhln o ; do
-	case $o in
-		d) dest_oldest="true" ;;
-		h) help="true" ;;
-		l) list_all="true" ;;
-		n) new="true" ;;
-	esac
-done
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-snap.sh
 
-shift $(( OPTIND - 1 ))
+get_options() {
+	while getopts cd:hly opts ; do
+		case $opts in
+			c) _CMD="create" ;;
+			d) [ -z "$_CMD" ] && _CMD="destroy" || get_msg_qb_snap "_1" "exit_1" 
+				DEL_DATE="$OPTARG" ;;
+			h) get_msg_qb_snap "none" "usage_0" ;; 
+			l) [ -z "$_CMD" ] && _CMD="list"  || get_msg_qb_snap "_1" "exit_1" ;;
+			y) assume_yes="true" ;;
+		esac
+	done
 
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
+	shift $(( OPTIND - 1 ))
 
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF) 
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF) 
-
-# Define script variables
-jail="$1"
-date=$(date +%b%d)
-tyme=$(date +%H%M)
-
-define_variables() {
-	class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
-
-	# Rootjail vs zusr jails have different zfs datasets to handle 
-	if [ "$class" = "rootjail" ] ; then
-		newsnap="${jails_zfs}/${jail}@${date}_${tyme}" 
-		newdeps=$(zfs list -o name,origin | grep "${newsnap}" | awk '{print $1}')
-
-		# Destroy option. zfs lists snapshots in chronological order 
-		if [ "$dest_oldest" ] ; then
-			oldsnap=$(zfs list -t snapshot | awk '{print $1}' \
-								| grep "${jails_zfs}/${jail}@" | head -1)
-			olddeps=$(zfs list -o name,origin | grep "${oldsnap}" | awk '{print $1}') 
-		fi
-	else
-		newsnap="${zusr_zfs}/${jail}@${date}_${tyme}"
-		newdeps=$(zfs list -o name,origin | grep "${newsnap}" | awk '{print $1}')
-
-		if [ "$dest_oldest" ] ; then 
-			oldsnap=$(zfs list -t snapshot | awk '{print $1}' \
-								| grep "${zusr_zfs}/${jail}@" | head -1)
-			olddeps=$(zfs list -o name,origin | grep "${oldsnap}" | awk '{print $1}') 
-		fi
-	fi
-	`zfs list -t snapshot | grep -qs $newsnap` && dupl="true"
-}
-
-define_messages() {
-	err1=$(printf "%b" "qb-snap: ERROR: need to specify an action [-d|-l|-n]")
-	err2=$(printf "%b" "qb-snap: ERROR: Need to list jail")
-	err2_1=$(printf "%b" "qb-snap: ERROR: $jail doesn't exist or isn't configured properly")
-	warn3=$(printf "%b" "qb-snap: WARNING: Snapshot with name, $newsnap, already exists." \
-					"\nReplace?(y/n):  ")
-	warn4=$(printf "%b" "qb-snap: The oldest snapshot: $oldsnap has the following dependencies:")
-	warn5=$(printf "%b" "These jails will be shutdown")
-	warn6=$(printf "%b" "Data inside these jails will be permanently destroyed")
-	warn7=$(printf "%b" "qb-snap: WARNING:  "$newsnap" has the following dependencies:")
-}
-
-usage() {
-	[ "$ERR" ] && printf "%b" "\n$ERR"
-	echo ""
-	echo "qb-snap: Quickly create/view snapshot datasets for <jail>" 
-	echo "Snapshot names default to the form of:  jail@MonDD_HHMM"
-	echo ""
-	echo "Usage: qb-snap [-d|-l|-n] <jail>" 
-	echo "   -d: (d)estroy oldest snapshot of <jail>"
-	echo "   -h: (h)elp . Outputs this help message"
-	echo "   -l: (l)ist all snapshots of <jail>."
-	echo "        If no argument is provided, lists all snapshots"
-	echo "   -n: (n)ew snapshot for <jail>"
-	echo ""
-	exit 1
+	# Define script variables
+	JAIL="$1"
+	ACTION="get_msg_qubsd"
 }
 
 checks() {
-	if [ "$help" ] ; then
-		usage
+	# Must specify a _CMD to execute 
+	[ -z "$_CMD" ] && get_msg_qb_snap "_2" "usage_1"
 
-	elif ! [ "$dest_oldest" -o "$list_all" -o "$new" ] ; then
-		ERR="$err1" ; usage
+	# Must have a valid jail
+	check_isvalid_jail "$JAIL" "$ACTION" || "usage_1"
 
-	elif [ -z "$list_all" -a -z "$jail" ] ; then 
-		ERR="$err2" ; usage
+	# Define _ZJAIL variable, which sets the zfs dataset being targeted 
+		# Class will determine what the target dataset is 
+		CLASS=$(sed -nE "s/^${JAIL}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+	
+		# var $_ZFS prevents multiple if/then statements later on.
+		[ "$CLASS" == "rootjail" ] && _ZFS="${JAILS_ZFS}" || _ZFS="${ZUSR_ZFS}"
 
-	elif [ "$jail" ] && ! `qb-list -qj "$jail"` ; then 
-		ERR="$err2_1" ; usage
+	# _CMD specific checks and variable assignments
+	case $_CMD in 
+		create)
+			# Standard snapshot label for [-c] create 
+			DATELABEL=$(date +@%b%d_%H:%M_USER)
 
-	elif [ "$new" -a "$dupl" ] ; then
-		printf "%b" "\n$warn3"
-		read resp
-		[ "$resp" = "y" -o "$r" = "Y" ] && replace="true" || exit 0 
-	fi
-
-	if [ "$oldsnap" -a "$olddeps" ] ; then
-		printf "%b" "\n${warn4}\n${olddeps}\n\n" 
-
-		if [ "$root" ] ; then
-			printf "%b" "\n${warn5}"
-		else
-			printf "%b" "\n${warn6}\n"
-		fi
-
-		read -p "Continue (y/n) :" resp
-		[ "$resp" = "y" -o "$r" = "Y" ] && : || exit 0 
-	fi
-
-	if [ "$replace" -a "$dupl" -a "$newdeps" ] ; then
-		printf "%b" "\n$warn7\n$newdeps\n" 
-		
-		if [ "$root" ] ; then
-			printf "%b" "\n${warn5}"
-		else
-			printf "%b" "\n${warn6}"
-		fi
-
-		read -p "Continue (y/n) :" r
-		[ "$r" = "y" -o "$r" = "Y" ] && : || exit 0 
-	fi
+			# Check for duplicate snapshot under same name. Suppress output
+			zfs list ${_ZFS}/${JAIL}${DATELABEL} > /dev/null 2>&1 && get_msg_qb_snap "_4" "exit_1"
+		;;
+		destroy)
+			# Translate user date input, to epoch. Exit if failure.
+			_del_epoch=$(date -j -f "%Y-%m-%dT%H:%M" "$DEL_DATE" "+%s") || exit 1
+		;;
+	esac
 }
 
-list_snaps() {
-	if [ "$list_all" ] ; then
-		echo ""
+get_destroy_list() {
+	# Get list of existing snapshots for <jail>, and cycle through them
+	for _snap in $(zfs list -t snapshot -Ho name ${_ZFS}/${JAIL}) ; do
 
-		if [ -z "$jail" ] ; then
-			zfs list -t snapshot 
+		# Pull the creation date for each snap, and convert to epoch time	
+		_snap_date=$(zfs list -Ho creation $_snap)
+		_snap_epoch=$(date -j -f "%a %b %d %H:%M %Y" "$_snap_date" "+%s")
+
+		# Snapshots older than user entered date, will be destroyed 
+		if [ "$_snap_epoch" -le "$_del_epoch" ] ; then
+			
+			# Create a list of all snapshots to destroy 
+			_DESTROY=$(printf "%b" "${_DESTROY}\n${_snap}") \
+			
+			# Find jails that depend on the snapshot, and create a list of depends
+			_snap_deps=$(zfs list -rHo name,origin $_ZFS | sed -nE "\#${_snap}#s#^${_ZFS}/##p")
+			_DEPENDS=$(printf "%b" "${_DEPENDS}\n${_snap_deps}")
+
 		else
-			zfs list -t snapshot | grep "$jail@"
+			# ZFS prints chronologically. Break at first snapshot newer than <date> 
+			break
 		fi
-
-		echo ""
-		exit 0
-	fi
+	done
 }
 
 main() {
-	if [ "$dest_oldest" ] ; then
-		olddeps="${olddeps##*/)}"
-		for o in $olddeps ; do
-			`jls | grep -qs " $o "` && qb-off $o
-		done
+	# Main program execution
+	case "$_CMD" in 
+		create) 
+			# Create the new snapshot
+			echo	zfs snapshot "${_ZFS}/${JAIL}${DATELABEL}" && get_msg_qb_snap "_5" 
+		;;
+		destroy)		
+			# Assemble list of all snapshots older than user input <date>
+			get_destroy_list
 
-		`jls | grep -qs " $jail "` && qb-off $jail
-		zfs destroy -Rf $oldsnap
-	fi
+			# Exit if there were no snapshots to destroy
+			[ -z "$_DESTROY" ] && get_msg_qb_snap "_6" "exit_0"
 
-	if [ "$replace" -a "$dupl" ] ; then
-		newdeps="${newdeps##*/}"
-		for n in $newdeps ; do
-			`jls | grep -qs " $n "` && qb-off $n
-		done
-		`jls | grep -qs " $jail "` && qb-off $jail
-		zfs destroy -Rf $newsnap
-	fi
+			# Present user with destroy and dependencies lies	
+			if [ -z "$assume_yes" ] ; then
+				get_msg_qb_snap "_7" 
+				get_user_response "severe" || get_msg_qb_snap "_8" "exit_0"
+			fi
 
-	if [ "$new" ] ; then
-		zfs snapshot $newsnap 
-		printf "%b" "\nCreated new snapshot: $newsnap\n"
-	fi
+			# Stop jails dependent on snapshot
+			_DEPENDS=$(echo "$_DEPENDS" | awk '{print $1}') 
 
-	list_all="true"
-	echo "New state of $jail snapshots is:"
+			for _jail in $_DEPENDS ; do
+				stop_jail "$_jail" "$ACTION" || get_msg_qb_snap "_9" "exit_1"
+			done			
+
+			# Destroy snapshots 
+			for _dsnap in $_DESTROY ; do
+				zfs destroy $_dsnap	
+			done			
+			
+			get_msg_qb_snap "_10"
+		;;
+		list)
+			#Show amended state of snapshots for <jail> 
+			zfs list -t snapshot -o name,used,creation "${_ZFS}/${JAIL}"
+		;;
+	esac
 }
 
+get_global_variables
 
-define_variables
-define_messages
+get_options "$@"
+
 checks
-list_snaps 
+
 main
-list_snaps 
+
 
 

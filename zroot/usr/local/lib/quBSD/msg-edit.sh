@@ -1,20 +1,27 @@
 #!/bin/sh
 
 get_msg_qb_edit() { 
-	# _message determines which feedback message to call.
-	# Just call "none" in the case you want no message to match.
-	# _action is optional, and can be used to exit and/or show usage
+	# Print messages and/or exiting script execution entirely 
+	# Positional parameters are used for determining action.
+	# $1 _message: Identifier tag for message
+		# To avoid calling a message, "none" is fine to pass
+	# $2 _action: What type of exit to perform if any
+	# $3 _msg2: A bit of a hack, for a catch-all [-f] message
 
-   local _message
-   local _action
-
-	_message="$1"
-	_action="$2"
-
-	# If force option is used, return to caller function
-	[ "$FORCE" ] && return 0
+	# FORCE should override all calls to the msg and exit function
+	[ -n "$FORCE" ] && return 0 
 	
-	case "$_message" in
+	# Positional parameters
+   local _message ; _message="$1"
+   local _action ; _action="$2"
+	local _msg2 ; _msg2="$3"
+
+
+#################################################################
+#####################  BEGIN MESSAGE TAGS  ######################
+
+	# QUIET should skip over messages 
+	[ -z "$QUIET" ] && case "$_message" in
 
 	_0) cat << ENDOFMSG
 EXITING. No changes were made.
@@ -39,29 +46,35 @@ ENDOFMSG
 	;;
 	_4) cat << ENDOFMSG
 
-ERROR: Parameter < class > cannot be changed with qb-edit. If
-
+ERROR: < no_destroy > must be either true or false
 ENDOFMSG
 	;;
 	_5) cat << ENDOFMSG
 
-ERROR: < cpuset > CPUs must exist, and entered in valid format
-       For example:  0,1,2,3  OR  0-3 
-       Run command:  cpuset -g  ;  or see man 1 cpuset 
+ERROR: Parameter < class > cannot be changed with qb-edit.
 ENDOFMSG
 	;;
 	_6) cat << ENDOFMSG
 
-ERROR: < maxmem > must be of valid format:  <integer><G|M|K>
-       See: man 8 rctl 
+ERROR: < $PARAM > is not a valid parameter to change in 
+       /usr/local/etc/quBSD/jailmap.conf
 ENDOFMSG
 	;;
 	_7) cat << ENDOFMSG
+ALERT: For changes to take effect, restart the following:
+$_restarts
 
-ERROR: < no_destroy > must be either true or false
 ENDOFMSG
+	# \c prevents newline. User input can happen on the same line 
+	echo -e "Should qb-edit to restart these jails? (y/n):  \c"
+	;; 
+	_8) 
+		echo -e "Success \c" 
+		qb-list -j $JAIL -p $PARAM
 	;;
-	_8) cat << ENDOFMSG
+		
+# NOTE: _8 and _9 are unused. Maybe integrate later.
+	_10) cat << ENDOFMSG
 
 ERROR: Invalid rootjail. Here's a list of valid rootjails: 
 ENDOFMSG
@@ -73,17 +86,6 @@ ENDOFMSG
 	;;
 	_9) cat << ENDOFMSG
 
-ERROR: < schg > can only be one of the following: none|sys|all
-ENDOFMSG
-	;;
-	_10) cat << ENDOFMSG
-
-ERROR: < seclvl > must be one of the following: -1|0|1|2|3
-       See man 7 security
-ENDOFMSG
-	;;
-	_11) cat << ENDOFMSG
-
 ERROR: Invalid template. Here's a list of valid templates: 
 ENDOFMSG
 		# All appjails in JMAP with zusr/<jail>
@@ -91,110 +93,64 @@ ENDOFMSG
 										| uniq | xargs -I@ zfs list -Ho name $ZUSR_ZFS/@
 		echo ''
 	;;
-	_12) cat << ENDOFMSG
 
-ALERT: Jail: < $VAL > doesn't start with < net- > , which is the
-       convention for gateway jails. However, a network connection 
-       can still be made between < $JAIL > and < $VAL >
-       Run again with [-f] option to force override this alert. 
-ENDOFMSG
-	;;
-	_13) cat << ENDOFMSG
-
-WARNING: Jail: < $VAL > does not have entries at: 
-         /usr/local/etc/quBSD/jailmap.conf  
-         Use [-f] option to force change in jailmap.conf  
-ENDOFMSG
-	;;
-	_13_1) cat << ENDOFMSG
-
-WARNING: Jail: < $VAL > does not have a valid zfs dataset at: 
-         $ZUSR_ZFS/${VAL}
-         Use [-f] option to force change in jailmap.conf  
-ENDOFMSG
-	;;
-	_14) cat << ENDOFMSG
-
-ERROR: No availalbe IPv4 was found in the range: "$_ip_range"
-       It's permissible to use the same IP twice; but ensure that 
-       jails with the same IP aren't connected to the same tunnel. 
-       Run again with [-f] option, to force override this error.
-ENDOFMSG
-	;;
-	_15) cat << ENDOFMSG
-
-ERROR: Invalid IPv4. Use CIDR notation:  IP.IP.IP.IP/subnet 
-ENDOFMSG
-	;;
-	_16) cat << ENDOFMSG
-
-WARNING: < $VAL > Overlaps with an IP already in use.
-         The same IP can be used twice; but ensure that jails 
-         with the same IP aren't connected to the same tunnel. 
-         Run again with [-f], to force override this warning.
-ENDOFMSG
-	;;
-	_17) cat << ENDOFMSG
-
-ALERT: < $VAL > diverges from quBSD convention. 
-       Run again with [-f], to force override this alert.
-
-CONVENTIONAL quBSD INTERNAL IP ASSIGNMENTS:
-JAIL              GATEWAY        IPv4 Range
-net-firewall      nicvm          External Router Dependent
-net-<gateway>     net-firewall   10.255.x.2/30
-serv-jails        net-firewall   10.128.x.2/30
-appjails          net-<gateway>  10.1.x.2/30
-usbvm             variable       10.88.88.1/30
-< adhoc created by qb-connect >  10.99.x.2/30
-ENDOFMSG
-	;;
-	_18) cat << ENDOFMSG
-
-ALERT: Assigning IP address to < $JAIL > which has no tunnel.
-ENDOFMSG
-	;;
-	_19) cat << ENDOFMSG
-
-ERROR: The only valid tunnel for net-firewall, is a tap interface, 
-       typically tap0, which connects to the nicvm.
-ENDOFMSG
-	;;
-	_20) cat << ENDOFMSG
-
-ERROR: < $PARAM > is not a valid parameter to change in 
-       /usr/local/etc/quBSD/jailmap.conf
-ENDOFMSG
-	;;
-	_21) cat << ENDOFMSG
-ALERT: Restart the following jails for changes to take effect: 
-$_restarts
-ENDOFMSG
-	# echo -e ending with \c prevents newline, so read command prints nicely
-	echo -e "Should qb-edit to restart these jails? (y/n):  \c"
-	;; 
 	esac
-	
-	# Options to show usage and/or exit
+
+####################  MESSAGES TAGS FINISHED  #####################
+###################################################################
+
+	# Print message informing user that [-f] can overcome errors. 
+	# It's not really appropriate to include an option specific to
+	# qb-edit, in the main error messages with msg-qubsd.sh.
+
+
+	# QUIET should skip over messages 
+	[ -z "$QUIET" ] && case $_msg2 in 
+		_f) cat << ENDOFMSG
+
+Run again with [-f] to force modification.
+    (errors will still be printed to stdout, but ignored)
+
+ENDOFMSG
+		;;
+	esac
+
+
+###################################################################
+#####################  FINAL ACTION TO TAKE  ######################
+
 	case $_action in 
-		usage_0) usage ; exit 0 ;;
-		usage_1) usage ; exit 1 ;;
-		exit_0)  exit 0 ;;
-		exit_1)  exit 1 ;;
+		usage_0) 
+				[ -z "$QUIET" ] && usage 
+				exit 0 ;;
+
+		usage_1) 
+				[ -z "$QUIET" ] && usage 
+				exit 1 ;;
+
+		exit_0) exit 0 ;;
+
+		exit_1) exit 1 ;;
+
 		*) : ;;
 	esac
 }
 
-usage() { cat << ENDOFUSAGE 
 
+###################################################################
+############################  USAGE  ##############################
+
+usage() { cat << ENDOFUSAGE 
 qb-edit:  Modify jail parameters in jailmap.conf
 
 Usage: qb-edit <jail> <parameter> <value>
        qb-edit [-f][-h][-i][-r] <jail> <parameter> <value>
 
-   -f: (f)orce: Ignore potential errors and modify anyways
-   -h: (h)elp:  Outputs this help message
-   -i: (i)pv4:  Auto-assign IP address along quBSD conventions
+   -f: (f)orce. Ignore errors and modify anyways. 
+       Errors messages will still print to stdout.
+   -h: (h)elp. Outputs this help message
+   -i: (i)pv4. Auto-assign IP address along quBSD conventions
+   -q: (q)uiet output, do not print anything to stdout 
    -r: (r)estart the required jails for changes to take effect
 
 PARAMETERS SAVED AT /usr/local/etc/quBSD/jailmap.conf

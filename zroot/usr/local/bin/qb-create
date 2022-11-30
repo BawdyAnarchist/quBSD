@@ -789,19 +789,19 @@ change_config_files() {
 	sed -nE "/^$template[[:blank:]]+/s/^$template/$newjail/p" $JMAP >> $JMAP
 
 	# Any parameters that are non-blank, were specified and should be changed
-	qb-edit -f $newjail class $class		>> /dev/null
-	qb-edit -f $newjail cpuset $cpuset	>> /dev/null
-	qb-edit -f $newjail schg $schg		>> /dev/null
-	qb-edit -f $newjail IP0 $IP0			>> /dev/null
-	qb-edit -f $newjail maxmem $maxmem	>> /dev/null
-	qb-edit -f $newjail seclvl $seclvl	>> /dev/null 
-	qb-edit -f $newjail tunnel $tunnel	>> /dev/null 
+	qb-edit -qf $newjail class $class	
+	qb-edit -qf $newjail cpuset $cpuset	
+	qb-edit -qf $newjail schg $schg	
+	qb-edit -qf $newjail IP0 $IP0	
+	qb-edit -qf $newjail maxmem $maxmem
+	qb-edit -qf $newjail seclvl $seclvl
+	qb-edit -qf $newjail tunnel $tunnel
 
 	# New rootjails need to redirect the rootjail line to self
 	if [ "$class" = "rootjail" ] ; then 
-		qb-edit $newjail rootjail $newjail   >> /dev/null
+		qb-edit -qf $newjail rootjail $newjail   >> /dev/null
 	else
-		qb-edit $newjail rootjail $rootjail  >> /dev/null
+		qb-edit -qf $newjail rootjail $rootjail  >> /dev/null
 	fi
 
 	# Dispjails have one extra line for template
@@ -852,7 +852,6 @@ if [ "$class" != "rootjail" ] ; then
 	change_zusr
 fi
 change_config_files
-
 
 
 

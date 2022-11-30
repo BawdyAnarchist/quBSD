@@ -16,10 +16,11 @@ get_options() {
 	shift $(( OPTIND - 1 ))
 
 	JAIL="$1"
+	ACTION="${ACTION:=get_msg_qubsd}"
 }
 
 checks() {
-	if [ -z "$DOWN" ] && [ -z "$UP" ] && [ -z "$RESTORE" ] ; then
+	if [ -z "${DOWN}${UP}${RESTORE}" ] ; then
 		# User didn't specify an action 
 		get_msg_qb_flags "_1" "usage_1"
 
@@ -33,8 +34,8 @@ checks() {
 
 	fi
 
-	# Error messages for invalid jails come embedded with the check 
-	check_isvalid_jail "$JAIL" "exit_1" 
+	# Check for valid jail, exit if invalid 
+	check_isvalid_jail "$JAIL" "$ACTION" || get_msg_qb_flags "none" "usage_1"
 }
 
 main() {
@@ -57,8 +58,8 @@ main() {
 	elif [ "$RESTORE" ] ; then
 		# Jails might have different chflag settings if started or stopped
 		check_isrunning_jail "$JAIL" \
-									&& ${QBDIR}/exec.poststart \
-																|| ${QBDIR}/exec.poststop
+									&& ${QBDIR}/exec.poststart $JAIL \
+																|| ${QBDIR}/exec.poststop $JAIL
 	fi
 }
 

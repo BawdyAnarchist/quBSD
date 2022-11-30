@@ -4,8 +4,8 @@
 . /usr/local/lib/quBSD/msg-rename.sh
 
 get_options() {
-	while getopts ah o ; do
-		case $o in
+	while getopts ah opts ; do
+		case $opts in
 			a) UPDATE="true" ;;
 			h) get_msg_qb_rename "none" "usage_0" ;; 
 		esac
@@ -15,6 +15,7 @@ get_options() {
 
 	JAIL="$1"
 	NEWNAME="$2"
+	ACTION="${ACTION=:get_msg_qubsd}"
 }
 
 define_variables() {
@@ -28,7 +29,7 @@ define_variables() {
 
 checks() {
 	# Check that JAIL was specified, and valid 
-	check_isvalid_jail "$JAIL" "exit_1"
+	check_isvalid_jail "$JAIL" "$ACTION" || get_msg_qb_rename "usage_1" 
 	
 	# Make sure new jailname was provided
 	[ -z "$NEWNAME" ] && get_msg_qb_rename "_1" "usage_1"
@@ -62,7 +63,7 @@ rename_jail() {
 	# attempting to modifying zusr datasets for instances they don't exist
 
 	# Stop jail before renaming. Rename should not happen if stop fails
-	stop_jail "$JAIL" "exit_1" > /dev/null 2>&1
+	stop_jail "$JAIL" "$ACTION" > /dev/null 2>&1 || get_msg_qb_rename "_7" "exit_1"  
 
 	# Flags down to modify directory names and fstab
 	chflags -R noschg ${M_ZUSR}/$JAIL  > /dev/null 2>&1
@@ -70,7 +71,7 @@ rename_jail() {
 
 	# Modify jailmap. Roojails need to update their own rootjail to self
 	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}	/g" $JMAP
-	[ "${JAIL} == "${rootjail} ] && qb-edit -f ${NEWNAME} rootjail ${NEWNAME}
+	[ "${JAIL} == "${rootjail} ] && qb-edit -fq ${NEWNAME} rootjail ${NEWNAME}
 
 	sed -i '' -E "s/^${JAIL}[[:blank:]]+\{/${NEWNAME} \{/g" $JCONF 
 	sed -i '' -E "s/${JAIL}/${NEWNAME}/g" ${M_ZUSR}/${JAIL}/rw/etc/fstab   > /dev/null 2>&1
@@ -97,22 +98,23 @@ update_dependencies() {
 	if [ -n "$UPDATE" ] ; then
 		for _jail in $rootj_for ; do
 			# Don't try to qb-edit for old jailname, as it's invalid now
-			[ "$_jail" == "$JAIL" ] || qb-edit -f $_jail rootjail $NEWNAME
+			[ "$_jail" == "$JAIL" ] || qb-edit -fq $_jail rootjail $NEWNAME
 		done
 
 		for _jail in $template_for ; do
-			qb-edit -f $_jail template $NEWNAME
+			qb-edit -fq $_jail template $NEWNAME
 		done
 
 		for _jail in $tunnel_for ; do
-			qb-edit -f $_jail tunnel $NEWNAME
+			qb-edit -fq $_jail tunnel $NEWNAME
 		done
 
 		# Restart dependencies that were already on
 		for _jail in $_ALLJAILS ; do
 
 			# Move process to background to parallelize jail restarts 
-			check_isrunning_jail "$_jail" && restart_jail "$_jail"  > /dev/null 2>&1 &	
+			check_isrunning_jail "$_jail" \
+					&& restart_jail "$_jail" "$ACTION" > /dev/null 2>&1 &	
 		done
 		
 		# Due to the & on the restart command, need to positively exit program.

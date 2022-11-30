@@ -42,7 +42,8 @@ qb-disp: Creates a disposable jail, using snapshot of existing
 
 Usage: qb-disp [-h]|<existing_jail> 
 Usage: qb-disp -p 
-   -h: outputs this usage message
+   -h: (h)elp. Outputs this help message
+	-v: (v)erbose. Print any error messages
 
 ENDOFUSAGE
 }

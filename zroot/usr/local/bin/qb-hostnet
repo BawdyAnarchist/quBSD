@@ -6,9 +6,9 @@
 get_options() {
 	while getopts dhu opts ; do
 		case $opts in
-			d) ACTION="down" ;;
+			d) _CMD="down" ;;
 			h) get_msg_qb_hostnet "none" "usage_0" ;;
-			u) [ -z "$ACTION" ] && ACTION="up" || get_msg_qb_hostnet "_1" "usage_1" ;;
+			u) [ -z "$_CMD" ] && _CMD="up" || get_msg_qb_hostnet "_1" "usage_1" ;;
 		esac
 	done
 
@@ -16,6 +16,7 @@ get_options() {
 	[ "$OPTIND" == 1 ] && get_msg_qb_hostnet "_2" "usage_1" 
 
 	# Define script variables
+	ACTION="${ACTION:=get_msg_qubsd}"
 	_jIP=$(sed -n "s/^host[[:blank:]]*IP0[[:blank:]]*//p" $JMAP)
 	TUNNEL=$(sed -nE "s/^host[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
 	MTU=$(sed -nE "s:^mtu[[:blank:]]+::p" $QBCONF) 
@@ -32,10 +33,10 @@ main() {
 	pfctl -f /etc/pf.conf	
 	
 	# Bring up host network connection 
-	if [ "$ACTION" == "up" ] ; then 
+	if [ "$_CMD" == "up" ] ; then 
 
 		# start_jail command handles most error messages 
-		start_jail "$TUNNEL"  ||  get_msg_qb_hostnet "_3" "usage_1"
+		start_jail "$TUNNEL" "$ACTION"  ||  get_msg_qb_hostnet "_3" "usage_1"
 	
 		# Create epair, and set it up inside the gateway
 		_epair=$(ifconfig epair create)

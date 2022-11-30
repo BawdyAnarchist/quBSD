@@ -20,14 +20,15 @@ get_options() {
 
 	JAIL="$1" ; shift
 	_CMD="$@"
+	ACTION="${ACTION:=get_msg_qubsd}"
 
-	# Passing commands through another terminal is always tricky
+	# Passing commands through another terminal is tricky. 
 	if [ -z "$_CMD" ] ; then
 
 		# No command is provided. Default to /bin/csh. Quotation not required
 		_CMD="${_CMD:=/bin/csh}"
 
-		# Redirect not desired. Switching to JAIL csh, on host xterm (need to see stdout) 
+		# Redirect not desired, because we're using host xterm to access JAIL 
 		_REDIRECT=''
 
 	else
@@ -60,7 +61,7 @@ main() {
 	fi
 
 	# Function handles all checks to see if jail needs to (and can) be started
-	start_jail "$JAIL" "exit_1"
+	start_jail "$JAIL" "$ACTION" || get_msg_qb_cmd "none" "exit_1"
 
 	# Final evaluation statement. Launches the window/commands 
 	eval jexec -l -U $_USER $JAIL csh -c $_NEWWIND $_CMD $_REDIRECT

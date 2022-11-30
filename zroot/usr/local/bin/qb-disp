@@ -10,6 +10,7 @@ get_options() {
 	while getopts h opts ; do
 		case $opts in
 			h) get_msg_qb_disp "none" "usage_0" ;;
+			v) ACTION="get_msg" ;;
 		esac
 	done
 
@@ -19,11 +20,12 @@ get_options() {
 	JAIL="$1"
 	DATETIME=$(date +%b%d_%H%M)
 	NEWSNAP="${ZUSR_ZFS}/${JAIL}@DISP${DATETIME}"
+	ACTION="${ACTION:=get_msg_qubsd}"
 }
 
 newjail_name() {
-	# Just one check. No need for a separate function
-	check_isvalid_jail "$JAIL" "pass" || get_msg_qb_disp "none" "usage_1"
+	# Valid jail or exit 
+	check_isvalid_jail "$JAIL" "$ACTION" || get_msg_qb_disp "none" "usage_1"
 	
 	# Make name visually easy to identify
 	NEWJAIL="DISP-${JAIL}"
@@ -47,21 +49,21 @@ main() {
 	zfs snapshot $NEWSNAP
 
 	#Trap to destroy snapshot after use.
-	trap 'zfs destroy -rRf $NEWSNAP' SIGINT SIGTERM SIGHUP SIGKILL SIGQUIT EXIT
+	trap 'zfs destroy -rRf $NEWSNAP' INT TERM HUP QUIT EXIT
 
-	# Create dispjail and edit no_destroy flag
+	# Create dispjail and disable the no_destroy protection 
 	qb-create -c dispjail -t none -i none -T $JAIL $NEWJAIL 
-	qb-edit -f $NEWJAIL no_destroy false
+	qb-edit -qf $NEWJAIL no_destroy false
 
 	#Trap to ensure DISP doesn't remain after use
-	trap	'destroy_dispjail' SIGINT SIGTERM SIGHUP SIGKILL SIGQUIT EXIT
+	trap	'destroy_dispjail' INT TERM HUP QUIT EXIT
 
 	# Launch a floating terminal for the dispjail
 	xterm -e csh -c "i3-msg -q floating enable, move position center; qb-cmd $NEWJAIL"
 }
 
 destroy_dispjail() {
-	stop_jail "$NEWJAIL"
+	stop_jail "$NEWJAIL" "$ACTION"
 	zfs destroy -rRf ${JAILS_ZFS}/$NEWJAIL
 	zfs destroy -rRf ${ZUSR_ZFS}/$NEWJAIL
 	zfs destroy $NEWSNAP

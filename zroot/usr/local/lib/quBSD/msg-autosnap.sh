@@ -46,9 +46,9 @@ Usage:  qb-autosnap
    -l:  (l)ist associated datasets and exit. Can filter with
         <dataset> or <snapshot>. No arguments will show all.
    -s:  (s)napshot datasets tagged with qubsd:autosnap.
-   -t:  (t)ime-to-live:  Available time TTL_UNITS are:  m|H|D|W|Y  
+   -t:  (t)ime-to-live:  TTL_UNITS are:  m|H|D|W|Y  
                          For example:  120m | 48H | 30D 
-        If [-t] is unspecified, snapshot will not be thinned.
+        If [-t] unspecified, snapshot will never be thinned
 
 This tool creates custom ZFS User Properties to track and 
 manage all datasets associated with qb-autosnap:

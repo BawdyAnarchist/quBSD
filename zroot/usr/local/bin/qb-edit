@@ -5,11 +5,13 @@
 
 get_options() {
 	local OPTIND
-	while getopts fhir opts ; do
+	while getopts fhiqr opts ; do
 		case $opts in
-			f) FORCE="true" ;;
+			   # [-f] acts on msg-edit function, rather than main script 
+			f) FORCE="true" ;; 
 			h) get_msg_qb_edit "none" "usage_0" ;; 
 			i) PARAM="IP0" ; VAL="auto" ;;
+			q) QUIET="true" ; ACTION="return 1" ;;
 			r) RESTART="true" ;;
 		esac
 	done
@@ -21,6 +23,7 @@ get_options() {
 	PARAM="${PARAM:-"$2"}"
 	VAL="${VAL:-"$3"}"
 	OLDSETTING=$(sed -nE "s@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+@@p" $JMAP)
+	ACTION="${ACTION:=get_msg_qubsd}"
 }
 
 checks() {
@@ -42,173 +45,127 @@ checks() {
 	# Sanity checks to make sure values are reasonable
 	case $PARAM in
 		autostart|no_destroy)
-				[ "$VAL" == "true" -o "$VAL" == "false" ] || get_msg_qb_edit "_7" "usage_1"
+				[ "$VAL" == "true" -o "$VAL" == "false" ] || get_msg_qb_edit "_4" "usage_1"
 		;;
 		class)
-				get_msg_qb_edit "_4" "usage_1"
+				get_msg_qb_edit "_5" "none" "_f"
 		;;
 		cpuset)
-				check_isvalid_cpuset "$VAL"  ||  get_msg_qb_edit "_5" "usage_1" 
+				check_isvalid_cpuset "$VAL" "$ACTION" || get_msg_qb_edit "none" "usage_1" 
 		;;
 		maxmem)
-				check_isvalid_maxmem "$VAL"  ||  get_msg_qb_edit "_6" "usage_1" 
+				check_isvalid_maxmem "$VAL" "$ACTION" || get_msg_qb_edit "none" "usage_1" 
 		;;
-		rootjail)
-				# Check that rootjail has jmap and zroot zfs 
-				check_isvalid_root "$VAL"  ||  get_msg_qb_edit "_8" "exit_1"
+		rootjail|template)
+				# Check that rootjail or template has jmap and zroot zfs 
+				check_isvalid_jail "$VAL" "$ACTION" || get_msg_qb_edit "none" "exit_1" "_f"
 		;;
 		schg) 
-				check_isvalid_schg "$VAL"  ||  get_msg_qb_edit "_9" "usage_1" 
+				check_isvalid_schg "$VAL" "$ACTION" ||  get_msg_qb_edit "none" "usage_1" 
 		;;	
 		seclvl)		
-				check_isvalid_seclvl "$VAL"  ||  get_msg_qb_edit "_10" "usage_1" 
-		;;
-		template)
-				# Check that template jail has jmap and zusr zfs 
-				check_isvalid_template "$VAL"  ||  get_msg_qb_edit "_11" "exit_1"
+				check_isvalid_seclvl "$VAL" "$ACTION" ||  get_msg_qb_edit "none" "usage_1" 
 		;;
 		tunnel)  
-				# Check that tunnel has jmap, zusr, is `none', and starts with `net-'
-				check_isvalid_tunnel "$VAL" "$JAIL"
-
-				case "$_validTunnel" in
-					# Alert and exit if tunnel doesn't have the form `net-'
-					firewall)  get_msg_qb_edit "_19" "exit_1" ;;
-
-					net)	get_msg_qb_edit "_12" "exit_1" ;;
-
-					# Warn and exit tunnel doesn't zusr zfs config  
-					jmap)	get_msg_qb_edit "_13" "usage_1" ;;
-
-					# Warn and exit tunnel doesn't zusr zfs config  
-					zusr)	get_msg_qb_edit "_13_1" "usage_1" ;;
-
-				esac
+				check_isvalid_tunnel "$VAL" "$ACTION" "$JAIL" \
+						|| get_msg_qb_edit "none" "exit_1" "_f"
 		;;
+		IP0) 
+				# It's possible user might try to assign DHCP from command line
+				if [ "$VAL" == "auto" ] || [ "$VAL" == "DHCP" ] ; then 
 
-		# IP0 is the most complicated. Save it for last, just for code organization
-		IP0)
-			# Function returns 1 if it's acting on net-firewall. 
-			# All else returns 0, and assigns globals for IP0 checks in other functions 
-			if define_ipv4_convention ; then
-
-				# Get a list of all IP in use by running jails (assigns $_USED_IPS)
-				# IP0 of 'non' doesn't need to check against used IPs
-				[ "$VAL" == "none" ] || get_used_ips
-
-				if [ "$VAL" == "auto" ] ; then 
-					# IP discovery doesn't require additional checks
-					VAL=$(discover_open_ipv4)  ||  get_msg_qb_edit "_14" "usage_1"
+					# Function returns available IPv4. Or for net-firewall returns "DHCP"
+					VAL=$(discover_open_ipv4 "$JAIL" "$ACTION") \
+							|| get_msg_qb_edit "none" "exit_1"
 
 				else
-					# Invalid IPs should throw an error
-					check_isvalid_ipv4 "$VAL"  ||  get_msg_qb_edit "_15" "usage_1" 
-					
-					# quBSD IP conventions check. Returns: $_isqubsd_ipv4
-					check_isqubsd_ipv4 "$VAL" 
-					[ -n "$_isoverlap" ]  &&  get_msg_qb_edit "_16" "exit_1" 
-					[ -n "$_ismismatch" ] &&  get_msg_qb_edit "_17" "exit_1" 
+					# Check IP addresses for validity and quBSD convention adherence 
+					check_isvalid_ipv4 "$VAL" "$ACTION" "$JAIL" \
+							|| get_msg_qb_edit "none" "exit_1" 
+
+					check_isqubsd_ipv4 "$VAL" "$ACTION" "$JAIL" \
+							|| get_msg_qb_edit "none" "exit_1" "_f"
 				fi
-				
-			# Special handling for net-firewall 
-			else
-				# Define variable to switch in main()
-				_firewall="true"
-
-				if [ "$VAL" == "auto" ] ; then 
-					# Auto IP assignment for net-firewall implies DHCP - handled in main()
-					VAL="DHCP" 
-				else
-					# If user provided IP, check that it's valid
-					check_isvalid_ipv4 "$VAL"  ||  get_msg_qb_edit "_15" "usage_1" 
-				fi
-			fi
-
-			# Check the tunnel associated with JAIL's IP0 change
-			TUNNEL=$(sed -nE "s/^${JAIL}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
-			check_isvalid_tunnel
-
-			case "$_validTunnel" in
-				# Error that net-firewall must be a tap tunnel
-				firewall)  get_msg_qb_edit "_19" "exit_1"  ;;
-
-				# Alert that tunnel doesn't have a zusr zfs config
-				jmap)	get_msg_qb_edit "_13"  ;;
-
-				# Alert that exit tunnel doesn't zusr zfs config  
-				zusr)	get_msg_qb_edit "_13_1"  ;;
-
-				# Alert that user is assigning an IP to a jail with no tunnel
-				none)	get_msg_qb_edit "_18"  ;;
-
-			esac
-		;; # /IP0
-
+		;; 
 		# Catch all. Any other entries for $PARAM return an error (really should be necessary).
-		*)	get_msg_qb_edit "_20" "usage_1"  ;;
-
+		*)	get_msg_qb_edit "_6" "usage_1"  ;;
+	
 	# /PARAM
 	esac
 }
 
 main() {
-	# Modify JMAP
-	sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VAL}@" $JMAP
+	# Modify JMAP and print new settings on success
+	sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VAL}@" $JMAP \
+			&& get_msg_qb_edit "_8" 
 
 	# Clean up the columns 
 	_newJMAP=$(column -t $JMAP)
 	echo "$_newJMAP" > $JMAP
 
 	# Special handling case for net-firewall, to modify rc.conf 
-	if [ "$_firewall" == "true" ] ; then
-		_rcconf="${M_JAILS}/net-firewall/rw/etc/rc.conf"
+	if [ "$JAIL" == "net-firewall" ] ; then
+		
+		# Relevant variables. 
+		_tap=$(sed -nE "s/^${JAIL}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
+		_rcconf="${M_ZUSR}/net-firewall/rw/etc/rc.conf"
+		chflags noschg "$_rcconf"	
 
 		if [ "$VAL" == "DHCP" ] ; then
-			sed -i '' -E "s/ifconfig_tap0.*/ifconfig_${TUNNEL}=\"DHCP\"/" $_rcconf
+			sed -i '' -E "s/ifconfig_${_tap}.*/ifconfig_${_tap}=\"DHCP\"/" $_rcconf
 			sed -i '' -E "/defaultrouter=/ d" $_rcconf
 
 		else
 			# Using `#' as sed separator, because `/' interferes with variable expansion
-			sed -i '' -E "s#ifconfig_tap0.*#ifconfig_${TUNNEL}=\"inet ${VAL}\"#g" $_rcconf
+			sed -i '' -E "s#ifconfig_${_tap}.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
 			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
-			sed -i '' -E "/^ifconfig_tap.*/ a\\
+			sed -i '' -E "/^ifconfig_${_tap}.*/ a\\
 defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
 		fi
 	fi
-
-	# Print new settings
-	echo "Success"
-	qb-list -j $JAIL -p $PARAM
 }
 
 handle_restarts() {
+	# If jail is off, don't offer restart. Still need tunnel, so assign newvar: _jail_
+	check_isrunning_jail $JAIL && _jail_="$JAIL" 
+
 	# Define which jails need to be restarted
 	case $PARAM in 
+
 		cpuset|maxmem|rootjail|schg|seclvl|template)
-			_restarts="       $JAIL" ;;
+			_restarts="       $_jail_" 
+		;;
 		IP0|tunnel)
+			_tunnel=$(sed -nE "s/^${JAIL}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
+			check_isrunning_jail $_tunnel || unset _tunnel
+
 			# This prevents `none' and `tap0' from being flagged for restart 
-			[ "$PARAM" == "tunnel" ] && TUNNEL="$VAL"
-			if [ "$TUNNEL" == "none" ] || [ -z "${tunnel##tap[[:digit:]]}" ] ; then
-				_restarts="       $JAIL" 
+			if [ "$_tunnel" == "none" ] || [ -z "${_tunnel##tap[[:digit:]]}" ] ; then
+				_restarts="       $_jail_" 
 			else	
-				_restarts=$(printf "%b" "       $JAIL\n       $TUNNEL")
+				_restarts=$(printf "%b" "       $_jail_\n       $_tunnel")
 			fi
 		;;	
 	esac
 
 	# If there are no jails to restart, exit
-	[ -z "$_restarts" -o -n "$FORCE" ] && exit 0
+	[ -z "$_jail_" ] && [ -z "$_tunnel" ] && exit 0
 	
+	# If QUIET tagged, only continue if users specified a restart
+	[ -n "$QUIET" ] && [ -z "$RESTART" ] && exit 0
+
 	# Query user to restart jails 
-	if [ -z "$RESTART" ] ; then
-		get_msg_qb_edit "_21"
+	if [ -z "$RESTART" ] && [ -z "$QUIET" ] ; then
+
+		get_msg_qb_edit "_7"
 		get_user_response || exit 0 
 	fi
 	
-# Restart jails (otherwise, would've already exited)	
+	# Restart jails (otherwise, would've already exited)	
 	for _jail in $_restarts ; do
-		[ "$_jail" == "none" ]  ||  restart_jail "$_jail"
+
+		# "hold" option prevents starting jail if it is off
+		[ "$_jail" == "none" ] || restart_jail "$_jail" "$ACTION" "hold" 
 	done
 }
 
@@ -221,6 +178,5 @@ checks
 main
 
 handle_restarts
-
 
 

@@ -12,30 +12,47 @@ get_options() {
 
 	shift $(( OPTIND - 1 ))
 
-	_NEW_DPI="$1" 
-	DEFAULT_DPI=$(xrdb -query | sed -nE "s/Xft.dpi:[[:blank:]]+//gp")
+	DPI_IN="$1" 
+	
+	# Scale references to typical standard default
 	SCALE=96
+
+	# REVERT defaults to 10 seconds unless otherwise specified
+	REVERT="${REVERT:=10}"
+	
+	# Get starting DPI, just in case .Xresources doesn't have it stored
+	DPI_START=$(xrdb -query | sed -nE "s/Xft.dpi:[[:blank:]]+//gp")
 }
 
 checks() {
-	# DPI between 4 and 48 is too high to be scaled; too low to be raw
-	echo "$_NEW_DPI" | grep -E "0\.[04 -lt 0.5 ] && get_msg_qb_dpi "_1" "exit 1"
+	# DPI less that 0.5 is too low 
+	echo "$DPI_IN < 0.3" | bc | grep -qs 1 && get_msg_qb_dpi "_1" "exit 1"
 
-	# DPI between 4 and 48 is too high to be scaled; too low to be raw
-	[ "$_NEW_DPI" -gt 4 ] && [ "$_NEW_DPI" -lt 48 ] && get_msg_qb_dpi "_2" "exit 1"
+	# DPI between 4 and 29 is too high to be a scaled entry; too low to be raw
+	echo "$DPI_IN > 4 && $DPI_IN < 29" | bc | grep -qs 1 && get_msg_qb_dpi "_2" "exit 1"
 
-	# DPI above 386 is too high for an automated script 
-	[ "$_NEW_DPI" -gt 386 ] && get_msg_qb_dpi "_3" "exit 1"
+	# DPI above 384 (4x96) is too high for an automated script 
+	echo "$DPI_IN > 384" | bc | grep -qs 1 && get_msg_qb_dpi "_3" "exit 1"
 }
 
 main() {
-	# Convert a relative scaled entry to raw entry
-	[ "$_NEW_DPI" -ge 0.5 ] && [ "$_NEW_DPI" -le 4 ] \
-				&& $_NEW_DPI=$(echo "$_NEW_DPI * $SCALE" | bc | grep -o "^[[:digit:]]*")
+	# Convert scaled to raw
+	echo "$DPI_IN >=29" | bc | grep -qs 1 \
+			&& DPI_RAW="$DPI_IN" \
+					|| DPI_RAW=$(echo "$DPI_IN * 96" | bc)
 
-	echo "Xft.dpi: $_NEW_DPI" #| xrdb -merge
+	# Change DPI	
+	echo "Xft.dpi: $DPI_RAW" | xrdb -merge
+}
 
-	sleep $REVERT && echo "Xft.dpi: $DEFAULT_DPI" | xrdb -merge
+revert_dpi() {
+
+	sleep $REVERT 
+
+	grep -Eq "Xft.dpi:[[:blank:]]+[[:digit:]]+" /root/.Xresources \
+			&& xrdb -merge /root/.Xresources	\
+					|| echo "Xft.dpi: $DEFAULT_DPI" | xrdb -merge 
+
 }
 
 get_options "$@"
@@ -44,3 +61,6 @@ checks
 
 main
 
+revert_dpi &
+
+exit 0
