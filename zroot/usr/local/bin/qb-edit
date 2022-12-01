@@ -11,7 +11,7 @@ get_options() {
 			f) FORCE="true" ;; 
 			h) get_msg_qb_edit "none" "usage_0" ;; 
 			i) PARAM="IP0" ; VAL="auto" ;;
-			q) QUIET="true" ; ACTION="return 1" ;;
+			q) QUIET="true" ; IF_ERR="return 1" ;;
 			r) RESTART="true" ;;
 		esac
 	done
@@ -23,7 +23,7 @@ get_options() {
 	PARAM="${PARAM:-"$2"}"
 	VAL="${VAL:-"$3"}"
 	OLDSETTING=$(sed -nE "s@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+@@p" $JMAP)
-	ACTION="${ACTION:=get_msg_qubsd}"
+	IF_ERR="${IF_ERR:=get_msg_qubsd}"
 }
 
 checks() {
@@ -51,23 +51,23 @@ checks() {
 				get_msg_qb_edit "_5" "none" "_f"
 		;;
 		cpuset)
-				check_isvalid_cpuset "$VAL" "$ACTION" || get_msg_qb_edit "none" "usage_1" 
+				check_isvalid_cpuset "$VAL" "$IF_ERR" || get_msg_qb_edit "none" "usage_1" 
 		;;
 		maxmem)
-				check_isvalid_maxmem "$VAL" "$ACTION" || get_msg_qb_edit "none" "usage_1" 
+				check_isvalid_maxmem "$VAL" "$IF_ERR" || get_msg_qb_edit "none" "usage_1" 
 		;;
 		rootjail|template)
 				# Check that rootjail or template has jmap and zroot zfs 
-				check_isvalid_jail "$VAL" "$ACTION" || get_msg_qb_edit "none" "exit_1" "_f"
+				check_isvalid_jail "$VAL" "$IF_ERR" || get_msg_qb_edit "none" "exit_1" "_f"
 		;;
 		schg) 
-				check_isvalid_schg "$VAL" "$ACTION" ||  get_msg_qb_edit "none" "usage_1" 
+				check_isvalid_schg "$VAL" "$IF_ERR" ||  get_msg_qb_edit "none" "usage_1" 
 		;;	
 		seclvl)		
-				check_isvalid_seclvl "$VAL" "$ACTION" ||  get_msg_qb_edit "none" "usage_1" 
+				check_isvalid_seclvl "$VAL" "$IF_ERR" ||  get_msg_qb_edit "none" "usage_1" 
 		;;
 		tunnel)  
-				check_isvalid_tunnel "$VAL" "$ACTION" "$JAIL" \
+				check_isvalid_tunnel "$VAL" "$IF_ERR" "$JAIL" \
 						|| get_msg_qb_edit "none" "exit_1" "_f"
 		;;
 		IP0) 
@@ -75,15 +75,15 @@ checks() {
 				if [ "$VAL" == "auto" ] || [ "$VAL" == "DHCP" ] ; then 
 
 					# Function returns available IPv4. Or for net-firewall returns "DHCP"
-					VAL=$(discover_open_ipv4 "$JAIL" "$ACTION") \
+					VAL=$(discover_open_ipv4 "$JAIL" "$IF_ERR") \
 							|| get_msg_qb_edit "none" "exit_1"
 
 				else
 					# Check IP addresses for validity and quBSD convention adherence 
-					check_isvalid_ipv4 "$VAL" "$ACTION" "$JAIL" \
+					check_isvalid_ipv4 "$VAL" "$IF_ERR" "$JAIL" \
 							|| get_msg_qb_edit "none" "exit_1" 
 
-					check_isqubsd_ipv4 "$VAL" "$ACTION" "$JAIL" \
+					check_isqubsd_ipv4 "$VAL" "$IF_ERR" "$JAIL" \
 							|| get_msg_qb_edit "none" "exit_1" "_f"
 				fi
 		;; 
@@ -165,7 +165,7 @@ handle_restarts() {
 	for _jail in $_restarts ; do
 
 		# "hold" option prevents starting jail if it is off
-		[ "$_jail" == "none" ] || restart_jail "$_jail" "$ACTION" "hold" 
+		[ "$_jail" == "none" ] || restart_jail "$_jail" "$IF_ERR" "hold" 
 	done
 }
 

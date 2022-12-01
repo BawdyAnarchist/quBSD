@@ -3,9 +3,9 @@
 get_msg_qubsd() { 
 	# _message determines which feedback message to call.
 	# Just call "none" in the case you want no message to match.
-	# _action is optional, and can be used to exit and/or show usage
+	# _if_err is optional, and can be used to exit and/or show usage
 
-	local _message ; local _value; local _passvar ; local _action
+	local _message ; local _value; local _passvar ; local _if_err
 	_message="$1"  ;  _value="$2" ; _passvar="$3"  
 
 	case "$_message" in
@@ -21,26 +21,22 @@ ENDOFMSG
 	;;	
 	_cj0) cat << ENDOFMSG
 
-ERROR: Invalid jail. 
-       < $_value > is missing a < $_passvar > in jailmap.conf
+
 ENDOFMSG
 	;;	
 	_cj1) cat << ENDOFMSG
 
-ERROR: Invalid jail. 
-       < $_value > is missing a < $_passvar > in jailmap.conf
+ERROR: < $_value > is missing a < $_passvar > in jailmap.conf
 ENDOFMSG
 	;;	
 	_cj2) cat << ENDOFMSG
 
-ERROR: Invalid jail. 
-       < $_value > is an invalid < $_passvar >
+ERROR: < $_value > is an invalid < $_passvar >
 ENDOFMSG
 	;;	
 	_cj3) cat << ENDOFMSG
 
-ERROR: Invalid jail. 
-       < $_value > is missing from /etc/jail.conf
+ERROR: < $_value > is missing from /etc/jail.conf
 ENDOFMSG
 	;;
 	_cj4) cat << ENDOFMSG
@@ -131,15 +127,19 @@ ALERT: < $_passvar > is the gateway jail for all external
             !Double check this file after qb-edit -f 
 ENDOFMSG
 	;;
-	_ip1) cat << ENDOFMSG
+	_cj16) cat << ENDOFMSG
 
-ERROR: Failed to find open IP for < $_value > 
-       in the quBSD designated range of < $_passvar > 
-
-       It's permissible to use the same IP twice; but ensure that 
-       jails with the same IP aren't connected to the same tunnel. 
+ERROR: < $_value > needs to be designated as a
+       rootjail in jailmap.conf
 ENDOFMSG
 	;;
+	_cj17) cat << ENDOFMSG
+
+WARNING: < $_value > was not found in jailmap.conf 
+         < #default > was applied instead. 
+ENDOFMSG
+	;;
+
 	_ip2) cat << ENDOFMSG
 
 ENDOFMSG
@@ -186,12 +186,25 @@ ENDOFMSG
 	;;
 	_jf6) cat << ENDOFMSG
 
-WARNING: < $_jail > could not be stopped. Attempt to
-         stop forcibly, failed. For more info, see: 
+WARNING: < $_value > could not be stopped. Attempt to
+         forcibly stop, failed. For more info, see: 
          /var/log/quBSD.log
 ENDOFMSG
 	;;
-	_) cat << ENDOFMSG
+	_ip7) cat << ENDOFMSG
+
+ERROR: Failed to find open IP for < $_value > 
+       in the quBSD designated range of < $_passvar > 
+
+       It's permissible to use the same IP twice; but ensure that 
+       jails with the same IP aren't connected to the same tunnel. 
+ENDOFMSG
+	;;
+	_jf8) cat << ENDOFMSG
+
+ERROR: Parameter < $_value > for < $_passvar > 
+       had a null value in $QBDIR/jailmap.conf
+
 ENDOFMSG
 	;;
 	_) cat << ENDOFMSG

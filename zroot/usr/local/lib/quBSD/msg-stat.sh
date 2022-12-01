@@ -3,13 +3,13 @@
 get_msg_qb_stat() { 
 	# _message determines which feedback message to call.
 	# Just call "none" in the case you want no message to match.
-	# _action is optional, and can be used to exit and/or show usage
+	# _if_err is optional, and can be used to exit and/or show usage
 
    local _message
-   local _action
+   local _if_err
 
 	_message="$1"
-	_action="$2"
+	_if_err="$2"
 
 	case "$_message" in
 	_1) cat << ENDOFMSG
@@ -17,7 +17,7 @@ ENDOFMSG
 	;;	
 	esac
 
-	case $_action in 
+	case $_if_err in 
 		usage_0) usage ; exit 0 ;;
 		usage_1) usage ; exit 1 ;;
 		exit_0)  exit 0 ;;

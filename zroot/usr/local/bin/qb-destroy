@@ -13,7 +13,7 @@ get_options() {
 	shift $(( OPTIND - 1 ))
 
 	JAIL="$1"
-	ACTION="${ACTION:=get_msg_qubsd}"
+	IF_ERR="${IF_ERR:=get_msg_qubsd}"
 }
 
 define_variables() {
@@ -37,7 +37,7 @@ define_variables() {
 
 checks() {
 	# Alert that the jail is invalid, but do not error and exit
-	check_isvalid_jail "$JAIL" "$ACTION"
+	check_isvalid_jail "$JAIL" "$IF_ERR"
 
 	# no_destroy protection flag still active
 	[ "$NO_DESTROY" == "true" ] && get_msg_qb_destroy "_2" "usage_1"	
@@ -63,7 +63,7 @@ main() {
 
 	# Turn off all jails before applying changes 
 	for _jail in $OFFJAILS ; do
-		stop_jail "$_jail" "$ACTION"
+		stop_jail "$_jail" "$IF_ERR"
 	done
 	
 	# Destroy datasets

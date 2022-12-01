@@ -11,7 +11,7 @@
 # discover_open_ipv4
 # check_isvalid_ipv4
 # check_isqubsd_ipv4
-# check_isvalid_root
+# check_isvalid_rootjail
 # check_isvalid_template
 # check_isvalid_tunnel
 # check_isvalid_schg
@@ -20,7 +20,7 @@
 # check_isvalid_cpuset
 
 ##################################################################################
-#############################  GENERIC  FUNCTIONS  ###############################
+########################  VARIABLES ASSIGNMENT FUNCTIONS  ########################
 ##################################################################################
 
 # Source error messages for library functions (jails) 
@@ -33,10 +33,10 @@ get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts 
 
 	# Define variables for files
+	JCONF="/etc/jail.conf"
 	QBDIR="/usr/local/etc/quBSD"
 	QBCONF="${QBDIR}/quBSD.conf"
 	JMAP="${QBDIR}/jailmap.conf"
-	JCONF="/etc/jail.conf"
 	QBLOG="/var/log/quBSD.log"
 	
 	# Remove blanks at end of line, to prevent bad variable assignments. 
@@ -50,6 +50,21 @@ get_global_variables() {
 	M_JAILS=$(zfs get -H mountpoint $JAILS_ZFS | awk '{print $3}')
 	M_ZUSR=$(zfs get -H mountpoint $ZUSR_ZFS | awk '{print $3}')
 } 
+
+get_networking_variables() {
+	WIREGRD="/rw/usr/local/etc/wireguard"
+	WG0CONF="${WIREGRD}/wg0.conf"
+	PFCONF="/rw/etc/pf.conf"
+	JPF="${M_ZUSR}/${JAIL}/${PFCONF}"
+
+	# Get wireguard related variables 
+   if [ -e "${M_ZUSR}/${JAIL}/${WG0CONF}" ] ; then
+		ENDPOINT=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*//p" \
+				${M_ZUSR}/${JAIL}/${WG0CONF} | sed -n "s/:[[:digit:]]*.*//p")
+		WGPORTS=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*.*://p" \
+				${M_ZUSR}/${JAIL}/${WG0CONF})
+	fi
+}
 
 get_user_response() {
 	# Exits successfully if response is y or yes 
@@ -74,6 +89,43 @@ get_user_response() {
 	esac
 }
 
+get_jail_parameter() {
+#eval echo \${$_PARAM}
+	# Get <param> for <jail> from JMAP. Saves global variable in CAPS <PARAM>
+	# Variable indirection and `eval` are used to consolidate this to ONE function,
+	# rather than mulitple functions for each JMAP <param>.
+	# Defaults can substitute blank <params>, if specified by caller function. 
+
+	# lower_case param is stored in jailmap, and check_funcs() use lower case
+	local _param ; _param="$1"  
+
+	# Global variable for <_param> is in CAPS for all scripts 
+	local _PARAM=$(echo "$_param" | tr '[:lower:]' '[:upper:]')
+
+	# Standard positional variables
+	local _jail ; _jail="$2"  
+	local _if_err ; _if_err="$3" ;  _if_err="${_if_err:=return 1}"
+	local _defaults ; _defaults="$4"
+
+	# Either jail or param weren't provided 
+	[ -z "$_jail" ]  && eval "$_if_err" "_0" "jail"  && return 1
+	[ -z "$_param" ] && eval "$_if_err" "_0" "parameter"  && return 1
+
+	# Variable indirection. <param> value saves to global var name in $_PARAM
+	eval $_PARAM=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
+
+	# If the <param> value was null, and if caller specified, get default value
+	if [ -z $(eval echo \${$_PARAM}) ] && [ "$_defaults" == "true" ] ; then
+		eval $_PARAM=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
+		eval "$_if_err" "_cj17" "$_param" 
+	fi
+
+	# Escape \" is required, to avoid word splitting. Variable indirection simplifies
+	# the logic to a single line, instead of a different func for each <param>.
+	eval "check_isvalid_${_param}" \${$_PARAM} \"$_if_err\" \"$_jail\" \
+			&& return 0 || return 1
+}
+
 ##################################################################################
 #####################  FUNCTIONS RELATED TO JAILS HANDLING #######################
 ##################################################################################
@@ -88,19 +140,19 @@ restart_jail() {
 	# Default behavior: If a jail is off, start it. 
 	# Override default with $3="hold"
 
-	# Positional params and func variables. $_action defaults to `return 1`
+	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _jail ; _jail="$1"
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 	local _hold ; 	_hold="$3"
 
 	# No jail specified. 
-	[ -z "$_jail" ] && eval "$_action" "_0" "jail"  && return 1
+	[ -z "$_jail" ] && eval "$_if_err" "_0" "jail"  && return 1
 
 	# If the jail was off, and the hold flag was given, don't start it.
 	! check_isrunning_jail "$_jail" && [ "$_hold" == "hold" ] && return 0
 
 	# Otherwise, cycle jail	
-	stop_jail "$_jail" "$_action" && start_jail "$_jail" "$_action"
+	stop_jail "$_jail" "$_if_err" && start_jail "$_jail" "$_if_err"
 }
 
 start_jail() {
@@ -109,22 +161,22 @@ start_jail() {
 		# Default if no $2 provided, will return 1 silently.
 	# _jf = jailfunction
 
-	# Positional params and func variables. $_action defaults to `return 1`
+	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _jail ; _jail="$1"
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 
 	# Check that JAIL was provided in the first place
-	[ -z "$_jail" ] && eval "$_action" "_0" "jail" && return 1
+	[ -z "$_jail" ] && eval "$_if_err" "_0" "jail" && return 1
 
 	# Check to see if _jail is already running 
 	if	! check_isrunning_jail "$_jail" ; then
 
 		# Run prelim checks on jail 
-		if check_isvalid_jail "$_jail" "$_action" ; then
+		if check_isvalid_jail "$_jail" "$_if_err" ; then
 			
 			# Checks were good, start jail, make a log of it 
 			get_msg_qubsd "_jf1" "$_jail" | tee -a $QBLOG
-			jail -c "$_jail"  >> $QBLOG  ||  eval "$_action" "_jf2" "$_jail"
+			jail -c "$_jail"  >> $QBLOG  ||  eval "$_if_err" "_jf2" "$_jail"
 
 		fi
 	else
@@ -142,12 +194,12 @@ stop_jail() {
 	# Caller may pass positional: $2 , to dictate action on failure.
 		# Default, or if no $2 provided, will return 1 silently.
 
-	# Positional params and func variables. $_action defaults to `return 1`
+	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _jail ; _jail="$1"
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 
 	# Check that JAIL was provided in the first place
-	[ -z "$_jail" ] && eval "$_action" "_0" "jail" && return 1
+	[ -z "$_jail" ] && eval "$_if_err" "_0" "jail" && return 1
 
 	# Check if jail is on, if so remove it 
 	if check_isrunning_jail "$_jail" ; then	
@@ -167,7 +219,7 @@ stop_jail() {
 			if check_isrunning_jail "$_jail" ; then 		
 
 				# Print warning about failure to forcibly remove jail
-				eval "$_action" "_jf5" "$_jail" 
+				eval "$_if_err" "_jf5" "$_jail" 
 			else
 				# Run exec.poststop to clean up mounts, and print warning
 				sh ${QBDIR}/exec.poststop "$_jail"
@@ -188,8 +240,8 @@ stop_jail() {
 ## NOTES ON HOW CHECKS ARE BUILT
 ## Each check should be called from the main function with positional parameters:
 	# $1={value_of_the_thing_to_check}
-   # $2={_action} - The literal command that you want to execute if failure
-		# `eval` is applied to $_action, so the variable becomes the command.
+   # $2={_if_err} - The literal command that you want to execute if failure
+		# `eval` is applied to $_if_err, so the variable becomes the command.
 		# Default action is `return 1` (fail with no error message).
 		# For error message: $2="get_msg_qubsd" is specified, which calls the
 		# function:  get_msg_qubsd() ; from  /usr/local/lib/quBSD/msg-quBSD.sh
@@ -205,12 +257,12 @@ stop_jail() {
 check_isrunning_jail() {
 	# Return 0 if jail is running; return 1 if not. 
 
-	# Positional params and func variables. $_action defaults to `return 1`
+	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _value; _value="$1"  
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 
 	# No jail specified. 
-	[ -z "$_value" ] && eval "$_action" "_0" "jail" && return 1
+	[ -z "$_value" ] && eval "$_if_err" "_0" "jail" && return 1
 
 	# Check if jail is running. No warning message returned if not.
 	jls -j "$_value" > /dev/null 2>&1  || return 1 
@@ -220,37 +272,37 @@ check_isvalid_jail() {
 	# Checks that jail has JCONF, JMAP, and corresponding ZFS dataset 
 	# Return 0 if jail is running; return 1 if not. 
 
-	# Positional parameters and func variables. $_action defaults to `return 1`
+	# Positional parameters and func variables. $_if_err defaults to `return 1`
 	local _value; _value="$1"  
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 	local _class ; local _rootjail ; local _template
 
 	# Fail if no jail specified
-	[ -z "$_value" ] && eval "$_action" "_0" "jail" && return 1
+	[ -z "$_value" ] && eval "$_if_err" "_0" "jail" && return 1
 
 	# Must have class in JMAP. Used later to find the correct zfs dataset 
 	_class=$(sed -nE "s/^${_value}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
 
-	[ -z "$_class" ] && eval "$_action" "_cj1" "$_value" "class" && return 1
+	[ -z "$_class" ] && eval "$_if_err" "_cj1" "$_value" "class" && return 1
 	# Must also have a designated rootjail in JMAP
 	! grep -Eqs "^${_value}[[:blank:]]+rootjail[[:blank:]]+" $JMAP \
-			&& eval "$_action" "_cj1" "$_value" "rootjail" && return 1
+			&& eval "$_if_err" "_cj1" "$_value" "rootjail" && return 1
 
 	# Jail must also have an entry in JCONF
 	! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
-			&& eval "$_action" "_cj3" && return 1
+			&& eval "$_if_err" "_cj3" && return 1
 
 	# Verify existence of ZFS dataset
 	case $_class in
 		rootjail) 
 			# Rootjails require a dataset at zroot/quBSD/jails 
 			! zfs list ${JAILS_ZFS}/${_value} > /dev/null 2>&1 \
-					&& eval "$_action" "_cj4" "$_value" "$JAILS_ZFS" && return 1
+					&& eval "$_if_err" "_cj4" "$_value" "$JAILS_ZFS" && return 1
 		;;
 		appjail)
 			# Appjails require a dataset at quBSD/zusr
 			! zfs list ${ZUSR_ZFS}/${_value} > /dev/null 2>&1 \
-					&& eval "$_action" "_cj4" "$_value" "$ZUSR_ZFS" && return 1
+					&& eval "$_if_err" "_cj4" "$_value" "$ZUSR_ZFS" && return 1
 		;;
 		dispjail)
 
@@ -259,7 +311,7 @@ check_isvalid_jail() {
 																								$JMAP)
 
 			# First ensure that it's not blank			
-			[ -z "$_template" ] && eval "$_action" "_cj5" "$_value" && return 1
+			[ -z "$_template" ] && eval "$_if_err" "_cj5" "$_value" && return 1
 
 			# Prevent infinite loop: $_template must not be a template for the  
 			# jail under examination < $_value >. Otherwise, < $_value > would 
@@ -268,68 +320,96 @@ check_isvalid_jail() {
 			# is some other jail that is not < $_value >.
 # NOTE: Technically speaking, this still has potential for an infinite loop, 
 # but the user really has to try hard to create a circular reference.
-			! check_isvalid_jail "$_template" "$_action" \
-					&& eval "$_action" "_cj6" "$_value" "$_template" && return 1
+			! check_isvalid_jail "$_template" "$_if_err" \
+					&& eval "$_if_err" "_cj6" "$_value" "$_template" && return 1
 		;;
 			# Any other class is invalid
-		*) eval "$_action" "_cj2" "$_class" "class"  && return 1
+		*) eval "$_if_err" "_cj2" "$_class" "class"  && return 1
 		;;
 	esac
-	return 0
-}
-
-check_isvalid_tunnel() {
-	# Return 0 if proposed tunnel is valid ; return 1 if invalid
-
-	# Positional parameters and func variables. $_action defaults to `return 1`
-	local _value; _value="$1" 
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
-	local _jail; _jail="$3"  
-
-	# net-firewall has special requirements for tunnel. Must be tap interface
-##### NOTE: This isn't robust. It fails after tap0 to tap9
-	[ "$_jail" == "net-firewall" ] && [ -n "${_value##tap[[:digit:]]}" ] \
-			&& eval "$_action" "_cj7" "$_value" && return 1
-	
-	# `none' is valid for any jail except net-firewall. Order matters here.
-	[ "$_value" == "none" ] && return 0
-
-	# First check that tunnel is a valid jail. (note: func already has messages)  
- 	check_isvalid_jail "$_value" "$_action" || return 1
-
-	# Checks that tunnel starts with `net-'
-	[ -n "${_value##net-*}" ] \
-			&& eval "$_action" "_cj8" "$_value" "$_jail" && return 1
-
 	return 0
 }
 
 check_isvalid_class() {
 	# Return 0 if proposed schg is valid ; return 1 if invalid
 
-	# Positional params and func variables. $_action defaults to `return 1`
+	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _value; _value="$1"  
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 
 	# No jail specified. 
-	[ -z "$_value" ] && eval "$_action" "_0" "class"  && return 1
+	[ -z "$_value" ] && eval "$_if_err" "_0" "class"  && return 1
 
 	# Valid inputs are: appjail | rootjail | dispjail 
 	[ "$_value" != "appjail" ] && [ "$_value" != "rootjail" ] \
 			&& [ "$_value" != "dispjail" ] \
-					&& eval "$_action" "_cj2" "$_value" "class" && return 1
+					&& eval "$_if_err" "_cj2" "$_value" "class" && return 1
+	return 0
+}
+
+check_isvalid_rootjail() {
+	# Return 0 if proposed rootjail is valid ; return 1 if invalid
+
+	# Positional params and func variables. $_if_err defaults to `return 1`
+	local _value; _value="$1"  
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
+
+	# No jail specified. 
+	[ -z "$_value" ] && eval "$_if_err" "_0" "class"  && return 1
+
+	# Must be designated as a rootjail in jailmap.con 
+	_rootj=$(sed -nE "s/${_value}[[:blank:]]+class[[:blank:]]+//p" $JMAP) 
+	[ "$_rootj" == "rootjail" ] || (eval "$_if_err" "_cj16" "$_value" && return 1)
+
+	# Must have an entry in JCONF 
+	! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
+			&& eval "$_if_err" "_cj3" && return 1
+	
+	# Rootjails require a dataset at zroot/quBSD/jails 
+	! zfs list ${JAILS_ZFS}/${_value} > /dev/null 2>&1 \
+			&& eval "$_if_err" "_cj4" "$_value" "$JAILS_ZFS" && return 1
+
+	return 0
+}
+
+check_isvalid_tunnel() {
+	# Return 0 if proposed tunnel is valid ; return 1 if invalid
+
+	# Positional parameters and func variables. $_if_err defaults to `return 1`
+	local _value; _value="$1" 
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
+	local _jail; _jail="$3"  
+
+	# net-firewall has special requirements for tunnel. Must be tap interface
+##### NOTE: This isn't robust. It fails after tap0 to tap9
+	if [ "$_jail" == "net-firewall" ] ; then 
+		[ -n "${_value##tap[[:digit:]]}" ] \
+				&& (eval "$_if_err" "_cj7" "$_value" && return 1) \
+					|| return 0
+	fi
+	
+	# `none' is valid for any jail except net-firewall. Order matters here.
+	[ "$_value" == "none" ] && return 0
+
+	# First check that tunnel is a valid jail. (note: func already has messages)  
+ 	check_isvalid_jail "$_value" "$_if_err" || return 1
+
+	# Checks that tunnel starts with `net-'
+	[ -n "${_value##net-*}" ] \
+			&& eval "$_if_err" "_cj8" "$_value" "$_jail" && return 1
+
 	return 0
 }
 
 check_isvalid_schg() {
 	# Return 0 if proposed schg is valid ; return 1 if invalid
 
-	# Positional params and func variables. $_action defaults to `return 1`
+	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _value; _value="$1"  
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 
 	# No value specified 
-	[ -z "$_value" ] && eval "$_action" "_0" "schg" && return 1 
+	[ -z "$_value" ] && eval "$_if_err" "_0" "schg" && return 1 
 
 	# None is always a valid schg
 	[ "$_value" == "none" ] && return 0 
@@ -337,7 +417,7 @@ check_isvalid_schg() {
 	# Valid inputs are: none | sys | all
 	[ "$_value" != "none" ] && [ "$_value" != "sys" ] \
 			&& [ "$_value" != "all" ] \
-					&& eval "$_action" "_cj2" "$_value" "schg" && return 1
+					&& eval "$_if_err" "_cj2" "$_value" "schg" && return 1
 
 	return 0
 }
@@ -345,19 +425,19 @@ check_isvalid_schg() {
 check_isvalid_seclvl() {
 	# Return 0 if proposed seclvl is valid ; return 1 if invalid
 
-	# Positional params and func variables. $_action defaults to `return 1`
+	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _value; _value="$1"  
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 
 	# No value specified 
-	[ -z "$_value" ] && eval "$_action" "_0" "seclvl" && return 1
+	[ -z "$_value" ] && eval "$_if_err" "_0" "seclvl" && return 1
 
 	# None is always a valid seclvl 
 	[ "$_value" == "none" ] && return 0
 
 	# Security defines levels from lowest == -1 to highest == 3
 	[ "$_value" -lt -1 -o "$_value" -gt 3 ] \
-			&& eval "$_action" "_cj2" "$_value" "seclvl" && return 1
+			&& eval "$_if_err" "_cj2" "$_value" "seclvl" && return 1
 
 	return 0
 }
@@ -366,19 +446,19 @@ check_isvalid_maxmem() {
 	# Return 0 if proposed maxmem is valid ; return 1 if invalid
 # IMPROVEMENT IDEA - check that proposal isn't greater than system memory
 
-	# Positional params and func variables. $_action defaults to `return 1`
+	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _value; _value="$1"  
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 
 	# No value specified 
-	[ -z "$_value" ] && eval "$_action" "_0" "maxmem" && return 1
+	[ -z "$_value" ] && eval "$_if_err" "_0" "maxmem" && return 1
 
 	# None is always a valid maxmem
 	[ "$_value" == "none" ] && return 0
 	
 	# Per man 8 rctl, user can assign units: G|g|M|m|K|k
    ! echo "$_value" | grep -Eqs "^[[:digit:]]+(G|g|M|m|K|k)\$" \
-			&& eval "$_action" "_cj2" "$_value" "maxmem" && return 1
+			&& eval "$_if_err" "_cj2" "$_value" "maxmem" && return 1
 
 	return 0
 }
@@ -386,12 +466,12 @@ check_isvalid_maxmem() {
 check_isvalid_cpuset() {
 	# Return 0 if proposed schg is valid ; return 1 if invalid
 
-	# Positional params and func variables. $_action defaults to `return 1`
+	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _value; _value="$1"  
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 
 	# No value specified 
-	[ -z "$_value" ] && eval "$_action" "_0" "cpuset" && return 1
+	[ -z "$_value" ] && eval "$_if_err" "_0" "cpuset" && return 1
 
 	# None is always a valid cpuset 
 	[ "$_value" == "none" ] && return 0
@@ -401,7 +481,7 @@ check_isvalid_cpuset() {
 
 	# Test for negative numbers and dashes in the wrong place
 	echo "$_value" | grep -Eq "(,-|,[[:blank:]]*-|^[^[:digit:]])" \
-			&& eval "$_action" "_cj2" "$_value" "cpuset" && return 1
+			&& eval "$_if_err" "_cj2" "$_value" "cpuset" && return 1
 
 	# Remove `-' and `,' to check that all numbers are valid CPU numbers
 	_cpuset_mod=$(echo $_value | sed -E "s/(,|-)/ /g")
@@ -409,8 +489,27 @@ check_isvalid_cpuset() {
 	for _cpu in $_cpuset_mod ; do
 		# Every number is followed by a comma except the last one
 		! echo $_validcpuset | grep -Eq "${_cpu},|${_cpu}\$" \
-			&& eval "$_action" "_cj2" "$_value" "cpuset" && return 1
+			&& eval "$_if_err" "_cj2" "$_value" "cpuset" && return 1
 	done
+
+	return 0
+}
+
+check_isvalid_mtu() {
+	# Return 0 if proposed schg is valid ; return 1 if invalid
+
+	# Positional params and func variables. $_if_err defaults to `return 1`
+	local _value; _value="$1"  
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
+
+	# No value specified 
+	[ -z "$_value" ] && eval "$_if_err" "_0" "mtu" && return 1
+
+	# None is always a valid mtu 
+	[ "$_value" == "none" ] && return 0
+
+	[ "$_value" -ge 1200 ] && [ "$_value" -le 1500 ] \
+			|| eval "$_if_err" "_jc11" "mtu" || return 1
 
 	return 0
 }
@@ -422,16 +521,16 @@ check_isvalid_ipv4() {
 	# Variables below are required for caller function to perform other checks. 
 	#   $_a0  $_a1  $_a2  $_a3  $_a4  
 
-	# Positional params and local vars. $_action defaults to `return 1`
+	# Positional params and local vars. $_if_err defaults to `return 1`
 	local _value; _value="$1"  
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 	local _b1 ; local _b2 ; local _b3
 	
 	# _jail only needed for net-firewall exception
 	local _jail ; _jail="$3"
 
 	# No value specified 
-	[ -z "$_value" ] && eval "$_action" "_0" "IPv4" && return 1
+	[ -z "$_value" ] && eval "$_if_err" "_0" "IPv4" && return 1
 
 	# None is always considered valid; but send warning for net-firewall
 	[ "$_value" == "none" ] && return 0
@@ -459,15 +558,16 @@ check_isvalid_ipv4() {
 			&& [ "$_a3" -ge 0 ] && [ "$_a3" -le 255 ] \
 			&& [ "$_a4" -ge 0 ] && [ "$_a4" -le 32 ]  >> /dev/null 2>&1
 		then
+			_valid_IPv4="true"
 			return 0
 		else
 			# Error message, is invalid IPv4
-			eval "$_action" "_cj10" "$_value" && return 1
+			eval "$_if_err" "_cj10" "$_value" && return 1
 		fi
 
 	else
 		# Error message, is invalid IPv4
-		eval "$_action" "_cj10" "$_value" && return 1
+		eval "$_if_err" "_cj10" "$_value" && return 1
 	fi
 }
 
@@ -477,31 +577,31 @@ check_isqubsd_ipv4() {
 		# $_isoverlap=true
 		# $_ismismatch=true
 
-	# Positional params and func variables. $_action defaults to `return 1`
+	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _value  ; _value="$1"  
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 	local _jail   ; _jail="$3" 
 	
 	define_ipv4_convention
 	_used_ips=$(get_used_ips)
 
 	# No value specified 
-	[ -z "$_value" ] && eval "$_action" "_0" "IPv4" 
+	[ -z "$_value" ] && eval "$_if_err" "_0" "IPv4" 
 
 	# net-firewall needs special attention
 	if [ "$_jail" == "net-firewall" ] ; then 
 
 		# IP0 `none' with net-firewall shouldn't really happen
 		[ "$_value" == "none" ] \
-					&& eval "$_action" "_cj9" "$_value" "$_jail" && return 1
+					&& eval "$_if_err" "_cj9" "$_value" "$_jail" && return 1
 	
 		# All else gets ALERT message
-		eval "$_action" "_cj15" "$_value" "$_jail" && return 1
+		eval "$_if_err" "_cj15" "$_value" "$_jail" && return 1
 	fi
 
 	# IP0 `none' with < net- > jails should also be rare/never 
 	[ "$_value" == "none" ] && [ -z "${_jail##net-*}" ] \
-					&& eval "$_action" "_cj13" "$_value" "$_jail" && return 1
+					&& eval "$_if_err" "_cj13" "$_value" "$_jail" && return 1
 	
 	# Otherwise, `none' is fine for any other jails. Skip additional checks.
 	[ "$_value" == "none" ] && return 0 
@@ -510,20 +610,45 @@ check_isqubsd_ipv4() {
 	if grep -qs "$_value" $JMAP \
 			|| [ $(echo "$_used_ips" | grep -qs "${_value%/*}") ] ; then
 	
-		eval "$_action" "_cj11" "$_value" "$_jail" && return 1
+		eval "$_if_err" "_cj11" "$_value" "$_jail" && return 1
 	fi
 
 	# Note that $a2 and $ip2 are missing, because that is the _cycle 
 	# Any change to quBSD naming convention will require manual change.
 	! [ "$_a0.$_a1.$_a3/$_a4" == "$_ip0.$_ip1.$_ip3/$_subnet" ] \
-			&& eval "$_action" "_cj12" "$_value" "$_jail" && return 1
+			&& eval "$_if_err" "_cj12" "$_value" "$_jail" && return 1
 
 	_tunnel=$(sed -nE "s/^${_jail}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
-	[ "$_tunnel" == "none" ] && eval "$_action" "_cj14" "$_value" "$_jail" \
+	[ "$_tunnel" == "none" ] && eval "$_if_err" "_cj14" "$_value" "$_jail" \
 		&& return 1
 	
 	# Otherwise return 0
 	return 0
+}
+
+
+# The checks below are a bit of a hack so that get_jail_parameter() can be a single
+# simplified function, rather than multiple ones. 
+check_isvalid_IP0() {
+	# IP0 probably should be changed to: ipv4 in jailmap.conf
+	check_isvalid_ipv4 "$1" "$2"
+}
+check_isvalid_autostart() {
+	check_is_trueorfalse "$1" "$2" "autostart" 
+}
+check_isvalid_no_destroy() {
+	check_is_trueorfalse "$1" "$2" "no_destroy"
+}
+check_is_trueorfalse() {
+	local _value ; _value="$1"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
+	local _param ; _param="$3" 
+
+	# No value specified 
+	[ -z "$_value" ] && eval "$_if_err" "_0" "$_param" 
+
+	[ "$_value" == "true" -o "$_value" == "false" ] && return 0 \
+			|| eval "$_if_err" "_cj2" "$_value" "$_param"
 }
 
 
@@ -588,9 +713,9 @@ discover_open_ipv4() {
 	# Finds an IP address unused by any running jails, or in jailmap.conf 
 	# Echo open IP on success; Returns 1 if failure to find an available IP
 
-	# Positional params and func variables. $_action defaults to `return 1`
+	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _value; _value="$1"  
-	local _action ; _action="$2" ;  _action="${_action:=return 1}"
+	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 	local _temp_ip
 
 	# net-firewall connects to external network. Assign DHCP, and skip checks. 
@@ -618,7 +743,7 @@ discover_open_ipv4() {
 			# Failure to find IP in the quBSD conventional range 
 			if [ $_cycle -gt 255 ] ; then 
 				eval "_pass_var=${_ip0}.${_ip1}.x.${_ip3}"
-				eval "$_action" "_ip1" "$_value" "$_pass_var"
+				eval "$_if_err" "_jf7" "$_value" "$_pass_var"
 				return 1
 			fi
 		else
@@ -674,10 +799,10 @@ poweroff_vm() {
 	local _quiet
 
 	local _vm
-	[ -n "$1" ] && _vm="$1" || eval "$_action _0 $2" 
-	local _action
+	[ -n "$1" ] && _vm="$1" || eval "$_if_err _0 $2" 
+	local _if_err
 	# Action to take on failure. Default is return 1 to caller function
-	[ -z "$2" ] && _action="return 1" || _action="return 1"
+	[ -z "$2" ] && _if_err="return 1" || _if_err="return 1"
 
 	# Error if $_jail provided is empty
 	[ -z "$_jail" ] && 
@@ -703,7 +828,7 @@ poweroff_vm() {
 
 testfunct() {
 	local _cpuset ; _cpuset="$1"  
-	local _action ; _action="$2" ;  _action=${_action:=return 1}
+	local _if_err ; _if_err="$2" ;  _if_err=${_if_err:=return 1}
 
 	get_msg "_vj11" "testest"
 

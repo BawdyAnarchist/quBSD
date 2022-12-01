@@ -5,7 +5,7 @@ get_msg_qb_edit() {
 	# Positional parameters are used for determining action.
 	# $1 _message: Identifier tag for message
 		# To avoid calling a message, "none" is fine to pass
-	# $2 _action: What type of exit to perform if any
+	# $2 _if_err: What type of exit to perform if any
 	# $3 _msg2: A bit of a hack, for a catch-all [-f] message
 
 	# FORCE should override all calls to the msg and exit function
@@ -13,7 +13,7 @@ get_msg_qb_edit() {
 	
 	# Positional parameters
    local _message ; _message="$1"
-   local _action ; _action="$2"
+   local _if_err ; _if_err="$2"
 	local _msg2 ; _msg2="$3"
 
 
@@ -117,9 +117,9 @@ ENDOFMSG
 
 
 ###################################################################
-#####################  FINAL ACTION TO TAKE  ######################
+#####################  FINAL IF_ERR TO TAKE  ######################
 
-	case $_action in 
+	case $_if_err in 
 		usage_0) 
 				[ -z "$QUIET" ] && usage 
 				exit 0 ;;

@@ -15,7 +15,7 @@ get_options() {
 
 	JAIL="$1"
 	NEWNAME="$2"
-	ACTION="${ACTION=:get_msg_qubsd}"
+	IF_ERR="${IF_ERR=:get_msg_qubsd}"
 }
 
 define_variables() {
@@ -29,7 +29,7 @@ define_variables() {
 
 checks() {
 	# Check that JAIL was specified, and valid 
-	check_isvalid_jail "$JAIL" "$ACTION" || get_msg_qb_rename "usage_1" 
+	check_isvalid_jail "$JAIL" "$IF_ERR" || get_msg_qb_rename "usage_1" 
 	
 	# Make sure new jailname was provided
 	[ -z "$NEWNAME" ] && get_msg_qb_rename "_1" "usage_1"
@@ -63,7 +63,7 @@ rename_jail() {
 	# attempting to modifying zusr datasets for instances they don't exist
 
 	# Stop jail before renaming. Rename should not happen if stop fails
-	stop_jail "$JAIL" "$ACTION" > /dev/null 2>&1 || get_msg_qb_rename "_7" "exit_1"  
+	stop_jail "$JAIL" "$IF_ERR" > /dev/null 2>&1 || get_msg_qb_rename "_7" "exit_1"  
 
 	# Flags down to modify directory names and fstab
 	chflags -R noschg ${M_ZUSR}/$JAIL  > /dev/null 2>&1
@@ -114,7 +114,7 @@ update_dependencies() {
 
 			# Move process to background to parallelize jail restarts 
 			check_isrunning_jail "$_jail" \
-					&& restart_jail "$_jail" "$ACTION" > /dev/null 2>&1 &	
+					&& restart_jail "$_jail" "$IF_ERR" > /dev/null 2>&1 &	
 		done
 		
 		# Due to the & on the restart command, need to positively exit program.

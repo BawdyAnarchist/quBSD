@@ -20,7 +20,7 @@ get_options() {
 	JAIL=${JAIL:="$1"}
 	TUNNEL="$2"
 	MTU=$(sed -nE "s:^mtu[[:blank:]]+::p" $QBCONF)
-	ACTION="get_msg_qubsd"
+	IF_ERR="get_msg_qubsd"
 }
 
 checks() {
@@ -35,14 +35,14 @@ checks() {
 			# IP checks
 			if [ -n "$IP0" ] ; then
 				# Invalid IP must be rejected
-				check_isvalid_ipv4 "$IP0" "$ACTION" || exit 1 
+				check_isvalid_ipv4 "$IP0" "$IF_ERR" || exit 1 
 
 				# Just temporary connections. Warn for convention mismatch, but don't exit  
-				check_isqubsd_ipv4 "$IP0" "$ACTION" 
+				check_isqubsd_ipv4 "$IP0" "$IF_ERR" 
 			else
 
 				# Assign IP if not specified by user 
-				IP0=$(discover_open_ipv4 "$JAIL" "$ACTION") || exit 1 
+				IP0=$(discover_open_ipv4 "$JAIL" "$IF_ERR") || exit 1 
 			fi
 			
 			# Check the pf status and security levels
@@ -52,7 +52,7 @@ checks() {
 			# JAIL and TUNNEL must be running (helps prevent accidents) 
 			check_isrunning_jail "$JAIL" "return 1" || get_msg_qb_connect "_2" "usage_1"
 	
-			[ -n "$TUNNEL" ] && ! check_isrunning_jail "$TUNNEL" "$ACTION" \
+			[ -n "$TUNNEL" ] && ! check_isrunning_jail "$TUNNEL" "$IF_ERR" \
 					&& get_msg_qb_connect "_3" "usage_1"
 		;;
 	esac
@@ -126,7 +126,7 @@ assemble_interface_list() {
 
 configure_epairs() {
 	# Start tunnel if it's off
-	check_isrunning_jail "$TUNNEL" || start_jail "$TUNNEL" "$ACTION" || exit 1
+	check_isrunning_jail "$TUNNEL" || start_jail "$TUNNEL" "$IF_ERR" || exit 1
 
 	# Create the epair and send to jails
 	epair=$(ifconfig epair create)

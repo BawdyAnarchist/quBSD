@@ -20,7 +20,7 @@ get_options() {
 
 	JAIL="$1" ; shift
 	_CMD="$@"
-	ACTION="${ACTION:=get_msg_qubsd}"
+	IF_ERR="${IF_ERR:=get_msg_qubsd}"
 
 	# Passing commands through another terminal is tricky. 
 	if [ -z "$_CMD" ] ; then
@@ -36,6 +36,7 @@ get_options() {
 		_CMD="'${_CMD}'"
 		
 		# Unless [-v] is specified suppress output of command
+		# NOTE: The behavior of {parameter-word} isn't documented in man sh, but it works.
 		_REDIRECT="${_REDIRECT- > /dev/null 2>&1 &}"
 	fi
 }
@@ -61,7 +62,7 @@ main() {
 	fi
 
 	# Function handles all checks to see if jail needs to (and can) be started
-	start_jail "$JAIL" "$ACTION" || get_msg_qb_cmd "none" "exit_1"
+	start_jail "$JAIL" "$IF_ERR" || get_msg_qb_cmd "none" "exit_1"
 
 	# Final evaluation statement. Launches the window/commands 
 	eval jexec -l -U $_USER $JAIL csh -c $_NEWWIND $_CMD $_REDIRECT
