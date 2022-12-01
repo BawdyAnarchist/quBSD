@@ -1,175 +1,126 @@
 #!/bin/sh
 
-#  Virtual interfaces, pf, and resource control are best done before starting services 
+. /usr/local/lib/quBSD/quBSD.sh
 
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $JMAP
-
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF) 
-m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-
-# Define script variables
-jail="$1"
-jpf="${m_zusr}/$jail/rw/etc/pf.conf"
-wgconf="${m_zusr}/$jail/rw/usr/local/etc/wireguard/wg0.conf"
-class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
-rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP)
-jIP=$(sed -nE "s/^${jail}[[:blank:]]+IP0[[:blank:]]+//p" $JMAP)
-IP0="$jIP"
-tunnel=$(sed -nE "s/^${jail}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
-connects=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${jail}//p" $JMAP)
-maxmem=$(sed -nE "s/^${jail}[[:blank:]]+maxmem[[:blank:]]+//p" $JMAP) 
-cpuset=$(sed -nE "s/^${jail}[[:blank:]]+cpuset[[:blank:]]+//p" $JMAP) 
-mtu=$(sed -nE "s:^mtu[[:blank:]]+::p" $QBCONF) 
-if [ -e "$wgconf" ] ; then
-	Endpoint=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*//p" $wgconf | \
-						sed -n "s/:[[:digit:]]*.*//p")
-	wgPorts=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*.*://p" $wgconf) 
-fi
-
-usage() {
-	printf "%b" "\n$err\n\n"
-	exit 1
+get_options() {
+	JAIL="$1"
+	IF_ERR="get_msg_qubsd"
+	DEFAULTS="true"
 }
 
-checks() {
-	if [ -z "$jail" ] ; then
-		err="Error: exec.poststart:  Must select a jail"
-		usage
-	elif [ -z "$JMAP" ] ; then
-		err="Error: exec.poststart:  No file selected for jailmap.conf"
-		usage
-	elif [ -z "$class" ] ; then
-		err="Error: exec.poststart: $jail has no class designated in jailmap.conf"
-		usage
-	elif [ -z "$rootjail" ] ; then
-		err="Error: exec.poststart: $jail has no rootjail designated in jailmap.conf" 
-	 	usage
-	elif [ -z "$tunnel" ] ; then
-		err="Error: exec.poststart: $jail has no tunnel desingated in jailmap.conf"
-		usage
-	elif [ -z "$jIP" ] ; then
-		err="Error: exec.poststart: $jail has no IP0 setting jailmap.conf"
-		usage
-	elif [ -z "$validIPv4" -a "$jIP" != "none" ] ; then
-		err="Error: exec.poststart: $jail IP0 must be \`none' or valid CIDR IPv4"
-		usage
-	fi
+get_parameters() {
+	# get_jail_parameter conducts all necessary checks for the parameter
+	get_jail_parameter class  "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	get_jail_parameter IP0    "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	get_jail_parameter tunnel "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	get_jail_parameter maxmem "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	get_jail_parameter cpuset "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	get_jail_parameter mtu    "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+
+	# All jails which are served a network connection by <JAIL>
+	CLIENTS=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${JAIL}//p" $JMAP) 
 }
 
-check_IPv4() {
-     # Perhpas not as technically correct as doing a regex,
-     # but it's readable, and the a/b pairs are usable elsewhere
-     # IPv4 cidr:  a0.a1.a2.a3/a4
+jail_to_gateway() {
+	# Create epair, send to <JAIL> and <TUNNEL> 
+	_ext_if=$(ifconfig epair create)
+	_ext_if="${_ext_if%?}b"
+	ifconfig "${_ext_if%?}a" vnet $TUNNEL
+	ifconfig "${_ext_if%?}b" vnet $JAIL
 
-	validIPv4=""
+	# Configure networking on the <TUNNEL> side of the epair
+	jexec -l -U root $TUNNEL ifconfig "${_ext_if%?}a" inet "${IP0%.*/*}.1/${IP0#*/}" mtu $MTU up 
 
-     a0=${IP0%%.*.*.*/*}
-     a4=${IP0##*.*.*.*/}
-          b1=${IP0#*.*}
-          a1=${b1%%.*.*/*}
-               b2=${IP0#*.*.*}
-               a2=${b2%%.*/*}
-                    b3=${IP0%/*}
-                    a3=${b3##*.*.*.}
-
-     if    [ "$a0" -ge 0 -a "$a0" -le 255 -a "$a1" -ge 0 -a "$a1" -le 255 \
-          -a "$a2" -ge 0 -a "$a2" -le 255 -a "$a3" -ge 0 -a "$a3" -le 255 \
-          -a "$a4" -ge 0 -a "$a4" -le 31 ] >> /dev/null 2>&1
-     then
-          echo "$IP0" | egrep -qs "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+"
-          [ "$?" = "0" ] && validIPv4="true"
-     fi
+	# Configure networking on the <JAIL> side of the epair   
+	jexec -l -U root $JAIL ifconfig "${_ext_if%?}b" inet $IP0 mtu $MTU up 
+	jexec -l -U root $JAIL route add default "${IP0%.*/*}.1" 
 }
 
-upstream_tunnel() {
-	ext_if=$(ifconfig epair create)
-	ext_if="${ext_if%?}b"
-	ifconfig "${ext_if%?}a" vnet $tunnel
-	ifconfig "${ext_if%?}b" vnet $jail
+jail_to_clients() {
+	# Create epair, send to <JAIL> and _client 
+	_int_if=$(ifconfig epair create)
+	ifconfig "${_int_if%?}a" vnet $JAIL
+	ifconfig "${_int_if%?}b" vnet $_client
 
-	# Configure the tunnel side of the epair
-	jexec -l -U root $tunnel ifconfig "${ext_if%?}a" inet "${jIP%.*/*}.1/${jIP#*/}" mtu $mtu up 
-
-	# MTU HACK: The mtu specification at the end will be unnecessary for most people
-	jexec -l -U root $jail ifconfig "${ext_if%?}b" inet $jIP mtu $mtu up 
-	jexec -l -U root $jail route add default "${jIP%.*/*}.1" 
-}
-
-client_connections() {
-	int_if=$(ifconfig epair create)
-	ifconfig "${int_if%?}a" vnet $jail
-	ifconfig "${int_if%?}b" vnet $c
-
-	jexec -l -U root $jail ifconfig "${int_if%?}a" inet "${cIP%.*/*}.1/${cIP#*/}" mtu $mtu up
-
-	jexec -l -U root $c ifconfig "${int_if%?}b" inet $cIP mtu $mtu up
-	jexec -l -U root $c route add default "${cIP%.*/*}.1"
-	jexec -l -U root $c route add default "${cIP%.*/*}.1"
+	# Configure <JAIL> (server) side of the epair	
+	jexec -l -U root $JAIL ifconfig "${_int_if%?}a" inet "${_cIP%.*/*}.1/${_cIP#*/}" mtu $MTU up
 	
-	# If there are wg interfaces, bring them down and back up
-	wg_intf=$(jexec -l -U root $c ifconfig -g tun | grep "wg")
-	for w in $wg_intf ; do 
-		jexec -l -U root $c wg-quick down $w 
-		jexec -l -U root $c wg-quick up $w 
+	# Configure <_client> side of the epair
+	jexec -l -U root $_client ifconfig "${_int_if%?}b" inet $_cIP mtu $MTU up
+	jexec -l -U root $_client route add default "${_cIP%.*/*}.1"
+
+	# If there are wg interfaces on <_client> , down/up to ensure connection is good 
+	wg_intf=$(jexec -l -U root $_client ifconfig -g tun | grep "wg")
+
+	for _wg in $wg_intf ; do 
+		jexec -l -U root $_client wg-quick down $_wg
+		jexec -l -U root $_client wg-quick up $_wg 
 	done
 }
 
 configure_epairs() {
-	# Jails with a tap interface specified in jailmap.conf receive their respective taps 
-	if [ "$jail" = "net-firewall" ] ; then
-		ifconfig $tunnel vnet $jail
-		jexec -l -U root $jail ifconfig $tunnel mtu $mtu up
-		ext_if="$tunnel"
+	# net-firewall is an exception case, as it only has a tap to configure 
+	if [ "$JAIL" == "net-firewall" ] ; then
+		ifconfig $TUNNEL vnet $JAIL
+		jexec -l -U root $JAIL ifconfig $TUNNEL mtu $MTU up
+		_ext_if="$TUNNEL"
 	fi
 
-	# Connects jail to its upstream tunnel specified in jailmap.conf
-	if [ "$jIP" != "none" ] && `jls | grep -qs "$tunnel"` ; then
-		upstream_tunnel	
-	fi
+	# Connects <jail> to its gateway network provider specified in jailmap.conf 
+	[ "$IP0" != "none" ] && check_isrunning_jail "$TUNNEL" && jail_to_gateway 
 
-	# Cycle through downstream clients, check IPs, bring up epairs for running jails
-	for c in $connects ; do 
-		cIP=$(sed -nE "s/^${c}[[:blank:]]+IP0[[:blank:]]+//p" $JMAP) 
-		IP0="$cIP"
-		check_IPv4
+	# If <jail> serves a network connection, bring those connections up 
+	for _client in $CLIENTS ; do 
+		# Get the IP address for each client
+		_cIP=$(sed -nE "s/^${_client}[[:blank:]]+IP0[[:blank:]]+//p" $JMAP) 
 
-		if [ -n "$c" -a "$validIPv4" ] ; then
-			nat_table="${cIP} ${nat_table}"
+		if [ -n "$_client" ] && check_isvalid_ipv4 "$_cIP" ; then
+			# Builds a table of allowable client IPs for the <jail>
+			nat_table="${_cIP} ${nat_table}"
 
-			if `jls | grep -qs " $c "` ; then
-				client_connections
+			if check_isrunning_jail "$_client" ; then
+				# If the client is running, connect jail and client
+				jail_to_clients
 			fi
 		fi
 	done
 }
 
 pf_modify() {
-	if [ -e "$jpf" ] ; then
-		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"$ext_if\"@" $jpf
-		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"$jIP\"@" $jpf
-		sed -i '' -e "s@^routerIP[[:blank:]]*=.*@routerIP = \"${jIP%.*/*}.1\"@" $jpf
-		sed -i '' -e "s@^table <pass_ips>.*@table <pass_ips> { $nat_table}@" "$jpf"
-		if [ "$jail" != "net-firewall" ] ; then
-			sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"$Endpoint\"@" $jpf  
-			sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"$wgPorts\"@" $jpf  
+	# Numerous variables need to be modified for pf.conf
+
+	if [ -e "$JPF" ] ; then
+
+		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"$_ext_if\"@" $JPF
+		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"$IP0\"@" $JPF
+		sed -i '' -e "s@^routerIP[[:blank:]]*=.*@routerIP = \"${IP0%.*/*}.1\"@" $JPF
+		sed -i '' -e "s@^table <pass_ips>.*@table <pass_ips> { $nat_table}@" "$JPF"
+
+		if ! [ "$JAIL" == "net-firewall" ] ; then
+			sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"$ENDPOINT\"@" $JPF  
+			sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"$WGPORTS\"@" $JPF  
 		fi
 	fi
 }
 
 resource_ctl() {
-        rctl -r jail:${jail}:: > /dev/null 2>&1
-        [ -n "$maxmem" -a "$maxmem" != "none" ] && rctl -a jail:${jail}:memoryuse:deny=${maxmem}
-        [ -z "$cpuset" -o "$cpuset" = "none" ] && cpuset -j $jail -cl 1-47 || cpuset -j $jail -cl $cpuset
+        rctl -r jail:${JAIL}:: > /dev/null 2>&1
+        [ "$MAXMEM" = "none" ] || rctl -a jail:${JAIL}:memoryuse:deny=${MAXMEM}
+        [ "$CPUSET" = "none" ] || cpuset -j $JAIL -cl 1-47 || cpuset -j $JAIL -cl $CPUSET
 }
 
+get_global_variables
 
-check_IPv4
-checks 
+get_options "$@"
+
+get_networking_variables
+
+get_parameters
+
 configure_epairs
+
 pf_modify			
+
 resource_ctl			
 
 

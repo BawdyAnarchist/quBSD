@@ -117,6 +117,8 @@ jails are being created on the basis of the most recent autosnap snapshots. That
 
 exec scripts should assign qb-list parameter defaults in case some are missing, but should also throw a log/error or something.
 
+Update the guides regarding #defaults
+
 ### MINOR UPGRADES
 
 qb-help
