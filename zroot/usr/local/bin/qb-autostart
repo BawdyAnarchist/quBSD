@@ -11,11 +11,11 @@ jautostart_start() {
 	
 	for _jail in $AUTOSTART ; do
 
-		# Jails with a tunnel not yet started, will need to wait for tunnel to start 
-		_tunnel=$(sed -nE "s/^${_jail}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
+		# Jails with a gateway not yet started, will need to wait for gateway to start 
+		_gateway=$(sed -nE "s/^${_jail}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
 
-		# Switch on the basis of whether tunnel is running
-		if jls -j "$_tunnel" > /dev/null 2>&1 ; then
+		# Switch on the basis of whether gateway is running
+		if jls -j "$_gateway" > /dev/null 2>&1 ; then
 
 			# Start jail, send start process to background, and move to next
 			jail -c $_jail & 

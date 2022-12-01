@@ -45,7 +45,7 @@ assemble_header() {
 	mktemp $TMP > /dev/null
 	mktemp $TMP2 > /dev/null
 
-	printf "%b" "${HILIT}CONTAINER\tJID\tTUNNEL\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" >> $TMP
+	printf "%b" "${HILIT}CONTAINER\tJID\tGATEWAY\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" >> $TMP
 }
 
 define_variables() {
@@ -76,8 +76,8 @@ get_jails_loop() {
 	for _j in $jails ; do
 		class=$(sed -nE "s/^${_j}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
 		class="${class%jail}"
-		tunnel=$(sed -nE "s/^${_j}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
-		tunnel="${tunnel:--}"
+		gateway=$(sed -nE "s/^${_j}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
+		gateway="${gateway:--}"
 		rootjail=$(sed -nE "s/^${_j}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP)
 		rootjail="${rootjail:--}"
 		disk="-"
@@ -109,7 +109,7 @@ get_jails_loop() {
 			fi
 		fi
 
-		tunnel="${tunnel:--}"
+		gateway="${gateway:--}"
 		rootjail="${rootjail:--}"
 		disk="${disk:--}"
 		jid="${jid:--}"
@@ -125,7 +125,7 @@ get_jails_loop() {
 
 		esac
 
-		printf "%b" "${TEMPCOL}$_j\t" "$jid\t" "$tunnel\t" "$class\t" "$rootjail\t" "$sub\t" "$disk\t" "$ram\t" "${cpu}${COL_OFF}\n" >> $TMP
+		printf "%b" "${TEMPCOL}$_j\t" "$jid\t" "$gateway\t" "$class\t" "$rootjail\t" "$sub\t" "$disk\t" "$ram\t" "${cpu}${COL_OFF}\n" >> $TMP
 	done
 }
 

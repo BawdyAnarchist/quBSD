@@ -22,7 +22,7 @@ get_options() {
 define_variables() {
 	_MEM=$(sed -nE "s/^${_VM}[[:blank:]]+memsize+//gp" $JMAP) 
 	_CPUS=$(egrep "^${_VM}[[:blank:]]+numcpus" $JMAP | awk '{print $3}')
-	_TAP=$(egrep "^${_VM}[[:blank:]]+tunnel" $JMAP | awk '{print $3}')
+	_TAP=$(egrep "^${_VM}[[:blank:]]+gateway" $JMAP | awk '{print $3}')
 ## This must be reworked for pciconf
 ##	_PPT=$(sed -nE "s:ppt_nic[[:blank:]]+::p" $QBCONF) 
 }

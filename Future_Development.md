@@ -61,8 +61,14 @@ qubsd_installer
 	Expand install options     
 		Can select to merge zroot and zusr with other existing dataset/mount     
 
+	- Double check the install script that it copies qb-ivpn to 0net
+
+
 
 ### BEST PRACTICES / CLEANUP
+
+qb-stat 
+	- #default is showing up as a jail. Remove lines that start with #
 
 - net-firewall pf.conf might not be fully generalized for routerIP. 
 	- basically, exec.created relies on setting the last number to "1". 
@@ -76,13 +82,6 @@ qubsd_installer
 qb-usbvm     
 	- When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
 	- Need to rework usbvm automatic internet with option (due to general net rework)
-
-qb-ivpn - sed error - needs better separation of the -j option to not throw error.
-        - Also an unused variable "pingfail"
-	   - Current server should be upgraded to show current settings, even if not connected
-	   - Need to verify how well it works when connection is down
-	   - pf.conf references the endpoint IP. Needs to be updated as well
-		- Double check the install script that it copies qb-ivpn to 0net
 
 qb-create 
 	- Really should have some trap functions set when zfs cloning
@@ -111,13 +110,11 @@ Optimze scripts. Some run too slow.
 		https://tldp.org/LDP/abs/html/optimizations.html
 	Probably alot of sed's can be replaced with cut and tr
 	
-"tunnel" should reall be changed to gateway
-
 jails are being created on the basis of the most recent autosnap snapshots. That *might?* not be a good idea?
 
 exec scripts should assign qb-list parameter defaults in case some are missing, but should also throw a log/error or something.
 
-Update the guides regarding #defaults
+Update the guides regarding #defaults in jailmap.
 
 ### MINOR UPGRADES
 
@@ -130,15 +127,9 @@ qb-help
 
 Test having the rootjails at high security levels when turned off.
 
-qb-dpi - make it so that a program can launch under alt dpi settings and return to normal
-	- You could even add it as an option to qb-cmd, and i3gen.sh/conf
-	
-	- Also good to add it to startup.sh
-
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 
 qb-update - Update rootjails, create snapshots
-
 
 Crons
 - Popup warning if zpool errors are discovered

@@ -29,7 +29,7 @@ jail="$1"
 define_variables() {
 	usbvmIP=$(egrep "^usbvm[[:blank:]]+IP0" $JMAP | awk '{print $3}')
 	jailconnectIP="${usbvmIP%.*/*}.2/${usbvmIP#*.*.*.*/}"
-	tap=$(egrep "^usbvm[[:blank:]]+tunnel" $JMAP | awk '{print $3}')
+	tap=$(egrep "^usbvm[[:blank:]]+gateway" $JMAP | awk '{print $3}')
 	ppt_usb1=$(sed -nE "s:ppt_usb1[[:blank:]]+:: p" $QBCONF) 
 	ppt_usb2=$(sed -nE "s:ppt_usb2[[:blank:]]+:: p" $QBCONF) 
 	

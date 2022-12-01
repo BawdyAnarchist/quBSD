@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # IMPROVEMENT: Make it so that a command can be run immediately at terminal launch.
-# IMPROVEMENT: Add option for automatic network connection (tunnel). Auto IP.  
+# IMPROVEMENT: Add option for automatic network connection (gateway). Auto IP.  
 
 . /usr/local/lib/quBSD/quBSD.sh
 . /usr/local/lib/quBSD/msg-disp.sh

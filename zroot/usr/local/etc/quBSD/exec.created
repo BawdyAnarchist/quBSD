@@ -2,41 +2,44 @@
 
 . /usr/local/lib/quBSD/quBSD.sh
 
-get_options() {
+get_parameters() {
 	JAIL="$1"
 	IF_ERR="get_msg_qubsd"
 	DEFAULTS="true"
-}
 
-get_parameters() {
 	# get_jail_parameter conducts all necessary checks for the parameter
-	get_jail_parameter class  "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
-	get_jail_parameter IP0    "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
-	get_jail_parameter tunnel "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
-	get_jail_parameter maxmem "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
-	get_jail_parameter cpuset "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
-	get_jail_parameter mtu    "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	get_jail_parameter class   "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	get_jail_parameter IP0     "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	get_jail_parameter gateway "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	get_jail_parameter maxmem  "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	get_jail_parameter cpuset  "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+
+	# MTU only with valid IP. No alert if substituting #default mtu 
+	[ IP0 == "none" ] || get_jail_parameter mtu "$JAIL" "$IF_ERR" "$DEFAULTS"  
 
 	# All jails which are served a network connection by <JAIL>
-	CLIENTS=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${JAIL}//p" $JMAP) 
+	CLIENTS=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${JAIL}//p" $JMAP) 
 }
 
-jail_to_gateway() {
-	# Create epair, send to <JAIL> and <TUNNEL> 
+connect_jail_to_gateway() {
+	# Create epair, send to <JAIL> and <GATEWAY> 
 	_ext_if=$(ifconfig epair create)
 	_ext_if="${_ext_if%?}b"
-	ifconfig "${_ext_if%?}a" vnet $TUNNEL
+	ifconfig "${_ext_if%?}a" vnet $GATEWAY
 	ifconfig "${_ext_if%?}b" vnet $JAIL
 
-	# Configure networking on the <TUNNEL> side of the epair
-	jexec -l -U root $TUNNEL ifconfig "${_ext_if%?}a" inet "${IP0%.*/*}.1/${IP0#*/}" mtu $MTU up 
+	# Configure networking on the <GATEWAY> side of the epair
+	jexec -l -U root $GATEWAY ifconfig "${_ext_if%?}a" inet "${IP0%.*/*}.1/${IP0#*/}" mtu $MTU up 
+echo	jexec -l -U root $GATEWAY ifconfig "${_ext_if%?}a" inet "${IP0%.*/*}.1/${IP0#*/}" mtu $MTU up 
 
 	# Configure networking on the <JAIL> side of the epair   
+echo	jexec -l -U root $JAIL ifconfig "${_ext_if%?}b" inet $IP0 mtu $MTU up 
 	jexec -l -U root $JAIL ifconfig "${_ext_if%?}b" inet $IP0 mtu $MTU up 
+echo	jexec -l -U root $JAIL route add default "${IP0%.*/*}.1" 
 	jexec -l -U root $JAIL route add default "${IP0%.*/*}.1" 
 }
 
-jail_to_clients() {
+connect_jail_to_clients() {
 	# Create epair, send to <JAIL> and _client 
 	_int_if=$(ifconfig epair create)
 	ifconfig "${_int_if%?}a" vnet $JAIL
@@ -61,27 +64,24 @@ jail_to_clients() {
 configure_epairs() {
 	# net-firewall is an exception case, as it only has a tap to configure 
 	if [ "$JAIL" == "net-firewall" ] ; then
-		ifconfig $TUNNEL vnet $JAIL
-		jexec -l -U root $JAIL ifconfig $TUNNEL mtu $MTU up
-		_ext_if="$TUNNEL"
+		ifconfig $GATEWAY vnet $JAIL
+		jexec -l -U root $JAIL ifconfig $GATEWAY mtu $MTU up
+		_ext_if="$GATEWAY"
 	fi
 
 	# Connects <jail> to its gateway network provider specified in jailmap.conf 
-	[ "$IP0" != "none" ] && check_isrunning_jail "$TUNNEL" && jail_to_gateway 
+	[ "$IP0" != "none" ] && check_isrunning_jail "$GATEWAY" && connect_jail_to_gateway 
 
 	# If <jail> serves a network connection, bring those connections up 
 	for _client in $CLIENTS ; do 
 		# Get the IP address for each client
-		_cIP=$(sed -nE "s/^${_client}[[:blank:]]+IP0[[:blank:]]+//p" $JMAP) 
+		_cIP=$(get_jail_parameter IP0 "$_client" "return 1" "false" "true")
 
-		if [ -n "$_client" ] && check_isvalid_ipv4 "$_cIP" ; then
-			# Builds a table of allowable client IPs for the <jail>
-			nat_table="${_cIP} ${nat_table}"
+		# Builds a table of allowable client IPs for the <jail>
+		nat_table="${_cIP} ${nat_table}"
 
-			if check_isrunning_jail "$_client" ; then
-				# If the client is running, connect jail and client
-				jail_to_clients
-			fi
+		if check_isrunning_jail "$_client" ; then
+			connect_jail_to_clients
 		fi
 	done
 }
@@ -104,18 +104,20 @@ pf_modify() {
 }
 
 resource_ctl() {
-        rctl -r jail:${JAIL}:: > /dev/null 2>&1
-        [ "$MAXMEM" = "none" ] || rctl -a jail:${JAIL}:memoryuse:deny=${MAXMEM}
-        [ "$CPUSET" = "none" ] || cpuset -j $JAIL -cl 1-47 || cpuset -j $JAIL -cl $CPUSET
+	# Remove any existing rules for the jail 	
+	rctl -r jail:${JAIL}:: > /dev/null 2>&1
+	
+	# Establish max memory allocaiton and jail CPUs
+	[ "$MAXMEM" = "none" ] || rctl -a jail:${JAIL}:memoryuse:deny=${MAXMEM}
+	[ "$CPUSET" = "none" ] || cpuset -j $JAIL -cl $CPUSET
 }
 
 get_global_variables
 
-get_options "$@"
-
+# pf and wireguard files and variables
 get_networking_variables
 
-get_parameters
+get_parameters "$@"
 
 configure_epairs
 

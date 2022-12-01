@@ -12,7 +12,7 @@ while getopts c:C:f:ghHi:m:r:s:t:T: o ; do
 		m) maxmem="$OPTARG" ;;
 		r) rootjail="$OPTARG" ;;
 		s) seclvl="$OPTARG" ;;
-		t) tunnel="$OPTARG" ;;
+		t) gateway="$OPTARG" ;;
 		T) template="$OPTARG" ;;
 	esac
 done
@@ -73,7 +73,7 @@ Usage: qb-create -c <class> -r <rootjail> <newjail>"
 All possible options:
 Usage: qb-create [-h] [-g] [-c <class>] [-C <cpuset>] [-f <flags>] \\ 
                  [-i <IP0>] [-m <maxmem>] [-r <rootjail>] [-s <seclvl>] \\
-                 [-t <tunnel_jail>] [-T <template_jail>] [-H] <newjail>"
+                 [-t <gateway_jail>] [-T <template_jail>] [-H] <newjail>"
 
    -h: (h)elp: Shows this message
    -g: (g)uided: Informative messages guide the user through a series of
@@ -98,7 +98,7 @@ JAIL PARAMETERS
         Valid arguments: <none|sys|all>  (This is a quBSD convention)
         \`sys' includes: /bin /boot /lib /etc and other system files
         \`all' includes: All files, including /home. See man 1 chflags
-   -i: (i)p: IPv4 of <newjail>. If [-i] is not specified, but <tunnel>  
+   -i: (i)p: IPv4 of <newjail>. If [-i] is not specified, but <gateway>  
         is a valid net-<jail>, an unused IPv4 address is auto applied
         Valid arguments:  In IPv4 CIDR notation IP.IP.IP.IP/subnet
    -m: (m)ax memory allocation for <newjail>
@@ -112,7 +112,7 @@ JAIL PARAMETERS
             [Bootstrapping new jails is unsupported. Use bsdinstall]
    -s: (s)ecurelevel: Applies \`sysctl kern.securelevel\` to <newjail>
         Valid arguments: <-1|0|1|2|3>. See man 7 security
-   -t: (t)unnel: <newjail> is connected to <tunnel_jail> at jail start
+   -t: (t)unnel: <newjail> is connected to <gateway_jail> at jail start
         Valid arguments: Must be existing appjail
 
 EOF
@@ -149,7 +149,7 @@ define_errors() {
 
 	e9=$(printf "%b" "qb-create: ERROR: [-T] Must specify a VALID template, or \`none'")
 
-	e12=$(printf "%b" "qb-create: ERROR: [-t] User opted to exit, tunnel has incomplete config" \
+	e12=$(printf "%b" "qb-create: ERROR: [-t] User opted to exit, gateway has incomplete config" \
 			"\nHere are a list of all net-jails:\n\n$netjails\n")
 
 	e13=$(printf "%b" "qb-create: ERROR: [-i] You must specify a VALID IP address\n" \
@@ -162,7 +162,7 @@ define_errors() {
 			"\nHere is a mapping of all IPs designated in jailmap.conf:\n\n$JMAPIPs\n" \
 			"\nAnd all the IPs currently in use by running jails:\n\n$usedIPs")
 
-	e15_1=$(printf "%b" "qb-create: ERROR: User opted to exit, to re-evaluate IP and/or tunnel") 
+	e15_1=$(printf "%b" "qb-create: ERROR: User opted to exit, to re-evaluate IP and/or gateway") 
 
 	e16=$(printf "%b" "qb-create: ERROR: [-f] Flags (schg) option can only be one of" \
 			"3 settings:  none | sys | all") 
@@ -186,7 +186,7 @@ define_errors() {
 			"\nshows your expected rootjail as not being a child zfs dataset" \
 			"\n\n\tChoose one of the rootjails above:  \n")
 
-	e23=$(printf "%b" "\n\tERROR:  Invalid selection. Choose a valid tunnel (or none):  ")
+	e23=$(printf "%b" "\n\tERROR:  Invalid selection. Choose a valid gateway (or none):  ")
 	
 	e24=$(printf "%b" "\n\tERROR: Invalid IPv4 CIDR. " \
 					"\n\tEnter valid IPv4. INCLUDE THE SUBNET! (or none):  ")
@@ -227,11 +227,11 @@ define_warnings() {
 	w3=$(printf "%b" "\n\tWARNING:  Selection overlaps with an IPv4 " \
 			"already in use\n\tDo you really want to do this? (y/n): ")
 
-	w4=$(printf "%b" "\nqb-create: WARNING: [-t] $tunnel (tunnel_jail) is not fully configured." \
-			"\nHere is a list of valid tunnel possibilities:\n\n$validtemplatejs\n" \
+	w4=$(printf "%b" "\nqb-create: WARNING: [-t] $gateway (gateway_jail) is not fully configured." \
+			"\nHere is a list of valid gateway possibilities:\n\n$validtemplatejs\n" \
 			"\n\tContinue anyways? (y/n):  ")
 
-	w5=$(printf "%b" "\nqb-create: WARNING: Valid IPv4 ($IP0), but tunnel is \`none'" \
+	w5=$(printf "%b" "\nqb-create: WARNING: Valid IPv4 ($IP0), but gateway is \`none'" \
 			"\n\tContinue anyways? (y/n):  ")
 }
 
@@ -284,14 +284,14 @@ define_messages() {
 			"\n \`0base' is a bare, unmodified install. You can duplicate and modify it. " \
 			"\n\n\tSelect one of the rootjails above:  ")
 
-	m7=$(printf "%b" "\nThe tunnel_jail is the gateway by which $newjail will connect to the network" \
+	m7=$(printf "%b" "\nThe gateway_jail is the gateway by which $newjail will connect to the network" \
 		"\nNormally you will select a \"net-<jail>\" jail; but any appjail is valid, and" \
 		"\nan epair will be created at jail start. Here's a list off all net-<jails>\n" \
-		"\n`egrep -o "^net[^[:blank:]]+" $JMAP` \n\n\tSelect a tunnel jail (or: none):  ")
+		"\n`egrep -o "^net[^[:blank:]]+" $JMAP` \n\n\tSelect a gateway jail (or: none):  ")
 	m8=$(printf "%b" "\nIP address should be entered as IPv4 CIDR notation" \
 		"\nFor reference, here's what is already designated in jail.conf:$JMAPIPs" \
 		"\n\nAnd here's a mapping of everything that is currently in use:$usedIPs" \
-		"\n\n\tBased on the selected tunnel, quBSD convention would be to" \
+		"\n\n\tBased on the selected gateway, quBSD convention would be to" \
 		"\n\tassign an IP like the following:  $ip0_255  " \
 		"\n\n\tThe first available IP in this range is: $OPENIP" \
 		"\n\n\tEnter IPv4. INCLUDE THE SUBNET!  (or: none):  " )
@@ -353,7 +353,7 @@ check_parameters() {
 		maxmem=${maxmem:-`sed -nE "s/^${template}[[:blank:]]+maxmem[[:blank:]]+//p" $JMAP`}
 		rootjail=${rootjail:-`sed -nE "s/^${template}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP`}
 		seclvl=${seclvl:-`sed -nE "s/^${template}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP`}
-		tunnel=${tunnel:-`sed -nE "s/^${template}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP`}
+		gateway=${gateway:-`sed -nE "s/^${template}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP`}
 
 		# Enusre that template conferred at least a class and rootjail 
 		if [ -z "$class" -o -z "$rootjail" ] ; then
@@ -366,7 +366,7 @@ check_parameters() {
 	schg=${schg:-none}
 	maxmem=${maxmem:-none}
 	seclvl=${seclvl:--1}
-	tunnel=${tunnel:-none}
+	gateway=${gateway:-none}
 		
 	# Check IP0 if specified, find auto increment if unspecified 
 	check_IPv4
@@ -399,9 +399,9 @@ check_parameters() {
 		fi
 	fi
 
-	if `echo "$validtemplatejs" | egrep -qs "^$tunnel\$"` ; then
-		validtunnel="true"
-	elif [ "$tunnel" != "none" ] ; then
+	if `echo "$validtemplatejs" | egrep -qs "^$gateway\$"` ; then
+		validgateway="true"
+	elif [ "$gateway" != "none" ] ; then
 		printf "%b" "$w4" ; read resp 
 		[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$e12" && usage
 	fi
@@ -419,13 +419,13 @@ check_parameters() {
 			printf "%b" "$w2" ; read resp 
 			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$e15" && usage
 		
-		elif [ "$ipwithnotunnel" ] ; then
+		elif [ "$ipwithnogateway" ] ; then
 			printf "%b" "$w5" ; read resp
 			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$e15_1" && usage
 		fi
 	else 
-		# If a valid tunnel is present, assume that an IP0 connection is desired
-		if [ "$validtunnel" ] ; then
+		# If a valid gateway is present, assume that an IP0 connection is desired
+		if [ "$validgateway" ] ; then
 			[ "$ERR" ] && usage
 			IP0="$OPENIP"
 		else 
@@ -528,12 +528,12 @@ get_networking() {
 	clear ; printf "%b" "$m7"
 
 	while : ; do 
-		read tunnel
-		`printf "%b" "$validtemplatejs\nnone" | egrep -qs "^$tunnel\$"` && break
+		read gateway
+		`printf "%b" "$validtemplatejs\nnone" | egrep -qs "^$gateway\$"` && break
 		printf "%b" "$e23"
 	done
 	
-	if [ "$tunnel" != "none" ] ; then
+	if [ "$gateway" != "none" ] ; then
 		find_IP 
 		define_messages
 		clear ; printf "%b" "$m8"
@@ -669,8 +669,8 @@ find_IP() {
         elif [ -z "${jail##serv-*}" ] ; then
                 aa=10 ; bb=128 ; dd=2 ; ee=30
 
-        elif [ -z "${tunnel##none*}" -a "$IP0" != "none" ] ; then
-                ipwithnotunnel="true" ; cycle=256
+        elif [ -z "${gateway##none*}" -a "$IP0" != "none" ] ; then
+                ipwithnogateway="true" ; cycle=256
         else
                 aa=10 ; bb=1 ; dd=2 ; ee=30
         fi
@@ -795,7 +795,7 @@ change_config_files() {
 	qb-edit -qf $newjail IP0 $IP0	
 	qb-edit -qf $newjail maxmem $maxmem
 	qb-edit -qf $newjail seclvl $seclvl
-	qb-edit -qf $newjail tunnel $tunnel
+	qb-edit -qf $newjail gateway $gateway
 
 	# New rootjails need to redirect the rootjail line to self
 	if [ "$class" = "rootjail" ] ; then 

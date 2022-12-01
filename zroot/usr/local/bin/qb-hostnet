@@ -18,8 +18,8 @@ get_options() {
 	# Define script variables
 	IF_ERR="${IF_ERR:=get_msg_qubsd}"
 	_jIP=$(sed -n "s/^host[[:blank:]]*IP0[[:blank:]]*//p" $JMAP)
-	TUNNEL=$(sed -nE "s/^host[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
-	MTU=$(sed -nE "s:^mtu[[:blank:]]+::p" $QBCONF) 
+	GATEWAY=$(sed -nE "s/^host[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
+	get_jail_parameter mtu "$JAIL" "$IF_ERR" "true" 
 }
 
 main() {
@@ -36,12 +36,12 @@ main() {
 	if [ "$_CMD" == "up" ] ; then 
 
 		# start_jail command handles most error messages 
-		start_jail "$TUNNEL" "$IF_ERR"  ||  get_msg_qb_hostnet "_3" "usage_1"
+		start_jail "$GATEWAY" "$IF_ERR"  ||  get_msg_qb_hostnet "_3" "usage_1"
 	
 		# Create epair, and set it up inside the gateway
 		_epair=$(ifconfig epair create)
-		ifconfig "${_epair%?}a" vnet $TUNNEL
-		jexec -l $TUNNEL ifconfig "${_epair%?}a" inet ${_jIP%.*/*}.1/${_jIP#*/} mtu $MTU up
+		ifconfig "${_epair%?}a" vnet $GATEWAY
+		jexec -l $GATEWAY ifconfig "${_epair%?}a" inet ${_jIP%.*/*}.1/${_jIP#*/} mtu $MTU up
 
 		# Configure epair on the host side
 		ifconfig "${_epair%?}b" inet $_jIP mtu $MTU up

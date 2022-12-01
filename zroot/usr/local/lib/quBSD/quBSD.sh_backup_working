@@ -13,7 +13,7 @@
 # check_isqubsd_ipv4
 # check_isvalid_root
 # check_isvalid_template
-# check_isvalid_tunnel
+# check_isvalid_gateway
 # check_isvalid_schg
 # check_isvalid_seclvl
 # check_isvalid_maxmem
@@ -278,15 +278,15 @@ check_isvalid_jail() {
 	return 0
 }
 
-check_isvalid_tunnel() {
-	# Return 0 if proposed tunnel is valid ; return 1 if invalid
+check_isvalid_gateway() {
+	# Return 0 if proposed gateway is valid ; return 1 if invalid
 
 	# Positional parameters and func variables. $_if_err defaults to `return 1`
 	local _value; _value="$1" 
 	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 	local _jail; _jail="$3"  
 
-	# net-firewall has special requirements for tunnel. Must be tap interface
+	# net-firewall has special requirements for gateway. Must be tap interface
 ##### NOTE: This isn't robust. It fails after tap0 to tap9
 	[ "$_jail" == "net-firewall" ] && [ -n "${_value##tap[[:digit:]]}" ] \
 			&& eval "$_if_err" "_cj7" "$_value" && return 1
@@ -294,10 +294,10 @@ check_isvalid_tunnel() {
 	# `none' is valid for any jail except net-firewall. Order matters here.
 	[ "$_value" == "none" ] && return 0
 
-	# First check that tunnel is a valid jail. (note: func already has messages)  
+	# First check that gateway is a valid jail. (note: func already has messages)  
  	check_isvalid_jail "$_value" "$_if_err" || return 1
 
-	# Checks that tunnel starts with `net-'
+	# Checks that gateway starts with `net-'
 	[ -n "${_value##net-*}" ] \
 			&& eval "$_if_err" "_cj8" "$_value" "$_jail" && return 1
 
@@ -518,8 +518,8 @@ check_isqubsd_ipv4() {
 	! [ "$_a0.$_a1.$_a3/$_a4" == "$_ip0.$_ip1.$_ip3/$_subnet" ] \
 			&& eval "$_if_err" "_cj12" "$_value" "$_jail" && return 1
 
-	_tunnel=$(sed -nE "s/^${_jail}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
-	[ "$_tunnel" == "none" ] && eval "$_if_err" "_cj14" "$_value" "$_jail" \
+	_gateway=$(sed -nE "s/^${_jail}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
+	[ "$_gateway" == "none" ] && eval "$_if_err" "_cj14" "$_value" "$_jail" \
 		&& return 1
 	
 	# Otherwise return 0

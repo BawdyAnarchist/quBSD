@@ -23,8 +23,8 @@ define_variables() {
 	rootjail=$(sed -nE "s/${JAIL}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP)
 	rootj_for=$(sed -nE "s/[[:blank:]]+rootjail[[:blank:]]+${JAIL}\$//p" $JMAP)
 	template_for=$(sed -nE "s/[[:blank:]]*template[[:blank:]]+${JAIL}\$//p" $JMAP)
-	tunnel_for=$(sed -nE "s/[[:blank:]]+tunnel[[:blank:]]+${JAIL}\$//p" $JMAP)
-	_ALLJAILS="$rootj_for $template_for $tunnel_for"
+	gateway_for=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${JAIL}\$//p" $JMAP)
+	_ALLJAILS="$rootj_for $template_for $gateway_for"
 }
 
 checks() {
@@ -48,7 +48,7 @@ checks() {
 		[ -n "$template_for" ] && _query="true" && get_msg_qb_rename "_4"
 		
 		# List jails which depend on JAIL for network connection 
-		[ -n "$tunnel_for" ] && _query="true" && get_msg_qb_rename "_5"
+		[ -n "$gateway_for" ] && _query="true" && get_msg_qb_rename "_5"
 	
 		# Query user to automatically update dependencies
 		[ -n "$_query" ] && get_msg_qb_rename "_6" \
@@ -105,8 +105,8 @@ update_dependencies() {
 			qb-edit -fq $_jail template $NEWNAME
 		done
 
-		for _jail in $tunnel_for ; do
-			qb-edit -fq $_jail tunnel $NEWNAME
+		for _jail in $gateway_for ; do
+			qb-edit -fq $_jail gateway $NEWNAME
 		done
 
 		# Restart dependencies that were already on

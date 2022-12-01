@@ -49,6 +49,12 @@ ENDOFMSG
 CURRENT IVPN SERVER INFO.  {Enter to continue}
 ENDOFMSG
 	;;
+	_4_2) cat << ENDOFMSG
+
+Couldn't establish ping to outside internet. 
+Below is the last configured ivpn server. 
+ENDOFMSG
+	;;
 	_5) cat << ENDOFMSG
 
 WARNING: Failed to download fresh server stats.
@@ -208,17 +214,27 @@ handle_if_off() {
 }
 
 fetch_connection() {
+
 	# Print info message while fetching latest data
 	get_msg_qb_ivpn "_4"
 
-	if [ "$INJAIL" == "true" ] ; then
-		fetch -qT 7 -o - "$_GET_CURRENT" | jq 
+	# Ping to ensure that connection exists first
+	if eval $_CMDMOD ping -Qot 6 1.1.1.1  > /dev/null 2>&1 
+	then
 
-	else
-		# Use of jq requires a here-command, so jq runs inside the <jail>
-		jexec -l -U root $JAIL << EOF
-			fetch -qT 7 -o - "$_GET_CURRENT" | jq
+		if [ "$INJAIL" == "true" ] ; then
+			fetch -qT 7 -o - $_GET_CURRENT | jq 
+
+		else
+			# jexec can't use pipe command without << herecommand 
+			jexec -l -U root $JAIL << EOF
+				fetch -qT 7 -o - $_GET_CURRENT | jq
 EOF
+		fi
+	else
+		# Ping was unsuccessful, pull most recently saved file 
+		get_msg_qb_ivpn "_4_2"
+		eval $_CMDMOD jq . ${CURRENT}
 	fi
 }
 
@@ -334,7 +350,10 @@ modify_ivpn() {
 main() {
 
 	# List is the simplest, just fetch connection and exit. No further logic required 
-	[ -n "$LIST" ] && fetch_connection && exit 0
+	if [ -n "$LIST" ] ; then 
+		fetch_connection 
+		exit 0
+	fi
 
 	# Check flags 	
 	get_security

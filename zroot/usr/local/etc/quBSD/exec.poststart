@@ -1,44 +1,39 @@
 #!/bin/sh
 
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $JMAP
+. /usr/local/lib/quBSD/quBSD.sh
 
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
+get_options() {
+	JAIL="$1"
+	IF_ERR="get_msg_qubsd"
+	DEFAULTS="true"
 
-# Define script variables
-jail="$1"
-schg=$(sed -nE "s/^${jail}[[:blank:]]+schg[[:blank:]]+//p" $JMAP)
-seclvl=$(sed -nE "s/^${jail}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
-
-usage() {
-	printf "%b" "\n$err\n\n"
-	exit 1
-}
-checks() {
-        if [ -z "$jail" ] ; then
-                err="Error: exec.poststart:  Must select a jail"
-		usage
-        elif [ -z "$JMAP" ] ; then
-                err="Error: exec.poststart:  No file selected for jailmap.conf"
-		usage
-        fi
+	get_jail_parameter schg "$JAIL" "$IF_ERR" "$DEFAULTS"
+	get_jail_parameter seclvl "$JAIL" "$IF_ERR" "$DEFAULTS"
 }
 
 security_flags() {
-	[ -z "$schg" -o "$schg" = "none" ] && jdir=""
-	[ "$schg" = "all" ] && jdir="/bin /sbin /boot /etc /home /lib /libexec /root /rw /usr"
-	[ "$schg" = "sys" ] && jdir="/boot /rw /bin /sbin /etc /lib /libexec /usr/bin /usr/sbin \
+	
+	# Different directories are schg flagged depending on user settings
+	case $SCHG in
+		none) _jdir="" 
+		;;
+		all)  _jdir="/bin /sbin /boot /etc /home /lib /libexec /root /rw /usr"
+		;;
+		sys)  _jdir="/boot /rw /bin /sbin /etc /lib /libexec /usr/bin /usr/sbin \
 					/usr/lib /usr/libexec /usr/libdata /usr/lib32 /usr/local"
-	for d in $jdir; do
-		[ -e "${m_jails}/${jail}${d}" ] && chflags -R schg "${m_jails}/${jail}${d}"
+		;;
+	esac
+
+	for _d in $_jdir; do
+		chflags -R schg "${M_JAILS}/${JAIL}${_d}" > /dev/null 2>&1
 	done 
-	[ -n "$seclvl" ] && jexec -l $jail sysctl kern.securelevel="$seclvl" || exit 0
+	
+	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL"
 }
 
-checks 
+get_global_variables
+
+get_options "$@"
 
 security_flags
 

@@ -1,112 +1,93 @@
 #!/bin/sh
 
-# Destroys non-persistent filesystems for appjails and dispjails; and reclones
+. /usr/local/lib/quBSD/quBSD.sh
 
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $JMAP
+get_parameters() {
+	JAIL="$1"
+	IF_ERR="get_msg_qubsd"
+	DEFAULTS="true"
 
-# Get datasets, mountpoints; and define files.
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
-m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
-m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
+	# get_jail_parameter conducts all necessary checks for the parameter
+	get_jail_parameter class    "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	get_jail_parameter rootjail "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
 
-# Define script variables
-jail="$1"
-jconf=$(egrep "^${jail}[[:blank:]]" $JMAP | uniq)
-class=$(sed -nE "s/^${jail}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
-rootjail=$(sed -nE "s/^${jail}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP)
-# $rootsnap relies on the fact that zfs lists snapshots chronologically
-rootsnap=$(zfs list -t snapshot | egrep -o "${jails_zfs}/${rootjail}@[^[:blank:]]+" | tail -1)
-jmount1=$(mount | egrep -o "${m_jails}/${jail}/[[:alnum:]]+")
-jmount2=$(mount | egrep -o "^${m_zusr}/${jail}/[^[:blank:]]+")
-
-usage() {
-        printf "%b" "\n$err\n\n"
-        exit 1
-}
-checks() {
-        if [ -z "$jail" ] ; then
-                err="Error: exec.poststop:  Must select a jail"
-                usage
-        elif [ -z "$JMAP" ] ; then
-                err="Error: exec.poststop:  No file selected for jailmap.conf"
-                usage
-        elif [ -z "$class" ] ; then
-		err="Error: exec.poststop:  Jail $jail has no class designated in jailmap.conf"
-		usage
-        elif [ -z "$rootjail" ] ; then
-               	err="Error: exec.poststop: Jail $jail has no rootjail designated in jailmap.conf"
-               	usage
-        fi
+	# rootsnap relies on the fact that zfs lists snapshots chronologically
+	ROOTSNAP=$(zfs list -t snapshot -Ho name ${JAILS_ZFS}/${ROOTJAIL} | tail -1)
+	JMOUNT1=$(mount | egrep -o "${M_JAILS}/${JAIL}/[[:alnum:]]+")
+	JMOUNT2=$(mount | egrep -o "^${M_ZUSR}/${JAIL}/[^[:blank:]]+")
 }
 
-umount_lingering() {
-	[ -e "${m_zusr}/${jail}/rw/etc/fstab" ] && umount -a -F ${m_zusr}/${jail}/rw/etc/fstab > /dev/null 2>&1
-	[ -n "$jmount1" ] && echo "$jmount1" | xargs umount -f > /dev/null 2>&1
-	[ -n "$jmount2" ] && echo "$jmount2" | xargs umount -f > /dev/null 2>&1 
-}
+unmount_lingering() {
+	[ -e "${M_ZUSR}/${JAIL}/rw/etc/fstab" ] \
+			&& umount -a -F ${M_ZUSR}/${JAIL}/rw/etc/fstab > /dev/null 2>&1
+	[ -n "$JMOUNT1" ] && echo "$JMOUNT1" | xargs umount -f > /dev/null 2>&1
+	[ -n "$JMOUNT2" ] && echo "$JMOUNT2" | xargs umount -f > /dev/null 2>&1 
 
-set_flags() {
-## NOTE: UNSURE ABOUT HOW TO DEAL WITH THIS. WAS A PITA FOR TESTING SO I HAD TO REMOVE IT
-## I NEED TO USE DAILY DRIVER TO SEE HOW MUCH A PAIN IT MIGHT BE IN REGULAR USE
-	if [ "$class" = "rootjail" ] ; then 
-#		chflags -R schg "${m_jails}/${jail}" > /dev/null 2>&1
-	else
-	#	chflags -R schg "${m_zusr}/${jail}" > /dev/null 2>&1
-	fi
+	# Ensures that any pefs mounts are completely removed (thus the data is re-encrypted
+	qb-pefs -u $JAIL
 }
 
 reclone_appjail() {
-	if [ "$class" != "rootjail" ] ; then 
-		zfs list ${jails_zfs}/${jail} > /dev/null 2>&1
-			[ "$?" = 0 ] && zfs destroy -rRf ${jails_zfs}/${jail}
-		zfs clone $rootsnap "${jails_zfs}/$jail"
-		zfs set qubsd:autosnap=- "${jails_zfs}/$jail"
 
-		# Add user and group to freshly cloned rootjail
-		pw -V ${m_jails}/${jail}/etc/ useradd -n $jail -u 1001 -d /usr/home/${jail} -s /bin/csh 2>&1
-	fi
+	# Check the dataset exists, and destroy it
+	zfs list "${JAILS_ZFS}/${JAIL}" > /dev/null 2>&1 \
+			&& zfs destroy -rRf "${JAILS_ZFS}/${JAIL}"
+
+	# Recone the rootjail, and make sure that the clone isn't set to autosnap
+	zfs clone $ROOTSNAP "${JAILS_ZFS}/$JAIL"
+	zfs set qubsd:autosnap=- "${JAILS_ZFS}/$JAIL"
+
+	# Add user and group to freshly cloned rootjail
+	pw -V ${M_JAILS}/${JAIL}/etc/ \
+			useradd -n $JAIL -u 1001 -d /usr/home/${JAIL} -s /bin/csh 2>&1
 }
 
 reclone_dispjail() {
-	if [ "$class" = "dispjail" ] ; then
-		template=$(sed -nE "s/^${jail}[[:blank:]]+template[[:blank:]]+//p" $JMAP)
-		homesnap=$(zfs list -t snapshot | \
-		egrep -o "${zusr_zfs}/${template}@[^[:blank:]]+" | tail -1)
+	# template and homesnap are needed to clone dispjail
+	get_jail_parameter template "$JAIL" "$IF_ERR" "DEFAULTS" || exit 1
+	HOMESNAP=$(zfs list -t snapshot -Ho name ${ZUSR_ZFS}/${TEMPLATE} | tail -1)
 
-		# Destroy/reclone existing dispjail /home
-		zfs list "${zusr_zfs}/${jail}" > /dev/null 2>&1 
-			[ "$?" = 0 ] && zfs destroy -rRf ${zusr_zfs}/${jail}
-		zfs clone "${homesnap}" "${zusr_zfs}/${jail}"
-		zfs set qubsd:autosnap=- "${zusr_zfs}/$jail"
+	# Check the dataset exists, and destroy it 
+	zfs list "${ZUSR_ZFS}/${JAIL}" > /dev/null 2>&1 \
+			&& zfs destroy -rRf ${ZUSR_ZFS}/${JAIL}  
 
-		# Remove schg flags (if inherited from clones) to modify new snap
-		[ -e ${m_zusr}/${jail} ] && chflags -R noschg ${m_zusr}/${jail}
+	# Reclone the rootjail, and make sure that it's not set to autosnap
+	zfs clone "${HOMESNAP}" "${ZUSR_ZFS}/${JAIL}"
+	zfs set qubsd:autosnap=- "${ZUSR_ZFS}/$JAIL"
 
-		# Rename directories and mounts with dispjail name 
-		[ -e ${m_zusr}/${jail}/usr/home/${template} ] && \
-				mv ${m_zusr}/${jail}/usr/home/${template} ${m_zusr}/${jail}/usr/home/${jail}
-		
-		sed -i '' -e "s/${template}/${jail}/g" ${m_zusr}/${jail}/rw/etc/fstab
+	# Remove schg flags (if inherited from clones) to modify new snap
+	chflags -R noschg ${M_ZUSR}/${JAIL}
+
+	# Rename directories and mounts with dispjail name 
+	[ -e ${M_ZUSR}/${JAIL}/usr/home/${TEMPLATE} ] && \
+			mv ${M_ZUSR}/${JAIL}/usr/home/${TEMPLATE} ${M_ZUSR}/${JAIL}/usr/home/${JAIL}
+	
+	# Replace the <template> jailname in fstab with the new <jail> (dispjail)	
+	sed -i '' -e "s/${TEMPLATE}/${JAIL}/g" ${M_ZUSR}/${JAIL}/rw/etc/fstab
+}
+
+set_rootjail_schg() {
+	# Protects rootjails from being modified while not in use
+	chflags -R schg "${M_JAILS}/${JAIL}" > /dev/null 2>&1
+}
+
+main() {
+	# Occassionally jail mounts linger and cause problems later 
+	unmount_lingering
+
+	# appjail's root filesystems are immediately destroyed and recloned
+	[ "$CLASS" == "rootjail" ] && set_rootjail_schg || reclone_appjail  
+
+	# dispjails root filesystem and /zusr data are destroyed and recloned 
+	if [ "$CLASS" == "dispjail" ] ; then 
+		reclone_dispjail        
+		# NOTE: /bin/sh fails if last command looks like:  `[ test ] && cmd`
 	fi
 }
 
+get_global_variables
 
-checks
+get_parameters "$@"
 
-# Occassionally jail mounts linger and cause problems later 
-umount_lingering 	
-
-# Flags up, to protect root and home filesystems when not in use 
-set_flags		
-
-# appjail's root filesystems are immediately destroyed and recloned
-reclone_appjail		
-
-# dispjails root filesystem and /zusr data are destroyed and recloned 
-reclone_dispjail	
-
-
+main
 

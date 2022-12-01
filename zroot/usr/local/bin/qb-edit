@@ -66,8 +66,8 @@ checks() {
 		seclvl)		
 				check_isvalid_seclvl "$VAL" "$IF_ERR" ||  get_msg_qb_edit "none" "usage_1" 
 		;;
-		tunnel)  
-				check_isvalid_tunnel "$VAL" "$IF_ERR" "$JAIL" \
+		gateway)  
+				check_isvalid_gateway "$VAL" "$IF_ERR" "$JAIL" \
 						|| get_msg_qb_edit "none" "exit_1" "_f"
 		;;
 		IP0) 
@@ -107,7 +107,7 @@ main() {
 	if [ "$JAIL" == "net-firewall" ] ; then
 		
 		# Relevant variables. 
-		_tap=$(sed -nE "s/^${JAIL}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
+		_tap=$(sed -nE "s/^${JAIL}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
 		_rcconf="${M_ZUSR}/net-firewall/rw/etc/rc.conf"
 		chflags noschg "$_rcconf"	
 
@@ -126,7 +126,7 @@ defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
 }
 
 handle_restarts() {
-	# If jail is off, don't offer restart. Still need tunnel, so assign newvar: _jail_
+	# If jail is off, don't offer restart. Still need gateway, so assign newvar: _jail_
 	check_isrunning_jail $JAIL && _jail_="$JAIL" 
 
 	# Define which jails need to be restarted
@@ -135,21 +135,21 @@ handle_restarts() {
 		cpuset|maxmem|rootjail|schg|seclvl|template)
 			_restarts="       $_jail_" 
 		;;
-		IP0|tunnel)
-			_tunnel=$(sed -nE "s/^${JAIL}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
-			check_isrunning_jail $_tunnel || unset _tunnel
+		IP0|gateway)
+			_gateway=$(sed -nE "s/^${JAIL}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
+			check_isrunning_jail $_gateway || unset _gateway
 
 			# This prevents `none' and `tap0' from being flagged for restart 
-			if [ "$_tunnel" == "none" ] || [ -z "${_tunnel##tap[[:digit:]]}" ] ; then
+			if [ "$_gateway" == "none" ] || [ -z "${_gateway##tap[[:digit:]]}" ] ; then
 				_restarts="       $_jail_" 
 			else	
-				_restarts=$(printf "%b" "       $_jail_\n       $_tunnel")
+				_restarts=$(printf "%b" "       $_jail_\n       $_gateway")
 			fi
 		;;	
 	esac
 
 	# If there are no jails to restart, exit
-	[ -z "$_jail_" ] && [ -z "$_tunnel" ] && exit 0
+	[ -z "$_jail_" ] && [ -z "$_gateway" ] && exit 0
 	
 	# If QUIET tagged, only continue if users specified a restart
 	[ -n "$QUIET" ] && [ -z "$RESTART" ] && exit 0

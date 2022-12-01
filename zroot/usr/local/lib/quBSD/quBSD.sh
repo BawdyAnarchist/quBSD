@@ -13,7 +13,7 @@
 # check_isqubsd_ipv4
 # check_isvalid_rootjail
 # check_isvalid_template
-# check_isvalid_tunnel
+# check_isvalid_gateway
 # check_isvalid_schg
 # check_isvalid_seclvl
 # check_isvalid_maxmem
@@ -91,39 +91,52 @@ get_user_response() {
 
 get_jail_parameter() {
 #eval echo \${$_PARAM}
-	# Get <param> for <jail> from JMAP. Saves global variable in CAPS <PARAM>
-	# Variable indirection and `eval` are used to consolidate this to ONE function,
-	# rather than mulitple functions for each JMAP <param>.
-	# Defaults can substitute blank <params>, if specified by caller function. 
+	# Get <jail> <param> from JMAP. 
+	# Variable indirection and `eval` are used to consolidate this to a single
+	# function, rather than mulitple functions for each JMAP <param>.
+	# Description of positional variables:
+		# _param - The parameter to pull from JMAP
+		# _PARAM - $_param converted to UPPER. The <value> of <param> can be saved
+					  # to the all CAPS name of the <param> being retreived.
+		# _jail  - jail in JMAP to retreive 
+		# _if_err - Action in case of error. This variable is executed with `eval`. 
+					 # Either: get_msg_qubsd to show error; or "return 1" exit silently.
+		# _defaults - Substitute #default from JMAP in case of :blank: <param> 
+		# _echo - Variable indirection is used to set the <value> of <param> to the
+				  # all CAPS name of the <param>. _echo=true prevents this behavior, 
+			     # and the _value will simply be echoed back to the caller function.
 
 	# lower_case param is stored in jailmap, and check_funcs() use lower case
 	local _param ; _param="$1"  
-
-	# Global variable for <_param> is in CAPS for all scripts 
 	local _PARAM=$(echo "$_param" | tr '[:lower:]' '[:upper:]')
 
-	# Standard positional variables
+	# Positional variables
 	local _jail ; _jail="$2"  
 	local _if_err ; _if_err="$3" ;  _if_err="${_if_err:=return 1}"
 	local _defaults ; _defaults="$4"
+	local _echo ; _echo="$5"
 
 	# Either jail or param weren't provided 
 	[ -z "$_jail" ]  && eval "$_if_err" "_0" "jail"  && return 1
 	[ -z "$_param" ] && eval "$_if_err" "_0" "parameter"  && return 1
 
-	# Variable indirection. <param> value saves to global var name in $_PARAM
-	eval $_PARAM=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
+	# Temporary place to save the returned <value> for <param> 
+	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
 
 	# If the <param> value was null, and if caller specified, get default value
-	if [ -z $(eval echo \${$_PARAM}) ] && [ "$_defaults" == "true" ] ; then
-		eval $_PARAM=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
+	if [ -z "$_value" ] && [ "$_defaults" == "true" ] ; then
+		_value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
 		eval "$_if_err" "_cj17" "$_param" 
 	fi
 
 	# Escape \" is required, to avoid word splitting. Variable indirection simplifies
 	# the logic to a single line, instead of a different func for each <param>.
-	eval "check_isvalid_${_param}" \${$_PARAM} \"$_if_err\" \"$_jail\" \
-			&& return 0 || return 1
+	if eval "check_isvalid_${_param}" \"$_value\" \"$_if_err\" \"$_jail\" ; then
+		[ "$_echo" ] && echo "$_value" || eval $_PARAM="$_value"
+		return 0	
+	else
+		return 1
+	fi
 }
 
 ##################################################################################
@@ -167,6 +180,9 @@ start_jail() {
 
 	# Check that JAIL was provided in the first place
 	[ -z "$_jail" ] && eval "$_if_err" "_0" "jail" && return 1
+
+	# none is an invalid jailname. Never start it. Always return 0. 
+	[ "$_jail" == "none" ] && return 0
 
 	# Check to see if _jail is already running 
 	if	! check_isrunning_jail "$_jail" ; then
@@ -331,7 +347,7 @@ check_isvalid_jail() {
 }
 
 check_isvalid_class() {
-	# Return 0 if proposed schg is valid ; return 1 if invalid
+	# Return 0 if proposed class is valid ; return 1 if invalid
 
 	# Positional params and func variables. $_if_err defaults to `return 1`
 	local _value; _value="$1"  
@@ -372,15 +388,15 @@ check_isvalid_rootjail() {
 	return 0
 }
 
-check_isvalid_tunnel() {
-	# Return 0 if proposed tunnel is valid ; return 1 if invalid
+check_isvalid_gateway() {
+	# Return 0 if proposed gateway is valid ; return 1 if invalid
 
 	# Positional parameters and func variables. $_if_err defaults to `return 1`
 	local _value; _value="$1" 
 	local _if_err ; _if_err="$2" ;  _if_err="${_if_err:=return 1}"
 	local _jail; _jail="$3"  
 
-	# net-firewall has special requirements for tunnel. Must be tap interface
+	# net-firewall has special requirements for gateway. Must be tap interface
 ##### NOTE: This isn't robust. It fails after tap0 to tap9
 	if [ "$_jail" == "net-firewall" ] ; then 
 		[ -n "${_value##tap[[:digit:]]}" ] \
@@ -391,10 +407,10 @@ check_isvalid_tunnel() {
 	# `none' is valid for any jail except net-firewall. Order matters here.
 	[ "$_value" == "none" ] && return 0
 
-	# First check that tunnel is a valid jail. (note: func already has messages)  
+	# First check that gateway is a valid jail. (note: func already has messages)  
  	check_isvalid_jail "$_value" "$_if_err" || return 1
 
-	# Checks that tunnel starts with `net-'
+	# Checks that gateway starts with `net-'
 	[ -n "${_value##net-*}" ] \
 			&& eval "$_if_err" "_cj8" "$_value" "$_jail" && return 1
 
@@ -508,8 +524,9 @@ check_isvalid_mtu() {
 	# None is always a valid mtu 
 	[ "$_value" == "none" ] && return 0
 
-	[ "$_value" -ge 1200 ] && [ "$_value" -le 1500 ] \
-			|| eval "$_if_err" "_jc11" "mtu" || return 1
+	# Just push a warning, but don't error for MTU 
+	[ "$_value" -ge 1000 ] && [ "$_value" -le 2000 ] \
+			|| eval "$_if_err" "_cj11" "mtu" 
 
 	return 0
 }
@@ -618,8 +635,8 @@ check_isqubsd_ipv4() {
 	! [ "$_a0.$_a1.$_a3/$_a4" == "$_ip0.$_ip1.$_ip3/$_subnet" ] \
 			&& eval "$_if_err" "_cj12" "$_value" "$_jail" && return 1
 
-	_tunnel=$(sed -nE "s/^${_jail}[[:blank:]]+tunnel[[:blank:]]+//p" $JMAP)
-	[ "$_tunnel" == "none" ] && eval "$_if_err" "_cj14" "$_value" "$_jail" \
+	_gateway=$(sed -nE "s/^${_jail}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
+	[ "$_gateway" == "none" ] && eval "$_if_err" "_cj14" "$_value" "$_jail" \
 		&& return 1
 	
 	# Otherwise return 0
@@ -629,6 +646,16 @@ check_isqubsd_ipv4() {
 
 # The checks below are a bit of a hack so that get_jail_parameter() can be a single
 # simplified function, rather than multiple ones. 
+
+check_isvalid_template() {
+	# Return 0 if proposed template is valid ; return 1 if invalid
+	# Exists mostly so that the get_jail_parameters() function works seamlessly
+
+	! check_isvalid_jail "$1" "$2" \
+			&& eval "$_if_err" "_cj6" "$_value" "$_template" && return 1
+
+	return 0
+}
 check_isvalid_IP0() {
 	# IP0 probably should be changed to: ipv4 in jailmap.conf
 	check_isvalid_ipv4 "$1" "$2"
@@ -824,16 +851,6 @@ poweroff_vm() {
 		[ "$_count" -gt 30 ] && get_msg_qb_vm "_5" "exit_1"
 	done
 
-}
-
-testfunct() {
-	local _cpuset ; _cpuset="$1"  
-	local _if_err ; _if_err="$2" ;  _if_err=${_if_err:=return 1}
-
-	get_msg "_vj11" "testest"
-
-	echo but were doing more stuff how it work now?
-	
 }
 
 

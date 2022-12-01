@@ -18,9 +18,9 @@ get_options() {
 
 	# Define script variables
 	JAIL=${JAIL:="$1"}
-	TUNNEL="$2"
-	MTU=$(sed -nE "s:^mtu[[:blank:]]+::p" $QBCONF)
+	GATEWAY="$2"
 	IF_ERR="get_msg_qubsd"
+	get_jail_parameter mtu "$JAIL" "$IF_ERR" "true" 
 }
 
 checks() {
@@ -29,7 +29,7 @@ checks() {
 
 	case "$_CMD" in
 		create) 
-			# JAIL must be running, but tunnel can be started later 
+			# JAIL must be running, but gateway can be started later 
 			check_isrunning_jail "$JAIL" "return 1" || get_msg_qb_connect "_2" "usage_1"
 			
 			# IP checks
@@ -49,10 +49,10 @@ checks() {
 		   check_seclvl || get_msg_qb_connect "_4" "exit_1"
 		;;
 		destroy)
-			# JAIL and TUNNEL must be running (helps prevent accidents) 
+			# JAIL and GATEWAY must be running (helps prevent accidents) 
 			check_isrunning_jail "$JAIL" "return 1" || get_msg_qb_connect "_2" "usage_1"
 	
-			[ -n "$TUNNEL" ] && ! check_isrunning_jail "$TUNNEL" "$IF_ERR" \
+			[ -n "$GATEWAY" ] && ! check_isrunning_jail "$GATEWAY" "$IF_ERR" \
 					&& get_msg_qb_connect "_3" "usage_1"
 		;;
 	esac
@@ -67,18 +67,18 @@ check_seclvl() {
 	# Return 1 to checks() if either seclvl is too high to modify network
 	[ "$_seclvl_J" == "3" ] && return 1 
 
-	# If TUNNEL has running pf, seclvl=3 could prevent modification 
-	if check_isrunning_jail "$TUNNEL" ; then
-		jexec -l -U root $TUNNEL service -e | grep -q "rc.d/pf" \
-				&& _seclvl_T=$(jexec -l -U root $TUNNEL sysctl kern.securelevel \
+	# If GATEWAY has running pf, seclvl=3 could prevent modification 
+	if check_isrunning_jail "$GATEWAY" ; then
+		jexec -l -U root $GATEWAY service -e | grep -q "rc.d/pf" \
+				&& _seclvl_T=$(jexec -l -U root $GATEWAY sysctl kern.securelevel \
 																| sed "s/kern.securelevel: //") 
 	else
-		# If TUNNEL is off, but has pf_enabled, use jailmap.conf for the warning 
-		grep -Eq 'pf_enable=.*YES' ${M_ZUSR}/${TUNNEL}/rw/etc/rc.conf \
-				&& _seclvl_T=$(sed -nE "s/^${TUNNEL}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
+		# If GATEWAY is off, but has pf_enabled, use jailmap.conf for the warning 
+		grep -Eq 'pf_enable=.*YES' ${M_ZUSR}/${GATEWAY}/rw/etc/rc.conf \
+				&& _seclvl_T=$(sed -nE "s/^${GATEWAY}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
 	fi
 	
-	# Return 1 if tunnel seclvl is too high. Must use if/then here, for return 0/1 to work  
+	# Return 1 if gateway seclvl is too high. Must use if/then here, for return 0/1 to work  
 	if [ "$_seclvl_T" == "3" ] ; then 
 		return 1 
 	fi
@@ -121,29 +121,29 @@ assemble_interface_list() {
 	# Clean up and categorize all_interfaces list for later usage
 	_jail_intfs=$(echo "$_ALL_INTF" | egrep "^$JAIL ") 
 	_jail_eps=$(echo "$_jail_intfs" | awk '{print $2}' | egrep -o "epair[[:digit:]]+")	
-	_tunnel_pairs=$(echo "$_ALL_INTF" | egrep -v "^$JAIL" | egrep "$_jail_eps")	
+	_gateway_pairs=$(echo "$_ALL_INTF" | egrep -v "^$JAIL" | egrep "$_jail_eps")	
 }
 
 configure_epairs() {
-	# Start tunnel if it's off
-	check_isrunning_jail "$TUNNEL" || start_jail "$TUNNEL" "$IF_ERR" || exit 1
+	# Start gateway if it's off
+	check_isrunning_jail "$GATEWAY" || start_jail "$GATEWAY" "$IF_ERR" || exit 1
 
 	# Create the epair and send to jails
 	epair=$(ifconfig epair create)
-	ifconfig "${epair%?}a" vnet $TUNNEL
+	ifconfig "${epair%?}a" vnet $GATEWAY
 	ifconfig "${epair%?}b" vnet $JAIL
 
-	# Apply IP0 to JAIL and TUNNEL
+	# Apply IP0 to JAIL and GATEWAY
 	jexec -l -U root $JAIL ifconfig "${epair%?}b" inet $IP0 mtu $MTU up
 
-	jexec -l -U root $TUNNEL ifconfig "${epair%?}a" \
+	jexec -l -U root $GATEWAY ifconfig "${epair%?}a" \
 										inet "${IP0%.*/*}.1/${IP0#*/}" mtu $MTU up
 }
 
 configure_network() {
-	# Add the IP to the tunnel's pf table
-	[ -e "${M_JAILS}/${TUNNEL}/rw/etc/pf.conf" ] \
-			&& jexec -l -U root $TUNNEL pfctl -t pass_ips -T add $IP0
+	# Add the IP to the gateway's pf table
+	[ -e "${M_JAILS}/${GATEWAY}/rw/etc/pf.conf" ] \
+			&& jexec -l -U root $GATEWAY pfctl -t pass_ips -T add $IP0
 
 	# Add the IP to the jail's pf table
 	[ -e "${M_JAILS}/${JAIL}/rw/etc/pf.conf" ] \
@@ -151,18 +151,18 @@ configure_network() {
 
 	# Add default route and a resolv.conf for jail to connect to the internet
 	jexec -l -U root $JAIL route add default "${IP0%.*/*}.1"
-	cp ${M_ZUSR}/${TUNNEL}/rw/etc/resolv.conf ${M_JAILS}/${JAIL}/rw/etc/
+	cp ${M_ZUSR}/${GATEWAY}/rw/etc/resolv.conf ${M_JAILS}/${JAIL}/rw/etc/
 }
 
 destroy_epairs() {
-	if [ -z "$TUNNEL" ] ; then
+	if [ -z "$GATEWAY" ] ; then
 		
-		# If no tunnel, destroy all epairs on JAIL
+		# If no gateway, destroy all epairs on JAIL
 		_destr_epairs=$(jexec -l -U root $JAIL ifconfig -g epair)
 	else
 		
-		# Othewise only remove the epairs common to both JAIL and TUNNEL	
-		_destr_epairs=$(echo "$_tunnel_pairs" | egrep "^${TUNNEL}[[:blank:]]+epair" \
+		# Othewise only remove the epairs common to both JAIL and GATEWAY	
+		_destr_epairs=$(echo "$_gateway_pairs" | egrep "^${GATEWAY}[[:blank:]]+epair" \
 														| awk '{print $2}')
 	fi
 

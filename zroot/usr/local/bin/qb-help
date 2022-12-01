@@ -22,7 +22,7 @@ qb-flags:    Remove or re-apply schg flags from all jail files,
 
 qb-hostnet:  Create/destroy epair and internet connectivity for host
 
-qb-ivpn:     Change ivpn servers for tunnel jail
+qb-ivpn:     Change ivpn servers for gateway jail
 
 qb-list:     List jailmap settings for a particular jail or parameter
 
