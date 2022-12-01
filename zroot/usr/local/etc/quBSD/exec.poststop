@@ -66,23 +66,27 @@ reclone_dispjail() {
 	sed -i '' -e "s/${TEMPLATE}/${JAIL}/g" ${M_ZUSR}/${JAIL}/rw/etc/fstab
 }
 
-set_rootjail_schg() {
-	# Protects rootjails from being modified while not in use
-	chflags -R schg "${M_JAILS}/${JAIL}" > /dev/null 2>&1
-}
-
 main() {
 	# Occassionally jail mounts linger and cause problems later 
 	unmount_lingering
 
-	# appjail's root filesystems are immediately destroyed and recloned
-	[ "$CLASS" == "rootjail" ] && set_rootjail_schg || reclone_appjail  
+	# Roojails have schg until started. Appjails are re-cloned from rootjails
+	case $CLASS in 
+		rootjail) 
+			# Protects rootjails from being modified while not in use
+			chflags -R schg "${M_JAILS}/${JAIL}" > /dev/null 2>&1
+		;;
 
-	# dispjails root filesystem and /zusr data are destroyed and recloned 
-	if [ "$CLASS" == "dispjail" ] ; then 
-		reclone_dispjail        
-		# NOTE: /bin/sh fails if last command looks like:  `[ test ] && cmd`
-	fi
+		appjail) 
+			# Appjails have their root filesystem destroyed/recloned
+			reclone_appjail 
+		;;
+		dispjail) 
+			# Dispjails also get /zusr recloned from their template jail 
+			reclone_appjail
+			reclone_dispjail
+		;;
+	esac
 }
 
 get_global_variables

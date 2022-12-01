@@ -15,7 +15,7 @@ get_parameters() {
 	get_jail_parameter cpuset  "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
 
 	# MTU only with valid IP. No alert if substituting #default mtu 
-	[ IP0 == "none" ] || get_jail_parameter mtu "$JAIL" "$IF_ERR" "$DEFAULTS"  
+	[ IP0 == "none" ] || get_jail_parameter mtu "$JAIL" "return 1" "$DEFAULTS"  
 
 	# All jails which are served a network connection by <JAIL>
 	CLIENTS=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${JAIL}//p" $JMAP) 
@@ -30,12 +30,12 @@ connect_jail_to_gateway() {
 
 	# Configure networking on the <GATEWAY> side of the epair
 	jexec -l -U root $GATEWAY ifconfig "${_ext_if%?}a" inet "${IP0%.*/*}.1/${IP0#*/}" mtu $MTU up 
-echo	jexec -l -U root $GATEWAY ifconfig "${_ext_if%?}a" inet "${IP0%.*/*}.1/${IP0#*/}" mtu $MTU up 
+	jexec -l -U root $GATEWAY ifconfig "${_ext_if%?}a" inet "${IP0%.*/*}.1/${IP0#*/}" mtu $MTU up 
 
 	# Configure networking on the <JAIL> side of the epair   
-echo	jexec -l -U root $JAIL ifconfig "${_ext_if%?}b" inet $IP0 mtu $MTU up 
 	jexec -l -U root $JAIL ifconfig "${_ext_if%?}b" inet $IP0 mtu $MTU up 
-echo	jexec -l -U root $JAIL route add default "${IP0%.*/*}.1" 
+	jexec -l -U root $JAIL ifconfig "${_ext_if%?}b" inet $IP0 mtu $MTU up 
+	jexec -l -U root $JAIL route add default "${IP0%.*/*}.1" 
 	jexec -l -U root $JAIL route add default "${IP0%.*/*}.1" 
 }
 
@@ -88,9 +88,8 @@ configure_epairs() {
 
 pf_modify() {
 	# Numerous variables need to be modified for pf.conf
-
 	if [ -e "$JPF" ] ; then
-
+		
 		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"$_ext_if\"@" $JPF
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"$IP0\"@" $JPF
 		sed -i '' -e "s@^routerIP[[:blank:]]*=.*@routerIP = \"${IP0%.*/*}.1\"@" $JPF
@@ -114,10 +113,9 @@ resource_ctl() {
 
 get_global_variables
 
-# pf and wireguard files and variables
-get_networking_variables
-
 get_parameters "$@"
+
+get_networking_variables
 
 configure_epairs
 

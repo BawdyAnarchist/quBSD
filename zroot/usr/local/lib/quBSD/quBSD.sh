@@ -90,21 +90,19 @@ get_user_response() {
 }
 
 get_jail_parameter() {
-#eval echo \${$_PARAM}
-	# Get <jail> <param> from JMAP. 
+	# Get the value of <jail> <param> from JMAP. 
 	# Variable indirection and `eval` are used to consolidate this to a single
 	# function, rather than mulitple functions for each JMAP <param>.
 	# Description of positional variables:
 		# _param - The parameter to pull from JMAP
-		# _PARAM - $_param converted to UPPER. The <value> of <param> can be saved
-					  # to the all CAPS name of the <param> being retreived.
-		# _jail  - jail in JMAP to retreive 
-		# _if_err - Action in case of error. This variable is executed with `eval`. 
-					 # Either: get_msg_qubsd to show error; or "return 1" exit silently.
-		# _defaults - Substitute #default from JMAP in case of :blank: <param> 
-		# _echo - Variable indirection is used to set the <value> of <param> to the
-				  # all CAPS name of the <param>. _echo=true prevents this behavior, 
-			     # and the _value will simply be echoed back to the caller function.
+		# _PARAM - <_param> name converted to UPPER. Variable indirection: $_PARAM 
+		#          is set to the <value> retreived from JMAP. 
+		# _jail  - <jail> in JMAP
+		#_if_err - Action in case of error. This variable is executed with `eval`. 
+		#			  Either: get_msg_qubsd to show error; or "return 1" exit silently.
+		# _defaults - Substitute #default from JMAP in case of null <param> 
+		# _echo  - Prevents variable indirection from setting <$_PARAM> to <value>.
+		#          Instead, <value> is simply echoed back to the caller.
 
 	# lower_case param is stored in jailmap, and check_funcs() use lower case
 	local _param ; _param="$1"  
@@ -123,17 +121,27 @@ get_jail_parameter() {
 	# Temporary place to save the returned <value> for <param> 
 	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
 
-	# If the <param> value was null, and if caller specified, get default value
+	# Substitute JMAP #defaults if desired 
 	if [ -z "$_value" ] && [ "$_defaults" == "true" ] ; then
+		
 		_value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
+
+		# Either set the global variable, or echo back the value to caller 
+		[ "$_echo" ] && echo "$_value" || eval $_PARAM="$_value"
+	
+		# Print warning msg to stdout, if desired 
 		eval "$_if_err" "_cj17" "$_param" 
+
+		return 0
 	fi
 
-	# Escape \" is required, to avoid word splitting. Variable indirection simplifies
-	# the logic to a single line, instead of a different func for each <param>.
+	# Variable indirection for checks. Escape \" avoids word splitting
 	if eval "check_isvalid_${_param}" \"$_value\" \"$_if_err\" \"$_jail\" ; then
+
+		# Either set the global variable, or echo back the value to caller 
 		[ "$_echo" ] && echo "$_value" || eval $_PARAM="$_value"
 		return 0	
+
 	else
 		return 1
 	fi

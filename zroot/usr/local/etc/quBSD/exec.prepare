@@ -17,7 +17,7 @@ get_parameters() {
 	JMOUNT2=$(mount | egrep -o "^${M_ZUSR}/${JAIL}/[^[:blank:]]+")
 }
 
-prepare_actions() {
+preparation_actions() {
 	# Sometimes bridge module unloads
 	kldstat -q -m if_bridge || kldload -q if_bridge     
 
@@ -26,21 +26,19 @@ prepare_actions() {
 
 	# unmount any parts of <JAIL>, just in case. Reduces errors. 
  	[ -e "${M_ZUSR}/${JAIL}/rw/etc/fstab" ] \
-			&& umount -aF ${M_ZUSR}/${JAIL}/rw/etc/fstab > /dev/null 2>&1
+			&& echo umount -aF ${M_ZUSR}/${JAIL}/rw/etc/fstab > /dev/null 2>&1
 
-	[ -n "$JMOUNT1" ] && echo "$JMOUNT1" | xargs umount -f 
-	[ -n "$JMOUNT2" ] && echo "$JMOUNT2" | xargs umount -f   
+	[ -n "$JMOUNT1" ] && umount -f "$JMOUNT1" 
+	[ -n "$JMOUNT2" ] && umount -f "$JMOUNT2" 
 }
 
 reclone_appjail() {
-
-	ROOTSNAP=$(zfs list -t snapshot -Ho name ${JAILS_ZFS}/${ROOTJAIL} | tail -1)
-	
 	# Check the dataset exists, and destroy it 
 	zfs list "${JAILS_ZFS}/${JAIL}" > /dev/null 2>&1 \
 			&& zfs destroy -rRf "${JAILS_ZFS}/${JAIL}"  
 		
 	# Reclone the rootjail, and make sure that the clone isn't set to autosnap
+	ROOTSNAP=$(zfs list -t snapshot -Ho name ${JAILS_ZFS}/${ROOTJAIL} | tail -1)
 	zfs clone $ROOTSNAP ${JAILS_ZFS}/${JAIL}
 	zfs set qubsd:autosnap=- "${JAILS_ZFS}/${JAIL}"
 
@@ -77,29 +75,29 @@ reclone_dispjail() {
 }
 
 flags_down() {      
-	[ -e ${M_JAILS}/${JAIL} ] && chflags -R noschg ${M_JAILS}/${JAIL}  
 	[ -e ${M_ZUSR}/${JAIL} ]  && chflags -R noschg ${M_ZUSR}/${JAIL}
+	[ -e ${M_JAILS}/${JAIL} ] && chflags -R noschg ${M_JAILS}/${JAIL}  
 }
 
 main() {
-
 	# Misc things to do/check before recloning the datasets
-	prepare_actions
+	preparation_actions
 
 	# Roojails have schg until started. Appjails are re-cloned from rootjails
 	case $CLASS in 
 		rootjail) 
 			# Rootjails have schg set when off. Drop flags while on. 
-			flags_down ;;
-
+			flags_down
+		;;
 		appjail) 
 			# Appjails have their root filesystem destroyed/recloned
-			reclone_appjail ;;
-
+			reclone_appjail
+		;;
 		dispjail) 
 			# Dispjails also get /zusr recloned from their template jail 
 			reclone_appjail
-			reclone_dispjail ;;
+			reclone_dispjail
+		;;
 	esac
 }
 
