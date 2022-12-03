@@ -31,9 +31,6 @@ nicvm
   - Make it a Linux VM so that it can use all the wireless protocols.
      - Someone made a post about this in FreeBSD
 
-qb-windows
-	- command that shows the jail, window title, and workspace of all active windows
-
 net-firewall 
 	- jail start should auto update the servIPs in pf.conf
 		- This might require some thought about setting an "auto" option in the settings.
@@ -63,12 +60,12 @@ qubsd_installer
 
 	- Double check the install script that it copies qb-ivpn to 0net
 
+	- /var/log/quBSD.log - line added to /usr/local/etc/X11/xinit/xinitrc to remove the log at each startx
 
 
 ### BEST PRACTICES / CLEANUP
 
-qb-stat 
-	- #default is showing up as a jail. Remove lines that start with #
+qubsd.sh - check that case can be applied to isqubsd_ipv4 and others
 
 - net-firewall pf.conf might not be fully generalized for routerIP. 
 	- basically, exec.created relies on setting the last number to "1". 
@@ -102,30 +99,15 @@ qb-create
 pf.conf
 	- wgIP constant really should be called "endpointIP" or something like that
 
-Coding practices
-	shellcheck.net - need to go over all code with a fine toothed comb. fix the formatting errors (like if "$?" then ...)
-
-Optimze scripts. Some run too slow. 
-	Disable unicode script:
-		https://tldp.org/LDP/abs/html/optimizations.html
-	Probably alot of sed's can be replaced with cut and tr
-	
-jails are being created on the basis of the most recent autosnap snapshots. That *might?* not be a good idea?
-
-exec scripts should assign qb-list parameter defaults in case some are missing, but should also throw a log/error or something.
-
-Update the guides regarding #defaults in jailmap.
+/usr/local/share/quBSD 
+	- Needs to document that the rootjails must stay lowered schg
+	- Needs updated in general after you're done
+	- Update the guides regarding #defaults in jailmap.
 
 ### MINOR UPGRADES
 
 qb-help
 	Make sure to update it after changes
-
-/var/log/quBSD.log
-	Creating a log files. Works nicely with quBSD.lib
-	qubsd setup script needs to include line to rm the log on startx
-
-Test having the rootjails at high security levels when turned off.
 
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 

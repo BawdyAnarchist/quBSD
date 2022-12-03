@@ -19,7 +19,6 @@ get_options() {
 
 	# Define script variables
 	JAIL="$1"
-	IF_ERR="get_msg_qubsd"
 }
 
 checks() {
@@ -27,7 +26,7 @@ checks() {
 	[ -z "$_CMD" ] && get_msg_qb_snap "_2" "usage_1"
 
 	# Must have a valid jail
-	check_isvalid_jail "$JAIL" "$IF_ERR" || "usage_1"
+	check_isvalid_jail "$JAIL" || "usage_1"
 
 	# Define _ZJAIL variable, which sets the zfs dataset being targeted 
 		# Class will determine what the target dataset is 
@@ -101,7 +100,7 @@ main() {
 			_DEPENDS=$(echo "$_DEPENDS" | awk '{print $1}') 
 
 			for _jail in $_DEPENDS ; do
-				stop_jail "$_jail" "$IF_ERR" || get_msg_qb_snap "_9" "exit_1"
+				stop_jail "$_jail" || get_msg_qb_snap "_9" "exit_1"
 			done			
 
 			# Destroy snapshots 

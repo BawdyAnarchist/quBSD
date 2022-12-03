@@ -1,11 +1,25 @@
 #!/bin/sh
 
-get_msg_qubsd() { 
+get_msg() { 
 	# _message determines which feedback message to call.
 	# Just call "none" in the case you want no message to match.
 	# _if_err is optional, and can be used to exit and/or show usage
 
-	local _message ; local _value; local _passvar ; local _if_err
+# Just a way to pass through
+#	local _m ; getopts m _m 
+#   shift $(( OPTIND - 1 ))
+#	[ -z "$_m" ] && return 0
+
+   # Quiet option
+	local _q ; local _opts 
+	getopts q _opts && return 0 
+	shift $(( OPTIND - 1 ))
+
+	# Quiet any messages, and return
+#	[ -n "$1" ] && return 0
+
+	local _q ; local _message ; local _value; local _passvar 
+	#_q="$1"  ; _message="$2"  ;  _value="$3" ; _passvar="$4"  
 	_message="$1"  ;  _value="$2" ; _passvar="$3"  
 
 	case "$_message" in
@@ -137,6 +151,11 @@ ENDOFMSG
 
 WARNING: < $_value > was not found in jailmap.conf 
          < #default > was applied instead. 
+ENDOFMSG
+	;;
+	_cj18) cat << ENDOFMSG
+
+WARNING: MTU is outside of sanity bounds (1000 to 2000)
 ENDOFMSG
 	;;
 

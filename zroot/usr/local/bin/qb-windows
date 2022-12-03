@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# It's not the cleanest looking script, but parsing JSON without a parser is a bit cumbersome.
+
+# Print help message
+[ "$1" == '-h' ] && \
+	echo -e "\nqb-windows: Print a list of all windows, their workspace, and jail (or host).\n"
+
+# get_tree from i3wm, and parse the important bits.
+LIST=$(i3-msg -t get_tree | grep -Eo '(\"num\":[[:alnum:]]+|\"machine\":\"[[:alnum:]]+|\"class\":\"[[:alnum:]]+)' | grep -v i3bar | sed 's/"num":/WORKSPACE: /g' | column -t | sed 's/"class":"/     /g' | sed 's/"machine":"/\tJail: /g' | sed 's/Jail: quBSD/Host/g' | sed "/WORKSPACE/ i\\
+
+#")
+
+
+# Print the list
+echo "$LIST" | sed 'N;s/\n/ /' | sed 's/WORKSPACE:[[:blank:]]*/WORKSPACE: /g' 
+
+
+

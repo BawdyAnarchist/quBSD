@@ -156,7 +156,6 @@ get_options() {
 	shift $(( OPTIND - 1 ))
 
 	JAIL="$1"
-	IF_ERR="get_msg_qubsd"
 	
 	# Operating on host vs inside jail is a crucial distinction. 
 	ps -o pid 0 > /dev/null 2>&1 && INJAIL="false" || INJAIL="true"
@@ -198,7 +197,7 @@ define_variables() {
 handle_if_off() {
 
 	# Jail must be valid
-	check_isvalid_jail "$JAIL" "$IF_ERR" || get_msg_qb_ivpn "none" "usage_1" 
+	check_isvalid_jail "$JAIL" || get_msg_qb_ivpn "none" "usage_1" 
 
 	# Will restore original SECLVL later on, after applying ivpn changes
 	SEC_orig=$(sed -En "s/^${JAIL}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
@@ -210,7 +209,7 @@ handle_if_off() {
 		qb-edit -fq $JAIL seclvl -1 
 	fi
 		
-	start_jail "$JAIL" "$IF_ERR" || get_msg_qb_ivpn "_1" "exit_1"
+	start_jail "$JAIL" || get_msg_qb_ivpn "_1" "exit_1"
 }
 
 fetch_connection() {
@@ -394,13 +393,13 @@ main() {
 		jexec -l -U root $JAIL qb-ivpn -x -p $PORT
 
 		# The flags applied somehow still prevent moving until jail is stopped.
-		stop_jail "$JAIL" "$IF_ERR"
+		stop_jail "$JAIL" 
 
 		# Completion of hack. Move modified pf.conf to rw/etc 
 		mv ${PATHMOD}/${WIREGRD}/pf.conf ${PATHMOD}/rw/etc/pf.conf
 
 		# Dont always need restart, but not worth the code/logic to branch.
-		start_jail "$JAIL" "$IF_ERR"
+		start_jail "$JAIL" 
 	fi
 }		
 

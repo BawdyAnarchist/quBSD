@@ -22,18 +22,18 @@ get_options() {
 	shift $(( OPTIND - 1 ))
 
 	JAIL="$1"
-	IF_ERR="get_msg_qubsd"
 
 	# Default directory if not defined by user
 	U_FOLDER="${U_FOLDER:=${M_ZUSR}/${JAIL}/usr/home/${JAIL}/crypt}"
 }
 
 checks() {
+
 	# Must specify an action
 	[ -z "$_CMD" ] && get_msg_qb_pefs "_2" "usage_1"
 
 	# Must have a valid jail 
-	check_isvalid_jail "$JAIL" "$IF_ERR" || get_msg_qb_pefs "none" "usage_1"
+	check_isvalid_jail "$JAIL" || get_msg_qb_pefs "none" "usage_1"
 
 	# If performing mount, the directory should already exist. 
 	[ "$_CMD" == "mount" ] && ! [ -d "$U_FOLDER" ] && get_msg_qb_pefs "_3" "usage_1"
@@ -60,7 +60,7 @@ main() {
 
 		mount)
 			# Start jail if off, or exit
-			start_jail "$JAIL" "$IF_ERR" || exit 1
+			start_jail "$JAIL" || exit 1
 
 			# Mount the folder and perform decryption
 			pefs mount $U_FOLDER $U_FOLDER

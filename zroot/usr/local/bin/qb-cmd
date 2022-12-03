@@ -20,7 +20,6 @@ get_options() {
 
 	JAIL="$1" ; shift
 	_CMD="$@"
-	IF_ERR="${IF_ERR:=get_msg_qubsd}"
 
 	# Passing commands through another terminal is tricky. 
 	if [ -z "$_CMD" ] ; then
@@ -35,8 +34,9 @@ get_options() {
 		# Quotations are required to pass multiple arguments to jail, through jexec 
 		_CMD="'${_CMD}'"
 		
-		# Unless [-v] is specified suppress output of command
-		# NOTE: The behavior of {parameter-word} isn't documented in man sh, but it works.
+		# {parameter-word} regards `null' as the "set" value. Default behavior of qb-cmd is to, 
+		# suppress output. So if [-v] option was set `null' ; we want to leave it that way. 
+		# NOTE: {paremeter-word} is not documented in man sh , but it works. 
 		_REDIRECT="${_REDIRECT- > /dev/null 2>&1 &}"
 	fi
 }
@@ -62,7 +62,7 @@ main() {
 	fi
 
 	# Function handles all checks to see if jail needs to (and can) be started
-	start_jail "$JAIL" "$IF_ERR" || get_msg_qb_cmd "none" "exit_1"
+	start_jail "$JAIL" || get_msg_qb_cmd "none" "exit_1"
 
 	# Final evaluation statement. Launches the window/commands 
 	eval jexec -l -U $_USER $JAIL csh -c $_NEWWIND $_CMD $_REDIRECT

@@ -55,10 +55,10 @@ remove() {
 
 		if [ "$RESTART" ] ; then 
 
-			restart_jail "$_jail" "$IF_ERR"
+			restart_jail "$_jail" 
 		else
 
-			stop_jail "$_jail" "$IF_ERR"
+			stop_jail "$_jail" 
 		fi
 	done
 }

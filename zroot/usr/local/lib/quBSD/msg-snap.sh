@@ -103,7 +103,9 @@ Usage: qb-snap [-c|-d|-l] <jail>
    -d: (d)estroy snapshot(s) of <jail> older than <date>.
        <date> must be in ISO format: YYYY-MM-DDTHH:mm
        Example: 2022-12-31T23:15 
-!ALL <JAIL> SNAPSHOTS OLDER THAN <date> WILL BE DESTROYED
+         !! ALL <JAIL> SNAPSHOTS OLDER THAN <date> !!
+                     WILL BE DESTROYED
+
    -h: (h)elp. Outputs this help message
    -l: (l)ist all snapshots of <jail>
    -y: (y)es. Assume "yes" to final confirmation before

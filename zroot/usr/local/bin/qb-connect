@@ -19,8 +19,8 @@ get_options() {
 	# Define script variables
 	JAIL=${JAIL:="$1"}
 	GATEWAY="$2"
-	IF_ERR="get_msg_qubsd"
-	get_jail_parameter mtu "$JAIL" "$IF_ERR" "true" 
+
+	get_jail_parameter -q mtu "$JAIL" 
 }
 
 checks() {
@@ -35,14 +35,14 @@ checks() {
 			# IP checks
 			if [ -n "$IP0" ] ; then
 				# Invalid IP must be rejected
-				check_isvalid_ipv4 "$IP0" "$IF_ERR" || exit 1 
+				check_isvalid_ipv4 "$IP0" || exit 1 
 
 				# Just temporary connections. Warn for convention mismatch, but don't exit  
-				check_isqubsd_ipv4 "$IP0" "$IF_ERR" 
+				check_isqubsd_ipv4 "$IP0" 
 			else
 
 				# Assign IP if not specified by user 
-				IP0=$(discover_open_ipv4 "$JAIL" "$IF_ERR") || exit 1 
+				IP0=$(discover_open_ipv4 "$JAIL") || exit 1 
 			fi
 			
 			# Check the pf status and security levels
@@ -52,7 +52,7 @@ checks() {
 			# JAIL and GATEWAY must be running (helps prevent accidents) 
 			check_isrunning_jail "$JAIL" "return 1" || get_msg_qb_connect "_2" "usage_1"
 	
-			[ -n "$GATEWAY" ] && ! check_isrunning_jail "$GATEWAY" "$IF_ERR" \
+			[ -n "$GATEWAY" ] && ! check_isrunning_jail "$GATEWAY" \
 					&& get_msg_qb_connect "_3" "usage_1"
 		;;
 	esac
@@ -75,7 +75,8 @@ check_seclvl() {
 	else
 		# If GATEWAY is off, but has pf_enabled, use jailmap.conf for the warning 
 		grep -Eq 'pf_enable=.*YES' ${M_ZUSR}/${GATEWAY}/rw/etc/rc.conf \
-				&& _seclvl_T=$(sed -nE "s/^${GATEWAY}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
+				&& _seclvl_T=$(get_jail_parameter seclvl "$GATEWAY" "return 1" "true" "true")
+#&& _seclvl_T=$(sed -nE "s/^${GATEWAY}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
 	fi
 	
 	# Return 1 if gateway seclvl is too high. Must use if/then here, for return 0/1 to work  
@@ -126,7 +127,7 @@ assemble_interface_list() {
 
 configure_epairs() {
 	# Start gateway if it's off
-	check_isrunning_jail "$GATEWAY" || start_jail "$GATEWAY" "$IF_ERR" || exit 1
+	check_isrunning_jail "$GATEWAY" || start_jail "$GATEWAY" || exit 1
 
 	# Create the epair and send to jails
 	epair=$(ifconfig epair create)
