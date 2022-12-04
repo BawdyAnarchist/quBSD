@@ -4,19 +4,15 @@
 
 get_options() {
 	JAIL="$1"
-	IF_ERR="get_msg_qubsd"
-	DEFAULTS="true"
 
-	get_jail_parameter schg "$JAIL" "$IF_ERR" "$DEFAULTS"
-	get_jail_parameter seclvl "$JAIL" "$IF_ERR" "$DEFAULTS"
+	get_jail_parameter schg "$JAIL"
+	get_jail_parameter seclvl "$JAIL" 
 }
 
 security_flags() {
 	
 	# Different directories are schg flagged depending on user settings
 	case $SCHG in
-		none) _jdir="" 
-		;;
 		all)  _jdir="/bin /sbin /boot /etc /home /lib /libexec /root /rw /usr"
 		;;
 		sys)  _jdir="/boot /rw /bin /sbin /etc /lib /libexec /usr/bin /usr/sbin \
@@ -25,10 +21,11 @@ security_flags() {
 	esac
 
 	for _d in $_jdir; do
-		chflags -R schg "${M_JAILS}/${JAIL}${_d}" > /dev/null 2>&1
+		[ -e "${M_JAILS}/${JAIL}${_d}" ] \
+				&& chflags -R schg "${M_JAILS}/${JAIL}${_d}" > /dev/null 2>&1
 	done 
 	
-	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL"
+	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL" > /dev/null 2>&1 
 }
 
 get_global_variables
@@ -37,3 +34,4 @@ get_options "$@"
 
 security_flags
 
+exit 0

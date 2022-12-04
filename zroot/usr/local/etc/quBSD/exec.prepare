@@ -5,16 +5,13 @@
 get_parameters() {
 	# Define script variables
 	JAIL="$1"
-	IF_ERR="get_msg_qubsd"
-	DEFAULTS="true"
 	
 	# Parameters and checks
-	get_jail_parameter class    "$JAIL" "$IF_ERR" "DEFAULTS" || exit 1
-	get_jail_parameter rootjail "$JAIL" "$IF_ERR" "DEFAULTS" || exit 1
-	get_jail_parameter gateway  "$JAIL" "$IF_ERR" "DEFAULTS" || exit 1
+	get_jail_parameter -d class    "$JAIL"  ||  exit 1
+	get_jail_parameter -d rootjail "$JAIL"  ||  exit 1
+	get_jail_parameter gateway  "$JAIL"  ||  exit 1
 
-	JMOUNT1=$(mount | egrep -o "${M_JAILS}/${JAIL}/[[:alnum:]]+") 
-	JMOUNT2=$(mount | egrep -o "^${M_ZUSR}/${JAIL}/[^[:blank:]]+")
+	JMOUNT=$(mount | grep -Eo "${M_JAILS}/${JAIL}/[^[:blank:]]+") 
 }
 
 preparation_actions() {
@@ -22,37 +19,31 @@ preparation_actions() {
 	kldstat -q -m if_bridge || kldload -q if_bridge     
 
 	# Prefer starting gateways here; as jail.conf dependencies can limit versatility 
-	start_jail "$GATEWAY" "$IF_ERR" 
+	[ "$JAIL" == "net-firewall" ] || start_jail "$GATEWAY" 
 
-	# unmount any parts of <JAIL>, just in case. Reduces errors. 
- 	[ -e "${M_ZUSR}/${JAIL}/rw/etc/fstab" ] \
-			&& echo umount -aF ${M_ZUSR}/${JAIL}/rw/etc/fstab > /dev/null 2>&1
-
-	[ -n "$JMOUNT1" ] && umount -f "$JMOUNT1" 
-	[ -n "$JMOUNT2" ] && umount -f "$JMOUNT2" 
+	# Double check to unmount any parts of <jail> before destroy/recreating the dataset 
+	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f 
 }
 
 reclone_appjail() {
+
 	# Check the dataset exists, and destroy it 
 	zfs list "${JAILS_ZFS}/${JAIL}" > /dev/null 2>&1 \
 			&& zfs destroy -rRf "${JAILS_ZFS}/${JAIL}"  
 		
-	# Reclone the rootjail, and make sure that the clone isn't set to autosnap
 	ROOTSNAP=$(zfs list -t snapshot -Ho name ${JAILS_ZFS}/${ROOTJAIL} | tail -1)
 	zfs clone $ROOTSNAP ${JAILS_ZFS}/${JAIL}
 	zfs set qubsd:autosnap=- "${JAILS_ZFS}/${JAIL}"
 
-	# New clones need schg removed so it doesn't cause startup errors 
-	flags_down
+	chflags -R noschg ${M_ZUSR}/${JAIL}
 
-	# Add user and group to freshly cloned rootjail 
 	pw -V ${M_JAILS}/${JAIL}/etc/ \
 			useradd -n $JAIL -u 1001 -d /usr/home/${JAIL} -s /bin/csh 2>&1
 }
 
 reclone_dispjail() {
 	# template and homesnap are needed to clone dispjail 
-	get_jail_parameter template "$JAIL" "$IF_ERR" "DEFAULTS" || exit 1
+	get_jail_parameter template "$JAIL" || exit 1
 	HOMESNAP=$(zfs list -t snapshot -Ho name ${ZUSR_ZFS}/${TEMPLATE} | tail -1)
 
 	# Check the dataset exists, and destroy it 
@@ -63,8 +54,7 @@ reclone_dispjail() {
 	zfs clone ${HOMESNAP} ${ZUSR_ZFS}/${JAIL} 
 	zfs set qubsd:autosnap=- "${ZUSR_ZFS}/${JAIL}"
 
-	# New clones need schg removed so it doesn't cause startup errors 
-	flags_down
+	chflags -R noschg ${M_ZUSR}/${JAIL}
 
 	# Rename directories 
 	[ -e ${M_ZUSR}/${JAIL}/usr/home/${TEMPLATE} ] && \
@@ -74,21 +64,12 @@ reclone_dispjail() {
 	sed -i '' -e "s/${TEMPLATE}/${JAIL}/g" ${M_ZUSR}/${JAIL}/rw/etc/fstab 
 }
 
-flags_down() {      
-	[ -e ${M_ZUSR}/${JAIL} ]  && chflags -R noschg ${M_ZUSR}/${JAIL}
-	[ -e ${M_JAILS}/${JAIL} ] && chflags -R noschg ${M_JAILS}/${JAIL}  
-}
-
 main() {
 	# Misc things to do/check before recloning the datasets
 	preparation_actions
 
 	# Roojails have schg until started. Appjails are re-cloned from rootjails
 	case $CLASS in 
-		rootjail) 
-			# Rootjails have schg set when off. Drop flags while on. 
-			flags_down
-		;;
 		appjail) 
 			# Appjails have their root filesystem destroyed/recloned
 			reclone_appjail
@@ -99,6 +80,8 @@ main() {
 			reclone_dispjail
 		;;
 	esac
+
+	return 0
 }
 
 get_global_variables

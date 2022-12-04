@@ -16,7 +16,7 @@ get_options() {
 	[ "$OPTIND" == 1 ] && get_msg_qb_hostnet "_2" "usage_1" 
 
 	get_jail_parameter gateway "host" || exit 1
-	get_jail_parameter IP0 "host" || exit 1 
+	get_jail_parameter ipv4 "host" || exit 1 
 	get_jail_parameter -q mtu "host" 
 }
 
@@ -39,11 +39,11 @@ main() {
 		# Create epair, and set it up inside the gateway
 		_epair=$(ifconfig epair create)
 		ifconfig "${_epair%?}a" vnet $GATEWAY
-		jexec -l $GATEWAY ifconfig "${_epair%?}a" inet ${IP0%.*/*}.1/${IP0#*/} mtu $MTU up
+		jexec -l $GATEWAY ifconfig "${_epair%?}a" inet ${IPV4%.*/*}.1/${IPV4#*/} mtu $MTU up
 
 		# Configure epair on the host side
-		ifconfig "${_epair%?}b" inet $IP0 mtu $MTU up
-		route add default "${IP0%.*/*}.1"
+		ifconfig "${_epair%?}b" inet $IPV4 mtu $MTU up
+		route add default "${IPV4%.*/*}.1"
 
 		# Change pf to file that passes internet from host to outside. 
 		pfctl -f /etc/pf_pass.conf

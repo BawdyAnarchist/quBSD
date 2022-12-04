@@ -159,7 +159,7 @@ class:       Cannot be modified. Use qb-create instead.
 cpuset:      CPUs a jail may use. Comma separated integers, or a
              range.  For example: 0,1,2,3 is the same as 0-3
              \`none' places no restrictions on jail's CPU access
-IP0:         IPv4 address for the jail.
+IPV4:         IPv4 address for the jail.
 maxmem:      RAM maximum allocation:  <integer><G|M|K> 
              For example: 4G or 3500M, or \'none' for no limit
 no_destroy:  Prevents accidental destruction of <jail>

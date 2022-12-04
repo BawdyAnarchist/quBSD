@@ -4,18 +4,16 @@
 
 get_parameters() {
 	JAIL="$1"
-	IF_ERR="get_msg_qubsd"
-	DEFAULTS="true"
 
-	# get_jail_parameter conducts all necessary checks for the parameter
-	get_jail_parameter class   "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
-	get_jail_parameter IP0     "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
-	get_jail_parameter gateway "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
-	get_jail_parameter maxmem  "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
-	get_jail_parameter cpuset  "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	# Get parameters. Class and gateway were already verified, so skip checks, for speed 
+	get_jail_parameter -dsq class  "$JAIL"  ||  exit 1
+	get_jail_parameter ipv4 "$JAIL"         ||  exit 1
+	get_jail_parameter -sq gateway "$JAIL"  ||  exit 1
+	get_jail_parameter maxmem  "$JAIL"      ||  exit 1
+	get_jail_parameter cpuset  "$JAIL"      ||  exit 1
 
-	# MTU only with valid IP. No alert if substituting #default mtu 
-	[ IP0 == "none" ] || get_jail_parameter mtu "$JAIL" "return 1" "$DEFAULTS"  
+	# MTU only with valid IP. Quiet messages (MTU is not critical) 
+	[ gateway == "none" ] || get_jail_parameter -q mtu "$JAIL" 
 
 	# All jails which are served a network connection by <JAIL>
 	CLIENTS=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${JAIL}//p" $JMAP) 
@@ -29,14 +27,11 @@ connect_jail_to_gateway() {
 	ifconfig "${_ext_if%?}b" vnet $JAIL
 
 	# Configure networking on the <GATEWAY> side of the epair
-	jexec -l -U root $GATEWAY ifconfig "${_ext_if%?}a" inet "${IP0%.*/*}.1/${IP0#*/}" mtu $MTU up 
-	jexec -l -U root $GATEWAY ifconfig "${_ext_if%?}a" inet "${IP0%.*/*}.1/${IP0#*/}" mtu $MTU up 
+	jexec -l -U root $GATEWAY ifconfig "${_ext_if%?}a" inet "${IPV4%.*/*}.1/${IPV4#*/}" mtu $MTU up 
 
 	# Configure networking on the <JAIL> side of the epair   
-	jexec -l -U root $JAIL ifconfig "${_ext_if%?}b" inet $IP0 mtu $MTU up 
-	jexec -l -U root $JAIL ifconfig "${_ext_if%?}b" inet $IP0 mtu $MTU up 
-	jexec -l -U root $JAIL route add default "${IP0%.*/*}.1" 
-	jexec -l -U root $JAIL route add default "${IP0%.*/*}.1" 
+	jexec -l -U root $JAIL ifconfig "${_ext_if%?}b" inet $IPV4 mtu $MTU up 
+	jexec -l -U root $JAIL route add default "${IPV4%.*/*}.1" 
 }
 
 connect_jail_to_clients() {
@@ -70,15 +65,14 @@ configure_epairs() {
 	fi
 
 	# Connects <jail> to its gateway network provider specified in jailmap.conf 
-	[ "$IP0" != "none" ] && check_isrunning_jail "$GATEWAY" && connect_jail_to_gateway 
+	! [ "$IPV4" == "none" ] && check_isrunning_jail "$GATEWAY" && connect_jail_to_gateway 
 
 	# If <jail> serves a network connection, bring those connections up 
 	for _client in $CLIENTS ; do 
-		# Get the IP address for each client
-		_cIP=$(get_jail_parameter IP0 "$_client" "return 1" "false" "true")
 
-		# Builds a table of allowable client IPs for the <jail>
-		nat_table="${_cIP} ${nat_table}"
+		# Builds a table of allowable client IPs (if it's a net- jail) 
+		_cIP=$(get_jail_parameter -deq ipv4 "$_client") && ! [ "$_cIP" == "none" ] \
+				&& nat_table="${_cIP} ${nat_table}"
 
 		if check_isrunning_jail "$_client" ; then
 			connect_jail_to_clients
@@ -91,8 +85,8 @@ pf_modify() {
 	if [ -e "$JPF" ] ; then
 		
 		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"$_ext_if\"@" $JPF
-		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"$IP0\"@" $JPF
-		sed -i '' -e "s@^routerIP[[:blank:]]*=.*@routerIP = \"${IP0%.*/*}.1\"@" $JPF
+		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"$IPV4\"@" $JPF
+		sed -i '' -e "s@^routerIP[[:blank:]]*=.*@routerIP = \"${IPV4%.*/*}.1\"@" $JPF
 		sed -i '' -e "s@^table <pass_ips>.*@table <pass_ips> { $nat_table}@" "$JPF"
 
 		if ! [ "$JAIL" == "net-firewall" ] ; then

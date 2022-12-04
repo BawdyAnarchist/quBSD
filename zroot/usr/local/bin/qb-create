@@ -8,7 +8,7 @@ while getopts c:C:f:ghHi:m:r:s:t:T: o ; do
 		g) guided="true" ;;
 		h) help="true" ;;
 		H) copyhome="true" ;;
-		i) IP0="$OPTARG" ; optIP="true" ;;
+		i) IPV4="$OPTARG" ; optIP="true" ;;
 		m) maxmem="$OPTARG" ;;
 		r) rootjail="$OPTARG" ;;
 		s) seclvl="$OPTARG" ;;
@@ -53,7 +53,7 @@ define_variables() {
 	done
 
 	# Additional parameters for later use with tests and messages
-	JMAPIPs=$(qb-list -p IP0 | tail +3 | sort -k3)
+	JMAPIPs=$(qb-list -p IPV4 | tail +3 | sort -k3)
 	usedIPs=$(qb-connect -l | tail +3 | sort -k3)
 	netjails=$(echo "$validtemplatejs" | egrep "^net-")
 	validcpuset=$(cpuset -g | sed "s/pid -1 mask: //" | sed "s/pid -1 domain.*//")
@@ -72,7 +72,7 @@ Usage: qb-create -c <class> -r <rootjail> <newjail>"
 
 All possible options:
 Usage: qb-create [-h] [-g] [-c <class>] [-C <cpuset>] [-f <flags>] \\ 
-                 [-i <IP0>] [-m <maxmem>] [-r <rootjail>] [-s <seclvl>] \\
+                 [-i <IPV4>] [-m <maxmem>] [-r <rootjail>] [-s <seclvl>] \\
                  [-t <gateway_jail>] [-T <template_jail>] [-H] <newjail>"
 
    -h: (h)elp: Shows this message
@@ -206,7 +206,7 @@ define_errors() {
 	e31=$(printf "%b" "\n\tERROR: Entry is invalid. Enter a valid cpuset:  ")
 
 	e32=$(printf "%b" "qb-create: ERROR: No available IP address between: \n$ip0_0 and $ip0 " \
-			"Manually assign IP0 with [-i] option and try again")
+			"Manually assign IPV4 with [-i] option and try again")
 }
 
 define_warnings() {
@@ -219,7 +219,7 @@ define_warnings() {
 							"\nappjails          net-<gateway>  10.1.x.2/30" \
 							"\nusbvm             variable       10.88.88.1/30" \
 							"\nadhoc created with qb-connect    10.99.x.2/30" \
-							"\n\n\tContinue with $IP0 anyways? (y/n):  ")
+							"\n\n\tContinue with $IPV4 anyways? (y/n):  ")
 
 	w2=$(printf "%b" "\nWARNING: [-i] overlaps with an IPv4 already in use.\n" \
 			"Do you really want to do this? (y/n): ")
@@ -231,7 +231,7 @@ define_warnings() {
 			"\nHere is a list of valid gateway possibilities:\n\n$validtemplatejs\n" \
 			"\n\tContinue anyways? (y/n):  ")
 
-	w5=$(printf "%b" "\nqb-create: WARNING: Valid IPv4 ($IP0), but gateway is \`none'" \
+	w5=$(printf "%b" "\nqb-create: WARNING: Valid IPv4 ($IPV4), but gateway is \`none'" \
 			"\n\tContinue anyways? (y/n):  ")
 }
 
@@ -348,7 +348,7 @@ check_parameters() {
 	if [ "$template" ] ; then
 		class=${class:-`sed -nE "s/^${template}[[:blank:]]+class[[:blank:]]+//p" $JMAP`}
 		cpuset=${cpuset:-`sed -nE "s/^${template}[[:blank:]]+cpuset[[:blank:]]+//p" $JMAP`}
-		IP0=${IP0:-`sed -nE "s/^${template}[[:blank:]]+IP0[[:blank:]]+//p" $JMAP`}
+		IPV4=${IPV4:-`sed -nE "s/^${template}[[:blank:]]+IPV4[[:blank:]]+//p" $JMAP`}
 		schg=${schg:-`sed -nE "s/^${template}[[:blank:]]+schg[[:blank:]]+//p" $JMAP`}
 		maxmem=${maxmem:-`sed -nE "s/^${template}[[:blank:]]+maxmem[[:blank:]]+//p" $JMAP`}
 		rootjail=${rootjail:-`sed -nE "s/^${template}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP`}
@@ -368,7 +368,7 @@ check_parameters() {
 	seclvl=${seclvl:--1}
 	gateway=${gateway:-none}
 		
-	# Check IP0 if specified, find auto increment if unspecified 
+	# Check IPV4 if specified, find auto increment if unspecified 
 	check_IPv4
 	find_IP
 	define_warnings
@@ -407,7 +407,7 @@ check_parameters() {
 	fi
 
 	# IP handling. Warn for invalid, overlapping, or straying from IP assignment convention 
-	if [ "$optIP"  -a "$IP0" != "none" ] ; then
+	if [ "$optIP"  -a "$IPV4" != "none" ] ; then
 		if [ -z "$validIPv4" ] ; then
 			ERR="$e13" ; usage
 
@@ -424,12 +424,12 @@ check_parameters() {
 			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$e15_1" && usage
 		fi
 	else 
-		# If a valid gateway is present, assume that an IP0 connection is desired
+		# If a valid gateway is present, assume that an IPV4 connection is desired
 		if [ "$validgateway" ] ; then
 			[ "$ERR" ] && usage
-			IP0="$OPENIP"
+			IPV4="$OPENIP"
 		else 
-			IP0="none"
+			IPV4="none"
 		fi
 	fi			
 
@@ -539,8 +539,8 @@ get_networking() {
 		clear ; printf "%b" "$m8"
 
 		while : ; do 
-			read IP0
-			[ "$IP0" = "none" ] && break 
+			read IPV4
+			[ "$IPV4" = "none" ] && break 
 
 			check_IPv4
 			find_IP
@@ -629,20 +629,20 @@ check_IPv4() {
 
 	validIPv4=""
 
-     a0=${IP0%%.*.*.*/*}
-     a4=${IP0##*.*.*.*/}
-          b1=${IP0#*.*}
+     a0=${IPV4%%.*.*.*/*}
+     a4=${IPV4##*.*.*.*/}
+          b1=${IPV4#*.*}
           a1=${b1%%.*.*/*}
-               b2=${IP0#*.*.*}
+               b2=${IPV4#*.*.*}
                a2=${b2%%.*/*}
-                    b3=${IP0%/*}
+                    b3=${IPV4%/*}
                     a3=${b3##*.*.*.}
 
 	if   [ "$a0" -ge 0 -a "$a0" -le 255 -a "$a1" -ge 0 -a "$a1" -le 255 \
  	    -a "$a2" -ge 0 -a "$a2" -le 255 -a "$a3" -ge 0 -a "$a3" -le 255 \
 	    -a "$a4" -ge 0 -a "$a4" -le 31 ] >> /dev/null 2>&1
 	then
-		echo "$IP0" | egrep -qs "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+"
+		echo "$IPV4" | egrep -qs "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+"
                 [ "$?" = "0" ] && validIPv4="true" 
 	fi
 }
@@ -669,14 +669,14 @@ find_IP() {
         elif [ -z "${jail##serv-*}" ] ; then
                 aa=10 ; bb=128 ; dd=2 ; ee=30
 
-        elif [ -z "${gateway##none*}" -a "$IP0" != "none" ] ; then
+        elif [ -z "${gateway##none*}" -a "$IPV4" != "none" ] ; then
                 ipwithnogateway="true" ; cycle=256
         else
                 aa=10 ; bb=1 ; dd=2 ; ee=30
         fi
 
         # Check if the convention = user_input, otherwise, is mismatch
-        [ -n "$IP0" -a "$jail" != "net-firewall" \
+        [ -n "$IPV4" -a "$jail" != "net-firewall" \
                                         -a "$aa.$bb.$dd/$ee" = "$a0.$a1.$a3/$a4" ] || mismatch="true"
         
         # Run through cycles to find an open IP
@@ -792,7 +792,7 @@ change_config_files() {
 	qb-edit -qf $newjail class $class	
 	qb-edit -qf $newjail cpuset $cpuset	
 	qb-edit -qf $newjail schg $schg	
-	qb-edit -qf $newjail IP0 $IP0	
+	qb-edit -qf $newjail IPV4 $IPV4	
 	qb-edit -qf $newjail maxmem $maxmem
 	qb-edit -qf $newjail seclvl $seclvl
 	qb-edit -qf $newjail gateway $gateway

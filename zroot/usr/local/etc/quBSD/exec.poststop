@@ -4,24 +4,19 @@
 
 get_parameters() {
 	JAIL="$1"
-	IF_ERR="get_msg_qubsd"
-	DEFAULTS="true"
 
-	# get_jail_parameter conducts all necessary checks for the parameter
-	get_jail_parameter class    "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
-	get_jail_parameter rootjail "$JAIL" "$IF_ERR" "$DEFAULTS"  ||  exit 1
+	# Get jail parameters.   
+	get_jail_parameter class -d "$JAIL" ||  exit 1
+	get_jail_parameter rootjail -d "$JAIL" ||  exit 1
 
 	# rootsnap relies on the fact that zfs lists snapshots chronologically
 	ROOTSNAP=$(zfs list -t snapshot -Ho name ${JAILS_ZFS}/${ROOTJAIL} | tail -1)
-	JMOUNT1=$(mount | egrep -o "${M_JAILS}/${JAIL}/[[:alnum:]]+")
-	JMOUNT2=$(mount | egrep -o "^${M_ZUSR}/${JAIL}/[^[:blank:]]+")
+	JMOUNT=$(mount | egrep -o "${M_JAILS}/${JAIL}/[^[:blank:]]+")
 }
 
 unmount_lingering() {
-	[ -e "${M_ZUSR}/${JAIL}/rw/etc/fstab" ] \
-			&& umount -a -F ${M_ZUSR}/${JAIL}/rw/etc/fstab > /dev/null 2>&1
-	[ -n "$JMOUNT1" ] && echo "$JMOUNT1" | xargs umount -f > /dev/null 2>&1
-	[ -n "$JMOUNT2" ] && echo "$JMOUNT2" | xargs umount -f > /dev/null 2>&1 
+	# Since we're destroy the dataset, it needs umount now, instead of waiting for `jail`.
+	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f 
 
 	# Ensures that any pefs mounts are completely removed (thus the data is re-encrypted
 	qb-pefs -u $JAIL
@@ -40,11 +35,12 @@ reclone_appjail() {
 	# Add user and group to freshly cloned rootjail
 	pw -V ${M_JAILS}/${JAIL}/etc/ \
 			useradd -n $JAIL -u 1001 -d /usr/home/${JAIL} -s /bin/csh 2>&1
+
 }
 
 reclone_dispjail() {
 	# template and homesnap are needed to clone dispjail
-	get_jail_parameter template "$JAIL" "$IF_ERR" "DEFAULTS" || exit 1
+	get_jail_parameter template "$JAIL" || exit 1
 	HOMESNAP=$(zfs list -t snapshot -Ho name ${ZUSR_ZFS}/${TEMPLATE} | tail -1)
 
 	# Check the dataset exists, and destroy it 
@@ -54,9 +50,6 @@ reclone_dispjail() {
 	# Reclone the rootjail, and make sure that it's not set to autosnap
 	zfs clone "${HOMESNAP}" "${ZUSR_ZFS}/${JAIL}"
 	zfs set qubsd:autosnap=- "${ZUSR_ZFS}/$JAIL"
-
-	# Remove schg flags (if inherited from clones) to modify new snap
-	chflags -R noschg ${M_ZUSR}/${JAIL}
 
 	# Rename directories and mounts with dispjail name 
 	[ -e ${M_ZUSR}/${JAIL}/usr/home/${TEMPLATE} ] && \
@@ -70,13 +63,7 @@ main() {
 	# Occassionally jail mounts linger and cause problems later 
 	unmount_lingering
 
-	# Roojails have schg until started. Appjails are re-cloned from rootjails
 	case $CLASS in 
-		rootjail) 
-			# Protects rootjails from being modified while not in use
-			chflags -R schg "${M_JAILS}/${JAIL}" > /dev/null 2>&1
-		;;
-
 		appjail) 
 			# Appjails have their root filesystem destroyed/recloned
 			reclone_appjail 
@@ -87,6 +74,9 @@ main() {
 			reclone_dispjail
 		;;
 	esac
+	
+	# Flags come down after stopping.
+	chflags -R noschg ${M_ZUSR}/${JAIL} 
 }
 
 get_global_variables
@@ -95,3 +85,4 @@ get_parameters "$@"
 
 main
 
+exit 0

@@ -27,13 +27,13 @@ m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 jail="$1"
 
 define_variables() {
-	usbvmIP=$(egrep "^usbvm[[:blank:]]+IP0" $JMAP | awk '{print $3}')
+	usbvmIP=$(egrep "^usbvm[[:blank:]]+ipv4" $JMAP | awk '{print $3}')
 	jailconnectIP="${usbvmIP%.*/*}.2/${usbvmIP#*.*.*.*/}"
 	tap=$(egrep "^usbvm[[:blank:]]+gateway" $JMAP | awk '{print $3}')
 	ppt_usb1=$(sed -nE "s:ppt_usb1[[:blank:]]+:: p" $QBCONF) 
 	ppt_usb2=$(sed -nE "s:ppt_usb2[[:blank:]]+:: p" $QBCONF) 
 	
-	JMAPIPs=$(qb-list -p IP0 | awk '{print $3}')
+	JMAPIPs=$(qb-list -p ipv4 | awk '{print $3}')
 	usedIPs=$(qb-connect -l | awk '{print $3}')
 
 	# Determine if usbvm process is running
@@ -104,7 +104,7 @@ find_IP() {
 
 		# If the IP on this cycle is not found anywhere, then it can be used
 		if ! `printf "%b" "${usedIPs}\n${JMAPIPs}" | grep -qs "$openip"` ; then
-			IP0=${IP0:-"${openip}/24"}
+			IPV4=${IPV4:-"${openip}/24"}
 			break
 		else
 			cycle=$(( cycle + 1 ))
@@ -267,10 +267,10 @@ main() {
 							"echo '' \
 							; echo 'Type:  exit to leave usbvm and return to host' \
 							; echo '' \
-							; ifconfig vtnet0 alias $IP0 up \
+							; ifconfig vtnet0 alias $IPV4 up \
 							; route add default 10.99.99.1 \
 							; /bin/csh -i \
-							; ifconfig vtnet0 inet $IP0 -alias"
+							; ifconfig vtnet0 inet $IPV4 -alias"
 		else 
 			ifconfig $tap vnet $jail
 			jexec -l -U root $jail ifconfig $tap inet "$jailconnectIP" up

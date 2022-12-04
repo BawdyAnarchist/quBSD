@@ -1,4 +1,4 @@
-# $FreeBSD: releng/12.1/bin/csh/dot.cshrc 338374 2018-08-29 16:59:19Z brd $
+# $FreeBSD: releng/12.1/share/skel/dot.cshrc 337497 2018-08-08 19:24:20Z asomers $
 #
 # .cshrc - csh resource script, read at beginning of execution by each shell
 #
@@ -6,27 +6,26 @@
 # more examples available at /usr/share/examples/csh/
 #
 
-alias h      history 25
-alias j      jobs -l
-alias ls     ls -1IG
-alias lsc    ls -CIG
-alias lsa    ls -1AGI 
-alias lsac   ls -CAGI 
-alias lsr	   ls -CGIR
-alias lsar   ls -CAGIR
-alias vi     vim
+alias h        history 25
+alias j        jobs -l
+alias ls       ls -1IG
+alias lsc      ls -CIG
+alias lsa      ls -1AGI 
+alias lsac     ls -CAGI 
+alias lsr      ls -CGIR
+alias lsar     ls -CAGIR
+alias vi       vim
+alias firefox 	firefox --no-remote
 
-set apache="/usr/local/etc/apache24/"
-set www="/usr/local/www/"
-
+# These are normally set through /etc/login.conf.  You may override them here
+# if wanted.
+# set path = (/sbin /bin /usr/sbin /usr/bin /usr/local/sbin /usr/local/bin $HOME/bin)
+# setenv	BLOCKSIZE	K
 # A righteous umask
-umask 22
-
-set path = (/sbin /bin /usr/sbin /usr/bin /usr/local/sbin /usr/local/bin $HOME/bin /usr/local/bin/usr/unchanged)
+# umask 22
 
 setenv	EDITOR	vi
 setenv	PAGER	less
-setenv	BLOCKSIZE  K
 setenv	DISPLAY :0
 
 if ($?prompt) then
@@ -35,8 +34,8 @@ if ($?prompt) then
 	set promptchars = "%#"
 
 	set filec
-	set history = 100000
-	set savehist = (100000 merge)
+	set history = 1000
+	set savehist = (1000 merge)
 	set autolist = ambiguous
 	# Use history to aid expansion
 	set autoexpand

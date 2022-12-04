@@ -40,7 +40,6 @@ get_global_variables() {
 
 	# Defaults for quBSD.sh functions  
 	RTRN="return 1"
-	MESG="get_msg"
 } 
 
 get_networking_variables() {
@@ -674,7 +673,7 @@ check_isqubsd_ipv4() {
 	# net-firewall needs special attention
 	if [ "$_jail" == "net-firewall" ] ; then 
 
-		# IP0 `none' with net-firewall shouldn't really happen
+		# IPV4 `none' with net-firewall shouldn't really happen
 		[ "$_value" == "none" ] \
 					&& get_msg $_q "_cj9" "$_value" "$_jail" && return 1
 	
@@ -682,7 +681,7 @@ check_isqubsd_ipv4() {
 		get_msg $_q "_cj15" "$_value" "$_jail" && return 1
 	fi
 
-	# IP0 `none' with < net- > jails should also be rare/never 
+	# IPV4 `none' with < net- > jails should also be rare/never 
 	[ "$_value" == "none" ] && [ -z "${_jail##net-*}" ] \
 					&& get_msg $_q "_cj13" "$_value" "$_jail" && return 1
 	
@@ -730,10 +729,6 @@ check_isvalid_template() {
 			&& get_msg $_q "_cj6" "$_value" "$_template" && return 1
 
 	return 0
-}
-check_isvalid_IP0() {
-	# IP0 probably should be changed to: ipv4 in jailmap.conf
-	check_isvalid_ipv4 "$1" "$2" "$3"
 }
 
 check_is_trueorfalse() {

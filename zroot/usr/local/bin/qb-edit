@@ -10,7 +10,7 @@ get_options() {
 			   # [-f] acts on msg-edit function, rather than main script 
 			f) FORCE="true" ;; 
 			h) get_msg_qb_edit "none" "usage_0" ;; 
-			i) PARAM="IP0" ; VAL="auto" ;;
+			i) PARAM="ipv4" ; VAL="auto" ;;
 			q) QUIET="true" ; _q='-q' ;;
 			r) RESTART="true" ;;
 		esac
@@ -69,7 +69,7 @@ checks() {
 				check_isvalid_gateway $_q "$VAL" "$JAIL" \
 						|| get_msg_qb_edit "none" "exit_1" "_f"
 		;;
-		IP0) 
+		ipv4) 
 				# It's possible user might try to assign DHCP from command line
 				if [ "$VAL" == "auto" ] || [ "$VAL" == "DHCP" ] ; then 
 
@@ -118,6 +118,8 @@ main() {
 			# Using `#' as sed separator, because `/' interferes with variable expansion
 			sed -i '' -E "s#ifconfig_${_tap}.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
 			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
+			
+			# This might not be completley robust. Generally a.b.c.1 should be the default.
 			sed -i '' -E "/^ifconfig_${_tap}.*/ a\\
 defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
 		fi
@@ -134,7 +136,7 @@ handle_restarts() {
 		cpuset|maxmem|rootjail|schg|seclvl|template)
 			_restarts="       $_jail_" 
 		;;
-		IP0|gateway)
+		ipv4|gateway)
 			_gateway=$(sed -nE "s/^${JAIL}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
 			check_isrunning_jail $_gateway || unset _gateway
 

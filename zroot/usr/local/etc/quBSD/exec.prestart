@@ -3,9 +3,10 @@
 . /usr/local/lib/quBSD/quBSD.sh
 
 main() {
-	# Define script variables
 	JAIL="$1"
-	get_jail_parameter class "$JAIL" "$IF_ERR" "DEFAULTS" || exit 1
+
+	# class was already retrieved/check in exec.prepare. Don't check again [-sq]
+	get_jail_parameter -dqs class "$JAIL" || exit 1
 
 	# /rw/ nullfs mounts are best symlinked from within the cloned appjail's root 
 	if [ "$CLASS" != "rootjail" ] ; then

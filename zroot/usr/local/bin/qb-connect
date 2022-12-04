@@ -9,7 +9,7 @@ get_options() {
 			c) _CMD="create" ;;
 			d) [ -z "$_CMD" ] && _CMD="destroy" || get_msg_qb_connect "_1" "usage_1" ;;
 			h) get_msg_qb_connect "none" "usage_0" ;;
-			i) IP0="$OPTARG" manualIP="true" ;;
+			i) IPV4="$OPTARG" manualIP="true" ;;
 			l) [ -z "$_CMD" ] && _CMD="list" || get_msg_qb_connect "_1" "usage_1" ;;
 		esac
 	done
@@ -33,16 +33,16 @@ checks() {
 			check_isrunning_jail "$JAIL" "return 1" || get_msg_qb_connect "_2" "usage_1"
 			
 			# IP checks
-			if [ -n "$IP0" ] ; then
+			if [ -n "$IPV4" ] ; then
 				# Invalid IP must be rejected
-				check_isvalid_ipv4 "$IP0" || exit 1 
+				check_isvalid_ipv4 "$IPV4" || exit 1 
 
 				# Just temporary connections. Warn for convention mismatch, but don't exit  
-				check_isqubsd_ipv4 "$IP0" 
+				check_isqubsd_ipv4 "$IPV4" 
 			else
 
 				# Assign IP if not specified by user 
-				IP0=$(discover_open_ipv4 "$JAIL") || exit 1 
+				IPV4=$(discover_open_ipv4 "$JAIL") || exit 1 
 			fi
 			
 			# Check the pf status and security levels
@@ -134,24 +134,24 @@ configure_epairs() {
 	ifconfig "${epair%?}a" vnet $GATEWAY
 	ifconfig "${epair%?}b" vnet $JAIL
 
-	# Apply IP0 to JAIL and GATEWAY
-	jexec -l -U root $JAIL ifconfig "${epair%?}b" inet $IP0 mtu $MTU up
+	# Apply IPV4 to JAIL and GATEWAY
+	jexec -l -U root $JAIL ifconfig "${epair%?}b" inet $IPV4 mtu $MTU up
 
 	jexec -l -U root $GATEWAY ifconfig "${epair%?}a" \
-										inet "${IP0%.*/*}.1/${IP0#*/}" mtu $MTU up
+										inet "${IPV4%.*/*}.1/${IPV4#*/}" mtu $MTU up
 }
 
 configure_network() {
 	# Add the IP to the gateway's pf table
 	[ -e "${M_JAILS}/${GATEWAY}/rw/etc/pf.conf" ] \
-			&& jexec -l -U root $GATEWAY pfctl -t pass_ips -T add $IP0
+			&& jexec -l -U root $GATEWAY pfctl -t pass_ips -T add $IPV4
 
 	# Add the IP to the jail's pf table
 	[ -e "${M_JAILS}/${JAIL}/rw/etc/pf.conf" ] \
-			&& jexec -l -U root $JAIL pfctl -t pass_ips -T add $IP0
+			&& jexec -l -U root $JAIL pfctl -t pass_ips -T add $IPV4
 
 	# Add default route and a resolv.conf for jail to connect to the internet
-	jexec -l -U root $JAIL route add default "${IP0%.*/*}.1"
+	jexec -l -U root $JAIL route add default "${IPV4%.*/*}.1"
 	cp ${M_ZUSR}/${GATEWAY}/rw/etc/resolv.conf ${M_JAILS}/${JAIL}/rw/etc/
 }
 

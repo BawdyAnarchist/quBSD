@@ -106,6 +106,8 @@ pf.conf
 
 ### MINOR UPGRADES
 
+startup.sh should also take qb-dpi settings
+
 qb-help
 	Make sure to update it after changes
 

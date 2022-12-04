@@ -75,19 +75,20 @@ main() {
 			if [ -n "$USERDIR" ] ; then 
 
 				# The unmount must be done in reverse order. First the nullfs to the zroot/jail
-				umount -f $J_FOLDER
+				umount -f $J_FOLDER  > /dev/null 2>&1
 				# Then the original pefs mount, which encrypts the files
-				umount -f $U_FOLDER
+				umount -f $U_FOLDER  > /dev/null 2>&1
 			else
 
 				# Otherwise, search <jail>'s /usr/local for all pefs.db, to remove 
-				_zusr_umnt=$(find ${M_ZUSR}/${JAIL}/usr -name '.pefs.db' \
-						| sed 's:/.pefs.db::g')  
+				[ -e "${M_ZUSR}/${JAIL}/usr" ] \
+						&& _zusr_umnt=$(find ${M_ZUSR}/${JAIL}/usr -name '.pefs.db' \
+								| sed 's:/.pefs.db::g')  
 
 				# Unmount directories  
 				for _dir in $_zusr_umnt ; do
-					umount -f $(echo $_dir | sed "s:${M_ZUSR}:${M_JAILS}:")	
-					umount -f $_dir 
+					umount -f $(echo $_dir | sed "s:${M_ZUSR}:${M_JAILS}:")  > /dev/null 2>&1
+					umount -f $_dir  > /dev/null 2>&1
 				done
 			fi
 		;;

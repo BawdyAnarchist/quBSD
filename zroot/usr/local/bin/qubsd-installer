@@ -285,7 +285,7 @@ qubsd_files_copy() {
 
 pcidevice_variables() {
 	# IP Addresses
-	nicIP1=$(sed -n "s/^nicvm[[:blank:]]*IP0[[:blank:]]*//p" /usr/local/etc/quBSD/jailmap.conf)
+	nicIP1=$(sed -n "s/^nicvm[[:blank:]]*ipv4[[:blank:]]*//p" /usr/local/etc/quBSD/jailmap.conf)
 	nicIP1="${nicIP1%/*}"
 	nicIP2="${nicIP1%.*}.2/24"
 	usbIPtemp="${nicIP1%.*}.3/24"
