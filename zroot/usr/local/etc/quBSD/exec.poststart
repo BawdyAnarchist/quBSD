@@ -25,7 +25,8 @@ security_flags() {
 				&& chflags -R schg "${M_JAILS}/${JAIL}${_d}" > /dev/null 2>&1
 	done 
 	
-	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL" 
+	# exec.poststart is always sent to background. Don't report seclvl change 
+	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL" > /dev/null 2>&1
 }
 
 get_global_variables

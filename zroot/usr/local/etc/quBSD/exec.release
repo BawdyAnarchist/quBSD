@@ -1,0 +1,78 @@
+#!/bin/sh
+
+. /usr/local/lib/quBSD/quBSD.sh
+
+get_parameters() {
+	JAIL="$1"
+
+	# Get jail parameters.   
+	get_jail_parameter -d class "$JAIL" ||  exit 1
+	get_jail_parameter -d rootjail "$JAIL" ||  exit 1
+
+	# rootsnap relies on the fact that zfs lists snapshots chronologically
+	ROOTSNAP=$(zfs list -t snapshot -Ho name ${JAILS_ZFS}/${ROOTJAIL} | tail -1)
+	JMOUNT=$(mount | egrep -o "${M_JAILS}/${JAIL}/[^[:blank:]]+")
+}
+
+reclone_appjail() {
+	# Check the dataset exists, and destroy it
+	zfs list "${JAILS_ZFS}/${JAIL}" > /dev/null 2>&1 \
+			&& zfs destroy -rRf "${JAILS_ZFS}/${JAIL}"
+
+	# Recone the rootjail, and make sure that the clone isn't set to autosnap
+	zfs clone $ROOTSNAP "${JAILS_ZFS}/$JAIL" 
+	zfs set qubsd:autosnap=- "${JAILS_ZFS}/$JAIL"
+
+	# Add user and group to freshly cloned rootjail
+	pw -V ${M_JAILS}/${JAIL}/etc/ \
+			useradd -n $JAIL -u 1001 -d /usr/home/${JAIL} -s /bin/csh 2>&1
+}
+
+reclone_dispjail() {
+	# template and homesnap are needed to clone dispjail
+	get_jail_parameter template "$JAIL" || exit 1
+	HOMESNAP=$(zfs list -t snapshot -Ho name ${ZUSR_ZFS}/${TEMPLATE} | tail -1)
+
+	# Check the dataset exists, and destroy it 
+	zfs list "${ZUSR_ZFS}/${JAIL}" > /dev/null 2>&1 \
+			&& zfs destroy -rRf ${ZUSR_ZFS}/${JAIL} 
+
+	# Reclone the rootjail, and make sure that it's not set to autosnap
+	zfs clone "${HOMESNAP}" "${ZUSR_ZFS}/${JAIL}" 
+	zfs set qubsd:autosnap=- "${ZUSR_ZFS}/$JAIL"
+
+	# Rename directories and mounts with dispjail name 
+	[ -e ${M_ZUSR}/${JAIL}/usr/home/${TEMPLATE} ] && \
+			mv ${M_ZUSR}/${JAIL}/usr/home/${TEMPLATE} ${M_ZUSR}/${JAIL}/usr/home/${JAIL}
+	
+	# Replace the <template> jailname in fstab with the new <jail> (dispjail)	
+	sed -i '' -e "s/${TEMPLATE}/${JAIL}/g" ${M_ZUSR}/${JAIL}/rw/etc/fstab
+}
+
+main() {
+	# Just in case there were any mounts missed 
+	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f 
+
+	case $CLASS in 
+		appjail) 
+			# Appjails have their root filesystem destroyed/recloned
+			reclone_appjail 
+		;;
+		dispjail) 
+			# Dispjails also get /zusr recloned from their template jail 
+			reclone_appjail
+			reclone_dispjail
+		;;
+	esac
+	
+	# Flags come down after stopping.
+	chflags -R noschg ${M_ZUSR}/${JAIL} 
+}
+
+get_global_variables
+
+get_parameters "$@"
+
+main
+
+exit 0
