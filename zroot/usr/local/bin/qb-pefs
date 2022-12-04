@@ -46,6 +46,40 @@ checks() {
 			|| get_msg_qb_pefs "_5" "exit_1"
 }
 
+unmount_pefs() {
+	# If user specified directory, then unmount only that directory 
+	if [ -n "$USERDIR" ] ; then 
+		# unmount must be done in reverse order. First the nullfs to the zroot/jail
+		umount -f $J_FOLDER  > /dev/null 2>&1
+
+		# Then the original pefs mount, which encrypts the files
+		umount -f $U_FOLDER  > /dev/null 2>&1
+
+	else
+		# Otherwise, search <jail>'s /usr/local for any pefs.db, to remove them all
+		[ -e "${M_ZUSR}/${JAIL}/usr" ] \
+				&& _zusr_umnt=$(find ${M_ZUSR}/${JAIL}/usr -name '.pefs.db' \
+						| sed 's:/.pefs.db::g') 
+
+		# Cycle through discovered directories 
+		for _dir in $_zusr_umnt ; do
+
+			# Get the corresponding zroot nullfs mount for the zusr pefs mount
+			_jdir=$(echo $_dir | sed "s:${M_ZUSR}:${M_JAILS}:")
+
+			# The nullfs mount under zroot must be removed first. 
+			if mount | grep -q $_jdir ; then
+				umount -f $_jdir || get_msg_qb_pefs "_6" 
+			fi
+
+			# Now the actual pefs mount can be removed. 
+			if mount | grep -q $_dir ; then
+				umount -f $_dir  || get_msg_qb_pefs "_7" 
+			fi
+		done
+	fi
+}
+
 main() {
 	# Mount also takes place in running jail. Replace zusr mount with zroot jails mount 
 	J_FOLDER=$(echo $U_FOLDER | sed "s:${M_ZUSR}:${M_JAILS}:")	
@@ -70,29 +104,8 @@ main() {
 			mount_nullfs $U_FOLDER $J_FOLDER
 		;;
 
-		unmount)	
-			# If user specified directory, then unmount only that directory 
-			if [ -n "$USERDIR" ] ; then 
-
-				# The unmount must be done in reverse order. First the nullfs to the zroot/jail
-				umount -f $J_FOLDER  > /dev/null 2>&1
-				# Then the original pefs mount, which encrypts the files
-				umount -f $U_FOLDER  > /dev/null 2>&1
-			else
-
-				# Otherwise, search <jail>'s /usr/local for all pefs.db, to remove 
-				[ -e "${M_ZUSR}/${JAIL}/usr" ] \
-						&& _zusr_umnt=$(find ${M_ZUSR}/${JAIL}/usr -name '.pefs.db' \
-								| sed 's:/.pefs.db::g')  
-
-				# Unmount directories  
-				for _dir in $_zusr_umnt ; do
-					umount -f $(echo $_dir | sed "s:${M_ZUSR}:${M_JAILS}:")  > /dev/null 2>&1
-					umount -f $_dir  > /dev/null 2>&1
-				done
-			fi
+		unmount)	unmount_pefs
 		;;
-
 	esac
 }
 

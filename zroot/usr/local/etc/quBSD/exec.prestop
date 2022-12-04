@@ -4,6 +4,8 @@
 
 # Script variables
 JAIL="$1"
+echo "Stopping $JAIL. $(date "+%Y-%m-%d_%H:%M")" >> /var/log/quBSD.log 
+
 TAPS=$(jexec -l -U root $JAIL ifconfig -g tap)
 EPAIRS=$(jexec -l -U root $JAIL ifconfig -g epair)
 
@@ -19,3 +21,8 @@ for _epair in $EPAIRS ; do
 	ifconfig $_epair destroy
 done
 
+# Must remove pefs mounts to avoid umount errors as jail is stopped 
+qb-pefs -u $JAIL | tee -a $QBLOG
+
+# Exit success regardless of pefs command, to continue jail shutdown
+exit 0

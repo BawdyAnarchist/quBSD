@@ -3,11 +3,22 @@
 . /usr/local/lib/quBSD/quBSD.sh
 . /usr/local/lib/quBSD/msg-autostart.sh
 
+get_options() {
+	while getopts hs opts ; do
+		case $opts in
+			h) get_msg_qb_run "none" "usage_0" ;;
+			r) 
+		esac
+	done
 
-jautostart_start() {
+	shift $(( OPTIND - 1 ))
+
+	AUTOSTART=$(grep -E "autostart[[:blank:]]+true" $JMAP | awk '{print $1}')
+}
+
+autostart() {
 
 	# Find all jails in JMAP flagged for autostart
-	AUTOSTART=$(grep -E "autostart[[:blank:]]+true" $JMAP | awk '{print $1}')
 	
 	for _jail in $AUTOSTART ; do
 
@@ -32,6 +43,7 @@ jautostart_start() {
 get_global_variables
 
 get_options "$@"
+
 
 
 

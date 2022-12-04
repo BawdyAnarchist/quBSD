@@ -59,7 +59,7 @@ connect_jail_to_clients() {
 configure_epairs() {
 	# net-firewall is an exception case, as it only has a tap to configure 
 	if [ "$JAIL" == "net-firewall" ] ; then
-		ifconfig $GATEWAY vnet $JAIL
+		ifconfig $GATEWAY vnet $JAIL 
 		jexec -l -U root $JAIL ifconfig $GATEWAY mtu $MTU up
 		_ext_if="$GATEWAY"
 	fi

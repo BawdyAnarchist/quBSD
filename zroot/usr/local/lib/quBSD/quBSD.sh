@@ -84,7 +84,7 @@ get_jail_parameter() {
 	# Get the value of <jail> <param> from JMAP. 
 	# Variable indirection generalizes this function for all JMAP <params> 
 	# OPTIONS
-		# -d: If <_value> was null, do NOT the backup <#default> value in JMAP.
+		# -d: If <_value> was null, do NOT get backup <#default> value in JMAP.
 		#     Otherwise this function will substitute the <#default> in JMAP.
 		# -e: echo <_value> rather than setting the global variable
 		#	   Otherwise variable indirection will set <$_PARAM> with <_value> 
@@ -209,7 +209,7 @@ start_jail() {
 			
 			# Checks were good, start jail, make a log of it 
 			get_msg "_jf1" "$_jail" | tee -a $QBLOG
-			jail -c "$_jail"  >> $QBLOG  ||  get_msg $_q "_jf2" "$_jail"
+			jail -vc "$_jail"  >> $QBLOG  ||  get_msg $_q "_jf2" "$_jail"
 
 		fi
 	else

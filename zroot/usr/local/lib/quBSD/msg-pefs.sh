@@ -38,6 +38,16 @@ ERROR: Failed to load pefs.ko kernel module.
        Check that pefs-kmod pkg is installed on host.
 ENDOFMSG
 	;;
+	_6) cat << ENDOFMSG
+
+ERROR: Failed to unmount < $(echo $_dir | sed "s:${M_ZUSR}:${M_JAILS}:") > 
+ENDOFMSG
+	;;
+	_7) cat << ENDOFMSG
+
+ERROR: Failed to unmount < $_dir > 
+ENDOFMSG
+	;;
 	esac
 
 	case $_if_err in 

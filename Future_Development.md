@@ -61,9 +61,15 @@ qubsd_installer
 	- Double check the install script that it copies qb-ivpn to 0net
 
 	- /var/log/quBSD.log - line added to /usr/local/etc/X11/xinit/xinitrc to remove the log at each startx
+		- log isn't working as well as I'd hope.
 
 
 ### BEST PRACTICES / CLEANUP
+
+quBSD.conf 
+	- ppt_nic and usb should probably be more like: check /boot/loader.conf against pciconf 
+	- This would leave only the quBSD_root (zroot/quBSD). I prefer to remove this file entirely	
+	- Maybe this value can just get stored in quBSD.sh
 
 qubsd.sh - check that case can be applied to isqubsd_ipv4 and others
 
@@ -104,7 +110,14 @@ pf.conf
 	- Needs updated in general after you're done
 	- Update the guides regarding #defaults in jailmap.
 
+quBSD.sh 
+	- Clean up the list of functions at the top
+	- Check it thoroughly for test lines
+	- There's probably still functions you can generalize from $ubin
+
 ### MINOR UPGRADES
+
+qb-autostart still needs thought out
 
 startup.sh should also take qb-dpi settings
 
