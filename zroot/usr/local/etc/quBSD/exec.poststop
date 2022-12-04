@@ -6,8 +6,8 @@ get_parameters() {
 	JAIL="$1"
 
 	# Get jail parameters.   
-	get_jail_parameter class -d "$JAIL" ||  exit 1
-	get_jail_parameter rootjail -d "$JAIL" ||  exit 1
+	get_jail_parameter -d class "$JAIL" ||  exit 1
+	get_jail_parameter -d rootjail "$JAIL" ||  exit 1
 
 	# rootsnap relies on the fact that zfs lists snapshots chronologically
 	ROOTSNAP=$(zfs list -t snapshot -Ho name ${JAILS_ZFS}/${ROOTJAIL} | tail -1)
