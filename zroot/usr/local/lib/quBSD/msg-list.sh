@@ -82,7 +82,7 @@ rootjail:    Fully installed rootjail is cloned for <jail>
 schg:        Directories to receive schg flags: all|sys|none
 seclvl:      kern.securelevel to protect <jail>: -1|0|1|2|3
 template:    Dispjails require a template to clone.
-tunnel:      Gateway to provides <jail> with network connection 
+gateway:      Gateway to provides <jail> with network connection 
 devfs_ruleset=  Provided for reference. See /etc/jail.conf
 
 ENDOFUSAGE

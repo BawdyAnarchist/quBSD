@@ -46,7 +46,7 @@ ENDOFMSG
 
 ALERT: < $JAIL > has client jail dependencies.
        Is a network gateway for the following jails: 
-$tunnel_for
+$gateway_for
 ENDOFMSG
 	;;
 	_6) cat << ENDOFMSG

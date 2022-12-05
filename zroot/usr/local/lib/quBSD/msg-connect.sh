@@ -55,7 +55,7 @@ $_jail_intfs
 ENDOFMSG
 	;;
 	_6) cat << ENDOFMSG
-$_tunnel_pairs
+$_gateway_pairs
 
 ENDOFMSG
 	;;
@@ -81,12 +81,12 @@ usage() { cat << ENDOFUSAGE
 qb-connect: Create adhoc network connection between two jails.
             Attempts to auto configure as much as possible. 
 
-Usage: qb-connect [-i <IP>] [-c|-d] <target-jail> <tunnel-jail>
+Usage: qb-connect [-i <IP>] [-c|-d] <target-jail> <gateway-jail>
        qb-connect [-l] <target-jail>
 
-   -c: (c)create new connection between <target > and < tunnel >
+   -c: (c)create new connection between <target > and < gateway >
        IP address is auto-assigned unless [-i] is selected.
-   -d: (d)estroy all epairs for < target >. If < tunnel > jail 
+   -d: (d)estroy all epairs for < target >. If < gateway > jail 
        is specified, only epairs common to both are destroyed. 
    -h: (h)elp. Outputs this help message
    -i: (i)p. Override auto IP assignment. Must be valid IPv4 in 

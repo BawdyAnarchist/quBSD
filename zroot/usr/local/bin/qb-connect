@@ -87,7 +87,7 @@ check_seclvl() {
 
 get_local_ip() {
 
-	# Finds the CIDR notated IP address of an jails interface; or `none'
+	# Finds the CIDR notated IP address of a jails interface; or `none'
 	jexec -l -U root $_jail ifconfig -f inet:cidr $_intf inet \
 		| grep -Eo "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+" \
 			|| echo "none"

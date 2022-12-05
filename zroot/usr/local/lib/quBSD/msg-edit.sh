@@ -174,7 +174,7 @@ seclvl:      kern.securelevel to protect <jail>: -1|0|1|2|3
              \`1' or higher is required for schg to take effect
 template:    Only applicable for dispjail. Designates jail to
              clone (including /home) for dispjail
-tunnel:      Gateway for <jail> to receive network connectivity
+gateway:      Gateway for <jail> to receive network connectivity
 
 ENDOFUSAGE
 }

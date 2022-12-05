@@ -115,9 +115,6 @@ quBSD.sh
 	- There's probably still functions you can generalize from $ubin
 	- check that case can be applied to isqubsd_ipv4 and others
 
-qb-connect
-	- Not showing < my connected jails > 
-
 ### MINOR UPGRADES
 
 qb-autostart still needs thought out

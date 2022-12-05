@@ -62,7 +62,7 @@ ENDOFMSG
 	;;
 	_cj7) cat << ENDOFMSG
 
-ERROR: net-firewall should only have tunnel set to a tap  
+ERROR: net-firewall should only have gateway set to a tap  
        interface, typically tap0, which connects to nicvm
 ENDOFMSG
 	;;
@@ -90,7 +90,7 @@ ENDOFMSG
 
 WARNING: < $_value > Overlaps with an IP already in use.
          The same IP can be used twice; but ensure that jails 
-         with the same IP aren't connected to the same tunnel. 
+         with the same IP aren't connected to the same gateway. 
 ENDOFMSG
 	;;
 	_cj12) cat << ENDOFMSG
@@ -117,7 +117,7 @@ ENDOFMSG
 	;;
 	_cj14) cat << ENDOFMSG
 
-ALERT: Assigning IP to < $_passvar > which has no tunnel. 
+ALERT: Assigning IP to < $_passvar > which has no gateway. 
 ENDOFMSG
 	;;
 	_cj15) cat << ENDOFMSG
@@ -192,7 +192,7 @@ ERROR: Failed to find open IP for < $_value >
        in the quBSD designated range of < $_passvar > 
 
        It's permissible to use the same IP twice; but ensure that 
-       jails with the same IP aren't connected to the same tunnel. 
+       jails with the same IP aren't connected to the same gateway. 
 ENDOFMSG
 	;;
 	_jf8) cat << ENDOFMSG
