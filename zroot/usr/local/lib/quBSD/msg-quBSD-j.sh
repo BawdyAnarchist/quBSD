@@ -1,31 +1,19 @@
 #!/bin/sh
 
 get_msg() { 
-	# _message determines which feedback message to call.
-	# Just call "none" in the case you want no message to match.
-	# _if_err is optional, and can be used to exit and/or show usage
+	# $1 : _message is pulled by very long case statement
+	# $2 : _value of the thing that was checked ($1 from the caller)
+	# $3 : _passvar is a supplementary parameter to aid message specificity.
 
-# Just a way to pass through
-#	local _m ; getopts m _m 
-#   shift $(( OPTIND - 1 ))
-#	[ -z "$_m" ] && return 0
-
-   # Quiet option
+   # Quiet option finally resolves. Will return immediately if passed.
 	local _q ; local _opts 
 	getopts q _opts && return 0 
 	shift $(( OPTIND - 1 ))
 
-	# Quiet any messages, and return
-#	[ -n "$1" ] && return 0
-
-	local _q ; local _message ; local _value; local _passvar 
-	#_q="$1"  ; _message="$2"  ;  _value="$3" ; _passvar="$4"  
+	local _message ; local _value; local _passvar 
 	_message="$1"  ;  _value="$2" ; _passvar="$3"  
 
 	case "$_message" in
-
-	# null case, no message	
-	none) : ;;
 
 	_0) cat << ENDOFMSG
 
@@ -158,23 +146,11 @@ ENDOFMSG
 WARNING: MTU is outside of sanity bounds (1000 to 2000)
 ENDOFMSG
 	;;
+	_cj19) cat << ENDOFMSG
 
-	_ip2) cat << ENDOFMSG
-
+ERROR: < $_passvar > should be binary: true or false
 ENDOFMSG
 	;;
-	_ip2) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_ip2) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_ip2) cat << ENDOFMSG
-ENDOFMSG
-	;;
-############################ ############################
-############################ ############################
-############################ ############################
 	_jf1) cat << ENDOFMSG
 
 $0 is starting < $_value > 
@@ -226,30 +202,8 @@ ERROR: Parameter < $_value > for < $_passvar >
 
 ENDOFMSG
 	;;
-	_) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_) cat << ENDOFMSG
-ENDOFMSG
-	;;
+
+	# END OF MESSAGES
 	esac
 }
 

@@ -8,7 +8,7 @@
 get_options() {
 	while getopts hnru:v opts ; do
 		case $opts in
-			h) get_msg_qb_cmd "none" "usage_0" ;;
+			h) get_msg_cmd "none" "usage_0" ;;
 			n) _NEWWIND="xterm -e" ;;
         	r) _USER="root" ;;
 			u) _USER="${OPTARG}" ;;
@@ -62,7 +62,7 @@ main() {
 	fi
 
 	# Function handles all checks to see if jail needs to (and can) be started
-	start_jail "$JAIL" || get_msg_qb_cmd "none" "exit_1"
+	start_jail "$JAIL" || get_msg_cmd "none" "exit_1"
 
 	# Final evaluation statement. Launches the window/commands 
 	eval jexec -l -U $_USER $JAIL csh -c $_NEWWIND $_CMD $_REDIRECT

@@ -8,7 +8,7 @@ get_options() {
 		case $opts in
 			c) CONSOLE="true" ;;
 			d) DESTROY="true" ;;
-			h) get_msg_qb_nicvm "none" "usage_0" ;; 
+			h) get_msg_nicvm "none" "usage_0" ;; 
 			n) NO_RUN="true" ;;
 		esac
 	done
@@ -27,7 +27,7 @@ define_variables() {
 poweron_console() {
 	# Print message that VM is starting, and launch VM 
 
-	get_msg_qb_vm "_1" && sleep 1
+	get_msg_vm "_1" && sleep 1
 
 	bhyveload -c stdio -m 600M -d /dev/zvol/${QBROOT_ZFS}/${_VM} -S ${_VM} 
 
@@ -45,8 +45,8 @@ print_no_run() {
 	# Prints the commands that would be run, and exit
 	# Useful for modifying VM before manual launch
 
-	[ -n "$DESTROY" ] && get_msg_qb_vm "_2" 
-	[ -n "$CONSOLE" ] && get_msg_qb_vm "_2"
+	[ -n "$DESTROY" ] && get_msg_vm "_2" 
+	[ -n "$CONSOLE" ] && get_msg_vm "_2"
 
 	exit 0
 }	
@@ -55,18 +55,18 @@ poweroff_vm() {
 	# If VM is running, needs to shutdown before attempting to launch console 
 	if check_isrunning_vm "$_VM" ; then
 		pkill -f "bhyve: $_VM"  && 
-		get_msg_qb_vm "_3"	
+		get_msg_vm "_3"	
 
 		_count=1
 		while check_isrunning_vm "$_VM" ; do
 			sleep 3
-			get_msg_qb_vm "_4"	
+			get_msg_vm "_4"	
 			_count=$(( count + 1 ))
-			[ "$_count" -gt 30 ] && get_msg_qb_vm "_5" "exit_1"
+			[ "$_count" -gt 30 ] && get_msg_vm "_5" "exit_1"
 		done
 		
 		# Notify of succesful shutdown
-		get_msg_qb_vm "_6"	
+		get_msg_vm "_6"	
 
 		# Bring _TAP back to host, and make sure it's in a DOWN state.
 		remove_tap "$_TAP" && ifconfig $_TAP down

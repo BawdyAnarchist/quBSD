@@ -8,7 +8,7 @@ get_options() {
 		case $opts in
 			a) ALL="true" ;;
 			e) EXCLUDE="true" ;;
-			h) get_msg_qb_off "none" "usage_0" ;; 
+			h) get_msg_off "none" "usage_0" ;; 
 			r) RESTART="true" ;;
 		esac
 	done
@@ -24,11 +24,11 @@ get_options() {
 checks() {
 	if [ -z "${ALL}${EXLUDE}${_JAILS}" ] ; then
 		# Did not specify an action
-		get_msg_qb_off "_1" "usage_1"
+		get_msg_off "_1" "usage_1"
 
 	elif [ "$ALL" -a "$EXCLUDE" ] ; then
 		# Mutually exclusive actions
-		get_msg_qb_off "_2" "usage_1"
+		get_msg_off "_2" "usage_1"
 
 	fi
 }

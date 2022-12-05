@@ -7,7 +7,7 @@ get_options() {
 	while getopts ah opts ; do
 		case $opts in
 			a) UPDATE="true" ;;
-			h) get_msg_qb_rename "none" "usage_0" ;; 
+			h) get_msg_rename "none" "usage_0" ;; 
 		esac
 	done
 
@@ -28,33 +28,33 @@ define_variables() {
 
 checks() {
 	# Check that JAIL was specified, and valid 
-	check_isvalid_jail "$JAIL" || get_msg_qb_rename "usage_1" 
+	check_isvalid_jail "$JAIL" || get_msg_rename "usage_1" 
 	
 	# Make sure new jailname was provided
-	[ -z "$NEWNAME" ] && get_msg_qb_rename "_1" "usage_1"
+	[ -z "$NEWNAME" ] && get_msg_rename "_1" "usage_1"
 
 	# Due to the checks which exclude values of `none', it's unwise to use it for jailname 
-	[ "$NEWNAME" == "none" ] && get_msg_qb_rename "_2" "usage_1"
+	[ "$NEWNAME" == "none" ] && get_msg_rename "_2" "usage_1"
 	
 	# If jail is running, we're going to restart it
 	check_isrunning_jail "$JAIL" && RESTART="true"
 
 	if [ -z "$UPDATE" ] ; then
 		# List children jails for which JAIL is a rootjail
-		[ -n "$rootj_for" ] && _query="true" && get_msg_qb_rename "_3"
+		[ -n "$rootj_for" ] && _query="true" && get_msg_rename "_3"
 
 		# List children jails for which JAIL is a template jail
-		[ -n "$template_for" ] && _query="true" && get_msg_qb_rename "_4"
+		[ -n "$template_for" ] && _query="true" && get_msg_rename "_4"
 		
 		# List jails which depend on JAIL for network connection 
-		[ -n "$gateway_for" ] && _query="true" && get_msg_qb_rename "_5"
+		[ -n "$gateway_for" ] && _query="true" && get_msg_rename "_5"
 	
 		# Query user to automatically update dependencies
-		[ -n "$_query" ] && get_msg_qb_rename "_6" \
+		[ -n "$_query" ] && get_msg_rename "_6" \
 											&& get_user_response  &&  UPDATE="true"
 	fi
 
-	get_msg_qb_rename "_8" && get_user_response  || get_msg_qb_rename "_0" "exit_0" 
+	get_msg_rename "_8" && get_user_response  || get_msg_rename "_0" "exit_0" 
 }
 
 rename_jail() {
@@ -62,7 +62,7 @@ rename_jail() {
 	# attempting to modifying zusr datasets for instances they don't exist
 
 	# Stop jail before renaming. Rename should not happen if stop fails
-	stop_jail "$JAIL" > /dev/null 2>&1 || get_msg_qb_rename "_7" "exit_1"  
+	stop_jail "$JAIL" > /dev/null 2>&1 || get_msg_rename "_7" "exit_1"  
 
 	# Flags down to modify directory names and fstab
 	chflags -R noschg ${M_ZUSR}/$JAIL  > /dev/null 2>&1
@@ -117,7 +117,7 @@ update_dependencies() {
 		done
 		
 		# Due to the & on the restart command, need to positively exit program.
-		get_msg_qb_rename "_9" "exit_0"	
+		get_msg_rename "_9" "exit_0"	
 	fi
 }
 

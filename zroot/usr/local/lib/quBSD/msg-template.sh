@@ -1,14 +1,14 @@
 #!/bin/sh
 
-get_msg_qb_() { 
+get_msg_() { 
 	# _message determines which feedback message to call.
 	# Just call "none" in the case you want no message to match.
-	# _if_err is optional, and can be used to exit and/or show usage
+	# _pass_cmd is optional, and can be used to exit and/or show usage
 
 	local _message
-	local _if_err
+	local _pass_cmd
 	_message="$1"
-	_if_err="$2"
+	_pass_cmd="$2"
 
 	case "$_message" in
 	_1) cat << ENDOFMSG
@@ -38,7 +38,7 @@ ENDOFMSG
 	;;
 	esac
 
-	case $_if_err in 
+	case $_pass_cmd in 
 		usage_0) usage ; exit 0 ;;
 		usage_1) usage ; exit 1 ;;
 		exit_0)  exit 0 ;;

@@ -9,7 +9,7 @@ get_options() {
 		case $opts in
 			   # [-f] acts on msg-edit function, rather than main script 
 			f) FORCE="true" ;; 
-			h) get_msg_qb_edit "none" "usage_0" ;; 
+			h) get_msg_edit "none" "usage_0" ;; 
 			i) PARAM="ipv4" ; VAL="auto" ;;
 			q) QUIET="true" ; _q='-q' ;;
 			r) RESTART="true" ;;
@@ -29,45 +29,45 @@ checks() {
 	# Check for required inputs
 	if [ -z "$JAIL" -o -z "$PARAM" -o -z "$VAL" ] ; then
 		# Only exception to missing input, is for [-i] auto assign IP 
-		[ -z "$AUTO_IP" ]  &&  get_msg_qb_edit "_1" "usage_1"
+		[ -z "$AUTO_IP" ]  &&  get_msg_edit "_1" "usage_1"
 	
 	elif ! grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP ; then
 		# Doesn't exist in jmap (thus, can't be edited)
-		get_msg_qb_edit "_2" "usage_1"
+		get_msg_edit "_2" "usage_1"
 
 	elif [ "$VAL" == "$OLDSETTING" ] ; then
 		# New value is unchanged from old value 
-		get_msg_qb_edit "_3" "usage_0"
+		get_msg_edit "_3" "usage_0"
 
 	fi	
 
 	# Sanity checks to make sure values are reasonable
 	case $PARAM in
 		autostart|no_destroy)
-				[ "$VAL" == "true" -o "$VAL" == "false" ] || get_msg_qb_edit "_4" "usage_1"
+				check_is_truefalse $_q "$VAL" "$PARAM" || get_msg_edit "_4" "usage_1"
 		;;
 		class)
-				get_msg_qb_edit "_5" "none" "_f"
+				get_msg_edit "_5" "none" "_f"
 		;;
 		cpuset)
-				check_isvalid_cpuset $_q "$VAL" || get_msg_qb_edit "none" "usage_1" 
+				check_isvalid_cpuset $_q "$VAL" || get_msg_edit "none" "usage_1" 
 		;;
 		maxmem)
-				check_isvalid_maxmem $_q "$VAL" || get_msg_qb_edit "none" "usage_1" 
+				check_isvalid_maxmem $_q "$VAL" || get_msg_edit "none" "usage_1" 
 		;;
 		rootjail|template)
 				# Check that rootjail or template has jmap and zroot zfs 
-				check_isvalid_jail $_q "$VAL" || get_msg_qb_edit "none" "exit_1" "_f"
+				check_isvalid_jail $_q "$VAL" || get_msg_edit "none" "exit_1" "_f"
 		;;
 		schg) 
-				check_isvalid_schg $_q "$VAL" ||  get_msg_qb_edit "none" "usage_1" 
+				check_isvalid_schg $_q "$VAL" ||  get_msg_edit "none" "usage_1" 
 		;;	
 		seclvl)		
-				check_isvalid_seclvl $_q "$VAL" ||  get_msg_qb_edit "none" "usage_1" 
+				check_isvalid_seclvl $_q "$VAL" ||  get_msg_edit "none" "usage_1" 
 		;;
 		gateway)  
 				check_isvalid_gateway $_q "$VAL" "$JAIL" \
-						|| get_msg_qb_edit "none" "exit_1" "_f"
+						|| get_msg_edit "none" "exit_1" "_f"
 		;;
 		ipv4) 
 				# It's possible user might try to assign DHCP from command line
@@ -75,19 +75,19 @@ checks() {
 
 					# Function returns available IPv4. Or for net-firewall returns "DHCP"
 					VAL=$(discover_open_ipv4 $_q "$JAIL") \
-							|| get_msg_qb_edit "none" "exit_1"
+							|| get_msg_edit "none" "exit_1"
 
 				else
 					# Check IP addresses for validity and quBSD convention adherence 
 					check_isvalid_ipv4 $_q "$VAL" "$JAIL" \
-							|| get_msg_qb_edit "none" "exit_1" 
+							|| get_msg_edit "none" "exit_1" 
 
 					check_isqubsd_ipv4 $_q "$VAL" "$JAIL" \
-							|| get_msg_qb_edit "none" "exit_1" "_f"
+							|| get_msg_edit "none" "exit_1" "_f"
 				fi
 		;; 
 		# Catch all. Any other entries for $PARAM return an error (really should be necessary).
-		*)	get_msg_qb_edit "_6" "usage_1"  ;;
+		*)	get_msg_edit "_6" "usage_1"  ;;
 	
 	# /PARAM
 	esac
@@ -96,7 +96,7 @@ checks() {
 main() {
 	# Modify JMAP and print new settings on success
 	sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VAL}@" $JMAP \
-			&& get_msg_qb_edit "_8" 
+			&& get_msg_edit "_8" 
 
 	# Clean up the columns 
 	_newJMAP=$(column -t $JMAP)
@@ -158,7 +158,7 @@ handle_restarts() {
 	# Query user to restart jails 
 	if [ -z "$RESTART" ] && [ -z "$QUIET" ] ; then
 
-		get_msg_qb_edit "_7"
+		get_msg_edit "_7"
 		get_user_response || exit 0 
 	fi
 	

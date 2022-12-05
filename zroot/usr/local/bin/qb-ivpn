@@ -2,9 +2,9 @@
 
 # Seamless handling of seclvl and chflags requires straddling host and <jail>
 # A single script simplifies the UX frontend, but adds complexity in the script backend.
-# To help simplify, get_msg_qb_ivpn and usage functions, are integrated into the script.
+# To help simplify, get_msg_ivpn and usage functions, are integrated into the script.
 
-get_msg_qb_ivpn() { 
+get_msg_ivpn() { 
 	# _message determines which feedback message to call.
 	# Just call "none" in the case you want no message to match.
 	# _action is optional, and can be used to exit and/or show usage
@@ -146,7 +146,7 @@ ENDOFUSAGE
 get_options() {
 	while getopts hlp:x opts ; do
   	   case $opts in
-  	   	h) get_msg_qb_ivpn "none" "usage_0" ;;
+  	   	h) get_msg_ivpn "none" "usage_0" ;;
 			l) LIST="true" ;;
 			p) PORT="$OPTARG" ;;
 			x) CALLED="true" ;;
@@ -191,13 +191,13 @@ define_variables() {
 	# Define PORT 
 	PORT="${PORT:=$(sed -nE "s/Endpoint.*://p" ${PATHMOD}/${WG0CONF})}"
 
-	[ "$PORT" -gt 0 ] && [ "$PORT" -le 65535 ] || get_msg_qb_ivpn "_1" "usage_1"
+	[ "$PORT" -gt 0 ] && [ "$PORT" -le 65535 ] || get_msg_ivpn "_1" "usage_1"
 }
 
 handle_if_off() {
 
 	# Jail must be valid
-	check_isvalid_jail "$JAIL" || get_msg_qb_ivpn "none" "usage_1" 
+	check_isvalid_jail "$JAIL" || get_msg_ivpn "none" "usage_1" 
 
 	# Will restore original SECLVL later on, after applying ivpn changes
 	SEC_orig=$(sed -En "s/^${JAIL}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
@@ -209,13 +209,13 @@ handle_if_off() {
 		qb-edit -fq $JAIL seclvl -1 
 	fi
 		
-	start_jail "$JAIL" || get_msg_qb_ivpn "_1" "exit_1"
+	start_jail "$JAIL" || get_msg_ivpn "_1" "exit_1"
 }
 
 fetch_connection() {
 
 	# Print info message while fetching latest data
-	get_msg_qb_ivpn "_4"
+	get_msg_ivpn "_4"
 
 	# Ping to ensure that connection exists first
 	if eval $_CMDMOD ping -Qot 6 1.1.1.1  > /dev/null 2>&1 
@@ -232,7 +232,7 @@ EOF
 		fi
 	else
 		# Ping was unsuccessful, pull most recently saved file 
-		get_msg_qb_ivpn "_4_2"
+		get_msg_ivpn "_4_2"
 		eval $_CMDMOD jq . ${CURRENT}
 	fi
 }
@@ -262,18 +262,18 @@ update_api() {
 # Fetch API if ping is successful
 	if ping -Qot 6 1.1.1.1  > /dev/null 2>&1 ; then
 
-		get_msg_qb_ivpn "_4"	
+		get_msg_ivpn "_4"	
 
-		fetch -qT 10 -o - "$_GET_CURRENT"  > $CURRENT || get_msg_qb_ivpn "_5"
-		fetch -qT 10 -o - "$_GET_SERVERS"  > $SERVERS || get_msg_qb_ivpn "_5"
-		fetch -qT 10 -o - "$_GET_SRV_IPS"  > $SRV_IPS || get_msg_qb_ivpn "_5"
+		fetch -qT 10 -o - "$_GET_CURRENT"  > $CURRENT || get_msg_ivpn "_5"
+		fetch -qT 10 -o - "$_GET_SERVERS"  > $SERVERS || get_msg_ivpn "_5"
+		fetch -qT 10 -o - "$_GET_SRV_IPS"  > $SRV_IPS || get_msg_ivpn "_5"
 
 		cat $CURRENT | jq  
-		get_msg_qb_ivpn "_4_1" 
+		get_msg_ivpn "_4_1" 
 		read wait ; clear
 	else
 
-		get_msg_qb_ivpn "_3"
+		get_msg_ivpn "_3"
 		read wait ; clear
 	fi
 }
@@ -282,7 +282,7 @@ national() {
 	countries=$(jq '[.servers[] | .country] | unique' $SERVERS \
 			| sed 1d | sed '$d' | nl) 
 
-	get_msg_qb_ivpn "_7" ; read _c ; clear
+	get_msg_ivpn "_7" ; read _c ; clear
 
 	country=$(echo "$countries" | sed -n ${_c}p \
 			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed "s/[^[:alnum:]]*$//")
@@ -292,7 +292,7 @@ town() {
 	cities=$(jq --arg COUNTRY "$country" \
 			'[.servers[] | select(.country==$COUNTRY) | .city] | unique' $SERVERS | sed 1d | sed '$d' | nl)
 
-	get_msg_qb_ivpn "_8" ; read _i ; clear
+	get_msg_ivpn "_8" ; read _i ; clear
 
 	city=$(echo "$cities" | sed -n ${_i}p \
 			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed "s/[^[:alnum:]]*$//")
@@ -305,7 +305,7 @@ server() {
 	_servers=$(jq --arg CITY "$city" \
 			'[.servers[] | select(.city==$CITY) | .wg_public_key]' $SERVERS | sed 1d | sed '$d' | nl)
 
-	get_msg_qb_ivpn "_9" ; read _e ; clear
+	get_msg_ivpn "_9" ; read _e ; clear
 
 	publickey=$(echo "$_servers" | sed -n ${_e}p \
 			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed 's/\".*$//')
@@ -365,7 +365,7 @@ main() {
 
 			# Flags can't be lowered from inside jail. Send error	and exit.
 			true_true_*|true_false_3)
-				get_msg_qb_ivpn "_2" "exit_1"
+				get_msg_ivpn "_2" "exit_1"
 			;;	
 			# Flags lowered from host. Restart required for network changes. 
 			false_true_3|false_false_3)

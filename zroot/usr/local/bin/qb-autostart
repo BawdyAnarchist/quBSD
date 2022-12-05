@@ -6,7 +6,7 @@
 get_options() {
 	while getopts hs opts ; do
 		case $opts in
-			h) get_msg_qb_run "none" "usage_0" ;;
+			h) get_msg_run "none" "usage_0" ;;
 			r) 
 		esac
 	done

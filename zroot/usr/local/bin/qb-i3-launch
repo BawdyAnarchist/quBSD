@@ -2,6 +2,19 @@
 
 . /usr/local/lib/quBSD/quBSD.sh
 
+get_options() {
+	while getopts f:hs opts ; do
+		case $opts in
+			f) [ -e "$OPTARG" ] && FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
+			h) get_msg_i3_launch "none" "usage_0" ;;
+			s) STARTONLY="true" ;;
+		esac
+	done
+
+	shift $(( OPTIND - 1 ))
+	FILE="${FILE:=${HOME}/.config/i3/launch.conf}"
+}
+
 parse_config() {
 
 	# Set variable, and trap to remove it on exit
@@ -9,7 +22,7 @@ parse_config() {
 	trap "rm $CONF > /dev/null 2>&1" INT TERM HUP QUIT EXIT
 	
 	# Copy the launch config to tmp ($CONF)
-	cp ${HOME}/.config/i3/launch.conf $CONF 
+	cp -a $FILE $CONF 
 
 	# Remove comments and blank lines
 	sed -i '' -e "/^$/ d ; /^[[:blank:]]*#.*/ d" $CONF
@@ -20,9 +33,11 @@ start_jails() {
 	for _jail in $(grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}') ; do
 		check_isrunning_jail "$_jail" || start_jail "$_jail"
 	done
+
+	[ -n "$STARTONLY" ] && exit 0
 }
 
-execute_cmds() {
+execute_commands() {
 	_cycle=1
 
 	while : ; do 
@@ -84,11 +99,13 @@ wait_for_window() {
 
 get_global_variables
 
+get_options
+
 parse_config
 
 start_jails 
 
-execute_cmds > /dev/null 2>&1
+execute_commands > /dev/null 2>&1
 
 exit 0
 

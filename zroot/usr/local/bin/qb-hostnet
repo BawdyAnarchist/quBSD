@@ -7,13 +7,13 @@ get_options() {
 	while getopts dhu opts ; do
 		case $opts in
 			d) _CMD="down" ;;
-			h) get_msg_qb_hostnet "none" "usage_0" ;;
-			u) [ -z "$_CMD" ] && _CMD="up" || get_msg_qb_hostnet "_1" "usage_1" ;;
+			h) get_msg_hostnet "none" "usage_0" ;;
+			u) [ -z "$_CMD" ] && _CMD="up" || get_msg_hostnet "_1" "usage_1" ;;
 		esac
 	done
 
 	# Did not specify an action
-	[ "$OPTIND" == 1 ] && get_msg_qb_hostnet "_2" "usage_1" 
+	[ "$OPTIND" == 1 ] && get_msg_hostnet "_2" "usage_1" 
 
 	get_jail_parameter gateway "host" || exit 1
 	get_jail_parameter ipv4 "host" || exit 1 
@@ -34,7 +34,7 @@ main() {
 	if [ "$_CMD" == "up" ] ; then 
 
 		# start_jail command handles most error messages 
-		start_jail "$GATEWAY" ||  get_msg_qb_hostnet "_3" "usage_1"
+		start_jail "$GATEWAY" ||  get_msg_hostnet "_3" "usage_1"
 	
 		# Create epair, and set it up inside the gateway
 		_epair=$(ifconfig epair create)

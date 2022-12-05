@@ -8,12 +8,12 @@ get_options() {
 	while getopts ':dhl:st:' opts ; do
 		case $opts in 
 			d) 	DESTROY=true ;;
-			h) 	get_msg_qb_autosnap "none" "usage_0" ;;
+			h) 	get_msg_autosnap "none" "usage_0" ;;
 			l) 	LIST=${OPTARG} ;;
 			s) 	SNAPSHOT=true ;;	
 			t) 	TTL="${OPTARG}" ;;
 			\:) 	LIST="all" ;;
-			\?)   get_msg_qb_autosnap "_2" "usage_1"	
+			\?)   get_msg_autosnap "_2" "usage_1"	
 		esac
 	done
 
@@ -28,11 +28,11 @@ get_options() {
 checks() {
 	# Ensuring that _INT is an integer 
 	if [ -n "$TTL" ] && ! echo "$_INT" | grep -Eq '^[0-9]+$' ; then
-		get_msg_qb_autosnap "_1" "usage_1"
+		get_msg_autosnap "_1" "usage_1"
 
 	# Ensuring that _UNITS is in a proper time unit 
 	elif [ -n "$TTL" ] && ! echo "$_UNITS" | grep -Eq "m|H|D|W|Y" ; then
-		get_msg_qb_autosnap "_1" "usage_1"
+		get_msg_autosnap "_1" "usage_1"
 
 	fi	
 }

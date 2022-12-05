@@ -4,9 +4,9 @@
 . /usr/local/lib/quBSD/msg-destroy.sh
 
 get_options() {
-	while getopts ch o ; do
-		case $o in
-			h) get_msg_qb_destroy "none" "usage_0" ;;
+	while getopts ch opts ; do
+		case $opts in
+			h) get_msg_destroy "none" "usage_0" ;;
 		esac
 	done
 
@@ -39,21 +39,21 @@ checks() {
 	check_isvalid_jail "$JAIL" 
 
 	# no_destroy protection flag still active
-	[ "$NO_DESTROY" == "true" ] && get_msg_qb_destroy "_2" "usage_1"	
+	[ "$NO_DESTROY" == "true" ] && get_msg_destroy "_2" "usage_1"	
 
 	# Extra reminder that they're destorying a rootjail
-	[ "$CLASS" == "rootjail" ] && get_msg_qb_destroy "_4" 
+	[ "$CLASS" == "rootjail" ] && get_msg_destroy "_4" 
 
 	# Print the datasets and amount of data to be destroyed
-	get_msg_qb_destroy "_5" 
-	[ -n "$zrootDestroy" ] && get_msg_qb_destroy "_6" 
-	[ -n "$zusrDestroy" ] && get_msg_qb_destroy "_7"
+	get_msg_destroy "_5" 
+	[ -n "$zrootDestroy" ] && get_msg_destroy "_6" 
+	[ -n "$zusrDestroy" ] && get_msg_destroy "_7"
 
 	# Solicit user response. 
-	get_msg_qb_destroy "_8"
+	get_msg_destroy "_8"
 
 	# "severe" requires a full `yes' to be typed
-	get_user_response "severe" || get_msg_qb_destroy "_1" "exit_0"
+	get_user_response "severe" || get_msg_destroy "_1" "exit_0"
 }
 
 main() {

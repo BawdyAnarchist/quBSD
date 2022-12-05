@@ -7,10 +7,10 @@ get_options() {
 	while getopts cd:hly opts ; do
 		case $opts in
 			c) _CMD="create" ;;
-			d) [ -z "$_CMD" ] && _CMD="destroy" || get_msg_qb_snap "_1" "exit_1" 
+			d) [ -z "$_CMD" ] && _CMD="destroy" || get_msg_snap "_1" "exit_1" 
 				DEL_DATE="$OPTARG" ;;
-			h) get_msg_qb_snap "none" "usage_0" ;; 
-			l) [ -z "$_CMD" ] && _CMD="list"  || get_msg_qb_snap "_1" "exit_1" ;;
+			h) get_msg_snap "none" "usage_0" ;; 
+			l) [ -z "$_CMD" ] && _CMD="list"  || get_msg_snap "_1" "exit_1" ;;
 			y) assume_yes="true" ;;
 		esac
 	done
@@ -23,7 +23,7 @@ get_options() {
 
 checks() {
 	# Must specify a _CMD to execute 
-	[ -z "$_CMD" ] && get_msg_qb_snap "_2" "usage_1"
+	[ -z "$_CMD" ] && get_msg_snap "_2" "usage_1"
 
 	# Must have a valid jail
 	check_isvalid_jail "$JAIL" || "usage_1"
@@ -42,7 +42,7 @@ checks() {
 			DATELABEL=$(date +@%b%d_%H:%M_USER)
 
 			# Check for duplicate snapshot under same name. Suppress output
-			zfs list ${_ZFS}/${JAIL}${DATELABEL} > /dev/null 2>&1 && get_msg_qb_snap "_4" "exit_1"
+			zfs list ${_ZFS}/${JAIL}${DATELABEL} > /dev/null 2>&1 && get_msg_snap "_4" "exit_1"
 		;;
 		destroy)
 			# Translate user date input, to epoch. Exit if failure.
@@ -81,26 +81,26 @@ main() {
 	case "$_CMD" in 
 		create) 
 			# Create the new snapshot
-			echo	zfs snapshot "${_ZFS}/${JAIL}${DATELABEL}" && get_msg_qb_snap "_5" 
+			echo	zfs snapshot "${_ZFS}/${JAIL}${DATELABEL}" && get_msg_snap "_5" 
 		;;
 		destroy)		
 			# Assemble list of all snapshots older than user input <date>
 			get_destroy_list
 
 			# Exit if there were no snapshots to destroy
-			[ -z "$_DESTROY" ] && get_msg_qb_snap "_6" "exit_0"
+			[ -z "$_DESTROY" ] && get_msg_snap "_6" "exit_0"
 
 			# Present user with destroy and dependencies lies	
 			if [ -z "$assume_yes" ] ; then
-				get_msg_qb_snap "_7" 
-				get_user_response "severe" || get_msg_qb_snap "_8" "exit_0"
+				get_msg_snap "_7" 
+				get_user_response "severe" || get_msg_snap "_8" "exit_0"
 			fi
 
 			# Stop jails dependent on snapshot
 			_DEPENDS=$(echo "$_DEPENDS" | awk '{print $1}') 
 
 			for _jail in $_DEPENDS ; do
-				stop_jail "$_jail" || get_msg_qb_snap "_9" "exit_1"
+				stop_jail "$_jail" || get_msg_snap "_9" "exit_1"
 			done			
 
 			# Destroy snapshots 
@@ -108,7 +108,7 @@ main() {
 				zfs destroy $_dsnap	
 			done			
 			
-			get_msg_qb_snap "_10"
+			get_msg_snap "_10"
 		;;
 		list)
 			#Show amended state of snapshots for <jail> 

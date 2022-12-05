@@ -1,7 +1,48 @@
 #!/bin/sh
 
-##########################  LIST OF FUNCTIONS  ###########################
+######################  GENERAL DESCRIPTION OF FUNCTIONS  ########################
 
+# Global variables, jail/quBSD parameters, sanity checks, messages, networking.
+# Functions embed many sanity checks, but also call other functions to assist.
+# Messages are sourced from a separate script, as a function. They have the form:
+#	 get_msg <$_q> <_msg_ident> <_pass_variable1> <_pass_variable2>
+#		<$_q> Acts as a (q)uiet option. Sometimes it is sent as a variable, other
+#           times it is passed as a positional parameter. This is because it can
+#           (needs to be) passed numerous times through multiple funcitons. 
+#     <_msg_ident> Is used to retreive the particular message from a function.			  
+#     <_pass_variable> 1 and 2 are for supplementing message specificity.
+
+# Except for messages and returned varaiables; functions only return success or
+# failure, leaving it to the caller, to determine what to do with failures.
+
+##############################  LIST OF FUNCTIONS  ###############################
+
+# get_global_variables   - File names/locations ; ZFS datasets 
+# get_networking_variables - pf.conf ; wireguard ; endpoints 
+# get_user_response      - Simple yes/no y/n checker
+# get_jail_parameter     - All JMAP entries, along with sanity checks
+# get_onjails            - Get a list of currently running jails
+# restart_jail           - Self explanatory 
+# start_jail             - Performs checks before starting, creates log 
+# stop_jail              - Performs checks before starting, creates log 
+# check_isrunning_jail   - Searches jls for the jail 
+# check_isvalid_jail     - Makes sure the jail has JMAP entries and a ZFS dataset
+# check_isvalid_class    - JMAP parameter
+# check_isvalid_rootjail - Only certain jails qualify as rootjails
+# check_isvalid_gateway  - Checks that jail adhere's to gateway jail norms
+# check_isvalid_schg     - jail resource control 
+# check_isvalid_seclvl   - jail resource control 
+# check_isvalid_maxmem   - jail resource control
+# check_isvalid_cpuset   - jail resource control
+# check_isvalid_mtu      - networking option (typically unused) 
+# check_isvalid_ipv4     - Must adhere to CIDR notation
+# check_isqubsd_ipv4     - Implements quBSD conventions over internal IP addresses 
+# check_isvalid_template - Somewhat redundant with: check_isvalid_jail  
+# check_is_trueorfalse   - When inputs must be either true or false
+# define_ipv4_convention - Necessary for implementing quBSD IPv4 conventions
+# get_used_ips           - Pulls all currently used IPs in JMAP and running jails.
+# discover_open_ipv4     - Finds an unused IP address from the internal network. 
+# remove_tap             - Removes tap interface from whichever jail it's in. 
 
 ##################################################################################
 ########################  VARIABLES ASSIGNMENT FUNCTIONS  ########################
@@ -12,10 +53,6 @@
 
 # Source error messages for library functions (VMs) 
 . /usr/local/lib/quBSD/msg-quBSD-vm.sh
-
-# Just a placeholder to reduce number of operations for [-q] 
-empty() {
-}
 
 get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts 
@@ -59,7 +96,6 @@ get_networking_variables() {
 
 get_user_response() {
 	# Exits successfully if response is y or yes 
-	# Assigns _response=true|false ; available to caller function 
 	# Optional $1 input - `severe' ; which requires a user typed `yes'
 
 	read _response
@@ -81,26 +117,27 @@ get_user_response() {
 }
 
 get_jail_parameter() {
-	# Get the value of <jail> <param> from JMAP. 
+	# Get corresponding <value> for <jail> <param> from JMAP. 
 	# Variable indirection generalizes this function for all JMAP <params> 
 	# OPTIONS
-		# -d: If <_value> was null, do NOT get backup <#default> value in JMAP.
-		#     Otherwise this function will substitute the <#default> in JMAP.
-		# -e: echo <_value> rather than setting the global variable
+		# -d: Function default is to get the <#default> from JMAP, whenever the
+		#     retrieved <value> for <jail> <param> is NULL. [-d] prevents this.
+		# -e: echo <value> rather than setting the global variable
 		#	   Otherwise variable indirection will set <$_PARAM> with <_value> 
-			## NOTE: If using [-e] for variable assignment in caller, should 
-			## also k
+			## NOTE: If using [-e] for variable assignment in caller, best to [-q] 
+			## quiet any error messages to prevent unpredictable behavior. 
 		# -q: quiet any error/alert messages. Otherwise error messages are shown.
 		# -s: skip checks and return 0. Otherwise, checks will be run.
 
 	# Description of positional variables:
-		# _param - The parameter to pull from JMAP
-		# _PARAM - <_param> name converted to UPPER. Variable indirection: $_PARAM 
+		# $1: _param : The parameter to pull from JMAP
+		#     _PARAM : <_param> name converted to UPPER. Variable indirection: $_PARAM 
 		#          is set to the <value> retreived from JMAP. 
-		# _jail  - <jail> in JMAP
+		# $2: _jail  : <jail> to reference in JMAP
 
-	# Process local options for this function  
+	# Local options for this function  
 	local _d ; local _e ; local _q ; local _s
+
 	while getopts deqs opts ; do
 		case $opts in
 			d) _d="-d" ;;
@@ -124,15 +161,15 @@ get_jail_parameter() {
 	# Get the <_value> from JMAP.
 	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
 
-	# Substitute <#default> values, if specified 
+	# Substitute <#default> values, so long as [-d] was not passed
 	if [ -z "$_value" ] && [ -z "$_d" ] ; then
 		_value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
 
-		# Print warning message and return. Checks are skipped, assumes default
+		# Print warning message. 
 		get_msg $_q "_cj17" "$_param" 
 	fi
 
-	# Either echo the <value> , or assign global variable (as specified).
+	# Either echo <value> , or assign global variable (as specified by caller).
 	[ "$_e" ] && echo "$_value" || eval $_PARAM="$_value"
 
 	# Skip checks if indicated
@@ -158,9 +195,8 @@ get_onjails(){
 }
 
 restart_jail() {
-	# Restarts jail. Passes postional parameters, so checks are not missed
-	# Default behavior: If a jail is off, start it. 
-	# Override default with $3="hold"
+	# Restarts jail. If a jail is off, this will start it. However, passing 
+	# $2="hold" will override this default, so that an off jail stays off. 
 
 	# Quiet option
 	local _q ; local _opts
@@ -169,7 +205,7 @@ restart_jail() {
 
 	# Positional params and func variables. 
 	local _jail ; _jail="$1"
-	local _hold ; 	_hold="$2"
+	local _hold ; _hold="$2"
 
 	# No jail specified. 
 	[ -z "$_jail" ] && get_msg $_q "_0" "jail"  && return 1
@@ -182,10 +218,8 @@ restart_jail() {
 }
 
 start_jail() {
-	# Performs required checks on a jail, starts if able, and returns 0.
-	# Caller may pass positional: $2 , to dictate action on failure.
-		# Default if no $2 provided, will return 1 silently.
-	# _jf = jailfunction
+	# Starts jail. Performs sanity checks before starting. Logs results.
+	# return 0 on success ; 1 on failure.
 
 	# Quiet option
 	local _q ; local _opts
@@ -204,10 +238,10 @@ start_jail() {
 	# Check to see if _jail is already running 
 	if	! check_isrunning_jail "$_jail" ; then
 
-		# Run prelim checks on jail 
+		# If not, running, perform prelim checks 
 		if check_isvalid_jail $_q "$_jail" ; then
 			
-			# Checks were good, start jail, make a log of it 
+			# If checks were good, start jail, make a log of it 
 			get_msg "_jf1" "$_jail" | tee -a $QBLOG
 			jail -vc "$_jail"  >> $QBLOG  ||  get_msg $_q "_jf2" "$_jail"
 
@@ -220,12 +254,6 @@ start_jail() {
 
 stop_jail() {
 	# If jail is running, remove it. Return 0 on success; return 1 if fail.	
-	# Unfortunately, due to the way mounts are handled during jail -r, the
-	# command will exit 1, even the jail was removed successfully. 
-	# Extra logic has to be embedded to handle this problem.
-
-	# Caller may pass positional: $2 , to dictate action on failure.
-		# Default, or if no $2 provided, will return 1 silently.
 
 	# Quiet option
 	local _q ; local _opts
@@ -238,35 +266,35 @@ stop_jail() {
 	# Check that JAIL was provided in the first place
 	[ -z "$_jail" ] && get_msg $_q "_0" "jail" && return 1
 
-	# Check if jail is on, if so remove it 
+	# Check if jail is on
 	if check_isrunning_jail "$_jail" ; then	
 
-		# TRY TO REMOVE JAIL NORMALLY 
+		# If on, try to remove the jail normally
 		get_msg "_jf3" "$_jail" | tee -a $QBLOG
-		jail -vr "$_jail"  >> $QBLOG 
-		
-		# Extra logic to check if jail removal was successful 
-		if check_isrunning_jail "$_jail" ; then 		
-
-			# FORCIBLY REMOVE JAIL  
+		if ! jail -vr "$_jail"  >> $QBLOG ; then
+	
+			# If normal removal failed, try forcible removal 
 			get_msg "_jf4" "$_jail" | tee -a $QBLOG
-			jail -vR "$_jail"  >> $QBLOG 
+			if jail -vR "$_jail"  >> $QBLOG  ; then
 			
-			# Extra logic (same problem) to check jail removal success/fail 
-			if check_isrunning_jail "$_jail" ; then 		
+				# Forcible removal likely missed mounts. Clean them up. 
+				sh ${QBDIR}/exec.release "$_jail"
+				[ -e "${M_ZUSR}/${JAIL}/rw/etc/fstab" ] \
+					&& umount -aF "${M_ZUSR}/${JAIL}/rw/etc/fstab" > /dev/null 2>&1
+				
+				# Notify about failure to remove normally  
+				get_msg "_jf6" "$_jail" | tee -a $QBLOG
 
+			else
 				# Print warning about failure to forcibly remove jail
 				get_msg $_q "_jf5" "$_jail" 
-			else
-				# Run exec.poststop to clean up mounts, and print warning
-				sh ${QBDIR}/exec.poststop "$_jail"
-				get_msg "_jf6" "$_jail" | tee -a $QBLOG
+				return 1
 			fi
 		fi
-	else
-		# Jail was already off. Not regarded as an error.
-		return 0
 	fi
+
+	# Catch all. Either the jail was already off, or was succesfully removed
+	return 0
 }
 
 
@@ -274,22 +302,6 @@ stop_jail() {
 #######################  CHECKS ON JAILS and PARAMETERS  #########################
 ##################################################################################
 
-## NOTES ON HOW CHECKS ARE BUILT
-## Each check should be called from the main function with positional parameters:
-	# $1={value_of_the_thing_to_check}
-   # $2={_if_err} - The literal command that you want to execute if failure
-		# `eval` is applied to $_if_err, so the variable becomes the command.
-		# Default action is `return 1` (fail with no error message).
-		# For error message: $2="get_msg" is specified, which calls the
-		# function:  get_msg() ; from  /usr/local/lib/quBSD/msg-quBSD.sh
-		# get_msg also has positional parameters that should be specified. 
-			# $1 uniquely identifies the msg to show from the case/in statement
-         # $2 is an arbitrary "_passvar" which can be used in the message body.
-				# This helps reduce total number of case/in elements in get_msg()
-			# $3 Is an optional action to take after printing message. 
-				# This should be largely unused, but user may specify:
-					# exit_0, exit_1, return_0, return_1  
-	  				# If not provided, default is return_1
 
 check_isrunning_jail() {
 	# Return 0 if jail is running; return 1 if not. 
@@ -311,14 +323,14 @@ check_isrunning_jail() {
 
 check_isvalid_jail() {
 	# Checks that jail has JCONF, JMAP, and corresponding ZFS dataset 
-	# Return 0 if jail is running; return 1 if not. 
+	# Return 0 for passed all checks, return 1 for any failure
 
 	# Quiet option
 	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
-	# Positional parmeters. _q is passed as parameter to avoid getopts
+	# Positional parmeters and function specific variables. 
 	local _value; _value="$1"  
 	local _class ; local _rootjail ; local _template
 
@@ -329,6 +341,7 @@ check_isvalid_jail() {
 	_class=$(sed -nE "s/^${_value}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
 
 	[ -z "$_class" ] && get_msg $_q "_cj1" "$_value" "class" && return 1
+
 	# Must also have a designated rootjail in JMAP
 	! grep -Eqs "^${_value}[[:blank:]]+rootjail[[:blank:]]+" $JMAP \
 			&& get_msg $_q "_cj1" "$_value" "rootjail" && return 1
@@ -337,10 +350,10 @@ check_isvalid_jail() {
 	! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
 			&& get_msg $_q "_cj3" && return 1
 
-	# Verify existence of ZFS dataset
+	# Verify existence of ZFS dataset. zusr for appjail ; zroot for rootjails
 	case $_class in
 		rootjail) 
-			# Rootjails require a dataset at zroot/quBSD/jails 
+			# Rootjails require a dataset in zroot 
 			! zfs list ${JAILS_ZFS}/${_value} > /dev/null 2>&1 \
 					&& get_msg $_q "_cj4" "$_value" "$JAILS_ZFS" && return 1
 		;;
@@ -354,7 +367,6 @@ check_isvalid_jail() {
 			# Verify the dataset of the template for dispjail
 			_template=$(sed -nE "s/^${_value}[[:blank:]]+template[[:blank:]]+//p"\
 																								$JMAP)
-
 			# First ensure that it's not blank			
 			[ -z "$_template" ] && get_msg $_q "_cj5" "$_value" && return 1
 
@@ -365,6 +377,7 @@ check_isvalid_jail() {
 			# is some other jail that is not < $_value >.
 # NOTE: Technically speaking, this still has potential for an infinite loop, 
 # but the user really has to try hard to create a circular reference.
+
 			! check_isvalid_jail $_q "$_template" \
 					&& get_msg $_q "_cj6" "$_value" "$_template" && return 1
 		;;
@@ -423,6 +436,7 @@ check_isvalid_rootjail() {
 }
 
 check_isvalid_gateway() {
+	# Checks against the quBSD conventions.
 	# Return 0 if proposed gateway is valid ; return 1 if invalid
 
 	# Quiet option
@@ -485,8 +499,8 @@ check_isvalid_schg() {
 
 check_isvalid_seclvl() {
 	# Return 0 if proposed seclvl is valid ; return 1 if invalid
-	# NOTE: Securelevel of '-1' will error if options are enabled. 
-	# For this reason, _q is taken as a positional parameter
+	# NOTE: Securelevel of '-1' will error if options are enabled. For this
+	# reason, _q is taken as a positional parameter, for this func only.
 
 	local _q ; _q="$1"
 	[ "$_q" == '-q' ] && _value="$2" || _value="$_q"
@@ -506,7 +520,7 @@ check_isvalid_seclvl() {
 
 check_isvalid_maxmem() {
 	# Return 0 if proposed maxmem is valid ; return 1 if invalid
-# IMPROVEMENT IDEA - check that proposal isn't greater than system memory
+	# IMPROVEMENT IDEA - check that proposal isn't greater than system memory
 
 	# Quiet option
 	local _q ; local _opts
@@ -530,7 +544,7 @@ check_isvalid_maxmem() {
 }
 
 check_isvalid_cpuset() {
-	# Return 0 if proposed schg is valid ; return 1 if invalid
+	# Return 0 if proposed cpuset is valid ; return 1 if invalid
 
 	# Quiet option
 	local _q ; local _opts
@@ -566,7 +580,7 @@ check_isvalid_cpuset() {
 }
 
 check_isvalid_mtu() {
-	# Return 0 if proposed schg is valid ; return 1 if invalid
+	# Return 0 if proposed mtu is valid ; return 1 if invalid
 
 	# Quiet option
 	local _q ; local _opts
@@ -579,9 +593,6 @@ check_isvalid_mtu() {
 	# No value specified 
 	[ -z "$_value" ] && get_msg $_q "_0" "mtu" && return 1
 
-	# None is always a valid mtu 
-	[ "$_value" == "none" ] && return 0
-
 	# Just push a warning, but don't error for MTU 
 	[ "$_value" -ge 1000 ] && [ "$_value" -le 2000 ] \
 			|| get_msg $_q "_cj18" "mtu" 
@@ -592,8 +603,10 @@ check_isvalid_mtu() {
 check_isvalid_ipv4() {
 	# Tests for validity of IPv4 CIDR notation.
 	# return 0 if valid (or none), return 1 if not 
+	# Also assigns global variable: _isvalid_IPv4="true"
 
-	# Variables below are required for caller function to perform other checks. 
+	# Variables below are assigned as global variables rather than 
+	# local, because they're required for performing other checks. 
 	#   $_a0  $_a1  $_a2  $_a3  $_a4  
 
 	# Quiet option
@@ -603,15 +616,15 @@ check_isvalid_ipv4() {
 
 	# Positional parmeters. _
 	local _value ; _value="$1"
-	local _jail ; _jail="$2"
 
+	# Temporary variables used for checking ipv4 CIDR
 	local _b1 ; local _b2 ; local _b3
 
 	# No value specified 
 	[ -z "$_value" ] && get_msg $_q "_0" "IPv4" && return 1
 
 	# None is always considered valid; but send warning for net-firewall
-	[ "$_value" == "none" ] && return 0
+	[ "$_value" == "none" ] && return 0 
 
 	# Not as technically correct as a regex, but it's readable and functional 
 	# IP represented by the form: a0.a1.a2.a3/a4 ; b-variables are local/ephemeral
@@ -651,9 +664,7 @@ check_isvalid_ipv4() {
 
 check_isqubsd_ipv4() {
 	# Checks for IP overlaps and/or mismatch in quBSD convention. 
-	# Assigns the following, available to caller function:
-		# $_isoverlap=true
-		# $_ismismatch=true
+	# Returns 0 for IPv4 within convention ; return 1 if not. 
 
 	# Quiet option
 	local _q ; local _opts
@@ -663,7 +674,8 @@ check_isqubsd_ipv4() {
 	# Positional parmeters. _
 	local _value ; _value="$1"
 	local _jail ; _jail="$2"
-	
+
+	# Assigns global variables that will be used here for checks.
 	define_ipv4_convention
 	_used_ips=$(get_used_ips)
 
@@ -695,12 +707,14 @@ check_isqubsd_ipv4() {
 		get_msg $_q "_cj11" "$_value" "$_jail" && return 1
 	fi
 
-	# Note that $a2 and $ip2 are missing, because that is the _cycle 
-	# Any change to quBSD naming convention will require manual change.
+# NOTE:  $a2 and $ip2 are missing, because that is the _cycle 
+# Any change to quBSD naming convention will require manual change.
 	! [ "$_a0.$_a1.$_a3/$_a4" == "$_ip0.$_ip1.$_ip3/$_subnet" ] \
 			&& get_msg $_q "_cj12" "$_value" "$_jail" && return 1
 
 	_gateway=$(sed -nE "s/^${_jail}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
+	
+	# Assigning IP to jail that has no gateway 	
 	[ "$_gateway" == "none" ] && get_msg $_q "_cj14" "$_value" "$_jail" \
 		&& return 1
 	
@@ -731,17 +745,31 @@ check_isvalid_template() {
 	return 0
 }
 
-check_is_trueorfalse() {
-	# Positional parmeters. _q is passed as parameter to avoid getopts
-	local _q ; _q="$1"
-	local _value; _value="$2"  
-	local _jail; _jail="$3"  
+check_isvalid_autostart() {
+	check_is_truefalse "$1" "$2" "$3"
+}
+
+check_isvalid_no_destroy() {
+	check_is_truefalse "$1" "$2" "$3"
+}
+
+check_is_truefalse() {
+
+	# Quiet option
+	local _q ; local _opts
+	getopts q _opts && _q='-q'
+	shift $(( OPTIND - 1 ))
+
+	# Positional parmeters. _
+	local _value ; _value="$1"
+	local _jail ; _jail="$2"
 
 	# No value specified 
 	[ -z "$_value" ] && get_msg $_q "_0" "$_param" 
 
-	[ "$_value" == "true" -o "$_value" == "false" ] && return 0 \
-			|| get_msg $_q "_cj2" "$_value" "$_param"
+	# Must be either true or false.
+	[ "$_value" == "true" -o "$_value" == "false" ] \
+			&& return 0 || get_msg $_q "_cj19" "$_value" "$_param"
 }
 
 
@@ -751,13 +779,13 @@ check_is_trueorfalse() {
 
 define_ipv4_convention() {
 	# Defines the quBSD internal IP assignment convention.
-	# Variables: $ip0.$ip1.$ip2.$ip3/subnet ; are global, required 
-	# for functions:  discover_open_ipv4() and check_isqubsd_ipv4() 
+	# Variables: $ip0.$ip1.$ip2.$ip3/subnet ; are global. They're required 
+	# for functions:  discover_open_ipv4()  ;  check_isqubsd_ipv4() 
 
 	# Returns 0 for any normal IP assignment, returns 1 if 
 	# operating on net-firewall (which needs special handling).
 
-	# Variable indirection is used with `_cycle', in discover_open_ipv4() 
+	# Global variable indirection is used with `_cycle', in discover_open_ipv4() 
 	_cycle=1
 
 	# Combo of function caller and $JAIL determine which IP form to use
@@ -792,8 +820,8 @@ define_ipv4_convention() {
 
 get_used_ips() {
 	# Gathers a list of all IP addresses in use by running jails.
-	# Assigns variable: $_used_ips for use in main script. This variable
-	# is unfiltered, containing superflous info from `ifconfig` command.
+	# Assigns gloval variable: $_used_ips for use in main script. 
+	# It's an unfiltered variable, containing superflous info from ifconfig
 	
 	# Assemble list of ifconfig inet addresses for all running jails
 	for _jail in $(get_onjails) ; do

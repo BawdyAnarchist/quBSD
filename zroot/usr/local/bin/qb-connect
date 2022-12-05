@@ -7,10 +7,10 @@ get_options() {
 	while getopts cdhi:l opts ; do
 		case $opts in
 			c) _CMD="create" ;;
-			d) [ -z "$_CMD" ] && _CMD="destroy" || get_msg_qb_connect "_1" "usage_1" ;;
-			h) get_msg_qb_connect "none" "usage_0" ;;
+			d) [ -z "$_CMD" ] && _CMD="destroy" || get_msg_connect "_1" "usage_1" ;;
+			h) get_msg_connect "none" "usage_0" ;;
 			i) IPV4="$OPTARG" manualIP="true" ;;
-			l) [ -z "$_CMD" ] && _CMD="list" || get_msg_qb_connect "_1" "usage_1" ;;
+			l) [ -z "$_CMD" ] && _CMD="list" || get_msg_connect "_1" "usage_1" ;;
 		esac
 	done
 
@@ -25,12 +25,12 @@ get_options() {
 
 checks() {
 	# Must specify a _CMD 
-	[ -z "$_CMD" ] && get_msg_qb_connect "_0" "usage_1"	
+	[ -z "$_CMD" ] && get_msg_connect "_0" "usage_1"	
 
 	case "$_CMD" in
 		create) 
 			# JAIL must be running, but gateway can be started later 
-			check_isrunning_jail "$JAIL" "return 1" || get_msg_qb_connect "_2" "usage_1"
+			check_isrunning_jail "$JAIL" "return 1" || get_msg_connect "_2" "usage_1"
 			
 			# IP checks
 			if [ -n "$IPV4" ] ; then
@@ -46,14 +46,14 @@ checks() {
 			fi
 			
 			# Check the pf status and security levels
-		   check_seclvl || get_msg_qb_connect "_4" "exit_1"
+		   check_seclvl || get_msg_connect "_4" "exit_1"
 		;;
 		destroy)
 			# JAIL and GATEWAY must be running (helps prevent accidents) 
-			check_isrunning_jail "$JAIL" "return 1" || get_msg_qb_connect "_2" "usage_1"
+			check_isrunning_jail "$JAIL" "return 1" || get_msg_connect "_2" "usage_1"
 	
 			[ -n "$GATEWAY" ] && ! check_isrunning_jail "$GATEWAY" \
-					&& get_msg_qb_connect "_3" "usage_1"
+					&& get_msg_connect "_3" "usage_1"
 		;;
 	esac
 }
@@ -176,14 +176,14 @@ list_output() {
 	if [ -n "$JAIL" ] ; then 
 		
 		# Show the interfaces on JAIL 
-		get_msg_qb_connect "_5" 
+		get_msg_connect "_5" 
 
 		# Show all other jails that connect to JAIL
-		[ -n "$_jail_eps" ] && get_msg_qb_connect "_6" 
+		[ -n "$_jail_eps" ] && get_msg_connect "_6" 
 	else
 		
 		# List all existing connections for all running jails
-		get_msg_qb_connect "_7" 
+		get_msg_connect "_7" 
 	fi
 }
 

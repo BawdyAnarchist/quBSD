@@ -71,8 +71,6 @@ quBSD.conf
 	- This would leave only the quBSD_root (zroot/quBSD). I prefer to remove this file entirely	
 	- Maybe this value can just get stored in quBSD.sh
 
-qubsd.sh - check that case can be applied to isqubsd_ipv4 and others
-
 - net-firewall pf.conf might not be fully generalized for routerIP. 
 	- basically, exec.created relies on setting the last number to "1". 
      - Then it modifes pf.conf, but that might be inappropriate
@@ -112,14 +110,17 @@ pf.conf
 
 quBSD.sh 
 	- Clean up the list of functions at the top
+	- Clean up the function descriptions (if_err)
 	- Check it thoroughly for test lines
 	- There's probably still functions you can generalize from $ubin
+	- check that case can be applied to isqubsd_ipv4 and others
+
+qb-connect
+	- Not showing < my connected jails > 
 
 ### MINOR UPGRADES
 
 qb-autostart still needs thought out
-
-startup.sh should also take qb-dpi settings
 
 qb-help
 	Make sure to update it after changes

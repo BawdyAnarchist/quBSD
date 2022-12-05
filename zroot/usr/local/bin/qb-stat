@@ -7,7 +7,7 @@ get_options() {
 	while getopts c:h opts ; do
 		case $opts in
 			c) COL="$OPTARG" ;;
-			h) get_msg_qb_stat "none" "usage_0" ;;
+			h) get_msg_stat "none" "usage_0" ;;
 		esac
 	done
 

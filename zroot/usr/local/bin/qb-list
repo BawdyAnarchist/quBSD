@@ -6,7 +6,7 @@
 get_options() {
 	while getopts hj:lp:z opts ; do
 		case $opts in
-			h) get_msg_qb_list "none" "usage_0" ;;
+			h) get_msg_list "none" "usage_0" ;;
 			j) JAIL="${OPTARG}" ;;
 			l) LIST="true" ;;
 			p) PARAM="${OPTARG}" ;;
@@ -16,7 +16,7 @@ get_options() {
 
 	shift $(( OPTIND - 1 ))
 	
-	[ "$1" ] && get_msg_qb_list "_6" "usage_1"
+	[ "$1" ] && get_msg_list "_6" "usage_1"
 }
 
 main() {
@@ -27,12 +27,12 @@ main() {
 	elif [ "$JAIL" ] && [ -z "$PARAM" ] && [ -z "$ZFSLIST" ] ; then
 		# JAIL only. All JMAP entries for JAIL.
 		_result=$(grep -E "^${JAIL}[[:blank:]]+" $JMAP) \
-											|| get_msg_qb_list "_2" "usage_1"
+											|| get_msg_list "_2" "usage_1"
 	
 	elif [ -z "$JAIL" ] && [ "$PARAM" ] && [ -z "$ZFSLIST" ] ; then
 		# PARAM only. All JMAP entries matching PARAM. 
 		_result=$(grep -E "^[^[:blank:]]+[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP) \
-											|| get_msg_qb_list "_3" "usage_1"
+											|| get_msg_list "_3" "usage_1"
 
 	elif [ -z "$JAIL" ] && [ -z "$PARAM" ] && [ "$ZFSLIST" ] ; then
 		# ZFS list only. All datasets relevant to quBSD jails.
@@ -41,7 +41,7 @@ main() {
 	elif [ "$JAIL" ] && [ "$PARAM" ] && [ -z "$ZFSLIST" ] ; then
 		# Combination of JAIL and PARAM 
 		_result=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $JMAP) \
-											|| get_msg_qb_list "_4" "usage_1"
+											|| get_msg_list "_4" "usage_1"
 
 	elif [ "$JAIL" ] && [ -z "$PARAM" ] && [ "$ZFSLIST" ] ; then
 		# All ZFS datasets related to JAIL 
@@ -49,7 +49,7 @@ main() {
 		; zfs list -rt all -Ho name,used,mountpoint,origin "${ZUSR_ZFS}/${JAIL}") 
 
 	else
-		get_msg_qb_list "_5" "usage_1"
+		get_msg_list "_5" "usage_1"
 
 	fi
 

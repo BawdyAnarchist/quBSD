@@ -1,11 +1,11 @@
 #!/bin/sh
 
-get_msg_qb_edit() { 
+get_msg_edit() { 
 	# Print messages and/or exiting script execution entirely 
 	# Positional parameters are used for determining action.
 	# $1 _message: Identifier tag for message
 		# To avoid calling a message, "none" is fine to pass
-	# $2 _if_err: What type of exit to perform if any
+	# $2 _pass_cmd: What type of exit to perform if any
 	# $3 _msg2: A bit of a hack, for a catch-all [-f] message
 
 	# FORCE should override all calls to the msg and exit function
@@ -13,7 +13,7 @@ get_msg_qb_edit() {
 	
 	# Positional parameters
    local _message ; _message="$1"
-   local _if_err ; _if_err="$2"
+   local _pass_cmd ; _pass_cmd="$2"
 	local _msg2 ; _msg2="$3"
 
 
@@ -119,7 +119,7 @@ ENDOFMSG
 ###################################################################
 #####################  FINAL IF_ERR TO TAKE  ######################
 
-	case $_if_err in 
+	case $_pass_cmd in 
 		usage_0) 
 				[ -z "$QUIET" ] && usage 
 				exit 0 ;;

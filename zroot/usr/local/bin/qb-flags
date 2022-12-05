@@ -7,7 +7,7 @@ get_options() {
 	while getopts dhru opts ; do
 		case $opts in
 			d) DOWN="true" ;;
-			h) get_msg_qb_flags "none" "usage_0" ;;
+			h) get_msg_flags "none" "usage_0" ;;
 			u) UP="true" ;; 
 			r) RESTORE="true" ;; 
 		esac
@@ -21,20 +21,20 @@ get_options() {
 checks() {
 	if [ -z "${DOWN}${UP}${RESTORE}" ] ; then
 		# User didn't specify an action 
-		get_msg_qb_flags "_1" "usage_1"
+		get_msg_flags "_1" "usage_1"
 
 	elif echo "${DOWN}${UP}${RESTORE}" | grep -Eqs "truetrue" ; then
 		# Can't specify multiple actions 
-		get_msg_qb_flags "_2" "usage_1"
+		get_msg_flags "_2" "usage_1"
 
 	elif [ -z "$JAIL" ] ; then
 		# Must have a jail to operate on 
-		get_msg_qb_flags "_3" "usage_1"
+		get_msg_flags "_3" "usage_1"
 
 	fi
 
 	# Check for valid jail, exit if invalid 
-	check_isvalid_jail "$JAIL" || get_msg_qb_flags "none" "usage_1"
+	check_isvalid_jail "$JAIL" || get_msg_flags "none" "usage_1"
 }
 
 main() {

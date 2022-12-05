@@ -1,6 +1,6 @@
 #!/bin/sh
 
-get_msg_flags() { 
+get_msg_i3_launch() { 
 	# _message determines which feedback message to call.
 	# Just call "none" in the case you want no message to match.
 	# _pass_cmd is optional, and can be used to exit and/or show usage
@@ -8,24 +8,18 @@ get_msg_flags() {
 	local _message
 	local _pass_cmd
 	_message="$1"
-	_pass_cmd="$2"
 
 	case "$_message" in
 	_1) cat << ENDOFMSG
 
-ERROR: Must specify an action: [-d][-u][-r] 
+ERROR: < $FILE > does not exist.
 ENDOFMSG
 	;;	
 	_2) cat << ENDOFMSG
 
-ERROR: Actions are mutually exclusive. Chose only one. 
+
 ENDOFMSG
 	;;	
-	_3) cat << ENDOFMSG
-
-ERROR: Must specify a target jail
-ENDOFMSG
-	;;
 	esac
 
 	case $_pass_cmd in 
@@ -39,13 +33,15 @@ ENDOFMSG
 
 usage() { cat << ENDOFUSAGE
 
-qb-flags: Toggles schg/noschg for the indicated jail
+qb-i3-launch: Launch programs as indicated by config file
 
-Usage: qb-flags [-h|-d|-u|-r] <jail>
-   -d: (d)own. Recursive noschg flags for <jail>
-   -h: (h)elp. Outputs this help message
-   -r: (r)eapply jailmap settings for <jail> 
-   -u: (u)p. Recursive schg flags for <jail> 
+Usage: qb-i3-launch [-h][-f <conf_file>][-s]  
+   -h: (h)elp. Outputs this usage message.
+   -f: (f)ile. Run an alternate configuration file. 
+       Default launch.conf file is: < $CONF >
+   -s: (s)start jails; but do not launch programs.
+   
+If no options are given, default conf is fully run.
 
 ENDOFUSAGE
 }
