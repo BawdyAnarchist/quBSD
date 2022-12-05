@@ -9,9 +9,10 @@
 . /usr/local/lib/quBSD/msg-floatcmd.sh
 
 get_options(){
-	while getopts hru:x opts ; do
+	while getopts hiru:x opts ; do
 		case $opts in
 			h) get_msg_floatcmd "none" "usage_0" ;;
+			i) _i3wm="true" ;;
 			r) _USER="root" ; ROOT="-r" ;;
 			u) _USER="$OPTARG" ;;
 			x) PASS="true" ;;
@@ -24,24 +25,30 @@ get_options(){
 }
 
 main() {
-	
-	if [ "$PASS" ] ; then
-		
+	if [ -z "$PASS" ] ; then
+	# First push a xterm subshell to receive the command
+
+		if [ -z "$_i3wm" ] ; then
+			# New xterm window to receive command
+			xterm -e csh -c "/bin/csh -c 'qb-floatcmd -x $JAIL'"
+
+		else
+			# i3wm option for floating xterm
+			xterm -e csh -c "i3-msg -q floating enable, move position center; \
+						/bin/csh -c 'qb-floatcmd -x $JAIL'"
+		fi
+
+	else	
+	# Then start jail and read command in the new terminal
+			
 		start_jail "$JAIL" || get_msg_floatcmd "none" "exit_1"
 
-		# Script is now running on the new xterm, and can properly read in a command 
 		printf "%b" "Enter Command for $JAIL. Popup will close automatically" \
 					   "\n${_USER}@${JAIL} # "
 		read _CMD
 		
 		# nohup is required, or the launched command will die with the xterm shell
 		nohup qb-cmd $ROOT $JAIL $_CMD 
-
-	else	
-
-		# First push a xterm subshell, and run this script again with [-x] option
-		xterm -e csh -c "i3-msg -q floating enable, move position center; \
-						/bin/csh -c 'qb-floatcmd -x $JAIL'"
 	fi
 }
 

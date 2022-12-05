@@ -5,6 +5,8 @@ cat << ENDOFUSAGE
 qb-autosnap: Tool to automate the creation, management, and thinning
              of ZFS snapshots. Works in combination with /etc/crontab.
 
+qb-autostart: Starts all jails flagged with autostart. sysrc started. 
+
 qb-cmd:      Runs a command inside of a jail - starts the jail if off
 
 qb-connect:  Creates/destroys epairs between jails. Options for
@@ -16,17 +18,28 @@ qb-create:   Automates creation of new jails. Options exist to clone
 
 qb-destroy:  Destroys jail and removes all lingering pieces
 
+qb-disp:     Launches a disposable jail on the basis of any jail.
+             Useful for opening questionable files in an isolated env. 
+
+qb-dpi:      Modify dpi to launch a program, then autoreverts to default.
+
 qb-edit:     Edit jailmap. Checks performed to ensure valid entry
 
 qb-flags:    Remove or re-apply schg flags from all jail files,
 
-qb-hostnet:  Create/destroy epair and internet connectivity for host
+qb-floatcmd: Launches a popup to accept/run a single command for a jail. 
+
+qb-hostnet:  Bring up internet connectivity for host.
+
+qb-i3-genconf: Generates/adds key i3 bindings, based on: i3gen.conf 
+
+qb-i3-launch:  Starts jails and launches programes based on: launch.conf
+
+qb-i3-windows: Lists all i3 workspaces, and the windows/programs in them.
 
 qb-ivpn:     Change ivpn servers for gateway jail
 
 qb-list:     List jailmap settings for a particular jail or parameter
-
-qb-nicvm:    Manage nicvm, off/on, or console mode for troubleshooting
 
 qb-off:      Remove/restart specified jails. Options for -all and -except
 
@@ -38,8 +51,6 @@ qb-snap:     Create jail snapshot. Necessary for rootjails and dispjails
 
 qb-stat:     Continuously running status script for quBSD and jail status
 
-qb-usbvm:    Manage usbvm, off/on, or console mode for troubleshooting
-             Option to automate epair connection from usbvm to jail
 
 ENDOFUSAGE
 

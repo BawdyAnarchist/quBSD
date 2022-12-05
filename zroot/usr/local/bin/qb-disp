@@ -7,9 +7,10 @@
 . /usr/local/lib/quBSD/msg-disp.sh
 
 get_options() {
-	while getopts h opts ; do
+	while getopts hi opts ; do
 		case $opts in
 			h) get_msg_disp "none" "usage_0" ;;
+			i) _i3wm="true" ;;
 		esac
 	done
 
@@ -56,8 +57,13 @@ main() {
 	#Trap to ensure DISP doesn't remain after use
 	trap	'destroy_dispjail' INT TERM HUP QUIT EXIT
 
-	# Launch a floating terminal for the dispjail
-	xterm -e csh -c "i3-msg -q floating enable, move position center; qb-cmd $NEWJAIL"
+	if [ -n "$_i3wm" ] ; then 
+		# i3-specific command. Launch a floating terminal for the dispjail
+		xterm -e csh -c "i3-msg -q floating enable, move position center; qb-cmd $NEWJAIL"
+	else
+		# Can be called without i3 as well. 
+		csh -c "qb-cmd $NEWJAIL"	
+	fi
 }
 
 destroy_dispjail() {

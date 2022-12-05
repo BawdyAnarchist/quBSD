@@ -31,25 +31,13 @@ nicvm
   - Make it a Linux VM so that it can use all the wireless protocols.
      - Someone made a post about this in FreeBSD
 
-net-firewall 
-	- jail start should auto update the servIPs in pf.conf
-		- This might require some thought about setting an "auto" option in the settings.
-		  because people making servers might not want an auto setting
-
-qb-autosnap 
-	- Need to add the zfs custom props to the datasets as created (qubsd-installer)
-	- Would be good to beef up the script. If there's another snap taken within say 30sec 
-     of another one, to discard whichever the shortest timeframe was. 
-
 qb-backup (already created in $ubin)
 	- cron to run on both sides of source and dest, with ssh hostname, to automate backups
 
-Detect changes in nic and USB so that you can rewrite the file if necessary
-
 qubsd_installer
 	- Autosnap 
-		/etc/crontab
-		zfs datasets need to be tagged 	
+		- /etc/crontab
+		- Need to add the zfs custom props to the datasets as created (qubsd-installer)
 
 	- Autostart
 		/etc/rc.conf
@@ -65,6 +53,11 @@ qubsd_installer
 
 
 ### BEST PRACTICES / CLEANUP
+
+net-firewall 
+	- jail start should auto update the servIPs in pf.conf
+		- This might require some thought about setting an "auto" option in the settings.
+		  because people making servers might not want an auto setting
 
 quBSD.conf 
 	- ppt_nic and usb should probably be more like: check /boot/loader.conf against pciconf 
@@ -117,10 +110,10 @@ quBSD.sh
 
 ### MINOR UPGRADES
 
-qb-autostart still needs thought out
+qb-autostart still needs worked out. Figure out concurrent starting of jails.
 
-qb-help
-	Make sure to update it after changes
+qb-hostnet
+	- Auto-revert to bring down connection.  
 
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 
