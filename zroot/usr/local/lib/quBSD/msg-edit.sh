@@ -1,14 +1,11 @@
 #!/bin/sh
 
 get_msg_edit() { 
-	# Print messages and/or exiting script execution entirely 
-	# Positional parameters are used for determining action.
-	# $1 _message: Identifier tag for message
-		# To avoid calling a message, "none" is fine to pass
-	# $2 _pass_cmd: What type of exit to perform if any
-	# $3 _msg2: A bit of a hack, for a catch-all [-f] message
+	# _message determines which feedback message to call. 
+	# Just call "none" in the case you want no message to match.
+	# _pass_cmd is optional, and can be used to exit and/or show usage
 
-	# FORCE should override all calls to the msg and exit function
+	# FORCE overrides all calls to the msg and exit function
 	[ -n "$FORCE" ] && return 0 
 	
 	# Positional parameters
@@ -16,95 +13,73 @@ get_msg_edit() {
    local _pass_cmd ; _pass_cmd="$2"
 	local _msg2 ; _msg2="$3"
 
-
-#################################################################
-#####################  BEGIN MESSAGE TAGS  ######################
-
-	# QUIET should skip over messages 
+	# QUIET will skip over messages 
 	[ -z "$QUIET" ] && case "$_message" in
 
-	_0) cat << ENDOFMSG
+		_0) cat << ENDOFMSG
 EXITING. No changes were made.
 ENDOFMSG
-	;;
-	_1) cat << ENDOFMSG
+		;;
+		_1) cat << ENDOFMSG
 
 ERROR: Missing argument. Must specify jail, parameter, and new value
 ENDOFMSG
-	;;	
-	_2) cat << ENDOFMSG
+		;;	
+		_2) cat << ENDOFMSG
 
 ERROR: Combination of < $JAIL >< $PARAM > [jail and parameter]
        doesn't exist in jailmap.conf
 ENDOFMSG
-	;;	
-	_3) cat << ENDOFMSG
+		;;	
+		_3) cat << ENDOFMSG
 
 ALERT: The new value entered is the same as the old value.
        No changes were made.
 ENDOFMSG
-	;;
-	_4) cat << ENDOFMSG
+		;;
+		_4) cat << ENDOFMSG
 
 ERROR: < no_destroy > must be either true or false
 ENDOFMSG
-	;;
-	_5) cat << ENDOFMSG
+		;;
+		_5) cat << ENDOFMSG
 
 ERROR: Parameter < class > cannot be changed with qb-edit.
 ENDOFMSG
-	;;
-	_6) cat << ENDOFMSG
+		;;
+		_6) cat << ENDOFMSG
 
 ERROR: < $PARAM > is not a valid parameter to change in 
        /usr/local/etc/quBSD/jailmap.conf
 ENDOFMSG
-	;;
-	_7) cat << ENDOFMSG
+		;;
+		_7) cat << ENDOFMSG
 ALERT: For changes to take effect, restart the following:
-$_restarts
-
-ENDOFMSG
-	# \c prevents newline. User input can happen on the same line 
-	echo -e "Should qb-edit to restart these jails? (y/n):  \c"
-	;; 
-	_8) 
-		echo -e "Success \c" 
-		qb-list -j $JAIL -p $PARAM
-	;;
-		
-# NOTE: _8 and _9 are unused. Maybe integrate later.
-	_10) cat << ENDOFMSG
-
-ERROR: Invalid rootjail. Here's a list of valid rootjails: 
 ENDOFMSG
 
-		# All rootjails in JMAP with valid zroot/quBSD/jails/<jail>
-		sed -nE "s/[[:blank:]]+class[[:blank:]]+rootjail[[:blank:]]*//gp" $JMAP \
-										| uniq | xargs -I@ zfs list -Ho name $JAILS_ZFS/@
-		echo ''
-	;;
-	_9) cat << ENDOFMSG
+[ -n "$_restart1" ] && echo "    $_restart1"
+[ -n "$_restart2" ] && echo "    $_restart2"
+echo -e "Should qb-edit to restart these jails? (y/n):  \c"
+		;; 
+		_8) 
+			echo -e "Success \c" 
+			qb-list -j $JAIL -p $PARAM
+		;;
+		_9) cat << ENDOFMSG
 
-ERROR: Invalid template. Here's a list of valid templates: 
+ALERT: net-firewall connects to the external internet, so its
+       IP depends on your router. The following was modified: 
+       ${M_ZUSR}/net-firewall/rw/etc/rc.conf 
+       It's highly recommended to double check the IP address,
+       assigned by your router, and this file.
 ENDOFMSG
-		# All appjails in JMAP with zusr/<jail>
-		sed -nE "s/[[:blank:]]+class[[:blank:]]+(appjail)[[:blank:]]*//gp" $JMAP \
-										| uniq | xargs -I@ zfs list -Ho name $ZUSR_ZFS/@
-		echo ''
 	;;
 
+	# End of _message 
 	esac
 
-####################  MESSAGES TAGS FINISHED  #####################
-###################################################################
 
-	# Print message informing user that [-f] can overcome errors. 
-	# It's not really appropriate to include an option specific to
-	# qb-edit, in the main error messages with msg-qubsd.sh.
-
-
-	# QUIET should skip over messages 
+	# Secondary message is used to alert the potential of [-f] option (if not $QUIETed)
 	[ -z "$QUIET" ] && case $_msg2 in 
 		_f) cat << ENDOFMSG
 
@@ -115,9 +90,6 @@ ENDOFMSG
 		;;
 	esac
 
-
-###################################################################
-#####################  FINAL IF_ERR TO TAKE  ######################
 
 	case $_pass_cmd in 
 		usage_0) 
@@ -135,10 +107,6 @@ ENDOFMSG
 		*) : ;;
 	esac
 }
-
-
-###################################################################
-############################  USAGE  ##############################
 
 usage() { cat << ENDOFUSAGE 
 qb-edit:  Modify jail parameters in jailmap.conf

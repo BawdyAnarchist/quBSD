@@ -71,7 +71,7 @@ checks() {
 		;;
 		ipv4) 
 				# It's possible user might try to assign DHCP from command line
-				if [ "$VAL" == "auto" ] || [ "$VAL" == "DHCP" ] ; then 
+				if [ "$VAL" == "auto" ] ; then 
 
 					# Function returns available IPv4. Or for net-firewall returns "DHCP"
 					VAL=$(discover_open_ipv4 $_q "$JAIL") \
@@ -86,7 +86,7 @@ checks() {
 							|| get_msg_edit "none" "exit_1" "_f"
 				fi
 		;; 
-		# Catch all. Any other entries for $PARAM return an error (really should be necessary).
+		# Catch all. Any other entries for $PARAM return an error.
 		*)	get_msg_edit "_6" "usage_1"  ;;
 	
 	# /PARAM
@@ -123,50 +123,45 @@ main() {
 			sed -i '' -E "/^ifconfig_${_tap}.*/ a\\
 defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
 		fi
+		
+		get_msg_edit "_9"
 	fi
 }
 
 handle_restarts() {
-	# If jail is off, don't offer restart. Still need gateway, so assign newvar: _jail_
-	check_isrunning_jail $JAIL && _jail_="$JAIL" 
-
-	# Define which jails need to be restarted
+	# Logic could be written to change running jails, but simpler just to restart.
 	case $PARAM in 
 
 		cpuset|maxmem|rootjail|schg|seclvl|template)
-			_restarts="       $_jail_" 
+			check_isrunning_jail $JAIL && _restart1="$JAIL"
 		;;
 		ipv4|gateway)
 			_gateway=$(sed -nE "s/^${JAIL}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
-			check_isrunning_jail $_gateway || unset _gateway
 
-			# This prevents `none' and `tap0' from being flagged for restart 
-			if [ "$_gateway" == "none" ] || [ -z "${_gateway##tap[[:digit:]]}" ] ; then
-				_restarts="       $_jail_" 
-			else	
-				_restarts=$(printf "%b" "       $_jail_\n       $_gateway")
+			# If jail is running it needs restarted
+			if check_isrunning_jail $JAIL ; then
+				_restart1="$JAIL" ; _restart2="$_gateway"
+
+			else
+				check_isrunning_jail $_gateway && _restart2="$_gateway"
 			fi
 		;;	
 	esac
 
 	# If there are no jails to restart, exit
-	[ -z "$_jail_" ] && [ -z "$_gateway" ] && exit 0
+	[ -z "$_restart1" ] && [ -z "$_restart2" ] && exit 0
 	
 	# If QUIET tagged, only continue if users specified a restart
 	[ -n "$QUIET" ] && [ -z "$RESTART" ] && exit 0
 
-	# Query user to restart jails 
-	if [ -z "$RESTART" ] && [ -z "$QUIET" ] ; then
-
+	if [ -z "$QUIET" ] ; then 
 		get_msg_edit "_7"
 		get_user_response || exit 0 
 	fi
 	
 	# Restart jails (otherwise, would've already exited)	
-	for _jail in $_restarts ; do
-
-		# "hold" option prevents starting jail if it is off
-		[ "$_jail" == "none" ] || restart_jail "$_jail" "hold" 
+	for _jail in $_restart2 $_restart1 ; do
+		[ "$_jail" == "none" ] || restart_jail "$_jail" 
 	done
 }
 

@@ -15,11 +15,6 @@ get_msg_i3_launch() {
 ERROR: < $FILE > does not exist.
 ENDOFMSG
 	;;	
-	_2) cat << ENDOFMSG
-
-
-ENDOFMSG
-	;;	
 	esac
 
 	case $_pass_cmd in 

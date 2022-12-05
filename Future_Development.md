@@ -54,17 +54,12 @@ qubsd_installer
 
 ### BEST PRACTICES / CLEANUP
 
-net-firewall 
-	- jail start should auto update the servIPs in pf.conf
-		- This might require some thought about setting an "auto" option in the settings.
-		  because people making servers might not want an auto setting
-
 quBSD.conf 
 	- ppt_nic and usb should probably be more like: check /boot/loader.conf against pciconf 
 	- This would leave only the quBSD_root (zroot/quBSD). I prefer to remove this file entirely	
 	- Maybe this value can just get stored in quBSD.sh
 
-- net-firewall pf.conf might not be fully generalized for routerIP. 
+net-firewall pf.conf might not be fully generalized for routerIP. 
 	- basically, exec.created relies on setting the last number to "1". 
      - Then it modifes pf.conf, but that might be inappropriate
 	- Also needs to aggregate *all* client connections wireguard ports
@@ -72,6 +67,9 @@ quBSD.conf
 	- The pass in from clients would also let servers do it
   		- Segregate the servers from clients more carefully
 		- Maybe even segregate the wg gateways from clients as well
+	- jail start should auto update the servIPs in pf.conf
+		- This might require some thought about setting an "auto" option in the settings.
+		  because people making servers might not want an auto setting
 
 qb-usbvm     
 	- When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
@@ -102,15 +100,14 @@ pf.conf
 	- Update the guides regarding #defaults in jailmap.
 
 quBSD.sh 
-	- Clean up the list of functions at the top
-	- Clean up the function descriptions (if_err)
-	- Check it thoroughly for test lines
 	- There's probably still functions you can generalize from $ubin
 	- check that case can be applied to isqubsd_ipv4 and others
 
 ### MINOR UPGRADES
 
 qb-autostart still needs worked out. Figure out concurrent starting of jails.
+
+figure out how to parallel start jails
 
 qb-hostnet
 	- Auto-revert to bring down connection.  

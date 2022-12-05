@@ -27,12 +27,6 @@ ENDOFMSG
 ERROR: DPI is above sanity threshold of 384.
 ENDOFMSG
 	;;
-	_4) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_5) cat << ENDOFMSG
-ENDOFMSG
-	;;
 	esac
 
 	case $_pass_cmd in 

@@ -675,6 +675,10 @@ check_isqubsd_ipv4() {
 	local _value ; _value="$1"
 	local _jail ; _jail="$2"
 
+	# $_a0 - $_a4 vars are needed later. Check that they're all here, or get them. 
+	echo "${_a0}#${_a1}#${_a2}#${_a3}#${_a4}" | grep -q "##" \
+		&& check_isvalid_ipv4 -q "$_value"
+
 	# Assigns global variables that will be used here for checks.
 	define_ipv4_convention
 	_used_ips=$(get_used_ips)
@@ -682,23 +686,26 @@ check_isqubsd_ipv4() {
 	# No value specified 
 	[ -z "$_value" ] && get_msg $_q "_0" "IPv4" 
 
-	# net-firewall needs special attention
-	if [ "$_jail" == "net-firewall" ] ; then 
+	# Check the net-jails for IP values of none
+	case ${_value}_${_jail} in
 
-		# IPV4 `none' with net-firewall shouldn't really happen
-		[ "$_value" == "none" ] \
-					&& get_msg $_q "_cj9" "$_value" "$_jail" && return 1
-	
-		# All else gets ALERT message
-		get_msg $_q "_cj15" "$_value" "$_jail" && return 1
-	fi
-
-	# IPV4 `none' with < net- > jails should also be rare/never 
-	[ "$_value" == "none" ] && [ -z "${_jail##net-*}" ] \
-					&& get_msg $_q "_cj13" "$_value" "$_jail" && return 1
-	
-	# Otherwise, `none' is fine for any other jails. Skip additional checks.
-	[ "$_value" == "none" ] && return 0 
+		none_net-firewall)
+			# IPV4 `none' with net-firewall shouldn't really happen
+			get_msg $_q "_cj9" "$_value" "$_jail" && return 1
+		;;
+		*_net-firewall) 
+			# net-firewall has external connection. No convention to judge 
+			return 0
+		;;
+		none_net-*)
+			# `none' shouldn't really happen with net-jails either
+			get_msg $_q "_cj13" "$_value" "$_jail" && return 1
+		;;
+		none_*) 
+			# All other jails, `none' is fine. No checks required
+			return 0 
+		;;
+	esac 
 
 	# Compare against JMAP, and _USED_IPS 
 	if grep -qs "$_value" $JMAP \
@@ -718,7 +725,7 @@ check_isqubsd_ipv4() {
 	[ "$_gateway" == "none" ] && get_msg $_q "_cj14" "$_value" "$_jail" \
 		&& return 1
 	
-	# Otherwise return 0
+	# Catchall. return 0 if no other checks caused a return 1
 	return 0
 }
 

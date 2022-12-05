@@ -52,7 +52,7 @@ usage() { cat << ENDOFUSAGE
 qb-
 
 Usage: qb-
-   -h: outputs this usage message
+   -h: (h)elp. Outputs this help message.
 
 ENDOFUSAGE
 }

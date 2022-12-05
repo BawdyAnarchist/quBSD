@@ -5,7 +5,7 @@ get_msg() {
 	# $2 : _value of the thing that was checked ($1 from the caller)
 	# $3 : _passvar is a supplementary parameter to aid message specificity.
 
-   # Quiet option finally resolves. Will return immediately if passed.
+   # Quiet option finally resolves. Will return 0 to caller immediately 
 	local _q ; local _opts 
 	getopts q _opts && return 0 
 	shift $(( OPTIND - 1 ))
@@ -18,11 +18,6 @@ get_msg() {
 	_0) cat << ENDOFMSG
 
 ERROR: Missing argument. Must specify a < $_value >
-
-ENDOFMSG
-	;;	
-	_cj0) cat << ENDOFMSG
-
 
 ENDOFMSG
 	;;	
@@ -112,7 +107,7 @@ ENDOFMSG
 WARNING: < $_passvar > is a < net- > jail, which typically 
          pass external traffic for client jails. Setting IP 
          to < $_value > will prevent < $_passvar > and its
-         clients from reaching outside networks (internet). 
+         clients from reaching the outside internet.
 ENDOFMSG
 	;;
 	_cj14) cat << ENDOFMSG
@@ -122,11 +117,10 @@ ENDOFMSG
 	;;
 	_cj15) cat << ENDOFMSG
 
-ALERT: < $_passvar > is the gateway jail for all external 
-       network traffic. IP is dependent on your external
-       router. Changing this requires qb-edit to modify: 
-            /zusr/net-firewall/rw/etc/rc.conf
-            !Double check this file after qb-edit -f 
+######################
+######  UNUSED  ######
+######################
+
 ENDOFMSG
 	;;
 	_cj16) cat << ENDOFMSG
@@ -202,8 +196,6 @@ ERROR: Parameter < $_value > for < $_passvar >
 
 ENDOFMSG
 	;;
-
-	# END OF MESSAGES
 	esac
 }
 

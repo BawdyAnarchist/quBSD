@@ -42,7 +42,7 @@ Usage:  qb-autosnap
         qb-autosnap [-l dataset|snapshot]
 
    -d:  (d)estroy snapshots older than qubsd:destroy-date.
-   -h:  (h)elp.  Output this help message.
+   -h:  (h)elp.  Outputs this help message.
    -l:  (l)ist associated datasets and exit. Can filter with
         <dataset> or <snapshot>. No arguments will show all.
    -s:  (s)napshot datasets tagged with qubsd:autosnap.
