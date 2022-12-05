@@ -1,0 +1,94 @@
+#!/bin/sh
+
+. /usr/local/lib/quBSD/quBSD.sh
+
+parse_config() {
+
+	# Set variable, and trap to remove it on exit
+	CONF="/tmp/qb-i3-launch.conf"
+	trap "rm $CONF > /dev/null 2>&1" INT TERM HUP QUIT EXIT
+	
+	# Copy the launch config to tmp ($CONF)
+	cp ${HOME}/.config/i3/launch.conf $CONF 
+
+	# Remove comments and blank lines
+	sed -i '' -e "/^$/ d ; /^[[:blank:]]*#.*/ d" $CONF
+}
+
+start_jails() {
+	# Turn on any jails not started
+	for _jail in $(grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}') ; do
+		check_isrunning_jail "$_jail" || start_jail "$_jail"
+	done
+}
+
+execute_cmds() {
+	_cycle=1
+
+	while : ; do 
+		# Define cycle variables
+		_WS=$(sed  -n "$_cycle p" $CONF | awk '{print $1}') 
+		_LOC=$(sed -n "$_cycle p" $CONF | awk '{print $2}') 
+		_CMD=$(sed -En "${_cycle}p" $CONF \
+				| sed -E "s/[^[:blank:]]+[[:blank:]]+[^[:blank:]]+[[:blank:]]+//")
+
+		# If $_WS was blank, then there are no more lines in CONF 
+		[ -z "$_WS" ] && break
+
+		# Switch workspace
+		i3-msg workspace $_WS
+
+		# Execute commands in their respective places 
+		case "$_LOC" in 
+			!NO_WINDOW) 
+				eval "$_CMD"
+			;;
+			host) 
+				# Need the current window ID to compare against later
+				_id1=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
+				
+				# Execute the command provided
+				eval $_CMD
+
+				# A bit dirty, but it eliminates interference with the eval above 
+				[ "$?" == "0" ] && wait_for_window 
+			;;  
+			*) 
+				# Need the current window ID to compare against later
+				_id1=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
+
+				# Execute the command provided
+				eval "qb-cmd $_LOC $_CMD"
+
+				# A bit dirty, but it eliminates interference with the eval above 
+				[ "$?" == "0" ] && wait_for_window 
+			;;
+		esac	
+
+	_cycle=$(( _cycle + 1 ))
+	done
+}
+
+wait_for_window() {
+	# Ensure that old value for _id2 won't cause false positve
+	_id2=''
+
+	while : ; do 
+		sleep .2
+		_id2=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
+		# As soon as a new window pops up break 
+		[ $_id1 = $_id2 ] || break
+	done
+}
+
+
+get_global_variables
+
+parse_config
+
+start_jails 
+
+execute_cmds > /dev/null 2>&1
+
+exit 0
+

@@ -3,10 +3,11 @@
 . /usr/local/lib/quBSD/msg-dpi.sh
 
 get_options() { 
-	while getopts hr: opts ; do
+	while getopts hrt: opts ; do
 		case $opts in
 			h) get_msg_qb_dpi "none" "usage_0" ;;
-			r) REVERT="$OPTARG" ;;
+			r) DPI_START=96 ; REV_TIME=0 ; revert_dpi ;; 
+			t) REV_TIME="$OPTARG" ;;
 		esac
 	done
 
@@ -17,10 +18,10 @@ get_options() {
 	# Scale references to typical standard default
 	SCALE=96
 
-	# REVERT defaults to 10 seconds unless otherwise specified
-	REVERT="${REVERT:=10}"
-	
-	# Get starting DPI, just in case .Xresources doesn't have it stored
+	# REV_TIME defaults to 10 seconds unless otherwise specified
+	REV_TIME="${REV_TIME:=10}"
+
+	# Get starting DPI in case .Xresources doesn't have it stored
 	DPI_START=$(xrdb -query | sed -nE "s/Xft.dpi:[[:blank:]]+//gp")
 }
 
@@ -41,18 +42,23 @@ main() {
 			&& DPI_RAW="$DPI_IN" \
 					|| DPI_RAW=$(echo "$DPI_IN * 96" | bc)
 
-	# Change DPI	
+	# Change DPI 
 	echo "Xft.dpi: $DPI_RAW" | xrdb -merge
+
+	# Call the revert_dpi function to the background, then exit script
+	revert_dpi &
+	exit 0
 }
 
 revert_dpi() {
+	sleep $REV_TIME
 
-	sleep $REVERT 
-
+	# Try to revert back to .Xresources ; fallback to DPI_START if necessary
 	grep -Eq "Xft.dpi:[[:blank:]]+[[:digit:]]+" /root/.Xresources \
 			&& xrdb -merge /root/.Xresources	\
-					|| echo "Xft.dpi: $DEFAULT_DPI" | xrdb -merge 
+					|| echo "Xft.dpi: $DPI_START" | xrdb -merge 
 
+	exit 0
 }
 
 get_options "$@"
@@ -61,6 +67,3 @@ checks
 
 main
 
-revert_dpi &
-
-exit 0
