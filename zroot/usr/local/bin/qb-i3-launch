@@ -48,6 +48,9 @@ start_jails() {
 check_existing() {
 	# Returns 0 if the combo of _WS _LOC _CMD already exists. Return 1 if not
 
+	# FORCE option skips checks and launches everything
+	[ -n "$FORCE" ] && return 1
+
 	# Window check doesn't apply to commands with no window to launch
 	[ "$_LOC" == "!NO_WINDOW" ] && return 1 
 
