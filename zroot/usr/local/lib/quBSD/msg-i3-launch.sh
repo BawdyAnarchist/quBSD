@@ -8,6 +8,7 @@ get_msg_i3_launch() {
 	local _message
 	local _pass_cmd
 	_message="$1"
+	_pass_cmd="$2"
 
 	case "$_message" in
 	_1) cat << ENDOFMSG
@@ -34,6 +35,9 @@ Usage: qb-i3-launch [-h][-f <conf_file>][-s]
    -h: (h)elp. Outputs this usage message.
    -f: (f)ile. Run an alternate configuration file. 
        Default launch.conf file is: < $CONF >
+   -F: (F)orce. Program checks that there isn't already a
+       window with the same jail/program in the workspace.
+       Default behavior would skip, but you can (F)orce. 
    -s: (s)start jails; but do not launch programs.
    
 If no options are given, default conf is fully run.
