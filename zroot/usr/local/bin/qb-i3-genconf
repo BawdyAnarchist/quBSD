@@ -1,6 +1,7 @@
 #!/bin/sh
 
-# Uese i3gen.conf to generate i3 config lines
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-i3-genconf.sh
 
 config='/root/.config/i3/config'
 setup='/root/.config/i3/i3gen.conf'
