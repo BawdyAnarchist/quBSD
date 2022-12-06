@@ -101,9 +101,14 @@ pf.conf
 
 quBSD.sh 
 	- There's probably still functions you can generalize from $ubin
-	- check that case can be applied to isqubsd_ipv4 and others
+
+qb-i3-genconf
+	- Fix it up and convert to standardization
 
 ### MINOR UPGRADES
+
+qb-i3-launch
+	- Add protective mechanism so it doesn't launch if there's already a window , jail , command from the conf present in the workspace
 
 upgrade to p5
 
