@@ -4,32 +4,67 @@
 . /usr/local/lib/quBSD/msg-hostnet.sh
 
 get_options() {
-	while getopts dhu opts ; do
+	while getopts dht:u opts ; do
 		case $opts in
 			d) _CMD="down" ;;
 			h) get_msg_hostnet "none" "usage_0" ;;
+			t) _TIME="$OPTARG" ;;
 			u) [ -z "$_CMD" ] && _CMD="up" || get_msg_hostnet "_1" "usage_1" ;;
 		esac
 	done
 
-	# Did not specify an action
-	[ "$OPTIND" == 1 ] && get_msg_hostnet "_2" "usage_1" 
+	_TIME="${_TIME:=300}"
+}
 
+get_parameters() {
+	# Did not specify an action
+	[ -z "$_CMD" ] && get_msg_hostnet "_2" "usage_1" 
+
+	# [-t time] was invalid
+	[ "$_TIME" -ge 0 ] || get_msg_hostnet "_6" "usage_1"
+
+	# Must get host network parameters. Use <#default> mtu if not provided.
 	get_jail_parameter gateway "host" || exit 1
 	get_jail_parameter ipv4 "host" || exit 1 
 	get_jail_parameter -q mtu "host" 
 }
 
-main() {
-	# Regardless of [-u] or [-d], first remove all interfaces, 
-	# to ensure that host is in a known good state.
-		
+connection_down() {
 	# Find all epairs and destroy them. 
 	ifconfig -l | grep -o "epair[[:digit:]]*[a,b]" | xargs -I@ ifconfig @ destroy
+
+	# Make sure all other interfaces have no IP addr, and are down (except loopback).
+	for _intf in $(ifconfig -l | sed -E "s/lo[[:digit:]]+//g") ; do
+		ifconfig $_intf -alias > /dev/null 2>&1
+		ifconfig $_intf down
+	done
 	
 	# Set pf.conf, which is simply: "block all"
 	pfctl -f /etc/pf.conf	
+}
+
+revert_connection() {
+	# User opted out of the <timeout> feature
+	[ "$_TIME" -eq 0 ] && get_msg_hostnet "_7" "exit_0" 
 	
+	# Wait the prescribed time
+	sleep $_TIME	
+
+	# Check that there aren't still `pkg` or `freebsd-update` commands being run
+	while $(pgrep -qf '/usr/sbin/freebsd-update') || $(pgrep -q 'pkg') ; do
+		sleep 30
+	done
+
+	# Then bring down connection and exit
+	connection_down
+	exit 0
+}
+
+main() {
+	# Regardless of [-u] or [-d], first remove all interfaces, 
+	# to ensure that host network is in a known good state.
+	connection_down
+		
 	# Bring up host network connection 
 	if [ "$_CMD" == "up" ] ; then 
 
@@ -48,12 +83,16 @@ main() {
 		# Change pf to file that passes internet from host to outside. 
 		pfctl -f /etc/pf_pass.conf
 
+		revert_connection &
+		exit 0
 	fi
 }
 
 get_global_variables
 
 get_options "$@"
+
+get_parameters
 
 main
 
