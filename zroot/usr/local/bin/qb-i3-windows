@@ -14,7 +14,7 @@ ENDOFMSG
 [ "$1" == '-h' ] && usage
 
 # get_tree from i3wm, and parse the important bits.
-LIST=$(i3-msg -t get_tree | grep -Eo '(\"num\":[[:alnum:]]+|\"machine\":\"[[:alnum:]]+|\"class\":\"[[:alnum:]]+)' | grep -v i3bar | sed 's/"num":/WORKSPACE: /g' | column -t | sed 's/"class":"/     /g' | sed 's/"machine":"/\tJail: /g' | sed 's/Jail: quBSD/Host/g' | sed "/WORKSPACE/ i\\
+LIST=$(i3-msg -t get_tree | grep -Eo '(\"num\":[[:digit:]]+|\"machine\":\"[^\"]+|\"class\":\"[^\"]+)' | grep -v i3bar | sed 's/"num":/WORKSPACE: /g' | column -t | sed 's/"class":"/     /g' | sed 's/"machine":"/\tJail: /g' | sed 's/Jail: quBSD/Host/g' | sed "/WORKSPACE/ i\\
 
 #")
 
