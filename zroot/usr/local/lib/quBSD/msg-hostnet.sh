@@ -27,6 +27,17 @@ ERROR: Tunnel < $JAIL > failed to start.
        For more info, see: /var/log/quBSD.log
 ENDOFMSG
 	;;
+	_6) cat << ENDOFMSG
+
+ERROR: [-t] time must be a number. 
+ENDOFMSG
+	;;	
+	_7) cat << ENDOFMSG
+
+WARNING: User opted to remove the network timeout. Host
+         will keep this network connection indefintely.
+ENDOFMSG
+	;;	
 	esac
 
 	case $_pass_cmd in 
@@ -42,13 +53,22 @@ usage() { cat << ENDOFUSAGE
 
 qb-hostnet: Connect host to outside internet.
 
-Usage: hostnet [-h] [-d|-u]
+Usage: hostnet [-h][-d|-u][-t <time_in_seconds>]
    -h: (h)elp. Outputs this help message
    -d: (d)own. Remove connectivity; set pf to block all 
    -u: (u)p. Brings up connectivity as specified in JMAP
 
-   When host is up, qb-stat (if running) prints a large 
-   flashing warning message in red letters at the bottom
+   -t: (t)ime before connection is automatically removed.
+       Default is 300 secs (5 min). Two exceptions where
+       where connection will persist beyond <timeout>:
+          1) If freebsd-update is running, or
+          2) pkg is running
+          # After completion, connection is removed.
+       To disable default timeout and maintain indefinite
+       host connection, use qb-hostnet -u -t 0
+
+   When host is connected, qb-stat will print a large 
+   flashing warning message in red letters. 
 
 ENDOFUSAGE
 }
