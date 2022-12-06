@@ -105,12 +105,12 @@ quBSD.sh
 
 ### MINOR UPGRADES
 
+upgrade to p5
+
 qb-autostart still needs worked out. Figure out concurrent starting of jails.
 
-figure out how to parallel start jails
-
-qb-hostnet
-	- Auto-revert to bring down connection.  
+pf_pass.conf
+	- I think I had problems with upgrades or pkgs or something. I need to figure out which services are necessary
 
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 
