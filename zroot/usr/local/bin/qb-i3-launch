@@ -1,18 +1,26 @@
 #!/bin/sh
 
 . /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-i3-launch.sh
 
 get_options() {
-	while getopts f:hs opts ; do
+	while getopts f:Fhs opts ; do
 		case $opts in
 			f) [ -e "$OPTARG" ] && FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
+			F) FORCE="true" ;;
 			h) get_msg_i3_launch "none" "usage_0" ;;
 			s) STARTONLY="true" ;;
 		esac
 	done
 
 	shift $(( OPTIND - 1 ))
-	FILE="${FILE:=${HOME}/.config/i3/launch.conf}"
+
+	# Assign default file if one wasn't optioned
+	FILE="${FILE:=${HOME}/.config/i3/i3launch.conf}"
+	
+	# Get all running windows. Adds "WORKSPACE" at bottom, to simplify sed searches later on).
+	WINDS=$(qb-i3-windows| sed "s/Jail://g" | sed "$ a\\
+WORKSPACE")
 }
 
 parse_config() {
@@ -37,51 +45,19 @@ start_jails() {
 	[ -n "$STARTONLY" ] && exit 0
 }
 
-execute_commands() {
-	_cycle=1
+check_existing() {
+	# Returns 0 if the combo of _WS _LOC _CMD already exists. Return 1 if not
 
-	while : ; do 
-		# Define cycle variables
-		_WS=$(sed  -n "$_cycle p" $CONF | awk '{print $1}') 
-		_LOC=$(sed -n "$_cycle p" $CONF | awk '{print $2}') 
-		_CMD=$(sed -En "${_cycle}p" $CONF \
-				| sed -E "s/[^[:blank:]]+[[:blank:]]+[^[:blank:]]+[[:blank:]]+//")
+	# Window check doesn't apply to commands with no window to launch
+	[ "$_LOC" == "!NO_WINDOW" ] && return 1 
 
-		# If $_WS was blank, then there are no more lines in CONF 
-		[ -z "$_WS" ] && break
+	# Using alnum, helps match windows where title is slightly different than the launch cmd
+	_cmd=$(echo $_CMD | grep -Eo "^[^[:alnum:]]+")
 
-		# Switch workspace
-		i3-msg workspace $_WS
-
-		# Execute commands in their respective places 
-		case "$_LOC" in 
-			!NO_WINDOW) 
-				eval "$_CMD"
-			;;
-			host) 
-				# Need the current window ID to compare against later
-				_id1=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
-				
-				# Execute the command provided
-				eval $_CMD
-
-				# A bit dirty, but it eliminates interference with the eval above 
-				[ "$?" == "0" ] && wait_for_window 
-			;;  
-			*) 
-				# Need the current window ID to compare against later
-				_id1=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
-
-				# Execute the command provided
-				eval "qb-cmd $_LOC $_CMD"
-
-				# A bit dirty, but it eliminates interference with the eval above 
-				[ "$?" == "0" ] && wait_for_window 
-			;;
-		esac	
-
-	_cycle=$(( _cycle + 1 ))
-	done
+	# Isolate the windows/programs for the workspace in question; then
+			# check if an existing jail with that window name already exists.
+	echo "$WINDS" | sed -En "/WORKSPACE: ${_WS}\$/,/WORKSPACE/p" | sed "$ d" | \
+			grep -Eiq "${_cmd}.*${_LOC}"  &&  return 0  ||  return 1
 }
 
 wait_for_window() {
@@ -96,16 +72,68 @@ wait_for_window() {
 	done
 }
 
+execute_commands() {
+	# Switch workspace
+	i3-msg workspace $_WS
+
+	# Execute commands in their respective places 
+	case "$_LOC" in 
+		!NO_WINDOW) 
+			eval "$_CMD"
+		;;
+		host) 
+			# Need the current window ID to compare against later
+			_id1=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
+				
+			# Execute the command provided
+			eval $_CMD
+
+			# A bit dirty, but it eliminates interference with the eval above 
+			[ "$?" == "0" ] && wait_for_window 
+		;;  
+		*) 
+			# Need the current window ID to compare against later
+			_id1=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
+
+			# Execute the command provided
+			eval "qb-cmd $_LOC $_CMD"
+
+			# A bit dirty, but it eliminates interference with the eval above 
+			[ "$?" == "0" ] && wait_for_window 
+		;;
+	esac	
+}
+
+main() {
+	# Start jails first before launching (maybe change this order).
+	start_jails 
+
+	_cycle=1
+	while : ; do 
+		# Define cycle variables
+		_WS=$(sed  -n "$_cycle p" $CONF | awk '{print $1}') 
+		_LOC=$(sed -n "$_cycle p" $CONF | awk '{print $2}') 
+		_CMD=$(sed -En "${_cycle}p" $CONF \
+				| sed -E "s/[^[:blank:]]+[[:blank:]]+[^[:blank:]]+[[:blank:]]+//")
+
+		# If $_WS was blank, then there are no more lines in CONF 
+		[ -z "$_WS" ] && break
+
+		# This avoids an accidental re-launching of already existing jail/windows 
+		check_existing || execute_commands > /dev/null 2>&1
+
+	_cycle=$(( _cycle + 1 ))
+	done
+}
+
 
 get_global_variables
 
-get_options
+get_options "$@"
 
 parse_config
 
-start_jails 
-
-execute_commands > /dev/null 2>&1
+main 
 
 exit 0
 
