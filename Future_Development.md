@@ -107,9 +107,6 @@ qb-i3-genconf
 
 ### MINOR UPGRADES
 
-qb-i3-launch
-	- Add protective mechanism so it doesn't launch if there's already a window , jail , command from the conf present in the workspace
-
 upgrade to p5
 
 qb-autostart still needs worked out. Figure out concurrent starting of jails.
