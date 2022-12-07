@@ -48,7 +48,7 @@ main() {
 		read _CMD
 		
 		# nohup is required, or the launched command will die with the xterm shell
-		nohup qb-cmd $ROOT $JAIL $_CMD 
+		nohup qb-cmd $ROOT $JAIL $_CMD > /dev/null
 	fi
 }
 
