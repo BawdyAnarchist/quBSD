@@ -15,7 +15,7 @@ get_options() {
 }
 
 trap_on_exit() {
-	rm $TMP > /dev/null 2>&1
+	rm $TMP1 > /dev/null 2>&1
 	rm $TMP2 > /dev/null 2>&1
 	exit 0
 }
@@ -25,10 +25,9 @@ define_script_files() {
 	trap "trap_on_exit" INT TERM HUP QUIT EXIT
 
 	QBROOT=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $QBCONF) 
-	TMP="/tmp/qb-stat.txt"
-	TMP2="/tmp/qb-stat2.txt"
+	TMP1=$(mktemp -t "qb-stat1")
+	TMP2=$(mktemp -t "qb-stat2")
 	COL="${COL:=6,6}"
-
 }
 
 define_colors() {
@@ -46,12 +45,12 @@ define_colors() {
 }
 
 assemble_header() {
-	[ -e "$TMP" ] && rm $TMP 
+	[ -e "$TMP1" ] && rm $TMP1
 	[ -e "$TMP2" ] && rm $TMP2
-	mktemp $TMP > /dev/null
+	mktemp $TMP1 > /dev/null
 	mktemp $TMP2 > /dev/null
 
-	printf "%b" "${HILIT}CONTAINER\tJID\tGATEWAY\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" >> $TMP
+	printf "%b" "${HILIT}CONTAINER\tJID\tGATEWAY\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" >> $TMP1
 }
 
 define_variables() {
@@ -131,7 +130,7 @@ get_jails_loop() {
 			6) TEMPCOL=${GRAY} ;;
 		esac
 
-		printf "%b" "${TEMPCOL}$_j\t" "$jid\t" "$gateway\t" "$class\t" "$rootjail\t" "$sub\t" "$disk\t" "$ram\t" "${cpu}${COL_OFF}\n" >> $TMP
+		printf "%b" "${TEMPCOL}$_j\t" "$jid\t" "$gateway\t" "$class\t" "$rootjail\t" "$sub\t" "$disk\t" "$ram\t" "${cpu}${COL_OFF}\n" >> $TMP1
 	done
 }
 
@@ -160,7 +159,7 @@ main() {
 		get_jails_loop > /dev/null 2>&1
 
 		# Sort -b ignores leadings spaces, -f ignores case ; grep remove #defaults from JMAP
-		(head -n 1 $TMP && tail -n +2 $TMP | sort -fbk $COL | cut -f 1,2,3,4,5,7,8,9 \
+		(head -n 1 $TMP1 && tail -n +2 $TMP1 | sort -fbk $COL | cut -f 1,2,3,4,5,7,8,9 \
 				| grep -Ev '#default') >> $TMP2
 
 		# Clear at the last moment; re-print the new file in nice columns; plus any alerts
