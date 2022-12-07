@@ -34,7 +34,7 @@ qb-i3-launch: Launch programs as indicated by config file
 Usage: qb-i3-launch [-h][-f <conf_file>][-s]  
    -h: (h)elp. Outputs this usage message.
    -f: (f)ile. Run an alternate configuration file. 
-       Default launch.conf file is: < $CONF >
+       Default file is: < ${HOME}/.config/i3/i3gen.conf >
    -F: (F)orce. Program checks that there isn't already a
        window with the same jail/program in the workspace.
        Default behavior would skip, but you can (F)orce. 
