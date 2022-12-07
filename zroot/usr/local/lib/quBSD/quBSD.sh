@@ -65,8 +65,8 @@ get_global_variables() {
 	QBLOG="/var/log/quBSD.log"
 	
 	# Remove blanks at end of line, to prevent bad variable assignments. 
-	sed -i '' -e 's/[[:blank:]]*$//' $QBCONF 
-	sed -i '' -e 's/[[:blank:]]*$//' $JMAP  
+	sed -i '' -E 's/[[:blank:]]*$//' $QBCONF 
+	sed -i '' -E 's/[[:blank:]]*$//' $JMAP  
 
 	# Get datasets, mountpoints; and define files.
    QBROOT_ZFS=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $QBCONF)
@@ -707,8 +707,8 @@ check_isqubsd_ipv4() {
 		;;
 	esac 
 
-	# Compare against JMAP, and _USED_IPS 
-	if grep -qs "$_value" $JMAP \
+	# Compare against JMAP, and _USED_IPS.
+	if grep -v "^$_jail" $JMAP | grep -qs "$_value" \
 			|| [ $(echo "$_used_ips" | grep -qs "${_value%/*}") ] ; then
 	
 		get_msg $_q "_cj11" "$_value" "$_jail" && return 1
