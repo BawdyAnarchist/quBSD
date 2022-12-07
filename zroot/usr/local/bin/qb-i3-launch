@@ -6,7 +6,7 @@
 get_options() {
 	while getopts f:Fhs opts ; do
 		case $opts in
-			f) [ -e "$OPTARG" ] && FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
+			f) FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
 			F) FORCE="true" ;;
 			h) get_msg_i3_launch "none" "usage_0" ;;
 			s) STARTONLY="true" ;;
@@ -14,19 +14,14 @@ get_options() {
 	done
 
 	shift $(( OPTIND - 1 ))
-
-	# Assign default file if one wasn't optioned
-	FILE="${FILE:=${HOME}/.config/i3/i3launch.conf}"
-	
-	# Get all running windows. Adds "WORKSPACE" at bottom, to simplify sed searches later on).
-	WINDS=$(qb-i3-windows| sed "s/Jail://g" | sed "$ a\\
-WORKSPACE")
 }
 
 parse_config() {
-
+	# Assign default file if one wasn't optioned
+	FILE="${FILE:=${HOME}/.config/i3/i3launch.conf}"
+	
 	# Set variable, and trap to remove it on exit
-	CONF="/tmp/qb-i3-launch.conf"
+	CONF=$(mktemp -t "i3-launch.conf")
 	trap "rm $CONF > /dev/null 2>&1" INT TERM HUP QUIT EXIT
 	
 	# Copy the launch config to tmp ($CONF)
@@ -34,6 +29,11 @@ parse_config() {
 
 	# Remove comments and blank lines
 	sed -i '' -e "/^$/ d ; /^[[:blank:]]*#.*/ d" $CONF
+
+	# Get all running windows. Adds "WORKSPACE" at bottom, to simplify sed searches later on).
+	WINDS=$(qb-i3-windows| sed "s/Jail://g" | sed "$ a\\
+WORKSPACE")
+
 }
 
 start_jails() {
