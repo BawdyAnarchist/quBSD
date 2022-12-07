@@ -55,7 +55,9 @@ New i3 config was successfully reloaded.
 ENDOFMSG
 	;;	
 	_9) cat << ENDOFMSG
-i3 config reload unsuccessful. You might need to restart i3.
+If then new config did not take affect, either
+manually reload, or you might need to restart i3.
+  (Sometimes socket connections become corrupted).
 ENDOFMSG
 	;;	
 	_10) cat << ENDOFMSG
