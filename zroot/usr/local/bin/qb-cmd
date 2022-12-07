@@ -65,7 +65,7 @@ main() {
 	start_jail "$JAIL" || get_msg_cmd "none" "exit_1"
 
 	# Final evaluation statement. Launches the window/commands 
-	eval jexec -l -U $_USER $JAIL csh -c $_NEWWIND $_CMD $_REDIRECT
+	eval $_NEWWIND "jexec -l -U $_USER $JAIL csh -c $_CMD $_REDIRECT"
 }
 
 get_global_variables
