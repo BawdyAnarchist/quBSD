@@ -1,122 +1,180 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/quBSD.sh
 . /usr/local/lib/quBSD/msg-i3-genconf.sh
 
-config='/root/.config/i3/config'
-setup='/root/.config/i3/i3gen.conf'
-jailselect=$(egrep '^bindsym .* mode' $setup)
-jaillist=$(sed -n '/JAIL[[:blank:]]*GROUP[[:blank:]]*SYM1/,/ALIAS[[:blank:]]*SYM[[:blank:]]*COMMAND/p' \
-												$setup | sed '/^$/d' | egrep -v "^#")
-hostcommands=$(sed '1,/ALIAS[[:blank:]]*SYM[[:blank:]]/d'  $setup | sed '/^$/d' | egrep -v "^#" \
-												| sed 's/#.*//g' | sed 's/[[:blank:]]*$//g')
-wc=$(echo "$jaillist" | wc -l)
+get_options() {
+   while getopts c:f:h opts ; do
+		case $opts in
+			d) [ -e "$OPTARG" ] && CONF="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
+			f) [ -e "$OPTARG" ] && FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
+			h) get_msg_i3_launch "none" "usage_0" ;;
+			r) RELOAD="false" ;; 
+		esac
+	done
+	
+	shift $(( OPTIND - 1 ))
 
-initialize_config() {			
-	sed -i '' -e '/AUTO GENERATED MODES/,$d' "$config"
-	printf "%b" "##  AUTO GENERATED MODES  ##\n" \
-	       "##  Edit i3gen.conf and run i3gen.sh to make changes  ##\n\n\n"  >> "$config"
+	# Assign default file and main i3 configs, if not already assigned
+	FILE="${FILE:=${HOME}/.config/i3/i3gen.conf}"
+	CONF="${CONF:=${HOME}/.config/i3/config}"
 }
 
-jailselect() { 			
-# Creates the first level binding mode
-	printf "%b" "##  FIRST LEVEL BINDING MODE  ##" "\n"  >> "$config"
-	printf "%b" "\n" "$jailselect" "\n\n"  >> "$config"
-	printf "%b" "mode ${jailselect#bindsym * mode } {"  >>  "$config"
+parse_config() {
+	# Create the tmp files for parsed i3gen.conf 
+	GEN1=$(mktemp  -t "i3-genconf1")		
+	GEN2=$(mktemp  -t "i3-genconf2")		
+	TMP=$(mktemp   -t "i3-genconf3")		
+	NEWCONF=$(mktemp -t "i3-genconf_newconf")
+	
+	trap "rm $GEN1 $GEN2 $TMP $NEWCONF" INT TERM HUP QUIT EXIT
 
-	local loop="1"
-	while [ "$loop" -le "$wc" ] ; do 
-		local jail=$(echo "$jaillist" | sed -n ${loop}p | awk '{print $1}')
-		local sym=$(echo "$jaillist" | sed -n ${loop}p | awk '{print $3}')
-		local group=$(echo "$jaillist" | sed -n ${loop}p | awk '{print $2}')
-		local check=$(grep "bindsym $sym mode \"$group\"" "$config")
+	cp $CONF $NEWCONF
 
-		## Jails without a grouped bindsym get directly mapped at the first level
-		if [ "$group" = "none" -o "$group" = "-" ]; then			
-			printf "%b" "\n\t" "bindsym ${sym} mode \"${jail}\""  >> "$config"
+	# Populate GEN1 with the list of jails and aliased program names
+	sed -En "/#[[:blank:]]*JAIL[[:blank:]]*GROUP[[:blank:]]*SYM1/,\
+		/#[[:blank:]]*ALIAS[[:blank:]]*SYM/p" $FILE \
+			| sed -E 's/#.*//g ; s/[[:blank:]]+$//g ; /^$/ d' > $GEN1
 
-		## If not existing, create bindsym for second level group binding mode
-		elif [ -z "$check" ] ; then 			
-			printf "%b" "\n\t" "bindsym ${sym} mode \"${group}\""  >> "$config"
+	# Populate GEN2 with the list of aliased commands and key bindings 
+	sed -En "/#[[:blank:]]*ALIAS[[:blank:]]*SYM[[:blank:]]*COMMAND/,$ p" $FILE \
+			| sed -E 's/#.*//g ; s/[[:blank:]]+$//g ; /^$/ d' > $GEN2
+	
+	# First bindsym for top level selection mode
+	JSELECT=$(grep -E '^bindsym[[:blank:]]*\$mod\+[^[:blank:]]+[[:blank:]]+mode' $FILE)
+}
+
+generate_first_mode() {
+	MODETYPE="FIRST"
+
+	# Get the bindsym for entering the "Jail Select" mode. sed removes quotation marks \" 
+	_mode=$(echo ${JSELECT#bindsym * mode} | sed -E "s/\"//g")
+
+	# Looping over each SYM1, and populating the FIRST MODETYPE with lines
+	LOOP=$(awk '{print $3}' $GEN1) 
+
+	generate_mode	
+}
+
+generate_second_mode() {
+	MODETYPE="SECOND"		
+
+	for _mode in $(awk '{print $2}' $GEN1 | uniq) ; do
+		# Skip mode creation for non-groups 
+		if ! [ "$_mode" == '-' ] ; then
+
+			# Filter lines relevant only to the _group
+			TEMPGEN=$(grep -E "[^[:blank:]]+[[:blank:]]+${_mode}[[:blank:]]+" $GEN1)
+
+			# Loop over each SYM2 in the filtered _group
+			LOOP=$(echo "$TEMPGEN" | awk '{print $4}')
+			generate_mode
 		fi
-		loop=$(( loop + 1 ))
-	done
-
-	printf "%b" "\n\t" "bindsym Return mode \"default\"" "\n\t" \
-					"bindsym Escape mode \"default\"" "\n" "}\n\n"  >> "$config"
-}
-
-groupmode() {					
-# Prints the header, close, and escapes for each 2nd level binding mode group
-	printf "%b" "##  SECOND LEVEL, GROUPED MODE KEYBINDINGS  ##" "\n\n"  >> "$config"
-	local loop="1"
-
-	while [ "$loop" -le "$wc" ] ; do 
-		local group=$(echo "$jaillist" | sed -n ${loop}p | awk '{print $2}')
-		local check=$(grep "mode \"$group\" {" ""$config"")
-
-		if [ "$group" != "-" -a "$group" != "none" -a -z "$check" ]; then   	
-			printf "%b" "mode \"$group\" {" "\n"  >> "$config"
-			printf "%b" "\t" "bindsym Return mode \"default\"" "\n"   >> "$config"
-			printf "%b" "\t" "bindsym Escape mode \"default\"" "\n}\n\n"   >> "$config"
-		fi		
-		loop=$(( loop + 1 ))
 	done
 }
 
-group_populate() {				
-# Populates the body of each group mode with jail mode mappings
-	local loop="1"
-	local newln=$(echo -e "\n")
+generate_jails_modes() {
+	MODETYPE="THIRD"
 
-	while [ "$loop" -le "$wc" ] ; do 
-		local jail=$(echo "$jaillist" | sed -n ${loop}p | awk '{print $1}')
-		local sym=$(echo "$jaillist" | sed -n ${loop}p | awk '{print $4}')
-		local group=$(echo "$jaillist" | sed -n ${loop}p | awk '{print $2}')
-		local check=$(grep "mode \"$group\" {" ""$config"")
-		local newln=$(printf "%b" " \\" "\n" "\t" "bindsym $sym mode \"$jail\"")
+	_count=1
+	for _mode in $(awk '{print $1}' $GEN1) ; do
+	
+		# Loop over each COMMAND ALIAS for each JAIL 
+		LOOP=$(awk '{print $5}' $GEN1 | sed -n "${_count}p" | sed "s/,/ /g")
+		generate_mode
 
-		if [ "$group" != "-" -a "$group" != "none" ]; then	
-			sed -i '' -e "/$check/ s/$/$newln/" $config	
-		fi
-		loop=$(( loop + 1 ))
+	_count=$(( _count + 1 ))
 	done
 }
 
-jailgen() {
-# Generates the actual exec command lines for each jail mode
-	printf "%b" "##  JAIL KEYBINDINGS FOR EXEC COMMANDS  ##" "\n\n"  >> "$config"
-	local loop="1"
+define_mode_variables() {
+	case $MODETYPE in
 
-	while [ "$loop" -le "$wc" ] ; do 
-		local jail=$(echo "$jaillist" | sed -n ${loop}p | awk '{print $1}')
-		local progs=$(echo "$jaillist" | sed -n ${loop}p | awk '{print $5}' | sed 's/,/ /g')
-		printf "%b" "mode \"$jail\" {"  >>  "$config"
+		FIRST)	
+			_sym="$_loop"
+			_group=$(sed -n ${_cycle}p $GEN1 | awk '{print $2}')
 
-		## Searches for alias, and replaces with full command
-		for p in $progs; do
-			sym=$(echo "$hostcommands" | egrep "^${p} " | awk '{print $2}')
-			passed_command=$(echo "$hostcommands" | egrep "^${p}" \
-			| sed "s/^[^[:blank:]]*[[:blank:]]*[^[:blank:]]*[[:blank:]]*//" | sed "s,\$jail,${jail},") 
-		
-			if [ -n "$sym" ]; then	
-				printf "%b" "\n\tbindsym $sym exec $passed_command , mode \"default\"" >> "$config"; else
-				printf "%b" "\n\t\t## COMMAND \"$p\" NOT FOUND IN i3gen.conf file"  >> "$config"
+			if [ "$_group" == '-' ] ; then
+				# No group designated. Resolve directly to the <jail> mode
+				_jail=$(sed -n ${_cycle}p $GEN1 | awk '{print $1}')
+				_action="mode \"$_jail\""
+
+			else
+				# If group was provided, point to the secondary mode 
+				_action="mode \"$_group\""
 			fi
-		done
+		;;
+		SECOND)
+			_sym="$_loop"
+			_jail=$(echo "$TEMPGEN" | sed -n ${_cycle}p | awk '{print $1}')
+			_action="mode \"$_jail\""
+		;;
+		THIRD)
+			_line=$(grep -E "^${_loop}" $GEN2)
+			_alias=$(echo $_line | sed -En "s/^${_loop}[[:blank:]]+[^[:blank:]]+[[:blank:]]+//gp")
+			_sym=$(echo $_line | awk '{print $2}')
+			_action=$(printf "%b" "exec ${_alias} , mode \"default\"")
+		;;
+	esac
+}
+	
+test_new_config() {
+	# Test the new configuration 
+   if i3 -C -c $NEWCONF; then
+		# If successful, copy to new config and reload unless otherwise indicated
+		cp $NEWCONF $CONF	
+		get_msg_i3_genconf "_6"
 
-	printf "%b" "\n\tbindsym Return mode \"default\"" \
-			"\n\tbindsym Escape mode \"default\"" "\n}\n\n"  >> "$config"
-	loop=$(( loop + 1 ))
+		if [ "$RELOAD" == "false" ] ; then
+			get_msg_i3_genconf "_7"
+		else
+			i3-msg reload > /dev/null 2>&1 && get_msg_i3_genconf "_8" || get_msg_i3_genconf "_9"
+		fi
+
+	else
+		# If failue, copy failed config for examination; and show error message
+		cp $NEWCONF ${HOME}/.config/i3/config_attempted
+		get_msg_i3_genconf "_10"	
+	fi		
+}
+
+generate_mode() {
+	# Print the mode opening line to the config
+	get_msg_i3_genconf "_3"  > $TMP
+
+	_cycle=1
+	for _loop in $LOOP ; do
+		# Define $_sym and $_action	
+		define_mode_variables
+
+		# Make sure it's not already there, and then add new bindsym 
+		grep -q "bindsym $_sym" $TMP || get_msg_i3_genconf "_4" "$_sym" "$_action" >> $TMP
+
+	_cycle=$(( _cycle + 1 ))
 	done
+
+	# Escape/Return and close mode (print to config)
+	get_msg_i3_genconf "_5" >> $TMP
+
+	# Remove any duplicates created, and push to the main i3 config 
+	uniq $TMP >> $NEWCONF
 }
 
 main() {
-	initialize_config
-	jailselect
-	groupmode	
-	group_populate
-	jailgen
+	# Delete old lines from conf ; and add new header
+	sed -i '' -e '/I3GEN AUTO GENERATED MODES/,$d' $NEWCONF
+	get_msg_i3_genconf "_2" >> $NEWCONF
+	
+	generate_first_mode
+
+	generate_second_mode
+
+	generate_jails_modes
+
+	test_new_config
 }
+
+get_options "$@"
+
+parse_config
 
 main
