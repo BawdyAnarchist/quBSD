@@ -103,9 +103,6 @@ pf.conf
 quBSD.sh 
 	- There's probably still functions you can generalize from $ubin
 
-qb-i3-genconf
-	- Fix it up and convert to standardization
-
 ### MINOR UPGRADES
 
 upgrade to p5
