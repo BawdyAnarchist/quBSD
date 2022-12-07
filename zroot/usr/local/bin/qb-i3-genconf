@@ -7,7 +7,7 @@ get_options() {
 		case $opts in
 			d) [ -e "$OPTARG" ] && CONF="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
 			f) [ -e "$OPTARG" ] && FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
-			h) get_msg_i3_launch "none" "usage_0" ;;
+			h) get_msg_i3_genconf "none" "usage_0" ;;
 			r) RELOAD="false" ;; 
 		esac
 	done
@@ -110,7 +110,9 @@ define_mode_variables() {
 		;;
 		THIRD)
 			_line=$(grep -E "^${_loop}" $GEN2)
-			_alias=$(echo $_line | sed -En "s/^${_loop}[[:blank:]]+[^[:blank:]]+[[:blank:]]+//gp")
+			_alias=$(echo $_line \
+				| sed -En "s/^${_loop}[[:blank:]]+[^[:blank:]]+[[:blank:]]+//gp" \
+					| sed -E "s/\\\$jail/${_mode}/g")
 			_sym=$(echo $_line | awk '{print $2}')
 			_action=$(printf "%b" "exec ${_alias} , mode \"default\"")
 		;;
