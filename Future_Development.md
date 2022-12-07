@@ -90,6 +90,7 @@ qb-create
 		- be careful. Cloned datasets should not be autosnapped
 	- While in guided mode, add option to enter "auto" for IP assignment 
 	- You need to disallow 'none' and 'quBSD' as jailnames
+	- Add the new jail to the i3gen.conf and execute keybindings
 
 pf.conf
 	- wgIP constant really should be called "endpointIP" or something like that
