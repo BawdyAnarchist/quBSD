@@ -43,21 +43,24 @@ ENDOFMSG
 	;;	
 	_6) cat << ENDOFMSG
 
-Config test successful. New config is saved over the old one.
+Config test successful. Saved new config over the old one.
 ENDOFMSG
 	;;
 	_7) cat << ENDOFMSG
-New config will not take effect until i3 is reloaded.
+i3 reloaded successfully.
+
 ENDOFMSG
 	;;	
 	_8) cat << ENDOFMSG
 New i3 config was successfully reloaded.
+
 ENDOFMSG
 	;;	
 	_9) cat << ENDOFMSG
 If then new config did not take affect, either
 manually reload, or you might need to restart i3.
   (Sometimes socket connections become corrupted).
+
 ENDOFMSG
 	;;	
 	_10) cat << ENDOFMSG
@@ -65,6 +68,7 @@ ENDOFMSG
 ERROR: The new config has errors, and was not loaded. 
        It was saved to the following location: 
        ${HOME}/.config/i3/config_attempted
+
 ENDOFMSG
 	;;
 	esac
