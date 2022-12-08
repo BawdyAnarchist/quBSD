@@ -1,25 +1,73 @@
 #!/bin/sh
 
-# Not the cleanest script, but parsing JSON without a parser is a bit cumbersome.
+get_options() {
+	while getopts ch opts ; do
+		case $opts in
+			c) close_windows ; exit 0 ;;
+			h) usage ; exit 0 ;; 
+		esac
+	done
+
+	shift $(( OPTIND - 1 ))
+}
 
 usage() { cat << ENDOFMSG 
 
-qb-windows: Print a list of all open windows/programs currently
-            running, grouped by their respective i3 workspaces. 
+qb-i3-windows: Print a list of all open windows/programs currently
+               running, grouped by their respective i3 workspaces. 
+
+usage: qb-i3-windows [-h][-c]
+       No options specified:  will print list.
+   -c: (c)lose all open windows. Jails will stay running.
+   -h: (h)elp. Ouputs this help message.
+
 ENDOFMSG
-	exit 0
 }
 
-# Print help message
-[ "$1" == '-h' ] && usage
+close_windows() {
 
-# get_tree from i3wm, and parse the important bits.
-LIST=$(i3-msg -t get_tree | grep -Eo '(\"num\":[[:digit:]]+|\"machine\":\"[^\"]+|\"class\":\"[^\"]+)' | grep -v i3bar | sed 's/"num":/WORKSPACE: /g' | column -t | sed 's/"class":"/     /g' | sed 's/"machine":"/\tJail: /g' | sed 's/Jail: quBSD/Host/g' | sed "/WORKSPACE/ i\\
+	# Two passes are programmed. First attempts graceful TERM signal.
+	# Second sends KILL, if the process didn't stop.
+ 
+	_SIG="-15 -15 -9" 
+
+	for _sig in $_SIG ; do
+
+		# Get a list of all open windows
+		WINDOWS=$(xprop -root _NET_CLIENT_LIST | sed -nE "s/.*window id # //p" | sed "s/,//g")
+
+		# If it's the 2nd pass, and there are still windows, give them an extra moment to die
+		[ "$_sig" == "-9" ] && [ -n "$WINDOWS" ] && sleep 4 \
+	
+		# Cycle through windows and kill them
+		for _win in $WINDOWS; do
+
+			# Get the pid, and kill it
+			_pid=$(xprop -id $_win _NET_WM_PID | grep -Eo "[[:alnum:]]+$")
+			eval kill $_sig $_pid
+
+		done	
+
+		# Give a moment for windows to die 
+		sleep 2
+	done
+}
+
+list_windows() {
+
+	# get_tree from i3wm, and parse the important bits. 
+	# Not the cleanest implementation, but paring JSON without a parser is cumbersome.
+	LIST=$(i3-msg -t get_tree | grep -Eo '(\"num\":[[:digit:]]+|\"machine\":\"[^\"]+|\"class\":\"[^\"]+)' | grep -v i3bar | sed 's/"num":/WORKSPACE: /g' | column -t | sed 's/"class":"/     /g' | sed 's/"machine":"/\tJail: /g' | sed 's/Jail: quBSD/Host/g' | sed "/WORKSPACE/ i\\
 
 #")
 
-# Print the list
-echo "$LIST" | sed 'N;s/\n/ /' | sed 's/WORKSPACE:[[:blank:]]*/WORKSPACE: /g' 
+	echo "$LIST" | sed 'N;s/\n/ /' | sed 's/WORKSPACE:[[:blank:]]*/WORKSPACE: /g' 
+}
+
+
+get_options "$@"
+
+list_windows
 
 
 
