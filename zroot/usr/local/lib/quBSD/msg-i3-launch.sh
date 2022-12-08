@@ -42,6 +42,14 @@ Usage: qb-i3-launch [-h][-f <conf_file>][-s]
    
 If no options are given, default conf is fully run.
 
+NOTE: This script can be finicky, and windows can pop up
+in the wrong places sometimes. For example, if your browser 
+tries to restore multiple windows from its last session. 
+The script tries to account for that with a short delay
+after detecting the window; but it's not perfect. 
+
+If a window fails to launch within 6 sec, it's skipped. 
+
 ENDOFUSAGE
 }
 
