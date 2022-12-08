@@ -37,15 +37,23 @@ WORKSPACE")
 }
 
 start_jails() {
+
+	# Create a popup so user can monitor jail starts, then remove it later
+	xterm -fs 13 -e csh -c 'i3-msg floating enable , move position center ; qb-stat' &
+	_pid_stat=$(echo $!)
+
 	# Turn on any jails not started
 	for _jail in $(grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}') ; do
 		check_isrunning_jail "$_jail" || start_jail "$_jail"
 	done
 
+	kill -15 $_pid_stat
+
 	[ -n "$STARTONLY" ] && exit 0
 }
 
 check_existing() {
+	# This protects against double running or double launching the same windows.
 	# Returns 0 if the combo of _WS _LOC _CMD already exists. Return 1 if not
 
 	# FORCE option skips checks and launches everything
@@ -55,7 +63,7 @@ check_existing() {
 	[ "$_LOC" == "!NO_WINDOW" ] && return 1 
 
 	# Using alnum, helps match windows where title is slightly different than the launch cmd
-	_cmd=$(echo $_CMD | grep -Eo "^[^[:alnum:]]+")
+	_cmd=$(echo $_CMD | awk '{print $1}')
 
 	# Isolate the windows/programs for the workspace in question; then
 			# check if an existing jail with that window name already exists.
@@ -64,14 +72,36 @@ check_existing() {
 }
 
 wait_for_window() {
-	# Ensure that old value for _id2 won't cause false positve
-	_id2=''
-
+	_loop=1	
 	while : ; do 
+
+		# Wait a moment for window to launch
 		sleep .2
-		_id2=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
-		# As soon as a new window pops up break 
-		[ $_id1 = $_id2 ] || break
+
+		_Xid=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
+
+		if ! [ "$_Xid" == "0x0" ] ; then 
+			_pid=$(xprop -id $_Xid _NET_WM_PID | grep -Eo "[[:alnum:]]+$")
+		
+			# Get jail of window. Convert `hostname` for host windows with custom hostname 
+			_Xjail=$(xprop -id $_Xid WM_CLIENT_MACHINE | grep -Eo "[^[:blank:]]+$" \
+					| sed "s/$(hostname)/host/g" | sed "s/\"//g")
+
+			# Multiple ways to get the cmd are used, because none of them are 100% consistent
+			_Xname="$(ps $_pid) $(xprop -id $_Xid WM_NAME _NET_WM_NAME WM_CLASS)"
+
+			# Check for shortened _cmd in any of the returns for the window.
+			if echo "$_Xname" | grep -Eq "$_cmd" ; then
+
+				# Some programs can spawn multiple widows (like firefox), so give it a sec
+				[ "$_Xjail" == "$_LOC" ] && sleep 1 && break
+			fi
+		fi
+
+		# If it gets stuck waiting longer than about 6 seconds, just move on	
+		[ "$_loop" -gt 30 ] && break	
+		
+	_loop=$(( _loop + 1 ))
 	done
 }
 
@@ -85,9 +115,6 @@ execute_commands() {
 			eval "$_CMD"
 		;;
 		host) 
-			# Need the current window ID to compare against later
-			_id1=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
-				
 			# Execute the command provided
 			eval $_CMD
 
@@ -95,9 +122,6 @@ execute_commands() {
 			[ "$?" == "0" ] && wait_for_window 
 		;;  
 		*) 
-			# Need the current window ID to compare against later
-			_id1=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
-
 			# Execute the command provided
 			eval "qb-cmd $_LOC $_CMD"
 
@@ -118,6 +142,8 @@ main() {
 		_LOC=$(sed -n "$_cycle p" $CONF | awk '{print $2}') 
 		_CMD=$(sed -En "${_cycle}p" $CONF \
 				| sed -E "s/[^[:blank:]]+[[:blank:]]+[^[:blank:]]+[[:blank:]]+//")
+		# First word in _CMD is easier to find in the atrocious X window commands
+		_cmd=$(echo "$_CMD" | awk '{print $1}')
 
 		# If $_WS was blank, then there are no more lines in CONF 
 		[ -z "$_WS" ] && break
