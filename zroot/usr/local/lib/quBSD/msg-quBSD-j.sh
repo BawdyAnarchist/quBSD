@@ -48,6 +48,11 @@ ERROR: < $_value > is a dispjail. Requires a valid template.
        Missing < template > in jailmap.conf
 ENDOFMSG
 	;;
+	_cj5_1) cat << ENDOFMSG
+
+ERROR: Dispjails must reference an appjail as a template. 
+ENDOFMSG
+	;;
 	_cj6) cat << ENDOFMSG
 
 ERROR: < $_value > is a dispjail, which depends on a valid 
