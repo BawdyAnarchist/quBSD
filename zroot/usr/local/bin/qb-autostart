@@ -1,42 +1,152 @@
 #!/bin/sh
 
+# NOTE: Trying to start the list of autostart jails can lock up the system; when the same jail
+# attempts to start multiple times in quick succession. This script resovles dependencies, and 
+# which jails can be started in parallel in the background VS needing to wait for full start.
+
 . /usr/local/lib/quBSD/quBSD.sh
 . /usr/local/lib/quBSD/msg-autostart.sh
 
 get_options() {
-	while getopts hs opts ; do
+	while getopts f:h opts ; do
 		case $opts in
-			h) get_msg_run "none" "usage_0" ;;
-			r) 
+			h) get_msg_autostart "none" "usage_0" ;;
+			f) [ -e "$OPTARG" ] && FILE="$OPTARG" || get_msg_autostart "_1" "usage_1" ;;
 		esac
 	done
 
 	shift $(( OPTIND - 1 ))
 
-	AUTOSTART=$(grep -E "autostart[[:blank:]]+true" $JMAP | awk '{print $1}')
+	TRACK=$(mktemp  -t track) 
+	trap "rm $TRACK" INT TERM HUP QUIT EXIT
+
+	if [ -z "$FILE" ] ; then
+		# Find all jails in JMAP flagged for autostart
+		AUTOSTART=$(grep -E "autostart[[:blank:]]+true" $JMAP | awk '{print $1}' | uniq) 
+	else
+		AUTOSTART=$(uniq $FILE)
+	fi
 }
 
-autostart() {
+check_isgateway() {
+	local _client="$1" 
+	local _subclients=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${_client}//p" $JMAP)
+	[ -n "$_subclients" ] && return 0 || return 1
+}
 
-	# Find all jails in JMAP flagged for autostart
-	
-	for _jail in $AUTOSTART ; do
+classify_clients() {
+	# Secondary clients of the jail that was just started	
+	local _clients=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${_jail}//p" $JMAP)
+	local _jail="$1"
 
-		# Jails with a gateway not yet started, will need to wait for gateway to start 
-		_gateway=$(sed -nE "s/^${_jail}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
+	# Must clear these values so they return only relevant jails
+	_SUBGATEWAYS='' ; _ENDPOINTS=''
 
-		# Switch on the basis of whether gateway is running
-		if jls -j "$_gateway" > /dev/null 2>&1 ; then
+	for _client in $_clients ; do
 
-			# Start jail, send start process to background, and move to next
-			jail -c $_jail & 
+		# Must ensure that the jail is part of the autostart list
+		if echo "$AUTOSTART" | grep -q "$_client" ; then 
 
-		else	
-
-			# Start jail and wait for completion
-			jail -c $_jail 
+			if check_isgateway "$_client" ; then
+				# Lis of jails with clients
+				_SUBGATEWAYS="$_SUBGATEWAYS $_client"
+			else	
+				# Endpoints can be parallel/background started
+				_ENDPOINTS="$_ENDPOINTS $_client"
+			fi
 		fi
 	done
+}
+
+start_jail_to_background() {
+	local _jail ;
+	local _endpoints="$1"
+
+	for _jail in $_endpoints ; do
+		start_jail $_jail & 
+	done
+}
+
+begin_waterfall() {
+	local _jail
+	local _gateways="$1"
+
+	for _jail in $_gateways ; do
+		
+		# Only continue the waterfall if jail started successfully
+		if start_jail "$_jail" ; then
+
+			classify_clients "$_jail"
+			[ -n "$_ENDPOINTS" ] && start_jail_to_background "$_ENDPOINTS" &
+			[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS" 
+		fi
+	done
+}
+
+climb_hierarchy() {
+	local _jail="$1"
+	local _gateway=$(get_jail_parameter -deqs gateway "$_jail")
+	local _class_of_gateway=$(get_jail_parameter -deqs class "$_gateway")
+
+	# Arbitrary, but unlikely there's a string of 20 gateways. More likely circular error. 
+	[ "$_depth" -gt 20 ] && get_msg_autostart "_2" "exit_1"
+	_depth=$(( _depth + 1 ))
+
+	if grep -q "$_jail" $TRACK ; then
+		# _jail's gateway path was already handled. Skip further checks.
+		return 0
+
+	elif [ "$_gateway" == "none" ] ; then
+
+		if get_jail_info clients $_jail ; then
+			# Jail has no gateway, but serves clients. Add it to the priority list.	
+			STARTS="$_jail $STARTS"
+			echo "$_jail" >> $TRACK
+		else
+			# Jail has no clients and no gateway. Can be started and sent to background
+			start_jail $_jail &
+		fi
+
+	## NOTE: This part will need changed when VM integration is improved. 
+	## _class_of_gateway shouldn't matter. But autostart VM is not integrated
+	elif [ "$_class_of_gateway" == "VM" ] ; then
+
+		# Don't duplicate jails already present in STARTS
+		echo "$STARTS" | grep -q "$_jail" || STARTS="$_jail $STARTS"
+		echo "$_jail" >> $TRACK
+
+	else
+		# Track all jail's that were already checked 
+		echo "$_jail" >> $TRACK		
+		
+		# _gateway must be in AUTOSTART, in order to be allowed to start, later on. 
+		AUTOSTART=$(echo -e "${AUTOSTART}\n${_gateway}") 
+	
+		# Jail depends on a gateway being started first. 
+		climb_hierarchy "$_gateway"
+	fi	
+}
+
+main() {
+	local _jail
+
+	# Assemble lists that help scipt to determine efficient order to start jails 
+	for _jail in $AUTOSTART ; do
+
+		# _depth tracks number of climbs, to preven infinite loop 
+		_depth=1
+
+		# Create list of all jails that serve clients, but have no gateway themselves.
+		climb_hierarchy "$_jail"
+	done
+
+	# Jail's that connect to VMs *and* have clients, are highest priority (net-firewall) 
+	for _jail in $STARTS ; do
+		# Any jails on this list have an independent pathway, and can be started in parallel
+		begin_waterfall $STARTS &
+	done
+
+	exit 0
 }
 
 
@@ -44,6 +154,6 @@ get_global_variables
 
 get_options "$@"
 
+main
 
-
-
+exit 0
