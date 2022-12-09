@@ -48,11 +48,8 @@
 ########################  VARIABLES ASSIGNMENT FUNCTIONS  ########################
 ##################################################################################
 
-# Source error messages for library functions (jails) 
-. /usr/local/lib/quBSD/msg-quBSD-j.sh
-
-# Source error messages for library functions (VMs) 
-. /usr/local/lib/quBSD/msg-quBSD-vm.sh
+# Source error messages for library functions 
+. /usr/local/lib/quBSD/msg-quBSD.sh
 
 get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts 
@@ -153,6 +150,7 @@ get_jail_parameter() {
 	local _param ; _param="$1"  
 	local _PARAM=$(echo "$_param" | tr '[:lower:]' '[:upper:]')
 	local _jail ; _jail="$2"  
+	local _value 
 
 	# Either jail or param weren't provided 
 	[ -z "$_jail" ] && get_msg $_q "_0" "jail" && eval $_s $RTRN
@@ -183,6 +181,30 @@ get_jail_parameter() {
 	else
 		eval $_s $RTRN
 	fi
+}
+
+get_jail_info() {
+	# Commonly used info about a jail that's not as simple as finding a single
+	# jail/parameter in jailmap.conf	
+
+	local _param="$1"	
+	local _jail="$2"
+	local _value
+
+	# Either jail or param weren't provided 
+	[ -z "$_jail" ] && get_msg $_q "_0" "jail" && eval $_s $RTRN
+	[ -z "$_param" ] && get_msg $_q "_0" "parameter" && eval $_s $RTRN 
+
+	case $_param in
+		clients)
+			_value=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${_jail}//p" $JMAP)
+		;;
+	esac	
+
+	# Return value, or return failure
+	[ -n "$_value" ] && echo "$_value" || return 1
+
+	return 0
 }
 
 ##################################################################################
@@ -243,7 +265,8 @@ start_jail() {
 			
 			# If checks were good, start jail, make a log of it 
 			get_msg "_jf1" "$_jail" | tee -a $QBLOG
-			jail -vc "$_jail"  >> $QBLOG  ||  get_msg $_q "_jf2" "$_jail"
+			jail -vc "$_jail"  >> $QBLOG 2>&1  ||  get_msg $_q "_jf2" "$_jail"
+			#jail -vc "$_jail"  >> $QBLOG  ||  get_msg $_q "_jf2" "$_jail"
 
 		fi
 	else
@@ -332,7 +355,7 @@ check_isvalid_jail() {
 
 	# Positional parmeters and function specific variables. 
 	local _value; _value="$1"  
-	local _class ; local _rootjail ; local _template
+	local _class ; local _rootjail ; local _template ; local _class_of_temp
 
 	# Fail if no jail specified
 	[ -z "$_value" ] && get_msg $_q "_0" "jail" && return 1
@@ -340,18 +363,17 @@ check_isvalid_jail() {
 	# Must have class in JMAP. Used later to find the correct zfs dataset 
 	_class=$(sed -nE "s/^${_value}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
 
-	[ -z "$_class" ] && get_msg $_q "_cj1" "$_value" "class" && return 1
-
-	# Must also have a designated rootjail in JMAP
-	! grep -Eqs "^${_value}[[:blank:]]+rootjail[[:blank:]]+" $JMAP \
-			&& get_msg $_q "_cj1" "$_value" "rootjail" && return 1
-
-	# Jail must also have an entry in JCONF
-	! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
-			&& get_msg $_q "_cj3" && return 1
-
-	# Verify existence of ZFS dataset. zusr for appjail ; zroot for rootjails
-	case $_class in
+	case $_class in 
+		VM) 
+			# NOTE: This is just a placeholder for VM logic divergence	
+			# Integration of commands between jail/VM may be tricky later on.
+			# So for now, just silently return back to caller.
+			return 1 
+		;;	
+		"")
+			# Empty, no class exists in JMAP
+			get_msg $_q "_cj1" "$_value" "class" && return 1 
+		;;
 		rootjail) 
 			# Rootjails require a dataset in zroot 
 			! zfs list ${JAILS_ZFS}/${_value} > /dev/null 2>&1 \
@@ -365,19 +387,20 @@ check_isvalid_jail() {
 		dispjail)
 
 			# Verify the dataset of the template for dispjail
-			_template=$(sed -nE "s/^${_value}[[:blank:]]+template[[:blank:]]+//p"\
-																								$JMAP)
+			_template=$(sed -nE \
+					"s/^${_value}[[:blank:]]+template[[:blank:]]+//p" $JMAP)
+
 			# First ensure that it's not blank			
 			[ -z "$_template" ] && get_msg $_q "_cj5" "$_value" && return 1
 
-			# Prevent infinite loop: $_template must not be a template for the  
-			# jail under examination < $_value >. Otherwise, < $_value > would 
-			# depend on _template, and _template would depend on < $_value >. 
-			# However, it is okay for $_template to be a dispjail who's template 
-			# is some other jail that is not < $_value >.
-# NOTE: Technically speaking, this still has potential for an infinite loop, 
-# but the user really has to try hard to create a circular reference.
+			_class_of_temp=$(sed -nE \
+				"s/^${_template}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
 
+			# Dispjails can only reference appjails.
+			! [ "$_class_of_temp" == "appjail" ] \
+					&& get_msg $_q "_cj5_1" "$_value" "$_template" && return 1
+
+			# Ensure that the template being referenced is valid
 			! check_isvalid_jail $_q "$_template" \
 					&& get_msg $_q "_cj6" "$_value" "$_template" && return 1
 		;;
@@ -385,6 +408,15 @@ check_isvalid_jail() {
 		*) get_msg $_q "_cj2" "$_class" "class"  && return 1
 		;;
 	esac
+
+	# Must have a designated rootjail in JMAP
+	! grep -Eqs "^${_value}[[:blank:]]+rootjail[[:blank:]]+" $JMAP \
+			&& get_msg $_q "_cj1" "$_value" "rootjail" && return 1
+
+	# Must have an entry in JCONF
+	! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
+			&& get_msg $_q "_cj3" && return 1
+
 	return 0
 }
 
@@ -447,30 +479,42 @@ check_isvalid_gateway() {
 	# Positional parmeters. 
 	local _value; _value="$1"  
 	local _jail; _jail="$2"  
+	local _class_gw
 
-	# net-firewall gateway must be a tap interface in JMAP 
-	if [ "$_jail" == "net-firewall" ] ; then 
-		case "$_value" in
-			tap[[:digit:]]) 
-				return 0 ;;	
-			tap[[:digit:]][[:digit:]]) 
-				return 0 ;;	
-			*) get_msg $_q "_cj7" "$_value" 
-				return 1 ;;
+	# Tests will depend on the class of the gateway. VMs get special handling
+	_class_gw=$(sed -nE "s/^${_value}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+
+	# Split log for checking a valid VM vs a valid jail 
+	if [ "$_class_gw" == "VM" ] ; then 
+
+		# Error message is programmed into: check_isvalid_vintf
+		! get_jail_parameter -q vintf $_value \
+			&& get_msg "_cj7_1" "$_value" "$_jail" && return 1
+
+		### NOTE: Future expansion will include a check for valid VM right here	
+		# check_isvalid_vm "$_value"
+		
+		return 0
+
+	# The case where net-firewall was not assigned a VM as a gateway. 
+	elif [ "$_jail" == "net-firewall" ] ; then 
+
+		# net-firewall should always have a gatway 
+		[ "$_value" == "none" ] && get_msg "_cj7_2" 
+
+	else
+		# `none' is valid for any other jail 
+		[ "$_value" == "none" ] && return 0 
+
+		# First check that gateway is a valid jail. (note: func already has messages)  
+ 		check_isvalid_jail $_q "$_value" || return 1
+
+		# Checks that gateway starts with `net-'
+		case $_value in
+			net-*) return 0 ;;
+			  	 *) get_msg $_q "_cj8" "$_value" "$_jail"  ;  return 1 ;;
 		esac
 	fi
-	
-	# `none' is valid for any jail except net-firewall. Order matters here.
-	[ "$_value" == "none" ] && return 0
-
-	# First check that gateway is a valid jail. (note: func already has messages)  
- 	check_isvalid_jail $_q "$_value" || return 1
-
-	# Checks that gateway starts with `net-'
-	case $_value in
-		net-*) return 0 ;;
-		  	 *) get_msg $_q "_cj8" "$_value" "$_jail"  ;  return 1 ;;
-	esac
 }
 
 check_isvalid_schg() {
@@ -957,11 +1001,28 @@ poweroff_vm() {
 
 }
 
+check_isvalid_vintf() {
+	# Return 0 if vintf is valid ; return 1 if invalid
 
+	# Quiet option
+	local _q ; local _opts
+	getopts q _opts && _q='-q'
+	shift $(( OPTIND - 1 ))
 
+	# Positional parmeters. _
+	local _value ; _value="$1"
+	local _jail ; _jail="$2"
 
-
-
+	# Checks that it's a tap interface. Technically, failes after tap99
+	case $_value in
+		tap[[:digit:]]) 
+			return 0 ;;	
+		tap[[:digit:]][[:digit:]]) 
+			return 0 ;;	
+		*) get_msg $_q "_cj7" "$_value" "$_jail" 
+			return 1 ;;
+	esac
+}
 
 
 
