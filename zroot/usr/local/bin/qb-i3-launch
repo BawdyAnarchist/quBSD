@@ -21,8 +21,9 @@ parse_config() {
 	FILE="${FILE:=${HOME}/.config/i3/i3launch.conf}"
 	
 	# Set variable, and trap to remove it on exit
-	CONF=$(mktemp -t "i3-launch.conf")
-	trap "rm $CONF > /dev/null 2>&1" INT TERM HUP QUIT EXIT
+	CONF=$(mktemp  -t "i3-launch.conf")
+	JAILS=$(mktemp -t "i3-launch-jails")
+	trap "rm $CONF $JAILS > /dev/null 2>&1" INT TERM HUP QUIT EXIT
 	
 	# Copy the launch config to tmp ($CONF)
 	cp -a $FILE $CONF 
@@ -30,7 +31,7 @@ parse_config() {
 	# Remove comments and blank lines
 	sed -i '' -e "/^$/ d ; /^[[:blank:]]*#.*/ d" $CONF
 
-	# Get all running windows. Adds "WORKSPACE" at bottom, to simplify sed searches later on).
+	# Get all running windows. Adds "WORKSPACE" at bottom, to simplify sed command later on).
 	WINDS=$(qb-i3-windows| sed "s/Jail://g" | sed "$ a\\
 WORKSPACE")
 
@@ -43,10 +44,10 @@ start_jails() {
 	_pid_stat=$(echo $!)
 
 	# Turn on any jails not started
-	for _jail in $(grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}') ; do
-		check_isrunning_jail "$_jail" || start_jail "$_jail"
-	done
+	grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}' | uniq > $JAILS
 
+	qb-autostart -f $JAILS > /dev/null 2>&1
+		
 	kill -15 $_pid_stat
 
 	[ -n "$STARTONLY" ] && exit 0
@@ -62,7 +63,7 @@ check_existing() {
 	# Window check doesn't apply to commands with no window to launch
 	[ "$_LOC" == "!NO_WINDOW" ] && return 1 
 
-	# Using alnum, helps match windows where title is slightly different than the launch cmd
+	# Getting just the first part of the command makes it easier to match later on. 
 	_cmd=$(echo $_CMD | awk '{print $1}')
 
 	# Isolate the windows/programs for the workspace in question; then
