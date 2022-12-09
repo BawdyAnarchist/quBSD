@@ -57,8 +57,10 @@ remove() {
 
 			restart_jail "$_jail" 
 		else
-
-			stop_jail "$_jail" 
+			stop_jail "$_jail" &
+			
+			# Stopping jails right on top of each other can cause oddities with ifconfig 
+			sleep .5
 		fi
 	done
 }
