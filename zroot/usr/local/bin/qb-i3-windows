@@ -19,6 +19,8 @@ qb-i3-windows: Print a list of all open windows/programs currently
 usage: qb-i3-windows [-h][-c]
        No options specified:  will print list.
    -c: (c)lose all open windows. Jails will stay running.
+       NOTE: Windows might not close immediately. Wait for 5-10 
+       seconds, then run qb-i3-windows to verify if they closed.
    -h: (h)elp. Ouputs this help message.
 
 ENDOFMSG
