@@ -55,7 +55,7 @@ calculate_variables() {
 				_ttl_unix=$(( _INT * 3600 * 24 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
-			W)	SNAPNAME=$(date +%Y-%m_Weekly)
+			W)	SNAPNAME=$(date +%Y-%W_Weekly)
 				_ttl_unix=$(( _INT * 3600 * 24 * 7 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
