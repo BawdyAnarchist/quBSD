@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# PROVIDE: qb_autostart
+# REQUIRE: nicvm LOGIN
+
+. /etc/rc.subr
+
+name="qb_autostart"
+desc="Automatically starts jails flagged with autostart in jailmap.conf"
+rcvar="${name}_enable"
+start_cmd="${name}_start"
+
+qb_autostart_start() {
+	sh /usr/local/bin/qb-autostart  > /dev/null 2>&1
+}
+
+load_rc_config $name
+run_rc_command "$1"
+
