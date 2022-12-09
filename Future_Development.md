@@ -60,6 +60,11 @@ quBSD.conf
 	- Maybe this value can just get stored in quBSD.sh
 
 net-firewall pf.conf might not be fully generalized for routerIP. 
+	- ### OVERALL ###
+		Overall net-firewall is treated by name as a special exception to alot of networking procedures. This is hacky, and not generalized. For example, tap0 should not be the "gateway." nicvm is the gateway. VMs will have their own set of parameters, one of which should be their virt_intf. You should be able to call "net-firewall" whatever you want, and the scripts should detect that it's connecting to a VM (by getting the class of the gateway), and make the proper exceptions and adjustments on that basis. nicvm for example would have a parameter: virt_intf, to get tap0. 
+		### THIS IS A SOMEWHAT IN DEPTH CHANGE TO MAKE ### scripts that need adjusted: any script that makes a special exception for net-firewall.
+			- exec.prepare ; exec.created ; qb-create ; qb-edit
+
 	- basically, exec.created relies on setting the last number to "1". 
      - Then it modifes pf.conf, but that might be inappropriate
 	- Also needs to aggregate *all* client connections wireguard ports
@@ -102,10 +107,10 @@ pf.conf
 
 quBSD.sh 
 	- There's probably still functions you can generalize from $ubin
+	- local _variable=$(stuff) can be direct. You don't need two lines. 
+	- New function: get_jail_info for things like: _clients
 
 ### MINOR UPGRADES
-
-qb-autostart still needs worked out. Figure out concurrent starting of jails.
 
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 
