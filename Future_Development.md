@@ -110,6 +110,8 @@ quBSD.sh
 	- local _variable=$(stuff) can be direct. You don't need two lines. 
 	- New function: get_jail_info for things like: _clients
 
+jail -r <net-jail> is causing an "Operation not permitted" error
+
 ### MINOR UPGRADES
 
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
