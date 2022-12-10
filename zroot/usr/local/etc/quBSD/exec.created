@@ -5,49 +5,56 @@
 get_parameters() {
 	JAIL="$1"
 
-	# Get parameters. Class and gateway were already verified, so skip checks, for speed 
-	get_jail_parameter -dsq class  "$JAIL"  ||  exit 1
-	get_jail_parameter ipv4 "$JAIL"         ||  exit 1
-	get_jail_parameter -sq gateway "$JAIL"  ||  exit 1
-	get_jail_parameter maxmem  "$JAIL"      ||  exit 1
-	get_jail_parameter cpuset  "$JAIL"      ||  exit 1
+	# Get parameters. Class was already verified, so skip checks. Gateway still needs $VINTF
+	get_jail_parameter -dqs class  "$JAIL" ||  exit 1
+	get_jail_parameter ipv4 "$JAIL"        ||  exit 1
+	get_jail_parameter gateway "$JAIL"     ||  exit 1
+	get_jail_parameter maxmem  "$JAIL"     ||  exit 1
+	get_jail_parameter cpuset  "$JAIL"     ||  exit 1
+
+	# Check/warn if outside of quBSD IPv4 convention, but don't fail 
+	check_isqubsd_ipv4 "$IPV4" "$JAIL"
 
 	# MTU only with valid IP. Quiet messages (MTU is not critical) 
 	[ gateway == "none" ] || get_jail_parameter -q mtu "$JAIL" 
-
-	# All jails which are served a network connection by <JAIL>
-	CLIENTS=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${JAIL}//p" $JMAP) 
 }
 
+
 connect_jail_to_gateway() {
-	# Create epair, send to <JAIL> and <GATEWAY> 
-	_ext_if=$(ifconfig epair create)
-	_ext_if="${_ext_if%?}b"
-	ifconfig "${_ext_if%?}a" vnet $GATEWAY
-	ifconfig "${_ext_if%?}b" vnet $JAIL
+	# Create epair, send to JAIL/GATEWAY. Changed to <INTFb> for later, in pf.conf
+	VINTF=$(ifconfig epair create)
+		VINTF="${VINTF%?}b"
+		ifconfig "${VINTF%?}a" vnet $GATEWAY
+		ifconfig "${VINTF%?}b" vnet $JAIL
 
-	# Configure networking on the <GATEWAY> side of the epair
-	jexec -l -U root $GATEWAY ifconfig "${_ext_if%?}a" inet "${IPV4%.*/*}.1/${IPV4#*/}" mtu $MTU up 
+	# Only configure the epair if there's an IPV4 to add to it 
+	if ! [ "$IPV4" == "none" ] ; then
 
-	# Configure networking on the <JAIL> side of the epair   
-	jexec -l -U root $JAIL ifconfig "${_ext_if%?}b" inet $IPV4 mtu $MTU up 
-	jexec -l -U root $JAIL route add default "${IPV4%.*/*}.1" 
+		# Configure networking on the <GATEWAY> side of the epair
+		jexec -l -U root \
+			$GATEWAY ifconfig "${VINTF%?}a" inet "${IPV4%.*/*}.1/${IPV4#*/}" mtu $MTU up 
+
+		# Configure networking on the <JAIL> side of the epair   
+		jexec -l -U root $JAIL ifconfig "${VINTF%?}b" inet $IPV4 mtu $MTU up 
+		jexec -l -U root $JAIL route add default "${IPV4%.*/*}.1" 
+	fi
 }
 
 connect_jail_to_clients() {
 	# Create epair, send to <JAIL> and _client 
-	_int_if=$(ifconfig epair create)
-	ifconfig "${_int_if%?}a" vnet $JAIL
-	ifconfig "${_int_if%?}b" vnet $_client
+	INT_IF=$(ifconfig epair create)
+	ifconfig "${INT_IF%?}a" vnet $JAIL
+	ifconfig "${INT_IF%?}b" vnet $_client
 
 	# Configure <JAIL> (server) side of the epair	
-	jexec -l -U root $JAIL ifconfig "${_int_if%?}a" inet "${_cIP%.*/*}.1/${_cIP#*/}" mtu $MTU up
+	jexec -l -U root \
+			$JAIL ifconfig "${INT_IF%?}a" inet "${_cIP%.*/*}.1/${_cIP#*/}" mtu $MTU up
 	
 	# Configure <_client> side of the epair
-	jexec -l -U root $_client ifconfig "${_int_if%?}b" inet $_cIP mtu $MTU up
+	jexec -l -U root $_client ifconfig "${INT_IF%?}b" inet $_cIP mtu $MTU up
 	jexec -l -U root $_client route add default "${_cIP%.*/*}.1"
 
-	# If there are wg interfaces on <_client> , down/up to ensure connection is good 
+	# If there are wg interfaces on <_client> , down/up to re-establish connection. 
 	wg_intf=$(jexec -l -U root $_client ifconfig -g tun | grep "wg")
 
 	for _wg in $wg_intf ; do 
@@ -56,47 +63,29 @@ connect_jail_to_clients() {
 	done
 }
 
-configure_epairs() {
-	# net-firewall is an exception case, as it only has a tap to configure 
-	if [ "$JAIL" == "net-firewall" ] ; then
-		ifconfig $GATEWAY vnet $JAIL 
-		jexec -l -U root $JAIL ifconfig $GATEWAY mtu $MTU up
-		_ext_if="$GATEWAY"
-	fi
-
-	# Connects <jail> to its gateway network provider specified in jailmap.conf 
-	! [ "$IPV4" == "none" ] && check_isrunning_jail "$GATEWAY" && connect_jail_to_gateway 
-
-	# If <jail> serves a network connection, bring those connections up 
-	for _client in $CLIENTS ; do 
-
-		# Builds a table of allowable client IPs (if it's a net- jail) 
-		_cIP=$(get_jail_parameter -deq ipv4 "$_client") && ! [ "$_cIP" == "none" ] \
-				&& nat_table="${_cIP} ${nat_table}"
-
-		if check_isrunning_jail "$_client" ; then
-			connect_jail_to_clients
-		fi
-	done
-}
-
-pf_modify() {
+modify_pf() {
 	# Numerous variables need to be modified for pf.conf
 	if [ -e "$JPF" ] ; then
-		
-		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"$_ext_if\"@" $JPF
+	
+		# exec.created IPs and interfaces	
+		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"$VINTF\"@" $JPF
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"$IPV4\"@" $JPF
 		sed -i '' -e "s@^routerIP[[:blank:]]*=.*@routerIP = \"${IPV4%.*/*}.1\"@" $JPF
 		sed -i '' -e "s@^table <pass_ips>.*@table <pass_ips> { $nat_table}@" "$JPF"
 
-		if ! [ "$JAIL" == "net-firewall" ] ; then
-			sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"$ENDPOINT\"@" $JPF  
-			sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"$WGPORTS\"@" $JPF  
-		fi
+		# net-jail internal wireguard parameters
+		[ -n "$ENDPOINT" ] \
+			&& sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"$ENDPOINT\"@" $JPF  
+
+		[ -n "$WGPORTS" ] \
+			&& sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"$WGPORTS\"@" $JPF  
+
+		# Get the ports being passed by client's pf's, and add to gateway (usually net-firewall)
+		# Todo: Add the above	
 	fi
 }
 
-resource_ctl() {
+resource_control() {
 	# Remove any existing rules for the jail 	
 	rctl -r jail:${JAIL}:: > /dev/null 2>&1
 	
@@ -105,17 +94,49 @@ resource_ctl() {
 	[ "$CPUSET" = "none" ] || cpuset -j $JAIL -cl $CPUSET
 }
 
+main() {
+	# When $GATEWAY was retrieved, it automatically checked if it was a VM, and retrieved  
+	# the virtual interface (usually tap intf) for that VM. Otherwise, will be blank. 
+	if [ -n "$VINTF" ] ; then
+
+		# Send vintf to the jail and bring it up. The <jail> rc.conf handles the rest.
+		ifconfig $VINTF vnet $JAIL 
+		jexec -l -U root $JAIL ifconfig $VINTF mtu $MTU up
+
+	else
+		# Connects <jail> to its gateway network provider specified in jailmap.conf 
+		check_isrunning_jail "$GATEWAY" && connect_jail_to_gateway 
+	fi
+
+	# If <jail> serves a network connection, bring those connections up 
+	for _client in $(get_jail_info clients "$JAIL") ; do
+
+		# Build the pf table of allowable client IPs.
+		_cIP=$(get_jail_parameter -deq ipv4 "$_client") && ! [ "$_cIP" == "none" ] \
+				&& nat_table="${_cIP} ${nat_table}"
+
+		if check_isrunning_jail "$_client" ; then
+			# Connect to all clients that are running. 
+			connect_jail_to_clients
+		fi
+	done
+
+	# Modify pf.conf for the jail
+	modify_pf			
+
+	# Implement some of the resource controls
+	resource_control
+}
+
+
 get_global_variables
 
 get_parameters "$@"
 
 get_networking_variables
 
-configure_epairs
+main
 
-pf_modify			
-
-resource_ctl			
 
 
 

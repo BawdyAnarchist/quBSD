@@ -107,7 +107,6 @@ pf.conf
 
 quBSD.sh 
 	- There's probably still functions you can generalize from $ubin
-	- local _variable=$(stuff) can be direct. You don't need two lines. 
 	- New function: get_jail_info for things like: _clients
 
 jail -r <net-jail> is causing an "Operation not permitted" error

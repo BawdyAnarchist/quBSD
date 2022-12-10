@@ -28,16 +28,10 @@ get_options() {
 	fi
 }
 
-check_isgateway() {
-	local _client="$1" 
-	local _subclients=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${_client}//p" $JMAP)
-	[ -n "$_subclients" ] && return 0 || return 1
-}
-
 classify_clients() {
 	# Secondary clients of the jail that was just started	
-	local _clients=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${_jail}//p" $JMAP)
 	local _jail="$1"
+	local _clients=$(get_jail_info clients $_jail)
 
 	# Must clear these values so they return only relevant jails
 	_SUBGATEWAYS='' ; _ENDPOINTS=''
@@ -47,7 +41,7 @@ classify_clients() {
 		# Must ensure that the jail is part of the autostart list
 		if echo "$AUTOSTART" | grep -q "$_client" ; then 
 
-			if check_isgateway "$_client" ; then
+			if get_jail_info -q clients "$_client" ; then
 				# Lis of jails with clients
 				_SUBGATEWAYS="$_SUBGATEWAYS $_client"
 			else	
@@ -98,7 +92,7 @@ climb_hierarchy() {
 
 	elif [ "$_gateway" == "none" ] ; then
 
-		if get_jail_info clients $_jail ; then
+		if get_jail_info -q clients $_jail ; then
 			# Jail has no gateway, but serves clients. Add it to the priority list.	
 			STARTS="$_jail $STARTS"
 			echo "$_jail" >> $TRACK
