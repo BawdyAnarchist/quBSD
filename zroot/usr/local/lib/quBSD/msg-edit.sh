@@ -2,13 +2,19 @@
 
 get_msg_edit() { 
 
-	# FORCE overrides all calls to the msg and exit function
-	[ -n "$FORCE" ] && return 0 
-	
 	# Positional parameters
-   local _message ; _message="$1"
-   local _pass_cmd ; _pass_cmd="$2"
-	local _msg2 ; _msg2="$3"
+   local _message="$1"
+   local _pass_cmd="$2"
+	local _msg2="$3"
+
+	# FORCE overrides 
+	if [ -n "$FORCE" ] ; then 
+		# Do not exit the script on errors 
+		_pass_cmd="none"
+		
+		# The only message that should be shown, is the result.
+		! [ "$_message" == "_8" ] && _message="none"
+	fi
 
 	# QUIET will skip over messages 
 	[ -z "$QUIET" ] && case "$_message" in
@@ -76,7 +82,7 @@ ENDOFMSG
 	esac
 
 
-	# Secondary message is used to alert the potential of [-f] option (if not $QUIETed)
+	# Secondary message - informs about the [-f] option 
 	[ -z "$QUIET" ] && case $_msg2 in 
 		_f) cat << ENDOFMSG
 
@@ -111,8 +117,8 @@ qb-edit:  Modify jail parameters in jailmap.conf
 Usage: qb-edit <jail> <parameter> <value>
        qb-edit [-f][-h][-i][-r] <jail> <parameter> <value>
 
-   -f: (f)orce. Ignore errors and modify anyways. 
-       Errors messages will still print to stdout.
+   -f: (f)orce. Ignore errors and modify anyways. Error msgs
+       suppressed, but final state of <jail><param> is shown 
    -h: (h)elp. Outputs this help message
    -i: (i)pv4. Auto-assign IP address along quBSD conventions
    -q: (q)uiet output, do not print anything to stdout 

@@ -813,14 +813,16 @@ check_is_truefalse() {
 
 	# Positional parmeters. _
 	local _value="$1"
-	local _jail="$2"
+	local _param="$2"
 
 	# No value specified 
-	[ -z "$_value" ] && get_msg $_q "_0" "$_param" 
+	[ -z "$_value" ] && get_msg $_q "_0" "$_param" && return 1
 
 	# Must be either true or false.
-	[ "$_value" == "true" -o "$_value" == "false" ] \
-			&& return 0 || get_msg $_q "_cj19" "$_value" "$_param"
+	! [ "$_value" == "true" ] && ! [ "$_value" == "false" ] \
+			&& get_msg $_q "_cj19" "$_value" "$_param" && return 1
+	
+	return 0
 }
 
 

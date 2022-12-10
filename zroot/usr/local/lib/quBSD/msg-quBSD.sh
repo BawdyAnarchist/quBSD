@@ -10,8 +10,9 @@ get_msg() {
 	getopts q _opts && return 0 
 	shift $(( OPTIND - 1 ))
 
-	local _message ; local _value  ;  local _passvar 
-	_message="$1"  ;  _value="$2"  ;  _passvar="$3"  
+	local _message="$1"
+	local _value="$2"
+	local _passvar="$3"
 
 	case "$_message" in
 
@@ -160,7 +161,7 @@ ENDOFMSG
 	;;
 	_cj19) cat << ENDOFMSG
 
-ERROR: < $_passvar > should be binary: true or false
+ERROR: < $_passvar > is binary. Must be:  true or false
 ENDOFMSG
 	;;
 	_jf1) cat << ENDOFMSG

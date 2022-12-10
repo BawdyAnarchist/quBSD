@@ -8,7 +8,7 @@ get_options() {
 	while getopts fhiqr opts ; do
 		case $opts in
 			   # [-f] acts on msg-edit function, rather than main script 
-			f) FORCE="true" ;; 
+			f) FORCE="true" ; _q='-q' ;; 
 			h) get_msg_edit "none" "usage_0" ;; 
 			i) PARAM="ipv4" ; VAL="auto" ;;
 			q) QUIET="true" ; _q='-q' ;;
@@ -47,7 +47,7 @@ checks() {
 				check_is_truefalse $_q "$VAL" "$PARAM" || get_msg_edit "_4" "usage_1"
 		;;
 		class)
-				get_msg_edit "_5" "none" "_f"
+				get_msg_edit "_5" "usage_1" "_f"  
 		;;
 		cpuset)
 				check_isvalid_cpuset $_q "$VAL" || get_msg_edit "none" "usage_1" 
@@ -93,41 +93,6 @@ checks() {
 	esac
 }
 
-main() {
-	# Modify JMAP and print new settings on success
-	sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VAL}@" $JMAP \
-			&& get_msg_edit "_8" 
-
-	# Clean up the columns 
-	_newJMAP=$(column -t $JMAP)
-	echo "$_newJMAP" > $JMAP
-
-	# Special handling case for net-firewall, to modify rc.conf 
-	if [ "$JAIL" == "net-firewall" ] ; then
-		
-		# Relevant variables. 
-		_tap=$(sed -nE "s/^${JAIL}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
-		_rcconf="${M_ZUSR}/net-firewall/rw/etc/rc.conf"
-		chflags noschg "$_rcconf"	
-
-		if [ "$VAL" == "DHCP" ] ; then
-			sed -i '' -E "s/ifconfig_${_tap}.*/ifconfig_${_tap}=\"DHCP\"/" $_rcconf
-			sed -i '' -E "/defaultrouter=/ d" $_rcconf
-
-		else
-			# Using `#' as sed separator, because `/' interferes with variable expansion
-			sed -i '' -E "s#ifconfig_${_tap}.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
-			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
-			
-			# This might not be completley robust. Generally a.b.c.1 should be the default.
-			sed -i '' -E "/^ifconfig_${_tap}.*/ a\\
-defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
-		fi
-		
-		get_msg_edit "_9"
-	fi
-}
-
 handle_restarts() {
 	# Logic could be written to change running jails, but simpler just to restart.
 	case $PARAM in 
@@ -163,6 +128,42 @@ handle_restarts() {
 	for _jail in $_restart2 $_restart1 ; do
 		[ "$_jail" == "none" ] || restart_jail "$_jail" 
 	done
+}
+
+main() {
+
+	# Modify JMAP and print new settings on success
+	sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VAL}@" $JMAP \
+			&& get_msg_edit "_8" 
+
+	# Clean up the columns 
+	_newJMAP=$(column -t $JMAP)
+	echo "$_newJMAP" > $JMAP
+
+	# Special handling case for net-firewall, to modify rc.conf 
+	if [ "$JAIL" == "net-firewall" ] ; then
+		
+		# Relevant variables. 
+		_tap=$(sed -nE "s/^${JAIL}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
+		_rcconf="${M_ZUSR}/net-firewall/rw/etc/rc.conf"
+		chflags noschg "$_rcconf"	
+
+		if [ "$VAL" == "DHCP" ] ; then
+			sed -i '' -E "s/ifconfig_${_tap}.*/ifconfig_${_tap}=\"DHCP\"/" $_rcconf
+			sed -i '' -E "/defaultrouter=/ d" $_rcconf
+
+		else
+			# Using `#' as sed separator, because `/' interferes with variable expansion
+			sed -i '' -E "s#ifconfig_${_tap}.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
+			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
+			
+			# This might not be completley robust. Generally a.b.c.1 should be the default.
+			sed -i '' -E "/^ifconfig_${_tap}.*/ a\\
+defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
+		fi
+		
+		get_msg_edit "_9"
+	fi
 }
 
 get_global_variables 
