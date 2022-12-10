@@ -1,15 +1,10 @@
 #!/bin/sh
 
 get_msg_disp() { 
-	# _message determines which feedback message to call.
-	# Just call "none" in the case you want no message to match.
-	# _pass_cmd is optional, and can be used to exit and/or show usage
 
-   local _message
-   local _pass_cmd
+   local _message="$1"
+   local _pass_cmd="$2"
 
-	_message="$1"
-	_pass_cmd="$2"
 	case "$_message" in
 	_1) cat << ENDOFMSG
 

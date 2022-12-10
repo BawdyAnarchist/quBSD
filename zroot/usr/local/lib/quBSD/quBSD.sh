@@ -147,9 +147,9 @@ get_jail_parameter() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional variables
-	local _param ; _param="$1"  
+	local _param="$1"  
 	local _PARAM=$(echo "$_param" | tr '[:lower:]' '[:upper:]')
-	local _jail ; _jail="$2"  
+	local _jail="$2"  
 	local _value 
 
 	# Either jail or param weren't provided 
@@ -226,8 +226,8 @@ restart_jail() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional params and func variables. 
-	local _jail ; _jail="$1"
-	local _hold ; _hold="$2"
+	local _jail="$1"
+	local _hold="$2"
 
 	# No jail specified. 
 	[ -z "$_jail" ] && get_msg $_q "_0" "jail"  && return 1
@@ -249,7 +249,7 @@ start_jail() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional params and func variables. 
-	local _jail ; _jail="$1"
+	local _jail="$1"
 
 	# Check that JAIL was provided in the first place
 	[ -z "$_jail" ] && get_msg $_q "_0" "jail" && return 1
@@ -284,7 +284,7 @@ stop_jail() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional params and func variables. 
-	local _jail ; _jail="$1"
+	local _jail="$1"
 
 	# Check that JAIL was provided in the first place
 	[ -z "$_jail" ] && get_msg $_q "_0" "jail" && return 1
@@ -335,7 +335,7 @@ check_isrunning_jail() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. 
-	local _value; _value="$1"  
+	local _value="$1"  
 
 	# No jail specified. 
 	[ -z "$_value" ] && get_msg $_q "_0" "jail" && return 1
@@ -354,7 +354,7 @@ check_isvalid_jail() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters and function specific variables. 
-	local _value; _value="$1"  
+	local _value="$1"  
 	local _class ; local _rootjail ; local _template ; local _class_of_temp
 
 	# Fail if no jail specified
@@ -428,7 +428,7 @@ check_isvalid_class() {
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
-	local _value ; _value="$1"
+	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "jail" && return 1 
 
 	# Valid inputs are: appjail | rootjail | dispjail 
@@ -447,7 +447,7 @@ check_isvalid_rootjail() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. 
-	local _value ; _value="$1"
+	local _value="$1"
 
 	# No jail specified. 
 	[ -z "$_value" ] && get_msg $_q "_0" "class" && return 1
@@ -477,8 +477,8 @@ check_isvalid_gateway() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. 
-	local _value; _value="$1"  
-	local _jail; _jail="$2"  
+	local _value="$1"  
+	local _jail="$2"  
 	local _class_gw
 
 	# Tests will depend on the class of the gateway. VMs get special handling
@@ -526,7 +526,7 @@ check_isvalid_schg() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. 
-	local _value; _value="$1"  
+	local _value="$1"  
 
 	# No value specified 
 	[ -z "$_value" ] && get_msg $_q "_0" "schg" && return 1 
@@ -546,7 +546,7 @@ check_isvalid_seclvl() {
 	# NOTE: Securelevel of '-1' will error if options are enabled. For this
 	# reason, _q is taken as a positional parameter, for this func only.
 
-	local _q ; _q="$1"
+	local _q="$1"
 	[ "$_q" == '-q' ] && _value="$2" || _value="$_q"
 
 	# No value specified 
@@ -572,7 +572,7 @@ check_isvalid_maxmem() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. 
-	local _value; _value="$1"  
+	local _value="$1"  
 
 	# No value specified 
 	[ -z "$_value" ] && get_msg $_q "_0" "maxmem" && return 1
@@ -596,7 +596,7 @@ check_isvalid_cpuset() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. _
-	local _value ; _value="$1"
+	local _value="$1"
 
 	# No value specified 
 	[ -z "$_value" ] && get_msg $_q "_0" "cpuset" && return 1
@@ -632,7 +632,7 @@ check_isvalid_mtu() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. _
-	local _value ; _value="$1"
+	local _value="$1"
 
 	# No value specified 
 	[ -z "$_value" ] && get_msg $_q "_0" "mtu" && return 1
@@ -659,7 +659,7 @@ check_isvalid_ipv4() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. _
-	local _value ; _value="$1"
+	local _value="$1"
 
 	# Temporary variables used for checking ipv4 CIDR
 	local _b1 ; local _b2 ; local _b3
@@ -716,8 +716,8 @@ check_isqubsd_ipv4() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. _
-	local _value ; _value="$1"
-	local _jail ; _jail="$2"
+	local _value="$1"
+	local _jail="$2"
 
 	# $_a0 - $_a4 vars are needed later. Check that they're all here, or get them. 
 	echo "${_a0}#${_a1}#${_a2}#${_a3}#${_a4}" | grep -q "##" \
@@ -787,8 +787,8 @@ check_isvalid_template() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. _
-	local _value ; _value="$1"
-	local _jail; _jail="$2"  
+	local _value="$1"
+	local _jail="$2"  
 
 	! check_isvalid_jail "$1" "$2" \
 			&& get_msg $_q "_cj6" "$_value" "$_template" && return 1
@@ -812,8 +812,8 @@ check_is_truefalse() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. _
-	local _value ; _value="$1"
-	local _jail ; _jail="$2"
+	local _value="$1"
+	local _jail="$2"
 
 	# No value specified 
 	[ -z "$_value" ] && get_msg $_q "_0" "$_param" 
@@ -890,14 +890,14 @@ discover_open_ipv4() {
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
-	local _value; _value="$1"  
+	local _value="$1"  
 	local _temp_ip
 
 	# net-firewall connects to external network. Assign DHCP, and skip checks. 
 	[ "$_value" == "net-firewall" ] && echo "DHCP" && return 0
 
 	# _used_ips checks IPs in running jails, to compare each _cycle against 
-	local _used_ips ; _used_ips=$(get_used_ips)
+	local _used_ips=$(get_used_ips)
 		
 	# Assigns values for each IP position, and initializes $_cycle
 	define_ipv4_convention
@@ -1010,8 +1010,8 @@ check_isvalid_vintf() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters. _
-	local _value ; _value="$1"
-	local _jail ; _jail="$2"
+	local _value="$1"
+	local _jail="$2"
 
 	# Checks that it's a tap interface. Technically, failes after tap99
 	case $_value in

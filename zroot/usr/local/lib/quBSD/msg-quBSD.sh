@@ -10,8 +10,8 @@ get_msg() {
 	getopts q _opts && return 0 
 	shift $(( OPTIND - 1 ))
 
-	local _message ; local _value; local _passvar 
-	_message="$1"  ;  _value="$2" ; _passvar="$3"  
+	local _message ; local _value  ;  local _passvar 
+	_message="$1"  ;  _value="$2"  ;  _passvar="$3"  
 
 	case "$_message" in
 

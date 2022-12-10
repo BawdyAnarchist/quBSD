@@ -112,6 +112,8 @@ quBSD.sh
 
 jail -r <net-jail> is causing an "Operation not permitted" error
 
+Should cycle all scripts through shellcheck again
+
 ### MINOR UPGRADES
 
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN

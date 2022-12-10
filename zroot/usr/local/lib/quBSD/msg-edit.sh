@@ -1,9 +1,6 @@
 #!/bin/sh
 
 get_msg_edit() { 
-	# _message determines which feedback message to call. 
-	# Just call "none" in the case you want no message to match.
-	# _pass_cmd is optional, and can be used to exit and/or show usage
 
 	# FORCE overrides all calls to the msg and exit function
 	[ -n "$FORCE" ] && return 0 
