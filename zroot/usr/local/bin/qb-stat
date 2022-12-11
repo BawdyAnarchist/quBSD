@@ -58,11 +58,8 @@ define_variables() {
 	jails=$(grep -E "[^[:blank:]]+[[:blank:]]+class[[:blank:]]+" $JMAP | awk '{print $1}') 
 	zfs_list=$(zfs list -ro name,used)
 
-	# Active window info
-	id=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
-	active=$(xprop -id $id | grep "WM_CLIENT_MACHINE" | sed "s/WM_CLIENT_MACHINE(STRING) = \"//")
-	active="${active%\"}"
-	[ "$active" == "quBSD" ] && active="host" 
+	# Jailname of the active window is assigned to: $_XJAIL 
+	get_info _XJAIL
 
 	# Input devices status
 	cam=$(service webcamd onestatus | grep -o "webcamd is running")
@@ -135,7 +132,7 @@ get_jails_loop() {
 }
 
 print_alerts() {
-	printf "%b" "${GREEN}-------------------   ACTIVE WINDOW:  $active    ------------------${COL_OFF}\n"
+	printf "%b" "${GREEN}-------------------   ACTIVE WINDOW:  $_XJAIL ------------------${COL_OFF}\n"
 
 	if [ "$cam" -o "$mic" -o "$hostnet" ] ; then
 		echo -e "${RED}##############################################################" 

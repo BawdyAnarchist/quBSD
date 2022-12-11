@@ -20,7 +20,10 @@ get_options() {
 	TRACK=$(mktemp  -t track) 
 	trap "rm $TRACK" INT TERM HUP QUIT EXIT
 
+	# Autostart jails must be assigned a variable, not tmp file. Function: begin_waterfall() 
+	# is sent to background ; script ends before completion ; and removes /tmp files.  
 	if [ -z "$FILE" ] ; then
+
 		# Find all jails in JMAP flagged for autostart
 		AUTOSTART=$(grep -E "autostart[[:blank:]]+true" $JMAP | awk '{print $1}' | uniq) 
 	else
@@ -30,18 +33,17 @@ get_options() {
 
 classify_clients() {
 	# Secondary clients of the jail that was just started	
-	local _jail="$1"
-	local _clients=$(get_jail_info clients $_jail)
+	local _jail="$1"  ;  local _client
 
 	# Must clear these values so they return only relevant jails
 	_SUBGATEWAYS='' ; _ENDPOINTS=''
 
-	for _client in $_clients ; do
+	for _client in $(get_info -e _CLIENTS $_jail); do
 
 		# Must ensure that the jail is part of the autostart list
 		if echo "$AUTOSTART" | grep -q "$_client" ; then 
 
-			if get_jail_info -q clients "$_client" ; then
+			if get_info -q _CLIENTS "$_client" ; then
 				# Lis of jails with clients
 				_SUBGATEWAYS="$_SUBGATEWAYS $_client"
 			else	
@@ -52,7 +54,7 @@ classify_clients() {
 	done
 }
 
-start_jail_to_background() {
+start_jails_in_background() {
 	local _jail ;
 	local _endpoints="$1"
 
@@ -71,7 +73,7 @@ begin_waterfall() {
 		if start_jail "$_jail" ; then
 
 			classify_clients "$_jail"
-			[ -n "$_ENDPOINTS" ] && start_jail_to_background "$_ENDPOINTS" &
+			[ -n "$_ENDPOINTS" ] && start_jails_in_background "$_ENDPOINTS" &
 			[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS" 
 		fi
 	done
@@ -92,7 +94,7 @@ climb_hierarchy() {
 
 	elif [ "$_gateway" == "none" ] ; then
 
-		if get_jail_info -q clients $_jail ; then
+		if get_info -q _CLIENTS $_jail ; then
 			# Jail has no gateway, but serves clients. Add it to the priority list.	
 			STARTS="$_jail $STARTS"
 			echo "$_jail" >> $TRACK
@@ -101,22 +103,23 @@ climb_hierarchy() {
 			start_jail $_jail &
 		fi
 
-	## NOTE: This part will need changed when VM integration is improved. 
-	## _class_of_gateway shouldn't matter. But autostart VM is not integrated
+	## NOTE: Needs changed *when VM integration is completed*.
 	elif [ "$_class_of_gateway" == "VM" ] ; then
 
-		# Don't duplicate jails already present in STARTS
-		echo "$STARTS" | grep -q "$_jail" || STARTS="$_jail $STARTS"
+		## NOTE: For now, jails connecting to VM are hierarchy top. Assume VM is started. 
+		STARTS="$_jail $STARTS"
+		
+		# Track jails already handled to avoid excessive search/climb 
 		echo "$_jail" >> $TRACK
 
 	else
-		# Track all jail's that were already checked 
+		# Track jails already handled to avoid excessive search/climb 
 		echo "$_jail" >> $TRACK		
 		
-		# _gateway must be in AUTOSTART, in order to be allowed to start, later on. 
+		# _gateway must exist in $AUTOSTART, to be allowed to start later on. 
 		AUTOSTART=$(echo -e "${AUTOSTART}\n${_gateway}") 
 	
-		# Jail depends on a gateway being started first. 
+		# Jail depends on another gateway being started first. 
 		climb_hierarchy "$_gateway"
 	fi	
 }
@@ -127,16 +130,17 @@ main() {
 	# Assemble lists that help scipt to determine efficient order to start jails 
 	for _jail in $AUTOSTART ; do
 
-		# _depth tracks number of climbs, to preven infinite loop 
+		# _depth tracks number of climbs, to prevent infinite loop 
 		_depth=1
 
 		# Create list of all jails that serve clients, but have no gateway themselves.
 		climb_hierarchy "$_jail"
 	done
 
-	# Jail's that connect to VMs *and* have clients, are highest priority (net-firewall) 
+	# Start the list of jails assembled as hierarchy tops, and then start their dependencies 
 	for _jail in $STARTS ; do
-		# Any jails on this list have an independent pathway, and can be started in parallel
+
+		# These jails have independent gateway paths, and can be started in parallel '&' 
 		begin_waterfall $STARTS &
 	done
 

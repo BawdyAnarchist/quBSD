@@ -38,16 +38,13 @@ close_windows() {
 		# Get a list of all open windows
 		WINDOWS=$(xprop -root _NET_CLIENT_LIST | sed -nE "s/.*window id # //p" | sed "s/,//g")
 
-		# If it's the 2nd pass, and there are still windows, give them an extra moment to die
-		[ "$_sig" == "-9" ] && [ -n "$WINDOWS" ] && sleep 4 \
+		# If it's the 3nd pass, and there are still windows, give them an extra moment to die
+		[ "$_sig" == "-9" ] && [ -n "$WINDOWS" ] && sleep 4 
 	
 		# Cycle through windows and kill them
 		for _win in $WINDOWS; do
 
-			# Get the pid, and kill it
-			_pid=$(xprop -id $_win _NET_WM_PID | grep -Eo "[[:alnum:]]+$")
-			eval kill $_sig $_pid
-
+			eval kill $_sig $(get_info -e _XPID)
 		done	
 
 		# Give a moment for windows to die 

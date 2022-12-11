@@ -42,26 +42,23 @@ get_options() {
 }
 
 main() {
-	# Finds out which jail is running the active window, and sets the JAIL var
-	# Only get window if Xorg is running 
+	# If X is running, get the jailname of the active window 
 	if pgrep -q Xorg ; then
-		_id=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
-		_window=$(xprop -id "$_id" | grep "WM_CLIENT_MACHINE" \
-					| sed "s/WM_CLIENT_MACHINE(STRING) = \"//")
-		_window="${_window%\"}"
+		# Jailname of the active window is assigned to: $_XJAIL 
+		get_info _XJAIL
 	fi
 	
 	# Unless already specified, JAIL and USER should be set to the active window 
-	JAIL="${JAIL:=$_window}"
+	JAIL="${JAIL:=$_XJAIL}"
 	_USER="${_USER:=$JAIL}"
 
-	if [ -z "$JAIL" ] || [ "$JAIL" == `hostname` ] ; then
+	if [ -z "$JAIL" ] || [ "$JAIL" == "host" ] ; then
 		# If JAIL is still not assigned, assume user wants a host xterm
 		xterm &
 		exit 0
 	fi
 
-	# Function handles all checks to see if jail needs to (and can) be started
+	# Start the jail or exit with failure messages. 
 	start_jail "$JAIL" || get_msg_cmd "none" "exit_1"
 
 	# Final evaluation statement. Launches the window/commands 

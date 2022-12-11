@@ -75,34 +75,20 @@ check_existing() {
 wait_for_window() {
 	_loop=1	
 	while : ; do 
-
 		# Wait a moment for window to launch
 		sleep .2
 
-		_Xid=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
-
-		if ! [ "$_Xid" == "0x0" ] ; then 
-			_pid=$(xprop -id $_Xid _NET_WM_PID | grep -Eo "[[:alnum:]]+$")
-		
-			# Get jail of window. Convert `hostname` for host windows with custom hostname 
-			_Xjail=$(xprop -id $_Xid WM_CLIENT_MACHINE | grep -Eo "[^[:blank:]]+$" \
-					| sed "s/$(hostname)/host/g" | sed "s/\"//g")
-
-			# Multiple ways to get the cmd are used, because none of them are 100% consistent
-			_Xname="$(ps $_pid) $(xprop -id $_Xid WM_NAME _NET_WM_NAME WM_CLASS)"
-
-			# Check for shortened _cmd in any of the returns for the window.
-			if echo "$_Xname" | grep -Eq "$_cmd" ; then
-
-				# Some programs can spawn multiple widows (like firefox), so give it a sec
-				[ "$_Xjail" == "$_LOC" ] && sleep 1 && break
-			fi
+		# Jailname of window is same as the command. Func converts `hostname` to 'host'
+		if [ "$(get_info -e _XJAIL)" == "$_LOC" ] ; then
+				
+			# The i3launch $_cmd might be slightly different than xprop or ps, so check both.  
+			ps $(get_info -e _XPID) | grep -Eiq "$_cmd" && sleep 1 && break
+			get_info -e _XNAME      | grep -Eiq "$_cmd" && sleep 1 && break
 		fi
 
 		# If it gets stuck waiting longer than about 6 seconds, just move on	
 		[ "$_loop" -gt 30 ] && break	
-		
-	_loop=$(( _loop + 1 ))
+		_loop=$(( _loop + 1 ))
 	done
 }
 

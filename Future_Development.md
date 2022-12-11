@@ -108,10 +108,13 @@ pf.conf
 quBSD.sh 
 	- There's probably still functions you can generalize from $ubin
 	- New function: get_jail_info for things like: _clients
+	- get_jail_parameter
+		- it should probably have a secondary "get default" function if the check fails
 
 jail -r <net-jail> is causing an "Operation not permitted" error
 
 Should cycle all scripts through shellcheck again
+
 
 ### MINOR UPGRADES
 
