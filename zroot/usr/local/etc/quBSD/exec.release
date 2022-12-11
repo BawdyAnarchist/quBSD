@@ -16,8 +16,7 @@ get_parameters() {
 
 reclone_appjail() {
 	# Check the dataset exists, and destroy it
-	zfs list "${JAILS_ZFS}/${JAIL}" > /dev/null 2>&1 \
-			&& zfs destroy -rRf "${JAILS_ZFS}/${JAIL}"
+	chk_valid_zfs "${JAILS_ZFS}/${JAIL}" && zfs destroy -rRf "${JAILS_ZFS}/${JAIL}"
 
 	# Recone the rootjail, and make sure that the clone isn't set to autosnap
 	zfs clone $ROOTSNAP "${JAILS_ZFS}/$JAIL" 
@@ -34,8 +33,7 @@ reclone_dispjail() {
 	HOMESNAP=$(zfs list -t snapshot -Ho name ${ZUSR_ZFS}/${TEMPLATE} | tail -1)
 
 	# Check the dataset exists, and destroy it 
-	zfs list "${ZUSR_ZFS}/${JAIL}" > /dev/null 2>&1 \
-			&& zfs destroy -rRf ${ZUSR_ZFS}/${JAIL} 
+	chk_valid_zfs "${ZUSR_ZFS}/${JAIL}" && zfs destroy -rRf ${ZUSR_ZFS}/${JAIL} 
 
 	# Reclone the rootjail, and make sure that it's not set to autosnap
 	zfs clone "${HOMESNAP}" "${ZUSR_ZFS}/${JAIL}" 
