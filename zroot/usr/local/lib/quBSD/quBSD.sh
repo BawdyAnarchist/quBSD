@@ -1,32 +1,51 @@
 #!/bin/sh
 
+##################################################################################
 ######################  GENERAL DESCRIPTION OF FUNCTIONS  ########################
 
 # Global variables, jail/quBSD parameters, sanity checks, messages, networking.
 # Functions embed many sanity checks, but also call other functions to assist.
 # Messages are sourced from a separate script, as a function. They have the form:
 #	 get_msg <$_q> <_msg_ident> <_pass_variable1> <_pass_variable2>
-#		<$_q> Acts as a (q)uiet option. Sometimes it is sent as a variable, other
-#           times it is passed as a positional parameter. This is because it can
-#           (needs to be) passed numerous times through multiple funcitons. 
-#     <_msg_ident> Is used to retreive the particular message from a function.			  
+#		<$_q> (q)uiet option. Normally getopts, but sometimes as positional param, 
+#           when <value> of a positional var might have a leading '-' dash.
+#     <_msg_ident> Is used to retreive a particular message from the msg function.
 #     <_pass_variable> 1 and 2 are for supplementing message specificity.
 
-# Except for messages and returned varaiables; functions only return success or
-# failure, leaving it to the caller, to determine what to do with failures.
+# Functions can assign global variables and deliver error messages ; 
+# but they almost never make a determination to exit. That is left to the caller.
 
+
+##################################################################################
 ##############################  LIST OF FUNCTIONS  ###############################
 
+##################  VARIABLE ASSIGNMENTS and VALUE RETRIEVAL  #################### 
 # get_global_variables   - File names/locations ; ZFS datasets 
 # get_networking_variables - pf.conf ; wireguard ; endpoints 
-# get_user_response      - Simple yes/no y/n checker
-# get_jail_parameter     - All JMAP entries, along with sanity checks
-# get__info              - Info beyond that just for jails or jail parameters 
-# get_onjails            - Get a list of currently running jails
-# restart_jail           - Self explanatory 
-# start_jail             - Performs checks before starting, creates log 
-# stop_jail              - Performs checks before starting, creates log 
-# chk_isrunning   - Searches jls for the jail 
+# get_user_response  - Simple yes/no y/n checker
+# get_jail_parameter - All JMAP entries, along with sanity checks
+# get_info           - Info beyond that just for jails or jail parameters 
+	# _CLIENTS        - All jails that <jail> serves a network connection
+	# _ONJAILS        - All currently running jails
+	# _USED_IPS       - All IPs used by currently running jails
+	# _XID            - Window ID for the currently active X window
+	# _XJAIL          - Jailname (or 'host') for the currently active X window 
+	# _XNAME          - Name of the process for the current active X window
+	# _XPID           - PID for the currently active X window
+
+###########################  JAIL HANDLING / ACTIONS  ############################
+# start_jail         - Performs checks before starting, creates log 
+# stop_jail          - Performs checks before starting, creates log 
+# restart_jail       - Self explanatory 
+# remove_tap         - Removes tap interface from whichever jail it's in. 
+# create_epairs      -
+
+###############################  STATUS  CHECKS  #################################
+# chk_isblank        - Posix workaround: Variable is [ -z <null> OR [[:blank:]]* ]
+# chk_isrunning      - Searches jls -j for the jail 
+# chk_valid_zfs      - Checks for presence of zfs dataset. Redirect to null. 
+
+###############################  SANITY  CHECKS  #################################
 # chk_valid_jail     - Makes sure the jail has JMAP entries and a ZFS dataset
 # chk_valid_class    - JMAP parameter
 # chk_valid_rootjail - Only certain jails qualify as rootjails
@@ -37,16 +56,17 @@
 # chk_valid_cpuset   - jail resource control
 # chk_valid_mtu      - networking option (typically unused) 
 # chk_valid_ipv4     - Must adhere to CIDR notation
-# check_isqubsd_ipv4     - Implements quBSD conventions over internal IP addresses 
+# check_isqubsd_ipv4 - Implements quBSD conventions over internal IP addresses 
 # chk_valid_template - Somewhat redundant with: chk_valid_jail  
-# check_is_trueorfalse   - When inputs must be either true or false
+# chk_trueorfalse    - When inputs must be either true or false
+
+#######################  FUNCTIONS RELATED TO NETWORKING #########################
 # define_ipv4_convention - Necessary for implementing quBSD IPv4 conventions
-# get_used_ips           - Pulls all currently used IPs in JMAP and running jails.
 # discover_open_ipv4     - Finds an unused IP address from the internal network. 
-# remove_tap             - Removes tap interface from whichever jail it's in. 
+
 
 ##################################################################################
-########################  JAIL VARIABLES FUNCTIONS  ########################
+##################  VARIABLE ASSIGNMENTS and VALUE RETRIEVAL  #################### 
 ##################################################################################
 
 # Source error messages for library functions 
@@ -116,22 +136,21 @@ get_user_response() {
 
 get_jail_parameter() {
 	# Get corresponding <value> for <jail> <param> from JMAP. 
-	# Variable indirection generalizes this function for all JMAP <params> 
-	# OPTIONS
-		# -d: Function default is to get the <#default> from JMAP, whenever the
-		#     retrieved <value> for <jail> <param> is NULL. [-d] prevents this.
-		# -e: echo <value> rather than setting the global variable
-		#	   Otherwise variable indirection will set <$_PARAM> with <_value> 
-			## NOTE: If using [-e] for variable assignment in caller, best to [-q] 
-			## quiet any error messages to prevent unpredictable behavior. 
-		# -q: quiet any error/alert messages. Otherwise error messages are shown.
-		# -s: skip checks and return 0. Otherwise, checks will be run.
+	# Assigns global variable of ALL CAPS <param> name, with <value>
+	 # -d: Function default is to get the <#default> from JMAP, whenever the
+	     # retrieved <value> for <jail> <param> is NULL. [-d] prevents this.
+	 # -e: echo <value> rather than setting the global variable
+	     # Otherwise variable indirection will set <$_PARAM> with <_value> 
+	 	 ## NOTE: If using [-e] for variable assignment in caller, best to [-q] 
+		 ## quiet any error messages to prevent unpredictable behavior. 
+	 # -q: quiet any error/alert messages. Otherwise error messages are shown.
+	 # -s: skip checks and return 0. Otherwise, checks will be run.
 
-	# Description of positional variables:
-		# $1: _param : The parameter to pull from JMAP
-		#     _PARAM : <_param> name converted to UPPER. Variable indirection: $_PARAM 
-		#          is set to the <value> retreived from JMAP. 
-		# $2: _jail  : <jail> to reference in JMAP
+	# Positional variables:
+	 # $1: _param : The parameter to pull from JMAP
+	     # _PARAM : <_param> name converted to UPPER. eval statement is used to  
+	 	  # to save <value> to the ALL CAPS <param> name stored in: $_PARAM
+	 # $2: _jail  : <jail> to reference in JMAP
 
 	# Local options for this function  
 	local _d ; local _e ; local _q ; local _s
@@ -205,7 +224,17 @@ get_info() {
 		_CLIENTS)
 			_value=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${_jail}//p" $JMAP)
 		;;
-		
+		_ONJAILS)
+			# Prints a list of all jails that are currently running
+			_value=$(jls | awk '{print $2}' | tail -n +2) 
+		;;
+		_USED_IPS)
+			# Assemble list of ifconfig inet addresses for all running jails
+			for _onjail in $(get_info -e _ONJAILS) ; do
+				_intfs=$(jexec -l -U root $_onjail ifconfig -a inet | grep "inet")
+				_value=$(printf "%b" "$_value" "\n" "$_intfs")
+			done
+		;;			
 		_XID) 
 			_value=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
 		;;
@@ -215,16 +244,14 @@ get_info() {
 					| sed "s/WM_CLIENT_MACHINE(STRING) = \"//" | sed "s/.$//" \
 					| sed "s/$(hostname)/host/g")
 		;;
+		_XNAME)
+			# Gets the PID of the active window. 
+			_value=$(xprop -id $(get_info -e _XID) WM_NAME _NET_WM_NAME WM_CLASS)
+		;;
 		_XPID)
 			# Gets the PID of the active window. 
 			_value=$(xprop -id $(get_info -e _XID) _NET_WM_PID \
 					| grep -Eo "[[:alnum:]]+$")
-		;;
-		_XNAME)
-			# Gets the PID of the active window. 
-			_value=$(xprop -id $(get_info -e _XID) WM_NAME _NET_WM_NAME WM_CLASS)
-#echo $_value
-#exit 0
 		;;
 	esac	
 	
@@ -242,37 +269,10 @@ get_info() {
 	return 0
 }
 
-get_onjails(){
-	# Prints a list of all jails that are currently running; or returns 1
-	jls | awk '{print $2}' | tail -n +2 || return 1
-}
 
 ##################################################################################
 ###########################  JAIL HANDLING / ACTIONS  ############################
 ##################################################################################
-
-restart_jail() {
-	# Restarts jail. If a jail is off, this will start it. However, passing 
-	# $2="hold" will override this default, so that an off jail stays off. 
-
-	# Quiet option
-	local _q ; local _opts
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
-
-	# Positional params and func variables. 
-	local _jail="$1"
-	local _hold="$2"
-
-	# No jail specified. 
-	[ -z "$_jail" ] && get_msg $_q "_0" "jail"  && return 1
-
-	# If the jail was off, and the hold flag was given, don't start it.
-	! chk_isrunning "$_jail" && [ "$_hold" == "hold" ] && return 0
-
-	# Otherwise, cycle jail	
-	stop_jail $_q "$_jail" && start_jail $_q "$_jail" 
-}
 
 start_jail() {
 	# Starts jail. Performs sanity checks before starting. Logs results.
@@ -355,9 +355,54 @@ stop_jail() {
 	return 0
 }
 
+restart_jail() {
+	# Restarts jail. If a jail is off, this will start it. However, passing 
+	# $2="hold" will override this default, so that an off jail stays off. 
+
+	# Quiet option
+	local _q ; local _opts
+	getopts q _opts && _q='-q'
+	shift $(( OPTIND - 1 ))
+
+	# Positional params and func variables. 
+	local _jail="$1"
+	local _hold="$2"
+
+	# No jail specified. 
+	[ -z "$_jail" ] && get_msg $_q "_0" "jail"  && return 1
+
+	# If the jail was off, and the hold flag was given, don't start it.
+	! chk_isrunning "$_jail" && [ "$_hold" == "hold" ] && return 0
+
+	# Otherwise, cycle jail	
+	stop_jail $_q "$_jail" && start_jail $_q "$_jail" 
+}
+
+remove_tap() {
+	# If TAP is not already on host, find it and bring it to host
+	# Return 1 on failure, otherwise return 0 (even if tap was already on host)
+
+	# Assign name of tap
+	[ -n "$1" ] && _tap="$1" || return 1
+	
+	# Check if it's already on host
+	ifconfig "$_tap" > /dev/null 2>&1  &&  return 0
+	
+	# First find all jails that are on
+	for _jail in $(get_info -e _ONJAILS) ; do
+		if `jexec -l -U root $o ifconfig -l | egrep -qs "$tap"` ; then
+			ifconfig $tap -vnet $o
+			ifconfig $tap down
+		fi
+	done
+
+	# Bring tap down for host/network safety 
+	ifconfig $_tap down 
+}
+
 
 ##################################################################################
-#######################  STATUS CHECKS  |  SANITY CHECKS  ########################
+################################  STATUS  CHECKS  ################################
 ##################################################################################
 
 chk_isblank() {
@@ -371,8 +416,8 @@ chk_isblank() {
 chk_isrunning() {
 	# Return 0 if jail is running; return 1 if not. 
 
-	# Check if jail is running. No warning message returned if not.
-	jls -j "$1" > /dev/null 2>&1  && return 0  ||  return 1 
+	# Check if jail is running. [-d] includes dying. 
+	jls -dj "$1" > /dev/null 2>&1  && return 0  ||  return 1 
 }
 
 chk_valid_zfs() {
@@ -382,6 +427,11 @@ chk_valid_zfs() {
 	# Perform check
 	zfs list $1 >> /dev/null 2>&1  &&  return 0  ||  return 1
 }
+
+
+##################################################################################
+################################  SANITY  CHECKS  ################################
+##################################################################################
 
 chk_valid_jail() {
 	# Checks that jail has JCONF, JMAP, and corresponding ZFS dataset 
@@ -764,7 +814,6 @@ check_isqubsd_ipv4() {
 
 	# Assigns global variables that will be used here for checks.
 	define_ipv4_convention
-	_used_ips=$(get_used_ips)
 
 	# No value specified 
 	[ -z "$_value" ] && get_msg $_q "_0" "IPv4" 
@@ -792,7 +841,7 @@ check_isqubsd_ipv4() {
 
 	# Compare against JMAP, and _USED_IPS.
 	if grep -v "^$_jail" $JMAP | grep -qs "$_value" \
-			|| [ $(echo "$_used_ips" | grep -qs "${_value%/*}") ] ; then
+			|| get_info -e _USED_IPS | grep -qs "${_value%/*}" ; then
 	
 		get_msg $_q "_cj11" "$_value" "$_jail" && return 1
 	fi
@@ -910,18 +959,6 @@ define_ipv4_convention() {
 	esac
 }
 
-get_used_ips() {
-	# Gathers a list of all IP addresses in use by running jails.
-	# Assigns gloval variable: $_used_ips for use in main script. 
-	# It's an unfiltered variable, containing superflous info from ifconfig
-	
-	# Assemble list of ifconfig inet addresses for all running jails
-	for _jail in $(get_onjails) ; do
-		_intfs=$(jexec -l -U root $_jail ifconfig -a inet | grep "inet")
-		_USED_IPS=$(printf "%b" "$_USED_IPS" "\n" "$_intfs")
-	done
-}
-
 discover_open_ipv4() {	
 	# Finds an IP address unused by any running jails, or in jailmap.conf 
 	# Echo open IP on success; Returns 1 if failure to find an available IP
@@ -937,9 +974,6 @@ discover_open_ipv4() {
 	# net-firewall connects to external network. Assign DHCP, and skip checks. 
 	[ "$_value" == "net-firewall" ] && echo "DHCP" && return 0
 
-	# _used_ips checks IPs in running jails, to compare each _cycle against 
-	local _used_ips=$(get_used_ips)
-		
 	# Assigns values for each IP position, and initializes $_cycle
 	define_ipv4_convention
 	
@@ -951,7 +985,7 @@ discover_open_ipv4() {
 
 		# Compare against JMAP, and the IPs already in use
 		if grep -qs "$_temp_ip" $JMAP	\
-					|| [ $(echo "$_used_ips" | grep -qs "$_temp_ip") ] ; then
+					|| get_info -e _USED_IPS | grep -qs "$_temp_ip" ; then
 
 			# Increment for next cycle
 			_cycle=$(( _cycle + 1 ))
@@ -967,28 +1001,6 @@ discover_open_ipv4() {
 			echo "${_temp_ip}/${_subnet}" && return 0
 		fi
 	done
-}
-
-remove_tap() {
-	# If TAP is not already on host, find it and bring it to host
-	# Return 1 on failure, otherwise return 0 (even if tap was already on host)
-
-	# Assign name of tap
-	[ -n "$1" ] && _tap="$1" || return 1
-	
-	# Check if it's already on host
-	ifconfig "$_tap" > /dev/null 2>&1  &&  return 0
-	
-	# First find all jails that are on
-	for _jail in $(get_onjails) ; do
-		if `jexec -l -U root $o ifconfig -l | egrep -qs "$tap"` ; then
-			ifconfig $tap -vnet $o
-			ifconfig $tap down
-		fi
-	done
-
-	# Bring tap down for host/network safety 
-	ifconfig $_tap down 
 }
 
 

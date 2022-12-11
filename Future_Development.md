@@ -112,11 +112,6 @@ quBSD.sh
 		- create, send, setup, and destroy epairs might be a good one
 			- qb-connect exec.created qb-hostnet
 
-	- get_jail_parameter
-		- it should probably have a secondary "get default" function if the check fails
-
-	- check_validzfs
-
 jail -r <net-jail> is causing an "Operation not permitted" error
 
 Should cycle all scripts through shellcheck again

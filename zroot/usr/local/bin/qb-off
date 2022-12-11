@@ -28,12 +28,12 @@ remove_list() {
 	case $ACTION in
 		all)
 			# All running jails
-			_remove="$(get_onjails)"
+			_remove="$(get_info -e _ONJAILS)"
 		;;
 		exclude)
 			# Remove the indicated jails from the "all" list
 			for _jail in $_JAILS ; do
-				_remove=$(get_onjails | sed "s/$_jail//")
+				_remove=$(get_info -e _ONJAILS | sed "s/$_jail//")
 			done
 		;;
 		*)	
@@ -78,7 +78,7 @@ handle_restarts() {
 	done
 
 	# Transient shutdown ops need another moment, or start_jail will fail 
-	sleep .5
+	sleep .7
 
 	# For time-efficient restarts without networking conflicts, use qb-autostart 
 	[ -s "$_restarts" ] && qb-autostart -f "$_restarts" 

@@ -101,7 +101,7 @@ get_bridge_members() {
 
 assemble_interface_list() {
 	# For each jail that is running 
-	for _jail in $(get_onjails) ; do 
+	for _jail in $(get_info -e _ONJAILS) ; do 
 	
 		# Cycle through every interface on that jail
 		for _intf in $(jexec -l -U root $_jail ifconfig -l) ; do	
