@@ -40,16 +40,19 @@ WORKSPACE")
 start_jails() {
 
 	# Create a popup so user can monitor jail starts, then remove it later
-	xterm -fs 13 -e csh -c 'i3-msg floating enable , move position center ; qb-stat' &
+	xterm -fs 12 -e csh -c 'i3-msg floating enable , resize set height 1000 ; qb-stat' &
 	_pid_stat=$(echo $!)
 
-	# Turn on any jails not started
+	# Remove any non-jail line, and save to tmp file
 	grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}' | uniq > $JAILS
 
+	# Turn on any jails not started
 	qb-autostart -f $JAILS > /dev/null 2>&1
-		
+	
+	# Remove the temporary monitoring pop	
 	kill -15 $_pid_stat
-
+	
+	# Exit after starting jails if [-s] was given
 	[ -n "$STARTONLY" ] && exit 0
 }
 
