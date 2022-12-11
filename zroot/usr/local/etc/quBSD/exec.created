@@ -105,7 +105,7 @@ main() {
 
 	else
 		# Connects <jail> to its gateway network provider specified in jailmap.conf 
-		check_isrunning_jail "$GATEWAY" && connect_jail_to_gateway 
+		chk_isrunning "$GATEWAY" && connect_jail_to_gateway 
 	fi
 
 	# If <jail> serves a network connection, bring those connections up 
@@ -115,7 +115,7 @@ main() {
 		_cIP=$(get_jail_parameter -deq ipv4 "$_client") && ! [ "$_cIP" == "none" ] \
 				&& nat_table="${_cIP} ${nat_table}"
 
-		if check_isrunning_jail "$_client" ; then
+		if chk_isrunning "$_client" ; then
 			# Connect to all clients that are running. 
 			connect_jail_to_clients
 		fi

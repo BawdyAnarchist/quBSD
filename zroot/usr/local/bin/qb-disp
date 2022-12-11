@@ -24,7 +24,7 @@ get_options() {
 
 newjail_name() {
 	# Valid jail or exit 
-	check_isvalid_jail "$JAIL" || get_msg_disp "none" "usage_1"
+	chk_valid_jail "$JAIL" || get_msg_disp "none" "usage_1"
 	
 	# Make name visually easy to identify
 	NEWJAIL="DISP-${JAIL}"

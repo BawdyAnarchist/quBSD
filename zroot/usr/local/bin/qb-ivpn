@@ -185,7 +185,7 @@ define_variables() {
 		_CMDMOD="jexec -l -U root $JAIL"
 
 		# Handle case where jail is off 
-		check_isrunning_jail $JAIL || handle_if_off
+		chk_isrunning $JAIL || handle_if_off
 	fi
 
 	# Define PORT 
@@ -197,7 +197,7 @@ define_variables() {
 handle_if_off() {
 
 	# Jail must be valid
-	check_isvalid_jail "$JAIL" || get_msg_ivpn "none" "usage_1" 
+	chk_valid_jail "$JAIL" || get_msg_ivpn "none" "usage_1" 
 
 	# Will restore original SECLVL later on, after applying ivpn changes
 	SEC_orig=$(sed -En "s/^${JAIL}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)

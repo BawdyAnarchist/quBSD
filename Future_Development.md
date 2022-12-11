@@ -50,6 +50,8 @@ qubsd_installer
 
 	- /var/log/quBSD.log - line added to /usr/local/etc/X11/xinit/xinitrc to remove the log at each startx
 		- log isn't working as well as I'd hope.
+	
+	- /jails/0base installer needs to create the /rw/ folder, or appjails based on it, won't mount properly
 
 
 ### BEST PRACTICES / CLEANUP
@@ -107,9 +109,13 @@ pf.conf
 
 quBSD.sh 
 	- There's probably still functions you can generalize from $ubin
-	- New function: get_jail_info for things like: _clients
+		- create, send, setup, and destroy epairs might be a good one
+			- qb-connect exec.created qb-hostnet
+
 	- get_jail_parameter
 		- it should probably have a secondary "get default" function if the check fails
+
+	- check_validzfs
 
 jail -r <net-jail> is causing an "Operation not permitted" error
 

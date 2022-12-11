@@ -44,29 +44,29 @@ checks() {
 	# Sanity checks to make sure values are reasonable
 	case $PARAM in
 		autostart|no_destroy)
-				check_is_truefalse $_q "$VAL" "$PARAM" || get_msg_edit "_4" "usage_1"
+				chk_truefalse $_q "$VAL" "$PARAM" || get_msg_edit "_4" "usage_1"
 		;;
 		class)
 				get_msg_edit "_5" "usage_1" "_f"  
 		;;
 		cpuset)
-				check_isvalid_cpuset $_q "$VAL" || get_msg_edit "none" "usage_1" 
+				chk_valid_cpuset $_q "$VAL" || get_msg_edit "none" "usage_1" 
 		;;
 		maxmem)
-				check_isvalid_maxmem $_q "$VAL" || get_msg_edit "none" "usage_1" 
+				chk_valid_maxmem $_q "$VAL" || get_msg_edit "none" "usage_1" 
 		;;
 		rootjail|template)
 				# Check that rootjail or template has jmap and zroot zfs 
-				check_isvalid_jail $_q "$VAL" || get_msg_edit "none" "exit_1" "_f"
+				chk_valid_jail $_q "$VAL" || get_msg_edit "none" "exit_1" "_f"
 		;;
 		schg) 
-				check_isvalid_schg $_q "$VAL" ||  get_msg_edit "none" "usage_1" 
+				chk_valid_schg $_q "$VAL" ||  get_msg_edit "none" "usage_1" 
 		;;	
 		seclvl)		
-				check_isvalid_seclvl $_q "$VAL" ||  get_msg_edit "none" "usage_1" 
+				chk_valid_seclvl $_q "$VAL" ||  get_msg_edit "none" "usage_1" 
 		;;
 		gateway)  
-				check_isvalid_gateway $_q "$VAL" "$JAIL" \
+				chk_valid_gateway $_q "$VAL" "$JAIL" \
 						|| get_msg_edit "none" "exit_1" "_f"
 		;;
 		ipv4) 
@@ -79,7 +79,7 @@ checks() {
 
 				else
 					# Check IP addresses for validity and quBSD convention adherence 
-					check_isvalid_ipv4 $_q "$VAL" "$JAIL" \
+					chk_valid_ipv4 $_q "$VAL" "$JAIL" \
 							|| get_msg_edit "none" "exit_1" 
 
 					check_isqubsd_ipv4 $_q "$VAL" "$JAIL" \
@@ -98,17 +98,17 @@ handle_restarts() {
 	case $PARAM in 
 
 		cpuset|maxmem|rootjail|schg|seclvl|template)
-			check_isrunning_jail $JAIL && _restart1="$JAIL"
+			chk_isrunning $JAIL && _restart1="$JAIL"
 		;;
 		ipv4|gateway)
 			_gateway=$(sed -nE "s/^${JAIL}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
 
 			# If jail is running it needs restarted
-			if check_isrunning_jail $JAIL ; then
+			if chk_isrunning $JAIL ; then
 				_restart1="$JAIL" ; _restart2="$_gateway"
 
 			else
-				check_isrunning_jail $_gateway && _restart2="$_gateway"
+				chk_isrunning $_gateway && _restart2="$_gateway"
 			fi
 		;;	
 	esac

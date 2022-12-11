@@ -34,7 +34,7 @@ checks() {
 	fi
 
 	# Check for valid jail, exit if invalid 
-	check_isvalid_jail "$JAIL" || get_msg_flags "none" "usage_1"
+	chk_valid_jail "$JAIL" || get_msg_flags "none" "usage_1"
 }
 
 main() {
@@ -54,7 +54,7 @@ main() {
 
 	elif [ "$RESTORE" ] ; then
 		# Jails might have different chflag settings if started or stopped
-		check_isrunning_jail "$JAIL" \
+		chk_isrunning "$JAIL" \
 									&& ${QBDIR}/exec.poststart $JAIL \
 																|| ${QBDIR}/exec.poststop $JAIL
 	fi

@@ -87,7 +87,7 @@ get_jails_loop() {
 		cpu="-"
 		ram="-"
 		
-		if check_isrunning_jail "$_j" ; then
+		if chk_isrunning "$_j" ; then
 			jid=$(jls -j $_j -n jid | sed "s/jid=//") 
 			cpu=$(ps au -J $_j | awk '{sum+=$3;} END {print sum;}')
 			ram=$(ps au -J $_j | awk '{sum+=$4;} END {print sum;}')

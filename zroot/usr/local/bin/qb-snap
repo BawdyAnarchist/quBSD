@@ -26,7 +26,7 @@ checks() {
 	[ -z "$_CMD" ] && get_msg_snap "_2" "usage_1"
 
 	# Must have a valid jail
-	check_isvalid_jail "$JAIL" || "usage_1"
+	chk_valid_jail "$JAIL" || "usage_1"
 
 	# Define _ZJAIL variable, which sets the zfs dataset being targeted 
 		# Class will determine what the target dataset is 

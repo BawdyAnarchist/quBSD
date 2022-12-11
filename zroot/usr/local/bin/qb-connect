@@ -30,12 +30,12 @@ checks() {
 	case "$_CMD" in
 		create) 
 			# JAIL must be running, but gateway can be started later 
-			check_isrunning_jail "$JAIL" "return 1" || get_msg_connect "_2" "usage_1"
+			chk_isrunning "$JAIL" "return 1" || get_msg_connect "_2" "usage_1"
 			
 			# IP checks
 			if [ -n "$IPV4" ] ; then
 				# Invalid IP must be rejected
-				check_isvalid_ipv4 "$IPV4" || exit 1 
+				chk_valid_ipv4 "$IPV4" || exit 1 
 
 				# Just temporary connections. Warn for convention mismatch, but don't exit  
 				check_isqubsd_ipv4 "$IPV4" 
@@ -50,9 +50,9 @@ checks() {
 		;;
 		destroy)
 			# JAIL and GATEWAY must be running (helps prevent accidents) 
-			check_isrunning_jail "$JAIL" "return 1" || get_msg_connect "_2" "usage_1"
+			chk_isrunning "$JAIL" "return 1" || get_msg_connect "_2" "usage_1"
 	
-			[ -n "$GATEWAY" ] && ! check_isrunning_jail "$GATEWAY" \
+			[ -n "$GATEWAY" ] && ! chk_isrunning "$GATEWAY" \
 					&& get_msg_connect "_3" "usage_1"
 		;;
 	esac
@@ -68,7 +68,7 @@ check_seclvl() {
 	[ "$_seclvl_J" == "3" ] && return 1 
 
 	# If GATEWAY has running pf, seclvl=3 could prevent modification 
-	if check_isrunning_jail "$GATEWAY" ; then
+	if chk_isrunning "$GATEWAY" ; then
 		jexec -l -U root $GATEWAY service -e | grep -q "rc.d/pf" \
 				&& _seclvl_T=$(jexec -l -U root $GATEWAY sysctl kern.securelevel \
 																| sed "s/kern.securelevel: //") 
@@ -127,7 +127,7 @@ assemble_interface_list() {
 
 configure_epairs() {
 	# Start gateway if it's off
-	check_isrunning_jail "$GATEWAY" || start_jail "$GATEWAY" || exit 1
+	chk_isrunning "$GATEWAY" || start_jail "$GATEWAY" || exit 1
 
 	# Create the epair and send to jails
 	epair=$(ifconfig epair create)
