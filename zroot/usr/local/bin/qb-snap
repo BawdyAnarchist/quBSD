@@ -42,7 +42,7 @@ checks() {
 			DATELABEL=$(date +@%b%d_%H:%M_USER)
 
 			# Check for duplicate snapshot under same name. Suppress output
-			zfs list ${_ZFS}/${JAIL}${DATELABEL} > /dev/null 2>&1 && get_msg_snap "_4" "exit_1"
+			chk_valid_zfs ${_ZFS}/${JAIL}${DATELABEL} && get_msg_snap "_4" "exit_1"
 		;;
 		destroy)
 			# Translate user date input, to epoch. Exit if failure.

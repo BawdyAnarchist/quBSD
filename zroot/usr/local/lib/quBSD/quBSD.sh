@@ -368,19 +368,19 @@ chk_isblank() {
 	[ "$1" == "${1#*[![:space:]]}" ] && return 0  ||  return 1
 }
 
+chk_isrunning() {
+	# Return 0 if jail is running; return 1 if not. 
+
+	# Check if jail is running. No warning message returned if not.
+	jls -j "$1" > /dev/null 2>&1  && return 0  ||  return 1 
+}
+
 chk_valid_zfs() {
 	# Verifies the existence of a zfs dataset, returns 0, or 1 on failure
 	# zfs provides no quiet option, and > null redirect takes up real-estate
 
 	# Perform check
 	zfs list $1 >> /dev/null 2>&1  &&  return 0  ||  return 1
-}
-
-chk_isrunning() {
-	# Return 0 if jail is running; return 1 if not. 
-
-	# Check if jail is running. No warning message returned if not.
-	jls -j "$1" > /dev/null 2>&1  && return 0  ||  return 1 
 }
 
 chk_valid_jail() {
@@ -415,12 +415,12 @@ chk_valid_jail() {
 		;;
 		rootjail) 
 			# Rootjails require a dataset in zroot 
-			! zfs list ${JAILS_ZFS}/${_value} > /dev/null 2>&1 \
+			! chk_valid zfs ${JAILS_ZFS}/${_value} \
 					&& get_msg $_q "_cj4" "$_value" "$JAILS_ZFS" && return 1
 		;;
 		appjail)
 			# Appjails require a dataset at quBSD/zusr
-			! zfs list ${ZUSR_ZFS}/${_value} > /dev/null 2>&1 \
+			! chk_valid_zfs ${ZUSR_ZFS}/${_value} \
 					&& get_msg $_q "_cj4" "$_value" "$ZUSR_ZFS" && return 1
 		;;
 		dispjail)
@@ -500,7 +500,7 @@ chk_valid_rootjail() {
 			&& get_msg $_q "_cj3" && return 1
 	
 	# Rootjails require a dataset at zroot/quBSD/jails 
-	! zfs list ${JAILS_ZFS}/${_value} > /dev/null 2>&1 \
+	! chk_valid_zfs ${JAILS_ZFS}/${_value} \
 			&& get_msg $_q "_cj4" "$_value" "$JAILS_ZFS" && return 1
 
 	return 0
