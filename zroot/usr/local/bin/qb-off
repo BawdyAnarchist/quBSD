@@ -6,8 +6,8 @@
 get_options() {
 	while getopts aehr opts ; do
 		case $opts in
-			a) ALL="true" ;;
-			e) EXCLUDE="true" ;;
+			a) ACTION="all" ;; 
+			e) [ -z "$LIST" ] && ACTION="exclude" || get_msg_off "_2" "usage_1" ;;
 			h) get_msg_off "none" "usage_0" ;; 
 			r) RESTART="true" ;;
 		esac
@@ -17,63 +17,83 @@ get_options() {
 	
 	_JAILS="$@"
 
-	# Library function
-	ONJAILS=$(get_onjails)
-}
+	_restarts=$(mktemp -t "qb-off-restarts")
+	trap "rm $_restarts" INT TERM HUP QUIT EXIT
 
-checks() {
-	if [ -z "${ALL}${EXLUDE}${_JAILS}" ] ; then
-		# Did not specify an action
-		get_msg_off "_1" "usage_1"
-
-	elif [ "$ALL" -a "$EXCLUDE" ] ; then
-		# Mutually exclusive actions
-		get_msg_off "_2" "usage_1"
-
-	fi
+	# Did not specify an action
+	[ -z "${ACTION}${_JAILS}" ] && get_msg_off "_1" "usage_1"
 }
 
 remove_list() {
-	if [ -n "$ALL" ] ; then 
-		# _remove list is the same as all jails that are on
-		_remove="$ONJAILS"
-
-	elif [ -n "$EXCLUDE" ] ; then
-		# Remove jails presentin the user input exclude list
-		for _jail in $_JAILS ; do
-			_remove=$(echo $ONJAILS | sed "s/$_jail//")
-		done
-
-	else	
-		# Default action is to remove the user input jail list
-		_remove="$_JAILS"
-	fi
+	case $ACTION in
+		all)
+			# All running jails
+			_remove="$(get_onjails)"
+		;;
+		exclude)
+			# Remove the indicated jails from the "all" list
+			for _jail in $_JAILS ; do
+				_remove=$(get_onjails | sed "s/$_jail//")
+			done
+		;;
+		*)	
+			# Default action is to remove the user input jail list
+			_remove="$_JAILS"
+		;;
+	esac
 }
 
 remove() {
+	# To make this func time-efficient, some creative license is required. 
 	for _jail in $_remove; do
 
-		if [ "$RESTART" ] ; then 
+		# Add restart jails to tmp file, to be used later  
+		[ -n "$RESTART" ] && echo "$_jail" >> $_restarts
 
-			restart_jail "$_jail" 
-		else
-			stop_jail "$_jail" &
-			
-			# Stopping jails right on top of each other can cause oddities with ifconfig 
-			sleep .4
-		fi
+		# Stop jail and send process to background (for time-efficiency).
+		stop_jail "$_jail" > /dev/null 2>&1 &
+	
+		# Jails with common epairs will error if stopped simultaneously. Wait a moment
+		get_info -q _CLIENTS $_jail && sleep .5
+
 	done
 }
 
+handle_restarts() {
+	# Wait for all jails to shut down before attempting restart
+	while [ -s "$_restarts" ] ; do
+
+		_still_running=""
+		for _jail in $(cat $_restarts) ; do
+
+			# If any jails are still running, wait for restart			
+			chk_isrunning $_jail && _still_running="true" 
+
+		done
+
+		# When no jails were found to be running, break
+		[ -z "$_still_running" ] && break
+
+	sleep .2
+	done
+
+	# Transient shutdown ops need another moment, or start_jail will fail 
+	sleep .5
+
+	# For time-efficient restarts without networking conflicts, use qb-autostart 
+	[ -s "$_restarts" ] && qb-autostart -f "$_restarts" 
+	
+	# Wait a moment. qb-autostart must copy $_restarts before trap rm (I think that's why)
+	sleep .5
+}
 
 get_global_variables
 
 get_options "$@"
 
-checks 
-
 remove_list
 
 remove
 
+handle_restarts
 

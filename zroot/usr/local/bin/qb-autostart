@@ -59,7 +59,7 @@ start_jails_in_background() {
 	local _endpoints="$1"
 
 	for _jail in $_endpoints ; do
-		start_jail $_jail & 
+		start_jail $_jail > /dev/null 2>&1 &
 	done
 }
 
@@ -70,7 +70,7 @@ begin_waterfall() {
 	for _jail in $_gateways ; do
 		
 		# Only continue the waterfall if jail started successfully
-		if start_jail "$_jail" ; then
+		if start_jail "$_jail" > /dev/null 2>&1 ; then
 
 			classify_clients "$_jail"
 			[ -n "$_ENDPOINTS" ] && start_jails_in_background "$_ENDPOINTS" &
@@ -100,7 +100,7 @@ climb_hierarchy() {
 			echo "$_jail" >> $TRACK
 		else
 			# Jail has no clients and no gateway. Can be started and sent to background
-			start_jail $_jail &
+			start_jail $_jail > /dev/null 2>&1 &
 		fi
 
 	## NOTE: Needs changed *when VM integration is completed*.
@@ -143,8 +143,6 @@ main() {
 		# These jails have independent gateway paths, and can be started in parallel '&' 
 		begin_waterfall $STARTS &
 	done
-
-	exit 0
 }
 
 
