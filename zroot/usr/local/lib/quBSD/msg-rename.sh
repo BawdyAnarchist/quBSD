@@ -16,31 +16,33 @@ ENDOFMSG
 ERROR: Must specify < new_jailname >
 ENDOFMSG
 	;;	
+	_1_1) cat << ENDOFMSG
+
+ERROR: < $JAIL > failed checks. Fix errors and try again.
+ENDOFMSG
+	;;	
 	_2) cat << ENDOFMSG
 
-ERROR: Invalid jailname < none > . Using "none" as a jailname
-       will likely cause errors for quBSD operation, as this 
-       word is often used as an exception during various checks
+ERROR: < none > is an invalid name. Using "none" for a 
+       jailname will cause errors during quBSD operations, 
+       as it's often an exception during various checks.
 ENDOFMSG
 	;;	
 	_3) cat << ENDOFMSG
 
-ALERT: < $JAIL > has client jail dependencies. 
-       Is a rootjail for the following jails:
+ALERT: < $JAIL > is a rootjail for the following:
 $rootj_for
 ENDOFMSG
 	;;
 	_4) cat << ENDOFMSG
 
-ALERT: < $JAIL > has client jail dependencies.
-       Is a template for the following jails: 
+ALERT: < $JAIL > is a template for the following: 
 $template_for
 ENDOFMSG
 	;;
 	_5) cat << ENDOFMSG
 
-ALERT: < $JAIL > has client jail dependencies.
-       Is a network gateway for the following jails: 
+ALERT: < $JAIL > is a gateway for the following: 
 $gateway_for
 ENDOFMSG
 	;;
@@ -53,9 +55,12 @@ echo -e "                                    Enter (y/n): \c"
 	;;
 	_7) cat << ENDOFMSG
 
-WARNING: < $_jail > Could not be stopped. qb-rename will
-         continue, but there might be errors with 
-         < $_jail> until it is restarted.
+ERROR: < $_jail > could not be stopped. Aborting qb-rename.
+ENDOFMSG
+	;;
+	_7_1) cat << ENDOFMSG
+
+ERROR: \`chflags noschg\` failed. schg could prevent rename. 
 ENDOFMSG
 	;;
 	_8) cat << ENDOFMSG
