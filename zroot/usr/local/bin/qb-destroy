@@ -23,12 +23,12 @@ define_variables() {
 									| awk '{print $1}' | sed "s@.*/@@")
 
 	# Get sizes of datasets to be destroyed, and simulation messages from zfs 
-	if zfs list ${ZUSR_ZFS}/${JAIL} >> /dev/null 2>&1 ; then 
+	if chk_valid_zfs ${ZUSR_ZFS}/${JAIL} ; then 
 		zusrSize=$(zfs list -o used ${ZUSR_ZFS}/${JAIL} | tail -1) 
 		zusrDestroy=$(zfs destroy -nvrRf ${ZUSR_ZFS}/${JAIL} | grep -v "${JAIL}\@")
 	fi
 
-	if	zfs list ${JAILS_ZFS}/$JAIL >> /dev/null 2>&1 ; then
+	if	chk_valid_zfs ${JAILS_ZFS}/$JAIL ; then
 		zrootSize=$(zfs list -o used ${JAILS_ZFS}/${JAIL} | tail -1)
 		zrootDestroy=$(zfs destroy -nvrRf ${JAILS_ZFS}/${JAIL} | grep -v "${JAIL}\@")
 	fi
@@ -36,7 +36,7 @@ define_variables() {
 
 checks() {
 	# Alert that the jail is invalid, but do not error and exit
-	check_isvalid_jail "$JAIL" 
+	chk_valid_jail "$JAIL" 
 
 	# no_destroy protection flag still active
 	[ "$NO_DESTROY" == "true" ] && get_msg_destroy "_2" "usage_1"	
