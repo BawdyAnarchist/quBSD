@@ -19,16 +19,16 @@ get_options() {
 
 define_variables() {
 	# Finds jails dependent on the jail to be renamed
-	rootjail=$(sed -nE "s/${JAIL}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP)
-	rootj_for=$(sed -nE "s/[[:blank:]]+rootjail[[:blank:]]+${JAIL}\$//p" $JMAP)
-	template_for=$(sed -nE "s/[[:blank:]]*template[[:blank:]]+${JAIL}\$//p" $JMAP)
-	gateway_for=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${JAIL}\$//p" $JMAP)
-	_ALLJAILS="$rootj_for $template_for $gateway_for"
+	get_jail_parameter -sqd rootjail $JAIL
+	get_info _CLIENTS $JAIL
+	ROOTJ_FOR=$(sed -nE "s/[[:blank:]]+rootjail[[:blank:]]+${JAIL}\$//p" $JMAP)
+	TEMPL_FOR=$(sed -nE "s/[[:blank:]]*template[[:blank:]]+${JAIL}\$//p" $JMAP)
+	ALLJAILS="$ROOTJ_FOR $TEMPL_FOR $_CLIENTS"
 }
 
 checks() {
 	# Check that JAIL was specified, and valid 
-	check_isvalid_jail "$JAIL" || get_msg_rename "usage_1" 
+	chk_valid_jail "$JAIL" || get_msg_rename "_1_1" "usage_1" 
 	
 	# Make sure new jailname was provided
 	[ -z "$NEWNAME" ] && get_msg_rename "_1" "usage_1"
@@ -37,86 +37,84 @@ checks() {
 	[ "$NEWNAME" == "none" ] && get_msg_rename "_2" "usage_1"
 	
 	# If jail is running, we're going to restart it
-	check_isrunning_jail "$JAIL" && RESTART="true"
+	chk_isrunning "$JAIL" && RESTART="true"
 
 	if [ -z "$UPDATE" ] ; then
-		# List children jails for which JAIL is a rootjail
-		[ -n "$rootj_for" ] && _query="true" && get_msg_rename "_3"
 
-		# List children jails for which JAIL is a template jail
-		[ -n "$template_for" ] && _query="true" && get_msg_rename "_4"
-		
-		# List jails which depend on JAIL for network connection 
-		[ -n "$gateway_for" ] && _query="true" && get_msg_rename "_5"
-	
-		# Query user to automatically update dependencies
-		[ -n "$_query" ] && get_msg_rename "_6" \
-											&& get_user_response  &&  UPDATE="true"
+		# List jail dependencies for <jail> 
+		[ -n "$ROOTJ_FOR" ] && get_msg_rename "_3"
+		[ -n "$TEMPL_FOR" ] && get_msg_rename "_4"
+		[ -n "$_CLIENTS" ] && get_msg_rename "_5"
+
+		# Alert user to dependencies, and get response
+		! chk_isblank "$ALLJAILS" && get_msg_rename "_6" && get_user_response && UPDATE="true"
 	fi
 
 	get_msg_rename "_8" && get_user_response  || get_msg_rename "_0" "exit_0" 
 }
 
 rename_jail() {
-	# /dev/null redirects are used alot, to prevent errors from appearing when 
-	# attempting to modifying zusr datasets for instances they don't exist
-
 	# Stop jail before renaming. Rename should not happen if stop fails
-	stop_jail "$JAIL" > /dev/null 2>&1 || get_msg_rename "_7" "exit_1"  
+	stop_jail "$JAIL"  ||  get_msg_rename "_7" "exit_1"  
 
 	# Flags down to modify directory names and fstab
-	chflags -R noschg ${M_ZUSR}/$JAIL  > /dev/null 2>&1
-	
+	chflags -R noschg ${M_ZUSR}/$JAIL  ||  get_msg_rename "_7_1" "exit_1"  
 
-	# Modify jailmap. Roojails need to update their own rootjail to self
-	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}	/g" $JMAP
-	[ "${JAIL} == "${rootjail} ] && qb-edit -fq ${NEWNAME} rootjail ${NEWNAME}
+	# Modify jailmap. Roojails should update their own rootjail to self
+	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}  /g" $JMAP
+	[ "${JAIL}" == "${ROOTJAIL}" ] && qb-edit -fq ${NEWNAME} rootjail ${NEWNAME}
 
+	# Modify /etc/jail.conf
 	sed -i '' -E "s/^${JAIL}[[:blank:]]+\{/${NEWNAME} \{/g" $JCONF 
-	sed -i '' -E "s/${JAIL}/${NEWNAME}/g" ${M_ZUSR}/${JAIL}/rw/etc/fstab   > /dev/null 2>&1
+	
+	# Modify fstab (appjails/dispjails only) 
+	[ -e "${M_ZUSR}/${JAIL}" ] \
+			&& sed -i '' -E "s/${JAIL}/${NEWNAME}/g" ${M_ZUSR}/${JAIL}/rw/etc/fstab
 	
 	# Rename associated zfs datasets
-	zfs rename -f ${ZUSR_ZFS}/${JAIL} ${ZUSR_ZFS}/${NEWNAME}  > /dev/null 2>&1
-	zfs rename -f ${JAILS_ZFS}/${JAIL} ${JAILS_ZFS}/${NEWNAME}  > /dev/null 2>&1
+	chk_valid_zfs ${ZUSR_ZFS}/${JAIL} \
+			&& zfs rename -f ${ZUSR_ZFS}/${JAIL} ${ZUSR_ZFS}/${NEWNAME}
+
+	chk_valid_zfs ${JAILS_ZFS}/${JAIL} \
+			&& zfs rename -f ${JAILS_ZFS}/${JAIL} ${JAILS_ZFS}/${NEWNAME}
 	
 	# Home directory name changed (or dump to /dev/null if doesn't exist)
-	mv ${M_ZUSR}/${NEWNAME}/usr/home/${JAIL} \
-				${M_ZUSR}/${NEWNAME}/usr/home/${NEWNAME} > /dev/null 2>&1 
+	[ -e ${M_ZUSR}/${NEWNAME}/usr/home/${JAIL} ] \
+			&& mv ${M_ZUSR}/${NEWNAME}/usr/home/${JAIL} \
+					${M_ZUSR}/${NEWNAME}/usr/home/${NEWNAME} 
 	
 	# Jails don't necessarily have custom pw; but modify if so
-	pw -V ${M_ZUSR}/${NEWNAME}/rw/etc/ usermod -n ${JAIL} -l ${NEWNAME} -d /usr/home/${NEWNAME} > /dev/null 2>&1
+	pw -V ${M_ZUSR}/${NEWNAME}/rw/etc/ usermod -n ${JAIL} -l ${NEWNAME} -d \
+			/usr/home/${NEWNAME} > /dev/null 2>&1
 	
 	# If jail was stopped for the rename, restart it
-	[ -n "$RESTART" ] && start_jail "$NEWNAME"  > /dev/null 2>&1 
+	[ -n "$RESTART" ] && start_jail "$NEWNAME"
 }
 
 update_dependencies() {
-	# Handle jails dependent on the renamed jail
 	
-	# Each of variables needs to change a different parameter
 	if [ -n "$UPDATE" ] ; then
-		for _jail in $rootj_for ; do
-			# Don't try to qb-edit for old jailname, as it's invalid now
+
+		for _jail in $ROOTJ_FOR ; do
 			[ "$_jail" == "$JAIL" ] || qb-edit -fq $_jail rootjail $NEWNAME
 		done
 
-		for _jail in $template_for ; do
+		for _jail in $TEMPJ_FOR ; do
 			qb-edit -fq $_jail template $NEWNAME
 		done
 
-		for _jail in $gateway_for ; do
+		for _jail in $_CLIENTS ; do
 			qb-edit -fq $_jail gateway $NEWNAME
 		done
 
 		# Restart dependencies that were already on
-		for _jail in $_ALLJAILS ; do
+		for _jail in $ALLJAILS ; do
 
 			# Move process to background to parallelize jail restarts 
-			check_isrunning_jail "$_jail" \
-					&& restart_jail "$_jail" > /dev/null 2>&1 &	
+			chk_isrunning "$_jail" && restart_jail "$_jail" &
 		done
 		
-		# Due to the & on the restart command, need to positively exit program.
+		# Due to '&' on the restart command, need to positively exit program.
 		get_msg_rename "_9" "exit_0"	
 	fi
 }
