@@ -52,7 +52,7 @@ main() {
 	JAIL="${JAIL:=$_XJAIL}"
 	_USER="${_USER:=$JAIL}"
 
-	if [ -z "$JAIL" ] || [ "$JAIL" == "host" ] ; then
+	if [ -z "$JAIL" ] || [ "$JAIL" = "host" ] ; then
 		# If JAIL is still not assigned, assume user wants a host xterm
 		xterm &
 		exit 0
