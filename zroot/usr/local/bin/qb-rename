@@ -34,7 +34,7 @@ checks() {
 	[ -z "$NEWNAME" ] && get_msg_rename "_1" "usage_1"
 
 	# Due to the checks which exclude values of `none', it's unwise to use it for jailname 
-	[ "$NEWNAME" == "none" ] && get_msg_rename "_2" "usage_1"
+	[ "$NEWNAME" = "none" ] && get_msg_rename "_2" "usage_1"
 	
 	# If jail is running, we're going to restart it
 	chk_isrunning "$JAIL" && RESTART="true"
@@ -62,7 +62,7 @@ rename_jail() {
 
 	# Modify jailmap. Roojails should update their own rootjail to self
 	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}  /g" $JMAP
-	[ "${JAIL}" == "${ROOTJAIL}" ] && qb-edit -fq ${NEWNAME} rootjail ${NEWNAME}
+	[ "${JAIL}" = "${ROOTJAIL}" ] && qb-edit -fq ${NEWNAME} rootjail ${NEWNAME}
 
 	# Modify /etc/jail.conf
 	sed -i '' -E "s/^${JAIL}[[:blank:]]+\{/${NEWNAME} \{/g" $JCONF 
@@ -96,7 +96,7 @@ update_dependencies() {
 	if [ -n "$UPDATE" ] ; then
 
 		for _jail in $ROOTJ_FOR ; do
-			[ "$_jail" == "$JAIL" ] || qb-edit -fq $_jail rootjail $NEWNAME
+			[ "$_jail" = "$JAIL" ] || qb-edit -fq $_jail rootjail $NEWNAME
 		done
 
 		for _jail in $TEMPJ_FOR ; do
