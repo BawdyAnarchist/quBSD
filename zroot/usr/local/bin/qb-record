@@ -1,0 +1,108 @@
+#!/bin/sh
+
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-record.sh
+
+get_options() {
+   while getopts hmpv:w: opts ; do
+		case $opts in
+			h) get_msg_record "none" "usage_0" ;;
+			m) _DEVICES="virtual_oss" ;; 
+			w) _DEVICES="webcamd $_DEVICES" ; JAIL="$OPTARG" ;; 
+			v) _VOL="$OPTARG"  ;; 
+			p) PURGE="true" ; _DEVICES="webcamd virtual_oss" ;; 
+			/?) get_msg_record "_1" "exit_1" ;;
+		esac
+	done
+	
+	shift $(( OPTIND - 1 ))
+}
+
+checks() {
+	# Ensure the volume was 0-100 inclusive
+	if [ -n "$_VOL" ] ; then
+		echo "$_VOL" | grep -Eq "^([1-9][0-9]|100)$" || get_msg_record "_2" "exit_1" 
+	fi
+
+	if [ -n "$JAIL" ] ; then
+		chk_isrunning $JAIL || get_msg_record "_3" "exit_1"
+		UNHIDE=$(grep "devfsrules_qubsd_webcamd" /etc/devfs.rules | grep -Eo "[[:digit:]]")
+		HIDE=$(grep "devfsrules_guijail" /etc/devfs.rules | grep -Eo "[[:digit:]]")
+	fi	
+}
+
+adjust_mic() {
+	_VOL="${_VOL:=100}"
+	_mixers=$(ls /dev/mixer*)
+
+	for _mix in $_mixers ; do 
+		if mixer -f "$_mix" | grep "mic" > /dev/null 2>&1 ; then
+			mixer -f "$_mix" mic $_VOL 
+		fi
+	done
+}
+
+toggle_service() {
+		
+	if service $_device onestatus	> /dev/null ; then
+		# Stop the service if it was on
+		service $_device onestop
+
+		# Specific operations per device type 
+		case $_device in 
+			virtual_oss) 
+				# Sound won't work unless this is set back to 1
+				sysctl hw.snd.basename_clone=1
+			;;
+			webcamd)
+				devfs -m ${M_JAILS}/${JAIL}/dev ruleset $HIDE applyset
+				devfs -m ${M_JAILS}/${JAIL}/dev rule -s $HIDE applyset
+			;;
+		esac
+
+	elif [ -z "$PURGE" ] ; then
+		# If purge option wasn't specified, start the device.
+		service $_device onestart		
+
+		# Specific operations per device type 
+		case $_device in 
+			virtual_oss) 
+				adjust_mic 
+			;;
+			webcamd)
+				# Change to the devfs ruleset that unhides the camera
+				devfs -m ${M_JAILS}/${JAIL}/dev ruleset $UNHIDE 
+				devfs -m ${M_JAILS}/${JAIL}/dev rule -s $UNHIDE applyset
+
+				# Must bring down flags to make changes to pwdb, then bring flags up again
+				chflags -R noschg ${M_JAILS}/${JAIL}/etc 
+				jexec -l -U root $JAIL pw groupmod -n $_device -m 1001
+				qb-flags -r $JAIL
+			;;
+		esac
+	fi
+}
+
+main() {
+	
+	if [ -z "$_DEVICES" ] & [ -n "$_VOL" ] ; then
+		# In this case, the only thing to do is change the microphone input value 
+		adjust_mic
+
+	else
+		# Otherwise apply the toggle to each device
+		for _device in $_DEVICES ; do
+			toggle_service
+		done
+	fi
+}
+
+
+get_global_variables
+
+get_options "$@"
+
+checks
+
+main
+
