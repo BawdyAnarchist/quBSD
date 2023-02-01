@@ -69,14 +69,14 @@ PARAMETERS   Saved at:  /usr/local/etc/quBSD/jailmap.conf
 autostart:   Automatically start the jail during host boot. 
 class:       appjail, dispjail, or rootjail
 cpuset:      CPUs a jail may use, or \`none' for no limit
-IPV4:         IPv4 address for the jail.
+IPV4:        IPv4 address for the jail.
 maxmem:      RAM maximum allocation, or \'none' for no limit 
 no_destroy:  Prevents accidental destruction of a jail
 rootjail:    Fully installed rootjail is cloned for <jail>
 schg:        Directories to receive schg flags: all|sys|none
 seclvl:      kern.securelevel to protect <jail>: -1|0|1|2|3
 template:    Dispjails require a template to clone.
-gateway:      Gateway to provides <jail> with network connection 
+gateway:     Gateway to provides <jail> with network connection 
 devfs_ruleset=  Provided for reference. See /etc/jail.conf
 
 ENDOFUSAGE
