@@ -22,6 +22,12 @@ ERROR: Missing argument. Must specify a < $_value >
 
 ENDOFMSG
 	;;	
+	_1) cat << ENDOFMSG
+
+ERROR: Invalid variable to quBSD.sh function: create_epairs() 
+
+ENDOFMSG
+	;;	
 	_cj1) cat << ENDOFMSG
 
 ERROR: < $_value > is missing a < $_passvar > in jailmap.conf
@@ -76,7 +82,13 @@ ENDOFMSG
 	;;
 	_cj7_2) cat << ENDOFMSG
 
-ERROR: < net-firewall > should always be assigned a gateway,
+WARNING: < net-firewall > should always have a gateway,
+       as it's the connection point to the outside internet.       
+ENDOFMSG
+	;;
+	_cj7_3) cat << ENDOFMSG
+
+WARNING: < net-firewall > should typically connect to nicvm
        as it's the connection point to the outside internet.       
 ENDOFMSG
 	;;
