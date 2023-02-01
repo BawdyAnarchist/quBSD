@@ -60,7 +60,7 @@ generate_second_mode() {
 
 	for _mode in $(awk '{print $2}' $GEN1 | uniq) ; do
 		# Skip mode creation for non-groups 
-		if ! [ "$_mode" == '-' ] ; then
+		if ! [ "$_mode" = '-' ] ; then
 
 			# Filter lines relevant only to the _group
 			TEMPGEN=$(grep -E "[^[:blank:]]+[[:blank:]]+${_mode}[[:blank:]]+" $GEN1)
@@ -93,7 +93,7 @@ define_mode_variables() {
 			_sym="$_loop"
 			_group=$(sed -n ${_cycle}p $GEN1 | awk '{print $2}')
 
-			if [ "$_group" == '-' ] ; then
+			if [ "$_group" = '-' ] ; then
 				# No group designated. Resolve directly to the <jail> mode
 				_jail=$(sed -n ${_cycle}p $GEN1 | awk '{print $1}')
 				_action="mode \"$_jail\""
@@ -126,7 +126,7 @@ test_new_config() {
 		cp $NEWCONF $CONF	
 		get_msg_i3_genconf "_6"
 
-		if [ "$RELOAD" == "false" ] ; then
+		if [ "$RELOAD" = "false" ] ; then
 			get_msg_i3_genconf "_7"
 		else
 			i3-msg reload > /dev/null 2>&1 && get_msg_i3_genconf "_8" || get_msg_i3_genconf "_9"
