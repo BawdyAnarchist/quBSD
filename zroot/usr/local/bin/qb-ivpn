@@ -175,7 +175,7 @@ define_variables() {
 	_GET_SERVERS="https://api.ivpn.net/v4/servers/stats"
 	_GET_SRV_IPS="https://api.ivpn.net/v4/servers.json"
 
-	if [ "$INJAIL" == "false" ] ; then 
+	if [ "$INJAIL" = "false" ] ; then 
 		# Source quBSD library, and get variables (only available for host)
 		. /usr/local/lib/quBSD/quBSD.sh
 		get_global_variables
@@ -221,7 +221,7 @@ fetch_connection() {
 	if eval $_CMDMOD ping -Qot 6 1.1.1.1  > /dev/null 2>&1 
 	then
 
-		if [ "$INJAIL" == "true" ] ; then
+		if [ "$INJAIL" = "true" ] ; then
 			fetch -qT 7 -o - $_GET_CURRENT | jq 
 
 		else
@@ -290,7 +290,7 @@ national() {
 
 town() {
 	cities=$(jq --arg COUNTRY "$country" \
-			'[.servers[] | select(.country==$COUNTRY) | .city] | unique' $SERVERS | sed 1d | sed '$d' | nl)
+			'[.servers[] | select(.country=$COUNTRY) | .city] | unique' $SERVERS | sed 1d | sed '$d' | nl)
 
 	get_msg_ivpn "_8" ; read _i ; clear
 
@@ -300,10 +300,10 @@ town() {
 
 server() {
 
-	jq --arg CITY "$city" '[.servers[] | select(.city==$CITY) | {City: .city, pubkey: .wg_public_key, Gateway: .hostnames.wireguard, ISP: .isp, Active: .is_active, Load: .load}]' $SERVERS
+	jq --arg CITY "$city" '[.servers[] | select(.city=$CITY) | {City: .city, pubkey: .wg_public_key, Gateway: .hostnames.wireguard, ISP: .isp, Active: .is_active, Load: .load}]' $SERVERS
 
 	_servers=$(jq --arg CITY "$city" \
-			'[.servers[] | select(.city==$CITY) | .wg_public_key]' $SERVERS | sed 1d | sed '$d' | nl)
+			'[.servers[] | select(.city=$CITY) | .wg_public_key]' $SERVERS | sed 1d | sed '$d' | nl)
 
 	get_msg_ivpn "_9" ; read _e ; clear
 
@@ -311,7 +311,7 @@ server() {
 			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed 's/\".*$//')
 
 	endip=$(jq --arg PUB "$publickey" \
-			'.wireguard | .[] | .hosts | .[] | select(.public_key==$PUB) | .host' $SRV_IPS | sed 's/^.//' | sed 's/\".*$//')
+			'.wireguard | .[] | .hosts | .[] | select(.public_key=$PUB) | .host' $SRV_IPS | sed 's/^.//' | sed 's/\".*$//')
 
 	endpoint=$(printf "%b" "${endip}:${PORT}")
 }
@@ -380,7 +380,7 @@ main() {
 	fi
 
 	# API to IVPN must be done from inside jail (network access).
-	if [ "$INJAIL" == "true" ] ; then 
+	if [ "$INJAIL" = "true" ] ; then 
 
 		# Primary function that implements changes inside jail
 		modify_ivpn 
