@@ -9,8 +9,9 @@ get_options() {
 			c) _CMD="create" ;;
 			d) [ -z "$_CMD" ] && _CMD="destroy" || get_msg_connect "_1" "usage_1" ;;
 			h) get_msg_connect "none" "usage_0" ;;
-			i) IPV4="$OPTARG" manualIP="true" ;;
+			i) IPV4="$OPTARG" ;;
 			l) [ -z "$_CMD" ] && _CMD="list" || get_msg_connect "_1" "usage_1" ;;
+			*) get_msg "_1" && get_msg_connect "none" "usage_1" ;; 
 		esac
 	done
 
@@ -19,8 +20,6 @@ get_options() {
 	# Define script variables
 	JAIL=${JAIL:="$1"}
 	GATEWAY="$2"
-
-	get_jail_parameter -q mtu "$JAIL" 
 }
 
 checks() {
@@ -46,7 +45,7 @@ checks() {
 			fi
 			
 			# Check the pf status and security levels
-		   check_seclvl || get_msg_connect "_4" "exit_1"
+		   check_security || get_msg_connect "_4" "exit_1"
 		;;
 		destroy)
 			# JAIL and GATEWAY must be running (helps prevent accidents) 
@@ -58,31 +57,30 @@ checks() {
 	esac
 }
 
-check_seclvl() {
-	# If JAIL has running pf, seclvl=3 could prevent modification 
-	jexec -l -U root $JAIL service -e | grep -q "rc.d/pf" \
-			&& _seclvl_J=$(jexec -l -U root $JAIL sysctl kern.securelevel \
-					| sed "s/kern.securelevel: //")
+check_security() {
+	# Get <jail> security parameters
+	_pfJ=$(jexec -l -U root $JAIL service -e | grep 'rc.d/pf')
 
-	# Return 1 to checks() if either seclvl is too high to modify network
-	[ "$_seclvl_J" == "3" ] && return 1 
+	_secJ=$(jexec -l -U root $JAIL sysctl kern.securelevel | grep -Eo '[^[:blank:]]+$')
 
-	# If GATEWAY has running pf, seclvl=3 could prevent modification 
+	# Seclvl of 3 will prevent pf mod (if pf is running).
+	[ -n "$_pfJ" ] && [ "$_secJ" = "3" ] && return 1
+
 	if chk_isrunning "$GATEWAY" ; then
-		jexec -l -U root $GATEWAY service -e | grep -q "rc.d/pf" \
-				&& _seclvl_T=$(jexec -l -U root $GATEWAY sysctl kern.securelevel \
-																| sed "s/kern.securelevel: //") 
+		# If running, get security just like <jail>
+		_pfG=$(jexec -l -U root $GATEWAY service -e | grep 'rc.d/pf')
+		_secG=$(jexec -l -U root $GATEWAY sysctl kern.securelevel | grep -Eo '[^[:blank:]]+$')
+
 	else
-		# If GATEWAY is off, but has pf_enabled, use jailmap.conf for the warning 
-		grep -Eq 'pf_enable=.*YES' ${M_ZUSR}/${GATEWAY}/rw/etc/rc.conf \
-				&& _seclvl_T=$(get_jail_parameter seclvl "$GATEWAY" "return 1" "true" "true")
-#&& _seclvl_T=$(sed -nE "s/^${GATEWAY}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP)
+		# If not running, rely on rc.conf and JMAP
+		_pfG=$(grep -E "pf_enable=.*YES" ${M_ZUSR}/${GATEWAY}/rw/etc/rc.conf)
+		_secG=$(get_jail_parameter -eqs seclvl "$GATEWAY")
 	fi
-	
-	# Return 1 if gateway seclvl is too high. Must use if/then here, for return 0/1 to work  
-	if [ "$_seclvl_T" == "3" ] ; then 
-		return 1 
-	fi
+
+	# Seclvl of 3 will prevent pf mod for pf enabled jails
+	[ -n "$_pfG" ] && [ "$_secG" = "3" ] && return 1
+
+	return 0
 }
 
 get_local_ip() {
@@ -95,7 +93,7 @@ get_local_ip() {
 
 get_bridge_members() {
 	# If _intf is a bridge, add the members
-	jexec -l -U root $_jail ifconfig $_intf | egrep -o "member: [^[:blank:]]+" \
+	jexec -l -U root $_jail ifconfig $_intf | grep -Eo "member: [^[:blank:]]+" \
 		| sed -E "s/member/$_jail $_intf member/g" | sed "s/:[[:blank:]]*/:/g"
 }
 
@@ -112,7 +110,6 @@ assemble_interface_list() {
 			# If the _intf is a bridge, add its bridge members to the list 
 			[ -z "${_intf##bridge*}" ] \
 				&& _ALL_INTF=$(printf "%b" "$_ALL_INTF\n$(get_bridge_members)")
-				
 		done
 	done
 	
@@ -120,50 +117,30 @@ assemble_interface_list() {
 	_ALL_INTF=$(echo "$_ALL_INTF" | grep -v "[[:blank:]]lo0[[:blank:]]" | column -t)
 
 	# Clean up and categorize all_interfaces list for later usage
-	_jail_intfs=$(echo "$_ALL_INTF" | egrep "^$JAIL ") 
-	_jail_eps=$(echo "$_jail_intfs" | awk '{print $2}' | egrep -o "epair[[:digit:]]+")	
-	_gateway_pairs=$(echo "$_ALL_INTF" | egrep -v "^$JAIL" | egrep "$_jail_eps")	
+	_jail_intfs=$(echo "$_ALL_INTF" | grep -E "^$JAIL ") 
+	_jail_eps=$(echo "$_jail_intfs" | awk '{print $2}' | grep -Eo "epair[[:digit:]]+")	
+	_gateway_pairs=$(echo "$_ALL_INTF" | grep -Ev "^$JAIL" | grep -E "$_jail_eps")	
 }
 
-configure_epairs() {
+configure_connection() {
 	# Start gateway if it's off
 	chk_isrunning "$GATEWAY" || start_jail "$GATEWAY" || exit 1
+	
+	# Make the connection beteween jails
+	connect_client_gateway "$JAIL" "$GATEWAY"
 
-	# Create the epair and send to jails
-	epair=$(ifconfig epair create)
-	ifconfig "${epair%?}a" vnet $GATEWAY
-	ifconfig "${epair%?}b" vnet $JAIL
-
-	# Apply IPV4 to JAIL and GATEWAY
-	jexec -l -U root $JAIL ifconfig "${epair%?}b" inet $IPV4 mtu $MTU up
-
-	jexec -l -U root $GATEWAY ifconfig "${epair%?}a" \
-										inet "${IPV4%.*/*}.1/${IPV4#*/}" mtu $MTU up
-}
-
-configure_network() {
-	# Add the IP to the gateway's pf table
-	[ -e "${M_JAILS}/${GATEWAY}/rw/etc/pf.conf" ] \
-			&& jexec -l -U root $GATEWAY pfctl -t pass_ips -T add $IPV4
-
-	# Add the IP to the jail's pf table
-	[ -e "${M_JAILS}/${JAIL}/rw/etc/pf.conf" ] \
-			&& jexec -l -U root $JAIL pfctl -t pass_ips -T add $IPV4
-
-	# Add default route and a resolv.conf for jail to connect to the internet
-	jexec -l -U root $JAIL route add default "${IPV4%.*/*}.1"
-	cp ${M_ZUSR}/${GATEWAY}/rw/etc/resolv.conf ${M_JAILS}/${JAIL}/rw/etc/
+	# Temporarily modify running pf tables
+	[ -n "$_pfG" ] && jexec -l -U root $GATEWAY pfctl -t pass_ips -T add $IPV4
+	[ -n "$_pfJ" ] && jexec -l -U root $JAIL    pfctl -t pass_ips -T add $IPV4
 }
 
 destroy_epairs() {
 	if [ -z "$GATEWAY" ] ; then
-		
 		# If no gateway, destroy all epairs on JAIL
 		_destr_epairs=$(jexec -l -U root $JAIL ifconfig -g epair)
 	else
-		
 		# Othewise only remove the epairs common to both JAIL and GATEWAY	
-		_destr_epairs=$(echo "$_gateway_pairs" | egrep "^${GATEWAY}[[:blank:]]+epair" \
+		_destr_epairs=$(echo "$_gateway_pairs" | grep -E "^${GATEWAY}[[:blank:]]+epair" \
 														| awk '{print $2}')
 	fi
 
@@ -190,8 +167,7 @@ list_output() {
 main() {
 	case $_CMD in 
 		create)
-				configure_epairs
-				configure_network
+				configure_connection
 		;;
 		destroy)
 				assemble_interface_list	
