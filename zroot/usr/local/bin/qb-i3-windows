@@ -1,5 +1,7 @@
 #!/bin/sh
 
+. /usr/local/lib/quBSD/quBSD.sh
+
 get_options() {
 	while getopts ch opts ; do
 		case $opts in
@@ -39,12 +41,11 @@ close_windows() {
 		WINDOWS=$(xprop -root _NET_CLIENT_LIST | sed -nE "s/.*window id # //p" | sed "s/,//g")
 
 		# If it's the 3nd pass, and there are still windows, give them an extra moment to die
-		[ "$_sig" == "-9" ] && [ -n "$WINDOWS" ] && sleep 4 
+		[ "$_sig" = "-9" ] && [ -n "$WINDOWS" ] && sleep 4 
 	
 		# Cycle through windows and kill them
 		for _win in $WINDOWS; do
-
-			eval kill $_sig $(get_info -e _XPID)
+			eval kill $_sig $(xprop -id $_win _NET_WM_PID | grep -Eo "[[:alnum:]]+\$")
 		done	
 
 		# Give a moment for windows to die 
@@ -63,6 +64,8 @@ list_windows() {
 	echo "$LIST" | sed 'N;s/\n/ /' | sed 's/WORKSPACE:[[:blank:]]*/WORKSPACE: /g' 
 }
 
+
+get_global_variables
 
 get_options "$@"
 
