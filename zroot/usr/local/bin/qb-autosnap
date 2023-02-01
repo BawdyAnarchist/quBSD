@@ -43,7 +43,7 @@ calculate_variables() {
 
 	if [ -n "$TTL" ] ; then  
 		case $_UNITS in
-			m)	SNAPNAME=$(date +%b%d_%H:%M_temp)
+			m)	SNAPNAME=$(date +%b%d_%H:%M)
 				_ttl_unix=$(( _INT * 60 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
@@ -59,13 +59,17 @@ calculate_variables() {
 				_ttl_unix=$(( _INT * 3600 * 24 * 7 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
+			M)	SNAPNAME=$(date +%Y-%M_Monthly)
+				_ttl_unix=$(( _INT * 3600 * 24 * 31 )) 
+				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
+
 			Y)	SNAPNAME=$(date +%Y_Annual)
 				_ttl_unix=$(( _INT * 3600 * 24 * 365 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 		esac
 	else
 		# If user did not input any [-t] TTL, tag the snapshot as manually created.
-		SNAPNAME=$(date +%b%d_%H:%M_Manual)
+		SNAPNAME=$(date +%b%d_%H:%M_Indef)
 	fi
 }
 
