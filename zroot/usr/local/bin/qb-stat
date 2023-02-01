@@ -93,11 +93,11 @@ get_jails_loop() {
 			ram=$(ps au -J $_j | awk '{sum+=$4;} END {print sum;}')
 		fi	
 
-		if [ "$class" == "root" -o -z "${_j##0*template}" ] ; then 
+		if [ "$class" = "root" -o -z "${_j##0*template}" ] ; then 
 			disk=$(echo "$zfs_list" | sed -nE "s#^${JAILS_ZFS}/${_j}[[:blank:]]+##p")
 			sub=4
 
-		elif [ "$class" == "VM" ] ; then 
+		elif [ "$class" = "VM" ] ; then 
 			# Future functionality - bhyvectl or ping test for on/connected
 			disk=$(echo "$zfs_list" | sed -nE "s#^${QBROOT}/${_j}[[:blank:]]+##p")
 			sub=5
