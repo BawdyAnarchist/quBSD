@@ -33,7 +33,7 @@ checks() {
 		CLASS=$(sed -nE "s/^${JAIL}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
 	
 		# var $_ZFS prevents multiple if/then statements later on.
-		[ "$CLASS" == "rootjail" ] && _ZFS="${JAILS_ZFS}" || _ZFS="${ZUSR_ZFS}"
+		[ "$CLASS" = "rootjail" ] && _ZFS="${JAILS_ZFS}" || _ZFS="${ZUSR_ZFS}"
 
 	# _CMD specific checks and variable assignments
 	case $_CMD in 
