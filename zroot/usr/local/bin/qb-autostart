@@ -92,7 +92,7 @@ climb_hierarchy() {
 		# _jail's gateway path was already handled. Skip further checks.
 		return 0
 
-	elif [ "$_gateway" == "none" ] ; then
+	elif [ "$_gateway" = "none" ] ; then
 
 		if get_info -q _CLIENTS $_jail ; then
 			# Jail has no gateway, but serves clients. Add it to the priority list.	
@@ -104,7 +104,7 @@ climb_hierarchy() {
 		fi
 
 	## NOTE: Needs changed *when VM integration is completed*.
-	elif [ "$_class_of_gateway" == "VM" ] ; then
+	elif [ "$_class_of_gateway" = "VM" ] ; then
 
 		## NOTE: For now, jails connecting to VM are hierarchy top. Assume VM is started. 
 		STARTS="$_jail $STARTS"
