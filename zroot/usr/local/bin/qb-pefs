@@ -36,7 +36,7 @@ checks() {
 	chk_valid_jail "$JAIL" || get_msg_pefs "none" "usage_1"
 
 	# If performing mount, the directory should already exist. 
-	[ "$_CMD" == "mount" ] && ! [ -d "$U_FOLDER" ] && get_msg_pefs "_3" "usage_1"
+	[ "$_CMD" = "mount" ] && ! [ -d "$U_FOLDER" ] && get_msg_pefs "_3" "usage_1"
 
 	# Check that U_FOLDER path is relative to the zusr mount for the jail
 	echo "$U_FOLDER" | grep -qE "^${M_ZUSR}/${JAIL}" || get_msg_pefs "_4" "usage_1"
