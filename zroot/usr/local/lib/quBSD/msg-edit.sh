@@ -13,7 +13,7 @@ get_msg_edit() {
 		_pass_cmd="none"
 		
 		# The only message that should be shown, is the result.
-		! [ "$_message" == "_8" ] && _message="none"
+		! [ "$_message" = "_8" ] && _message="none"
 	fi
 
 	# QUIET will skip over messages 
