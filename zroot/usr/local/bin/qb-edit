@@ -23,6 +23,9 @@ get_options() {
 	PARAM="${PARAM:-"$2"}"
 	VAL="${VAL:-"$3"}"
 	OLDSETTING=$(sed -nE "s@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+@@p" $JMAP)
+
+	# If the user wants to mod both gateway and ipv4 simultanously, this will handle it later.
+	PARAM2="$2"
 }
 
 checks() {
@@ -35,7 +38,7 @@ checks() {
 		# Doesn't exist in jmap (thus, can't be edited)
 		get_msg_edit "_2" "usage_1"
 
-	elif [ "$VAL" == "$OLDSETTING" ] ; then
+	elif [ "$VAL" = "$OLDSETTING" ] ; then
 		# New value is unchanged from old value 
 		get_msg_edit "_3" "usage_0"
 
@@ -71,7 +74,7 @@ checks() {
 		;;
 		ipv4) 
 				# It's possible user might try to assign DHCP from command line
-				if [ "$VAL" == "auto" ] ; then 
+				if [ "$VAL" = "auto" ] ; then 
 
 					# Function returns available IPv4. Or for net-firewall returns "DHCP"
 					VAL=$(discover_open_ipv4 $_q "$JAIL") \
@@ -79,7 +82,7 @@ checks() {
 
 				else
 					# Check IP addresses for validity and quBSD convention adherence 
-					chk_valid_ipv4 $_q "$VAL" "$JAIL" \
+					chk_valid_ipv4 $_q "$VAL" \
 							|| get_msg_edit "none" "exit_1" 
 
 					check_isqubsd_ipv4 $_q "$VAL" "$JAIL" \
@@ -101,7 +104,7 @@ handle_restarts() {
 			chk_isrunning $JAIL && _restart1="$JAIL"
 		;;
 		ipv4|gateway)
-			_gateway=$(sed -nE "s/^${JAIL}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
+			_gateway=$(get_jail_parameter -deqs gateway $JAIL)
 
 			# If jail is running it needs restarted
 			if chk_isrunning $JAIL ; then
@@ -116,7 +119,7 @@ handle_restarts() {
 	# If there are no jails to restart, exit
 	[ -z "$_restart1" ] && [ -z "$_restart2" ] && exit 0
 	
-	# If QUIET tagged, only continue if users specified a restart
+	# If QUIET tagged, only continue if user specified a restart
 	[ -n "$QUIET" ] && [ -z "$RESTART" ] && exit 0
 
 	if [ -z "$QUIET" ] ; then 
@@ -126,8 +129,35 @@ handle_restarts() {
 	
 	# Restart jails (otherwise, would've already exited)	
 	for _jail in $_restart2 $_restart1 ; do
-		[ "$_jail" == "none" ] || restart_jail "$_jail" 
+		[ "$_jail" = "none" ] || restart_jail "$_jail" 
 	done
+}
+
+handle_vm_gateway() {
+		
+		# Relevant variables. 
+		_gateway=$(get_jail_parameter -deqs gateway $JAIL)
+		_tap=$(get_jail_parameter -deqs vif $_gateway)
+		_rcconf="${M_ZUSR}/net-firewall/rw/etc/rc.conf"
+		chflags noschg "$_rcconf"	
+
+		if [ "$VAL" = "DHCP" ] ; then
+			sed -i '' -E "s/ifconfig_${_tap}.*/ifconfig_${_tap}=\"DHCP\"/" $_rcconf
+			sed -i '' -E "/defaultrouter=/ d" $_rcconf
+
+		else
+
+			# Using `#' as sed separator, because `/' interferes with variable expansion
+			sed -i '' -E "s#ifconfig_${_tap}.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
+			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
+			
+			# This might not be completley robust. Generally a.b.c.1 should be the default.
+			sed -i '' -E "/^ifconfig_${_tap}.*/ a\\
+defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
+		fi
+
+		# Warn about having modified IP for net-firewall		
+		get_msg_edit "_9"
 }
 
 main() {
@@ -140,31 +170,12 @@ main() {
 	_newJMAP=$(column -t $JMAP)
 	echo "$_newJMAP" > $JMAP
 
-	# Special handling case for net-firewall, to modify rc.conf 
-	if [ "$JAIL" == "net-firewall" ] ; then
+	# Special case for net-firwell. Will need to eventually be generalized with VM handling. 
+	[ "$JAIL" = "net-firewall" ] && [ "$PARAM" = "ipv4" ] && handle_vm_gateway 
 		
-		# Relevant variables. 
-		_tap=$(sed -nE "s/^${JAIL}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
-		_rcconf="${M_ZUSR}/net-firewall/rw/etc/rc.conf"
-		chflags noschg "$_rcconf"	
-
-		if [ "$VAL" == "DHCP" ] ; then
-			sed -i '' -E "s/ifconfig_${_tap}.*/ifconfig_${_tap}=\"DHCP\"/" $_rcconf
-			sed -i '' -E "/defaultrouter=/ d" $_rcconf
-
-		else
-			# Using `#' as sed separator, because `/' interferes with variable expansion
-			sed -i '' -E "s#ifconfig_${_tap}.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
-			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
-			
-			# This might not be completley robust. Generally a.b.c.1 should be the default.
-			sed -i '' -E "/^ifconfig_${_tap}.*/ a\\
-defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
-		fi
-		
-		get_msg_edit "_9"
-	fi
+	handle_restarts
 }
+
 
 get_global_variables 
 
@@ -173,7 +184,5 @@ get_options "$@"
 checks
 
 main
-
-handle_restarts
 
 
