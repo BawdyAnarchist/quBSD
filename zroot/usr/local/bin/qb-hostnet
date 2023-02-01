@@ -23,10 +23,9 @@ get_parameters() {
 	# [-t time] was invalid
 	[ "$_TIME" -ge 0 ] || get_msg_hostnet "_6" "usage_1"
 
-	# Must get host network parameters. Use <#default> mtu if not provided.
+	# Must get host network parameters. 
 	get_jail_parameter gateway "host" || exit 1
 	get_jail_parameter ipv4 "host" || exit 1 
-	get_jail_parameter -q mtu "host" 
 }
 
 connection_down() {
@@ -66,20 +65,13 @@ main() {
 	connection_down
 		
 	# Bring up host network connection 
-	if [ "$_CMD" == "up" ] ; then 
+	if [ "$_CMD" = "up" ] ; then 
 
 		# start_jail command handles most error messages 
 		start_jail "$GATEWAY" ||  get_msg_hostnet "_3" "usage_1"
-	
-		# Create epair, and set it up inside the gateway
-		_epair=$(ifconfig epair create)
-		ifconfig "${_epair%?}a" vnet $GATEWAY
-		jexec -l $GATEWAY ifconfig "${_epair%?}a" inet ${IPV4%.*/*}.1/${IPV4#*/} mtu $MTU up
 
-		# Configure epair on the host side
-		ifconfig "${_epair%?}b" inet $IPV4 mtu $MTU up
-		route add default "${IPV4%.*/*}.1"
-
+		connect_client_gateway "host"
+		
 		# Change pf to file that passes internet from host to outside. 
 		pfctl -f /etc/pf_pass.conf
 
