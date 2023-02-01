@@ -64,7 +64,7 @@ check_existing() {
 	[ -n "$FORCE" ] && return 1
 
 	# Window check doesn't apply to commands with no window to launch
-	[ "$_LOC" == "!NO_WINDOW" ] && return 1 
+	[ "$_LOC" = "!NO_WINDOW" ] && return 1 
 
 	# Getting just the first part of the command makes it easier to match later on. 
 	_cmd=$(echo $_CMD | awk '{print $1}')
@@ -82,7 +82,7 @@ wait_for_window() {
 		sleep .2
 
 		# Jailname of window is same as the command. Func converts `hostname` to 'host'
-		if [ "$(get_info -e _XJAIL)" == "$_LOC" ] ; then
+		if [ "$(get_info -e _XJAIL)" = "$_LOC" ] ; then
 				
 			# The i3launch $_cmd might be slightly different than xprop or ps, so check both.  
 			ps $(get_info -e _XPID) | grep -Eiq "$_cmd" && sleep 1 && break
@@ -109,14 +109,14 @@ execute_commands() {
 			eval $_CMD
 
 			# A bit dirty, but it eliminates interference with the eval above 
-			[ "$?" == "0" ] && wait_for_window 
+			[ "$?" = "0" ] && wait_for_window 
 		;;  
 		*) 
 			# Execute the command provided
 			eval "qb-cmd $_LOC $_CMD"
 
 			# A bit dirty, but it eliminates interference with the eval above 
-			[ "$?" == "0" ] && wait_for_window 
+			[ "$?" = "0" ] && wait_for_window 
 		;;
 	esac	
 }
