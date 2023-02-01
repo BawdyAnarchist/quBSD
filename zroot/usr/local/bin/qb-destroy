@@ -39,10 +39,10 @@ checks() {
 	chk_valid_jail "$JAIL" 
 
 	# no_destroy protection flag still active
-	[ "$NO_DESTROY" == "true" ] && get_msg_destroy "_2" "usage_1"	
+	[ "$NO_DESTROY" = "true" ] && get_msg_destroy "_2" "usage_1"	
 
 	# Extra reminder that they're destorying a rootjail
-	[ "$CLASS" == "rootjail" ] && get_msg_destroy "_4" 
+	[ "$CLASS" = "rootjail" ] && get_msg_destroy "_4" 
 
 	# Print the datasets and amount of data to be destroyed
 	get_msg_destroy "_5" 
