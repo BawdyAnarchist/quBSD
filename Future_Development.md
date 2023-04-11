@@ -52,8 +52,6 @@ devfs.rules
 
 ### UPGRADES
 
-qb-record - add to the repo. Done
-
 pwd
 	- I think the right way to do this, is export any existing pwd db in /rw, and import it into the created jail (or maybe vice versa) 
 	- Right now I'm not so confident on how that's working
@@ -98,6 +96,10 @@ qubsd_installer
 			- qb-create should in realtime copy over /usr/local/etc from 0serv
 			- There might even be problems with pkg-upgrade operating on this dir
 			- Make sure to chown the directories as appropriate
+	
+	- devfs.rules
+		- add qubsd to the naming convention
+		- the new one for webcam
 
 ### VIRTUAL MACHINE INTEGRATION
 
