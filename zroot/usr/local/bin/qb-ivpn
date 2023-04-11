@@ -290,7 +290,7 @@ national() {
 
 town() {
 	cities=$(jq --arg COUNTRY "$country" \
-			'[.servers[] | select(.country=$COUNTRY) | .city] | unique' $SERVERS | sed 1d | sed '$d' | nl)
+			'[.servers[] | select(.country==$COUNTRY) | .city] | unique' $SERVERS | sed 1d | sed '$d' | nl)
 
 	get_msg_ivpn "_8" ; read _i ; clear
 
@@ -300,10 +300,10 @@ town() {
 
 server() {
 
-	jq --arg CITY "$city" '[.servers[] | select(.city=$CITY) | {City: .city, pubkey: .wg_public_key, Gateway: .hostnames.wireguard, ISP: .isp, Active: .is_active, Load: .load}]' $SERVERS
+	jq --arg CITY "$city" '[.servers[] | select(.city==$CITY) | {City: .city, pubkey: .wg_public_key, Gateway: .hostnames.wireguard, ISP: .isp, Active: .is_active, Load: .load}]' $SERVERS
 
 	_servers=$(jq --arg CITY "$city" \
-			'[.servers[] | select(.city=$CITY) | .wg_public_key]' $SERVERS | sed 1d | sed '$d' | nl)
+			'[.servers[] | select(.city==$CITY) | .wg_public_key]' $SERVERS | sed 1d | sed '$d' | nl)
 
 	get_msg_ivpn "_9" ; read _e ; clear
 
@@ -311,7 +311,7 @@ server() {
 			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed 's/\".*$//')
 
 	endip=$(jq --arg PUB "$publickey" \
-			'.wireguard | .[] | .hosts | .[] | select(.public_key=$PUB) | .host' $SRV_IPS | sed 's/^.//' | sed 's/\".*$//')
+			'.wireguard | .[] | .hosts | .[] | select(.public_key==$PUB) | .host' $SRV_IPS | sed 's/^.//' | sed 's/\".*$//')
 
 	endpoint=$(printf "%b" "${endip}:${PORT}")
 }
@@ -347,7 +347,6 @@ modify_ivpn() {
 }
 
 main() {
-
 	# List is the simplest, just fetch connection and exit. No further logic required 
 	if [ -n "$LIST" ] ; then 
 		fetch_connection 
