@@ -32,7 +32,7 @@ checks() {
 }
 
 adjust_mic() {
-	_VOL="${_VOL:=100}"
+	_VOL="${_VOL:=50}"
 	_mixers=$(ls /dev/mixer*)
 
 	for _mix in $_mixers ; do 
