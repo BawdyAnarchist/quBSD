@@ -85,7 +85,7 @@ checks() {
 					chk_valid_ipv4 $_q "$VAL" \
 							|| get_msg_edit "none" "exit_1" 
 
-					check_isqubsd_ipv4 $_q "$VAL" "$JAIL" \
+					chk_isqubsd_ipv4 $_q "$VAL" "$JAIL" \
 							|| get_msg_edit "none" "exit_1" "_f"
 				fi
 		;; 
