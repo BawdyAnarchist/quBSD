@@ -56,7 +56,7 @@
 # chk_valid_cpuset   - jail resource control
 # chk_valid_mtu      - networking option (typically unused) 
 # chk_valid_ipv4     - Must adhere to CIDR notation
-# check_isqubsd_ipv4 - Implements quBSD conventions over internal IP addresses 
+# chk_isqubsd_ipv4   - Implements quBSD conventions over internal IP addresses 
 # chk_valid_template - Somewhat redundant with: chk_valid_jail  
 # chk_trueorfalse    - When inputs must be either true or false
 
@@ -980,7 +980,7 @@ chk_valid_no_destroy() {
 define_ipv4_convention() {
 	# Defines the quBSD internal IP assignment convention.
 	# Variables: $ip0.$ip1.$ip2.$ip3/subnet ; are global. They're required 
-	# for functions:  discover_open_ipv4()  ;  check_isqubsd_ipv4() 
+	# for functions:  discover_open_ipv4()  ;  chk_isqubsd_ipv4() 
 
 	# Returns 0 for any normal IP assignment, returns 1 if 
 	# operating on net-firewall (which needs special handling).
