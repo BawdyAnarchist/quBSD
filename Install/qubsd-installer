@@ -644,8 +644,9 @@ rootjails_packages() {
 	# net-jails need VPN scripts
 	cp /usr/local/bin/qb-ivpn ${m_jails}/0net/usr/local/bin/
 
-	# Gui jails need the .X11-unix directory in order to nullfs the mount later
+	# Gui jails need the .X11-unix , and home directories in order to nullfs the mount later
 	mkdir ${m_jails}/0gui/tmp/.X11-unix
+	mkdir ${m_jails}/0gui/usr/home
 
 	# New tyme to make sure that the new snapshot is different from send/recv  
 	tyme=$(date +%H%M)
