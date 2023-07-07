@@ -15,8 +15,13 @@ get_parameters() {
 	# Check/warn if outside of quBSD IPv4 convention, but don't fail 
 	chk_isqubsd_ipv4 "$IPV4" "$JAIL"
 
-	# MTU only with valid IP. Quiet messages (MTU is not critical) 
-	[ gateway = "none" ] || get_jail_parameter -q mtu "$JAIL" 
+	if ! [ gateway = "none" ] ; then
+		# We will need the class of the gateway later for VM vs jails handling
+		_class_gw=$(get_jail_parameter -eq class "$GATEWAY")
+
+		# MTU only with valid IP. Quiet messages (MTU is not critical) 
+		get_jail_parameter -q mtu "$JAIL" 
+	fi
 }
 
 connect_jail_to_clients() {
@@ -65,7 +70,6 @@ resource_control() {
 main() {
 	# Jails connected to VMs must have handling of the tap interface 
 	if [ "$_class_gw" == "VM" ] ; then
-		
 		# Get the tap interface for the VM
 		get_jail_parameter vif "$GATEWAY" ||  exit 1
 		
