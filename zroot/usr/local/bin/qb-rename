@@ -28,14 +28,11 @@ define_variables() {
 
 checks() {
 	# Check that JAIL was specified, and valid 
-	chk_valid_jail "$JAIL" || get_msg_rename "_1_1" "usage_1" 
+	chk_valid_jail "$JAIL" || get_msg_rename "_0" "usage_1" 
 	
-	# Make sure new jailname was provided
-	[ -z "$NEWNAME" ] && get_msg_rename "_1" "usage_1"
+	# Check that the new jailname is available and has no conflicts 
+	chk_avail_jailname "$NEWNAME" || get_msg_rename "none" "usage_1"
 
-	# Due to the checks which exclude values of `none', it's unwise to use it for jailname 
-	[ "$NEWNAME" = "none" ] && get_msg_rename "_2" "usage_1"
-	
 	# If jail is running, we're going to restart it
 	chk_isrunning "$JAIL" && RESTART="true"
 
