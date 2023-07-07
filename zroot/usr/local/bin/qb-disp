@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # IMPROVEMENT: Make it so that a command can be run immediately at terminal launch.
-# IMPROVEMENT: Add option for automatic network connection (gateway). Auto IP.  
+
 
 . /usr/local/lib/quBSD/quBSD.sh
 . /usr/local/lib/quBSD/msg-disp.sh
@@ -31,11 +31,7 @@ newjail_name() {
 	_cycle=''
 
 	# If DISP-jail exists (even partially), increment the ending number and try again 
-	while zfs list -rt all | grep -Eqs "^${JAILS_ZFS}/$NEWJAIL[[:blank:]]" || \
-			zfs list -rt all | grep -Eqs "^${ZUSR_ZFS}/$NEWJAIL[[:blank:]]" || \
-			grep -Eqs "^$NEWJAIL[[:blank:]]" $JMAP || \
-			grep -Eqs "^$NEWJAIL[[:blank:]]" $JCONF 
-	do
+	while ! chk_avail_jailname "$NEWJAIL" ; do
 		_cycle=$(( _cycle + 1 ))	
 		NEWJAIL="DISP-${JAIL}_${_cycle}"
 	done	
@@ -51,8 +47,7 @@ main() {
 	trap 'zfs destroy -rRf $NEWSNAP' INT TERM HUP QUIT EXIT
 
 	# Create dispjail and disable the no_destroy protection 
-	qb-create -c dispjail -t none -i none -T $JAIL $NEWJAIL 
-	qb-edit -qf $NEWJAIL no_destroy false
+	qb-create -y -c dispjail -g none -i none -n false -t $JAIL $NEWJAIL 
 
 	#Trap to ensure DISP doesn't remain after use
 	trap	'destroy_dispjail' INT TERM HUP QUIT EXIT
