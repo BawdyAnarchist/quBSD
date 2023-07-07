@@ -66,18 +66,19 @@ Usage: qb-list [-p <parameter>]
    inside jailmap.conf will be sent to stdout
 
 PARAMETERS   Saved at:  /usr/local/etc/quBSD/jailmap.conf
+autosnap:    Include jail in qb-autosnap run by /etc/crontab.
 autostart:   Automatically start the jail during host boot. 
 class:       appjail, dispjail, or rootjail
 cpuset:      CPUs a jail may use, or \`none' for no limit
-IPV4:        IPv4 address for the jail.
+gateway:     Gateway to provides <jail> with network connection 
+ipv4:        IPv4 address for the jail.
 maxmem:      RAM maximum allocation, or \'none' for no limit 
+MTU:         MTU setting for network connections 
 no_destroy:  Prevents accidental destruction of a jail
 rootjail:    Fully installed rootjail is cloned for <jail>
 schg:        Directories to receive schg flags: all|sys|none
 seclvl:      kern.securelevel to protect <jail>: -1|0|1|2|3
 template:    Dispjails require a template to clone.
-gateway:     Gateway to provides <jail> with network connection 
-devfs_ruleset=  Provided for reference. See /etc/jail.conf
 
 ENDOFUSAGE
 }
