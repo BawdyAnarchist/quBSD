@@ -75,6 +75,9 @@ main() {
 		# Change pf to file that passes internet from host to outside. 
 		pfctl -f /etc/pf_pass.conf
 
+		# Restart ntpd. One problem with host being offline is that it loses time sync
+		service ntpd restart > /dev/null 
+
 		revert_connection &
 		exit 0
 	fi
