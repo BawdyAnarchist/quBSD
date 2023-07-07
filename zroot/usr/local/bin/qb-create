@@ -1,857 +1,371 @@
 #!/bin/sh
 
-while getopts c:C:f:ghHi:m:r:s:t:T: o ; do
-	case $o in
-		c) class="$OPTARG" ;;
-		C) cpuset="$OPTARG" ;;
-		f) schg="$OPTARG" ;;
-		g) guided="true" ;;
-		h) help="true" ;;
-		H) copyhome="true" ;;
-		i) IPV4="$OPTARG" ; optIP="true" ;;
-		m) maxmem="$OPTARG" ;;
-		r) rootjail="$OPTARG" ;;
-		s) seclvl="$OPTARG" ;;
-		t) gateway="$OPTARG" ;;
-		T) template="$OPTARG" ;;
-	esac
-done
-
-shift $(( OPTIND - 1 ))
-
-QBCONF="/usr/local/etc/quBSD/quBSD.conf"
-JCONF="/etc/jail.conf"
-JMAP="/usr/local/etc/quBSD/jailmap.conf"
-sed -i '' -e 's/[[:blank:]]*$//g' $JMAP    # Removes blanks at EOL, prevents errors
-
-# Get datasets and mountpoints
-zusr_zfs=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
-m_zusr=$(zfs get -H mountpoint $zusr_zfs | awk '{print $3}')
-jails_zfs=$(sed -En "s/^jails_dataset[[:blank:]]+//p" $QBCONF)
-m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
-
-
-# Define script variables
-newjail="$1"
-datetime=$(date +%b%d_%H%M)
-
-define_variables() {
-
-	# Valid template jails must have JMAP entries and ${zusr_zfs} dataset 
-	JMAP_appjs=$(qb-list -p class | grep appjail | awk '{print $1}')
-	zusrlist=$(zfs list -r ${zusr_zfs} | awk '{print $1}')
-	for j in $JMAP_appjs ; do
-		`echo "$zusrlist" | egrep -qs "^${zusr_zfs}/$j\$"` &&
-				validtemplatejs=$(printf "%b" "$j" "\n" "$validtemplatejs")
-	done
-
-	# Valid rootjails must have JMAP entries and ${jails_zfs} dataset 
-	JMAP_rootjs=$(qb-list -p class | grep rootjail | awk '{print $1}')
-	for j in $JMAP_rootjs ; do
-		tmpj=$(zfs list -ro name,used ${jails_zfs} | egrep "^${jails_zfs}/$j[[:blank:]]")
-		validrootjs=$(printf "%b" "$tmpj" "\n" "$validrootjs")
-	done
-
-	# Additional parameters for later use with tests and messages
-	JMAPIPs=$(qb-list -p IPV4 | tail +3 | sort -k3)
-	usedIPs=$(qb-connect -l | tail +3 | sort -k3)
-	netjails=$(echo "$validtemplatejs" | egrep "^net-")
-	validcpuset=$(cpuset -g | sed "s/pid -1 mask: //" | sed "s/pid -1 domain.*//")
-}
-
-usage() {
-	[ "$ERR" ] && printf "%b" "\n$ERR\n\nFor more info, see: qb-create -h\n\n" && exit 1
-	cat << EOF
-
-Quick/easy ways to create a new jail:
-Usage: qb-create [-H] -T <template_jail> <newjail>
-       qb-create -g <newjail>
-
-Minimum requirements: class and rootjail. Created, but no configs:
-Usage: qb-create -c <class> -r <rootjail> <newjail>"
-
-All possible options:
-Usage: qb-create [-h] [-g] [-c <class>] [-C <cpuset>] [-f <flags>] \\ 
-                 [-i <IPV4>] [-m <maxmem>] [-r <rootjail>] [-s <seclvl>] \\
-                 [-t <gateway_jail>] [-T <template_jail>] [-H] <newjail>"
-
-   -h: (h)elp: Shows this message
-   -g: (g)uided: Informative messages guide the user through a series of
-        input prompts for the creation of <newjail>. Any options specified
-        at the command line will be overwritten by user responses.
-   -T: (T)emplate: <newjail> inherits JAIL PARAMETERS of <template_jail>
-        but can be overriden by specifying JAIL PARAMETER options
-        All /rw files (like rc.conf, fstab, pwd) are copied and modified
-   -H: (H)OME: ${m_zusr}/<template_jail>/home files are copied to <newjail>
-        Only valid with [-T]
-        Hint: Use [-H] with appjail templates like 0gui-template, to create
-        new jails with a set of baseline user configs (eg: .cshrc, .config)
-
-JAIL PARAMETERS  
-       Stored at /usr/local/etc/quBSD/jailmap.conf
-   -c: (c)lass: Classification of <newjail>
-        Valid arguments: <appjail|rootjail|dispjail>
-   -C: (C)puset: Limits which CPUs <newjail> may use. For example:
-        0,1,2,3 and 0-3 mean the same thing. If set to \`none', no CPU
-        limitations will be applied. See:  man 1 cpuset
-   -f: (f)lags: schg is applied recursively to specified directory group
-        Valid arguments: <none|sys|all>  (This is a quBSD convention)
-        \`sys' includes: /bin /boot /lib /etc and other system files
-        \`all' includes: All files, including /home. See man 1 chflags
-   -i: (i)p: IPv4 of <newjail>. If [-i] is not specified, but <gateway>  
-        is a valid net-<jail>, an unused IPv4 address is auto applied
-        Valid arguments:  In IPv4 CIDR notation IP.IP.IP.IP/subnet
-   -m: (m)ax memory allocation for <newjail>
-        Valid arguments:  <integer><G|M|K>  For example:  4G or 4000M
-   -r: (r)ootjail: The fully installed root filesystem for <newjail>
-        Appjails receive a fresh rootjail clone at every start/stop
-        Rootjails can be duplicated like so:
-           qb-create -T <0base> <newjail>
-                or
-           qb-create -c rootjail -r <0base> <JAIL PARAMETERS> <newjail>
-            [Bootstrapping new jails is unsupported. Use bsdinstall]
-   -s: (s)ecurelevel: Applies \`sysctl kern.securelevel\` to <newjail>
-        Valid arguments: <-1|0|1|2|3>. See man 7 security
-   -t: (t)unnel: <newjail> is connected to <gateway_jail> at jail start
-        Valid arguments: Must be existing appjail
-
-EOF
-	exit 0
-}
-
-define_errors() {
-	e1=$(printf "%b" "qb-create: ERROR: must specify name of <newjail>")
-
-	e2=$(printf "%b" "qb-create: ERROR: You must specify one of the following: \n" \
-			"[-T <template>] | [-g] | [-c <class> -r <rootjail>]\n")
-	
-	e3=$(printf "%b" "qb-create: ERROR: [-T] The selected template jail:  $template is \n" \
-			"not sufficiently configured in /usr/local/etc/quBSD/jailmap.conf")
-
-	e4=$(printf "%b" "qb-create: ERROR: [-c] Class must be one of the" \
-			"\nfollowing: <appjail|rootjail|dispjail>")
-
-	e5=$(printf "%b" "qb-create: ERROR: [-r] You must specify a VALID rootjail."\
-			"\nHere is a list of valid possibilities from ${jails_zfs} \n\n$validrootjs\n" \
-			"\nIf you expected to see another rootjail, check that it's in jailmap.conf" \
-			"\nand a zfs ${jails_zfs}/<jailname> is an original dataset (not a child).")
-
-	e6=$(printf "%b" "qb-create: ERROR: [-r] [-T] mismatch in combination with [-c rootjail]" \
-			"\nCreating a rootjail requires user to specify an existing rootjail with" \
-			"\n[-r] | [-T]. If both options are specified, they must match. Choosing" \
-			"\n[-T <template>], requires a rootjail to be specified, not an appjail")
-
-	e7=$(printf "%b" "qb-create: ERROR: [-H] or [-c dispjail]: [-T] must be specified")
-
-	e8=$(printf "%b" "qb-create: ERROR: $newjail already has zfs datasets under the same" \
-			"\nname, or there already exists entries for it in jailmap.conf" \
-			"\nYou can use \`qb-destroy' to remove any lingering pieces of a jail")
-
-	e9=$(printf "%b" "qb-create: ERROR: [-T] Must specify a VALID template, or \`none'")
-
-	e12=$(printf "%b" "qb-create: ERROR: [-t] User opted to exit, gateway has incomplete config" \
-			"\nHere are a list of all net-jails:\n\n$netjails\n")
-
-	e13=$(printf "%b" "qb-create: ERROR: [-i] You must specify a VALID IP address\n" \
-			"which includes the subnet:  IP.IP.IP.IP/24")
-
-	e14=$(printf "%b" "qb-create: ERROR: User opted to exit, for IP re-assignment" \
-			"\nINFO: quBSD IP assignment conventions are as follows:\n")
-
-	e15=$(printf "%b" "qb-create: ERROR: User opted to quit due to IPv4 overlap." \
-			"\nHere is a mapping of all IPs designated in jailmap.conf:\n\n$JMAPIPs\n" \
-			"\nAnd all the IPs currently in use by running jails:\n\n$usedIPs")
-
-	e15_1=$(printf "%b" "qb-create: ERROR: User opted to exit, to re-evaluate IP and/or gateway") 
-
-	e16=$(printf "%b" "qb-create: ERROR: [-f] Flags (schg) option can only be one of" \
-			"3 settings:  none | sys | all") 
-
-	e17=$(printf "%b" "qb-create: ERROR: [-s] Secure level can only be one of" \
-			"the following:  <-1|0|1|2|3>") 
-
-	e18=$(printf "%b" "qb-create: ERROR: [-m] maximum memory must be of " \
-			"VALID format. <integer><G|M|K>\n")
-
-	e19=$(printf "%b" "qb-create: ERROR: [-C] must be valid format, and CPU cores must exist" \
-			"\nFor example:  0,1,2,3  OR  0-3 . List of valid CPUs:\n\n$validcpuset\n")
-
-	e20=$(printf "%b" "\n\tERROR:  Selection was invalid. Choose a valid class:  ")
-
-	e21=$(printf "%b" "\n\tERROR: Selection was invalid. Choose a valid template jail:  " )
-
-	e22=$(printf "%b" "\n\tERROR:  Selection was invalid. If you expected another" \
-			"\nrootjail, check that it's designated in jailmap.conf and that " \
-			"\nzfs list -o name,origin ${jails_zfs}/<jailname>" \
-			"\nshows your expected rootjail as not being a child zfs dataset" \
-			"\n\n\tChoose one of the rootjails above:  \n")
-
-	e23=$(printf "%b" "\n\tERROR:  Invalid selection. Choose a valid gateway (or none):  ")
-	
-	e24=$(printf "%b" "\n\tERROR: Invalid IPv4 CIDR. " \
-					"\n\tEnter valid IPv4. INCLUDE THE SUBNET! (or none):  ")
-
-	e25=$(printf "%b" "\n\tERROR: Entry is invalid. Here is schg mapping for all jails: \n\n")
-
-	e26=$(printf "%b" "\n\tEnter one of the 3 options:  none|sys|all :  "  )
-
-	e27=$(printf "%b" "\n\tERROR: Entry is invalid. Here is the seclvl of all jails: \n\n")
-
-	e28=$(printf "%b" "\n\tEnter a valid kern.securelevel:  ")
-
-	e29=$(printf "%b" "\nERROR: Entry is invalid. Here is the maxmem for all jails:\n\n")
-
-	e30=$(printf "%b" "\n\tEnter a valid rctl format:  ")
-
-	e31=$(printf "%b" "\n\tERROR: Entry is invalid. Enter a valid cpuset:  ")
-
-	e32=$(printf "%b" "qb-create: ERROR: No available IP address between: \n$ip0_0 and $ip0 " \
-			"Manually assign IPV4 with [-i] option and try again")
-}
-
-define_warnings() {
-	w1=$(printf "%b" "\nWARNING: [-i] IP assignment diverges from quBSD convention." \
-							"\n\nIP assignment conventions are as follows:\n" \
-							"\nJAIL              GATEWAY        IPv4 Range" \
-							"\nnet-firewall      nicvm          Router Dependent" \
-							"\nnet-<gateway>     net-firewall   10.255.x.2/30"\
-							"\nserv-jails        net-firewall   10.128.x.2/30" \
-							"\nappjails          net-<gateway>  10.1.x.2/30" \
-							"\nusbvm             variable       10.88.88.1/30" \
-							"\nadhoc created with qb-connect    10.99.x.2/30" \
-							"\n\n\tContinue with $IPV4 anyways? (y/n):  ")
-
-	w2=$(printf "%b" "\nWARNING: [-i] overlaps with an IPv4 already in use.\n" \
-			"Do you really want to do this? (y/n): ")
-	
-	w3=$(printf "%b" "\n\tWARNING:  Selection overlaps with an IPv4 " \
-			"already in use\n\tDo you really want to do this? (y/n): ")
-
-	w4=$(printf "%b" "\nqb-create: WARNING: [-t] $gateway (gateway_jail) is not fully configured." \
-			"\nHere is a list of valid gateway possibilities:\n\n$validtemplatejs\n" \
-			"\n\tContinue anyways? (y/n):  ")
-
-	w5=$(printf "%b" "\nqb-create: WARNING: Valid IPv4 ($IPV4), but gateway is \`none'" \
-			"\n\tContinue anyways? (y/n):  ")
-}
-
-define_messages() {
-
-	m1=$(printf "%b" "\nGUIDED MODE: User will be presented with information, options, and" \
-		"\ninput prompts to assist in the creation of a new jail.\n" \
-		"\nChoose a jail class: Valid arguments are:  appjail|rootjail|dispjail  " \
-		"\n\nRootjails contain the base FreeBSD system files, installation, and pkgs." \
-		"\nAppjails / dispjails depend on their associated rootjail, because they only" \
-		"\ncontain /usr/home and just a few system-specific files. All other system" \
-		"\nfiles are cloned from the associated rootjail at every jail start/stop." \
-		"\nSelecting rootjail here, will result in an on disk, full system install" \
-		"\nduplicated from which ever rootjail you select at the next prompt" \
-		"\n\n\tEnter jail class:  ")
-
-	m2=$(printf "%b" "\nYou selected dispjail, which operates off of a template for" \
-		       "\nzusr data at jail start. Valid template jails are as follows:\n" \
-			"\n$validtemplatejs\n\n\tSelect a valid template from the above:  ")
-
-	m3=$(printf "%b" "\nTemplate jails can simplify the process of creating a new jail\n" \
-			"For example ${zusr_zfs}/rw files will be copied (like fstab, rc.conf, resolv.conf)" \
-			"\nand a user will be created. Otherwise enter: none , and ${m_zusr}/$newjail will" \
-			"\nbe created but empty. Valid templates are as follows:\n\n$validtemplatejs" \
-			"\n\n\tSelect one of the above or \`none\':  ")
-
-
-	m4=$(printf "%b" "\nWould you like to also copy the /home directory " \
-					"from:  $template\nThis will duplicate ")
-
-	m4_1=$(printf "%b" " of data on disk into the new jail.\n\tEnter (y/n):  " )
-
-	m4_2=$(printf "%b" "\nSince this is a dispjail, do you want to create $newjail with the same" \
-			"\nsettings as the template; and skip the remaining input prompts? " \
-			"\n   - User options alread specified at command input will be preserved" \
-			"\n   - If applicable, an unused internal IP will be found" \
-			"\n     and applied to $newjail for network connectivity" \
-			"\n\nHere are the settings of the template:")
-
-	m4_3=$(printf "%b" "\n\tUse these settings and skip to jail creation? (y/n):  ")
-
-	m5=$(printf "%b" "\nChoose a rootjail appropriate for the intended use of your " \
-				"appjail:\n\n`echo "$validrootjs" | awk '{print $1}'`" \
-				"\n\n\tSelect one of the rootjails above:  ")
-
-	m6=$(printf "%b" "\nYou selected rootjail, thus opting to duplicate an existing rootjail" \
-			"\nThis will create a full copy, on disk. Valid rootjails are as follows:\n")
-
-	m6_1=$(printf "%b" "Installation of new rootjails is unsupported (use \`bsdinstall'). However" \
-			"\n \`0base' is a bare, unmodified install. You can duplicate and modify it. " \
-			"\n\n\tSelect one of the rootjails above:  ")
-
-	m7=$(printf "%b" "\nThe gateway_jail is the gateway by which $newjail will connect to the network" \
-		"\nNormally you will select a \"net-<jail>\" jail; but any appjail is valid, and" \
-		"\nan epair will be created at jail start. Here's a list off all net-<jails>\n" \
-		"\n`egrep -o "^net[^[:blank:]]+" $JMAP` \n\n\tSelect a gateway jail (or: none):  ")
-	m8=$(printf "%b" "\nIP address should be entered as IPv4 CIDR notation" \
-		"\nFor reference, here's what is already designated in jail.conf:$JMAPIPs" \
-		"\n\nAnd here's a mapping of everything that is currently in use:$usedIPs" \
-		"\n\n\tBased on the selected gateway, quBSD convention would be to" \
-		"\n\tassign an IP like the following:  $ip0_255  " \
-		"\n\n\tThe first available IP in this range is: $OPENIP" \
-		"\n\n\tEnter IPv4. INCLUDE THE SUBNET!  (or: none):  " )
-
-	m9=$(printf "%b" "\n\tEnter valid IPv4 (or none):  ")
-	m10=$(printf "%b" "\nschg flags can protect files from modification, even by root. This can be" \
-		"\napplied to just system files (like /boot /bin /lib /etc), or \`all' files, " \
-		"\nincluding /home. This is a security mechanism for security critical jails." \
-		"\n\n\tMake Selection:  none|sys|all :  ")
-	m11=$(printf "%b" "\nschg can only prevent file modification (even by root), only when " \
-		"\nsysctl kern.securelevel is elevated above 0. Valid arguments: -1|0|1|2|3 " \
-		"\n\n\tEnter one of these integers:  "  )
-
-	m12=$(printf "%b" "\nJail RAM usage can be limited with FreeBSD rctl. Valid arguments are: " \
-		"\n<integer><G|M|K>  For example: 4G or 3500M (or \`none' for no limits)." \
-		"\n\n\tEnter maxmem (or: none):  ")
-	m13=$(printf "%b" "\ncpuset specifies which CPUs a jail may access. Enter comma separated\n" \
-		"integers, or a range. For example: 0,1,2,3 is the same as 0-3. \`none'" \
-		"\n permits all CPUs (default). Here's a list of all CPUs on your system:" \
-		"\n\n$validcpuset\n\n\tEnter cpuset (or: none):  ")
-
-}
-
-checks_main() {
-
-	if [ "$help" ] ; then
-		usage
-
-	elif [ -z $newjail ] ; then
-		ERR="$e1" ; usage
-	
-	# Checks that the proposed new jailname doesn't already exist (or partially exist).
-	elif `zfs list -rt all | egrep -qs "^${jails_zfs}/$newjail[[:blank:]]"` || \
-	     `zfs list -rt all | egrep -qs "^${zusr_zfs}/$newjail[[:blank:]]"` || \
-	     `echo "$JMAP_rootjs" | egrep -qs "^$newjail\$"` || \
-	     `echo "$JMAP_appjs" | egrep -qs "^$newjail\$"` ; then
-	     	ERR="$e8" ; usage
-
-	# Guided mode travels a different route, with its own set of checks and messages
-	elif [ "$guided" ] ; then
-		guided
-
-	# Without a template designated, class and rootjail are minimum requirements
-	elif [ -z "$template" ] && [ -z "$class" -o -z "$rootjail" ] ; then
-		ERR="$e2" && usage
-
-	else
-		check_parameters
-	fi
-}
-
-check_parameters() {
-	# Variables not specified at command line, get initialized off the template
-	if [ "$template" ] ; then
-		class=${class:-`sed -nE "s/^${template}[[:blank:]]+class[[:blank:]]+//p" $JMAP`}
-		cpuset=${cpuset:-`sed -nE "s/^${template}[[:blank:]]+cpuset[[:blank:]]+//p" $JMAP`}
-		IPV4=${IPV4:-`sed -nE "s/^${template}[[:blank:]]+IPV4[[:blank:]]+//p" $JMAP`}
-		schg=${schg:-`sed -nE "s/^${template}[[:blank:]]+schg[[:blank:]]+//p" $JMAP`}
-		maxmem=${maxmem:-`sed -nE "s/^${template}[[:blank:]]+maxmem[[:blank:]]+//p" $JMAP`}
-		rootjail=${rootjail:-`sed -nE "s/^${template}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP`}
-		seclvl=${seclvl:-`sed -nE "s/^${template}[[:blank:]]+seclvl[[:blank:]]+//p" $JMAP`}
-		gateway=${gateway:-`sed -nE "s/^${template}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP`}
-
-		# Enusre that template conferred at least a class and rootjail 
-		if [ -z "$class" -o -z "$rootjail" ] ; then
-			ERR="$e3" && usage
-		fi	
-	fi
-
-	# Non-essential parameters get lazy defaults if unspecified
-	cpuset=${cpuset:-none}
-	schg=${schg:-none}
-	maxmem=${maxmem:-none}
-	seclvl=${seclvl:--1}
-	gateway=${gateway:-none}
-		
-	# Check IPV4 if specified, find auto increment if unspecified 
-	check_IPv4
-	find_IP
-	define_warnings
-
-	# Check that the basic parameters are valid, and there are no conflicts
-
-	if [ "$class" != "appjail" -a "$class" != "rootjail" -a "$class" != "dispjail" ] ; then
-		ERR="$e4" ; usage
-
-	elif ! `echo "$validrootjs" | egrep -qs "^${jails_zfs}/$rootjail[[:blank:]]"` ; then
-		ERR="$e5" && usage
-
-	elif [ "$class" = "rootjail" -a -n "$template" ] ; then 
-		if [ "$rootjail" != "$template" ] ; then
-			ERR="$e6" && usage
-
-		elif ! `echo "$validrootjs" | egrep -qs "^${jails_zfs}/$template[[:blank:]]"` ; then
-			ERR="$e9" && usage
-		fi
-	fi
-
-	if [ "$copyhome" -a -z "$template" ] ; then
-		ERR="$e7" && usage
-
-	elif [ "$class" != "rootjail" -a -n "$template" ] ; then 
-		if ! `echo "$validtemplatejs" | egrep -qs "^$template\$"` ; then
-			ERR="$e9" && usage
-		fi
-	fi
-
-	if `echo "$validtemplatejs" | egrep -qs "^$gateway\$"` ; then
-		validgateway="true"
-	elif [ "$gateway" != "none" ] ; then
-		printf "%b" "$w4" ; read resp 
-		[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$e12" && usage
-	fi
-
-	# IP handling. Warn for invalid, overlapping, or straying from IP assignment convention 
-	if [ "$optIP"  -a "$IPV4" != "none" ] ; then
-		if [ -z "$validIPv4" ] ; then
-			ERR="$e13" ; usage
-
-		elif [ "$mismatch" ] ; then
-			printf "%b" "$w1" ; read resp 
-			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$e14" && usage
-		
-		elif `printf "%b" "$usedIPs\n$JMAPIPs" | egrep -qs "$b3"` ; then 
-			printf "%b" "$w2" ; read resp 
-			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$e15" && usage
-		
-		elif [ "$ipwithnogateway" ] ; then
-			printf "%b" "$w5" ; read resp
-			[ "$resp" != "y" -a "$resp" != "Y" ] && ERR="$e15_1" && usage
-		fi
-	else 
-		# If a valid gateway is present, assume that an IPV4 connection is desired
-		if [ "$validgateway" ] ; then
-			[ "$ERR" ] && usage
-			IPV4="$OPENIP"
-		else 
-			IPV4="none"
-		fi
-	fi			
-
-	# Syntax / grammar checks for all non-essential parameters
-
-	if ! `echo "$schg" | egrep -qs "^(none|sys|all)\$"` ; then
-		ERR="$e16" ; usage
-	fi
-
-	if ! `echo "$seclvl" | egrep -qs "^(-1|0|1|2|3)\$"` ; then 
-		ERR="$e17" ; usage
-	fi
-
-	if [ "$maxmem" != "none" ] ; then 
-		if ! `echo "$maxmem" | egrep -qs "^[[:digit:]]+(G|M|K|g|m|k)\$"` ; then 
-			ERR="$e18" ; usage
-		fi
-	fi
-
-	if [ "$cpuset" != "none" ] ; then
-		cpuset_mod=$(echo $cpuset | sed -E "s/(,|-)/ /g")
-		for c in $cpuset_mod ; do
-			`echo "$validcpuset" | egrep -qs "($c,|$c\$)"` || badcpu="true"
-		done
-		if [ "$badcpu" ] ; then
-			ERR="$e19" ; usage
-		fi
-	fi
-}
-
-get_parents() {
-	printf "%b" "$m1"
-
-	while : ; do 
-		read class
-		`echo "$class" | egrep -qs "^appjail\$|^rootjail\$|^dispjail\$"` && break
-		printf "%b" "$e20"
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-create.sh
+
+get_options() {
+	while getopts a:A:c:C:eg:Ghi:m:M:n:r:s:S:t:yz:Z o ; do
+		case $o in
+			a) AUTOSTART="$OPTARG" ;;
+			A) AUTOSNAP="$OPTARG" ;;
+			c) CLASS="$OPTARG"; chk_valid_class "$CLASS" || get_msg_create "none" "exit_1" ;;
+			C) CPUSET="$OPTARG" ;;
+			e) get_msg_create "_examples" "exit_0" ;; 
+			g) GATEWAY="$OPTARG" ;;
+			G) GUIDED="true" ;;
+			h) get_msg_create "none" "usage_0" ;; 
+			i) IPV4="$OPTARG" ;; 
+			m) MAXMEM="$OPTARG" ;;
+			M) MTU="$OPTARG" ;;
+			n) NO_DEST="$OPTARG" ;;
+			r) ROOTJAIL="$OPTARG"; chk_valid_rootjail "$ROOTJAIL" || get_msg_create "none" "exit_1" ;;
+			s) SECLVL="$OPTARG" ;;
+			S) SCHG="$OPTARG" ;;
+			t) TEMPLATE="$OPTARG"; chk_valid_jail "$TEMPLATE" || get_msg_create "none" "exit_1" ;;
+			y) _ASSM_Y="true" ;;
+			z) U_ZOPT="$OPTARG" ;
+		         echo "$U_ZOPT" | grep -Eq "^(dupl|none|empty)\$" \
+					|| get_msg_create "_e1" "exit_1" ;;
+			Z) R_ZOPT="true" ;;
+			*) exit 1
+		esac
 	done
 	
-	if [ "$class" != "rootjail" ] ; then
-		if [ "$class" = "dispjail" ] ; then
-			printf "%b" "$m2"
-		elif [ "$class" = "appjail" ] ; then
-			printf "%b" "$m3"
-		fi
+	shift $(( OPTIND - 1 ))
 
-		while : ; do
-			read template
-			`echo "$validtemplatejs" | egrep -qs "^$template\$"` && break
-			if [ "$class" != "dispjail" -a "$template" = "none" ] ; then
-				template=""
-				break
-			fi
-			printf "%b" "$e21"
-		done
-		
-		clear
-		
-		if [ "$class" = "appjail" -a -e "${m_zusr}/$template/usr/home/$template" ] ; then 
-			define_messages
-			rootjail=$(qb-list -j $template -p rootjail | grep "rootjail" | awk '{print $3}')
-
-			printf "%b" "$m4 `zfs list -o used ${zusr_zfs}/$template | tail -1` $m4_1"
-			read resp
-			[ "$resp" = "y" -o "$resp" = "Y" ] && copyhome="true"
-
-		elif [ "$class" = "dispjail" ] ; then
-			rootjail=$(qb-list -j $template -p rootjail | grep "rootjail" | awk '{print $3}')
-
-			printf "%b" "$m4_2\n\n"
-			qb-list -j "$template"
-			printf "%b" "$m4_3"
-			read resp
-
-			if [ "$resp" = "y" -o "$resp" = "Y" ] ; then
-				skipguided="true" 
-				check_parameters
-			fi
-		fi
-	fi
-
-	if [ -z "$rootjail" ] ; then 
-		[ "$class" != "rootjail" ] && printf "%b" "$m5"
-		[ "$class" = "rootjail" ] && printf "%b" "$m6\n\n$validrootjs\n\n$m6_1"
-
-		while : ; do 
-			read rootjail 
-			rootjail="${rootjail#${jails_zfs}/}"
-			`echo "$validrootjs" | egrep -qs "^${jails_zfs}/$rootjail[[:blank:]]"` && break
-			printf "%b" "$e22"
-		done
-	fi
+	# Proposed newjail name is avail, and no conflict with existing or partially existing jails
+	NEWJAIL="$1"
+	chk_avail_jailname "$NEWJAIL" || exit 1 
 }
 
-get_networking() {
-	clear ; printf "%b" "$m7"
+assign_jail_parameters() {
 
-	while : ; do 
-		read gateway
-		`printf "%b" "$validtemplatejs\nnone" | egrep -qs "^$gateway\$"` && break
-		printf "%b" "$e23"
-	done
-	
-	if [ "$gateway" != "none" ] ; then
-		find_IP 
-		define_messages
-		clear ; printf "%b" "$m8"
+	# Need to track the resuls of assignements. Use a temp file
+	_TMP_WARN="/tmp/qb_create_warn"  ;  _TMP_PARAMS="/tmp/qb_create_params"
 
-		while : ; do 
-			read IPV4
-			[ "$IPV4" = "none" ] && break 
+	[ -e "$_TMP_WARN" ] && rm "$_TMP_WARN" 
+	[ -e "$_TMP_PARAMS" ] && rm "$_TMP_PARAMS"
 
-			check_IPv4
-			find_IP
-			define_warnings
+	mktemp "$_TMP_WARN" > /dev/null
+	mktemp "$_TMP_PARAMS" > /dev/null
 
-			if [ -z "$validIPv4" ] ; then
-				printf "%b" "$e24"
+	# Jail defining parameters that must be specified and valid 
+	PARAMS="AUTOSTART AUTOSNAP CLASS CPUSET GATEWAY IPV4 MAXMEM MTU NO_DESTROY ROOTJAIL SCHG SECLVL"
 
-			elif [ "$mismatch" ] ; then
-				printf "%b" "$w1" ; read resp 
-				[ "$resp" = "y" -o "$resp" = "Y" ] && break 
-				printf "%b" "$m9"
+	# Assign jail parameters based on 1) command line ; 2) template ; 3) #defaults in jmap
+	[ "$TEMPLATE" ] && PULLFROM="$TEMPLATE" || PULLFROM='#default'
+
+	# Cycle through parameters, define anything without a value, and record results to _TMP files. 
+	for _P in $PARAMS ; do
+
+		# Convert UPPER to lower because the functions and variable indirection use lower case 
+		_param=$(echo $_P | tr '[:upper:]' '[:lower:]')	
+
+		# Parameter was not assigned at the command line 
+		if [ -z $(eval echo "\${$_P}") ] ; then
 			
-			elif `printf "%b" "$usedIPs\n$JMAPIPs" | egrep -qs "$b3"` ; then 
-				printf "%b" "$w3" ; read resp 
-				[ "$resp" = "y" -o "$resp" = "Y" ] && break 
-				printf "%b" "\n$m9"
-
-			else break
-			fi
-		done
-	fi
-}
-
-get_security() {
-	clear ; printf "%b" "$m10"
-		
-	while : ; do
-		read schg 
-		`echo "$schg" | egrep -qs "^(none|sys|all)\$"` && break
-		printf "%b" "$e25"
-		qb-list -p schg  && clearscreen="true"
-		printf "%b" "$e26"
-	done
-
-	[ "$clearscreen" ] && clear && clearscreen=""
-	printf "%b" "$m11"
-
-	while : ; do
-		read seclvl 
-		`echo "$seclvl" | egrep -qs "^(-1|0|1|2|3)\$"` && break
-		printf "%b" "$e27"
-		qb-list -p seclvl && clearscreen="true"
-		printf "%b" "$e28"
-	done
-}
-
-get_rctl() {
-	[ "$clearscreen" ] && clear && clearscreen=""
-	printf "%b" "$m12"
-
-	while : ; do
-		read maxmem
-		[ "$maxmem" = "none" ] && break
-		`echo "$maxmem" | egrep -qs "^[[:digit:]]+(G|g|M|m|K|k)\$"` && break
-		printf "%b" "$e29"
-		qb-list -p maxmem && clearscreen="true"	
-		printf "%b" "$e30"
-	done
-
-	[ "$clearscreen" ] && clear && clearscreen=""
-	printf "%b" "$m13"
-
-	while : ; do
-		read cpuset 
-		cpuset_mod=$(echo "$cpuset" | sed -E "s/(,|-)/ /g")
-		[ "$cpuset" = "none" ] && break
-
-		for c in $cpuset_mod ; do
-			# Every number is followed by a comma except the last one
-			`echo "$validcpuset" | egrep -qs "$c,|$c\$"` || badcpu="true"
-		done
-
-		if [ "$badcpu" -o -z "$cpuset" ] ; then
-			badcpu=""
-			printf "%b" "$e31"
-		else
-			break
-		fi
-	done
-}
-
-check_IPv4() {
-	# Perhpas not as technically correct as doing a regex, 
-	# but it's readable, and the a/b pairs are usable elsewhere
-
-	validIPv4=""
-
-     a0=${IPV4%%.*.*.*/*}
-     a4=${IPV4##*.*.*.*/}
-          b1=${IPV4#*.*}
-          a1=${b1%%.*.*/*}
-               b2=${IPV4#*.*.*}
-               a2=${b2%%.*/*}
-                    b3=${IPV4%/*}
-                    a3=${b3##*.*.*.}
-
-	if   [ "$a0" -ge 0 -a "$a0" -le 255 -a "$a1" -ge 0 -a "$a1" -le 255 \
- 	    -a "$a2" -ge 0 -a "$a2" -le 255 -a "$a3" -ge 0 -a "$a3" -le 255 \
-	    -a "$a4" -ge 0 -a "$a4" -le 31 ] >> /dev/null 2>&1
-	then
-		echo "$IPV4" | egrep -qs "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+"
-                [ "$?" = "0" ] && validIPv4="true" 
-	fi
-}
-
-find_IP() {
-	# Search for unused IP. Jail's IP assignment is based on position in the
-	# internal network. Variable indirection simplifies the while loop; and 
-	# generalizes the labeling convention for future code changes/expansion
-
-# IP address can be thought of in two ways, depending on variable indirection:
-        #    $a0.$a1.$a2.$a3/$a4       (from check_IPv4 function)
-        #       $ip0.$ip1.$ip2.$ip3/$ip4  (holds the variable names)
-        #    aa.bb.cc.dd/subnet        (the replacement variable name) 
-        ip0="aa" ; ip1="bb" ; ip2="cycle" ; ip3="dd" ; subnet="ee"
-        cycle=1
-
-        # Change naming conventions depending on the jail
-        if [ "${jail}" = "net-firewall" ] ; then
-                cycle=256
-
-        elif [ -z "${jail##net-*}" ] ; then
-                aa=10 ; bb=255 ; dd=2 ; ee=30
-
-        elif [ -z "${jail##serv-*}" ] ; then
-                aa=10 ; bb=128 ; dd=2 ; ee=30
-
-        elif [ -z "${gateway##none*}" -a "$IPV4" != "none" ] ; then
-                ipwithnogateway="true" ; cycle=256
-        else
-                aa=10 ; bb=1 ; dd=2 ; ee=30
-        fi
-
-        # Check if the convention = user_input, otherwise, is mismatch
-        [ -n "$IPV4" -a "$jail" != "net-firewall" \
-                                        -a "$aa.$bb.$dd/$ee" = "$a0.$a1.$a3/$a4" ] || mismatch="true"
-        
-        # Run through cycles to find an open IP
-        while [ $cycle -lt 255 ] ; do
-                eval "openip=\${$ip0}.\${$ip1}.\${$ip2}.\${$ip3}"
-
-                if ! `printf "%b" "${usedIPs}\n${JMAPIPs}" | grep -qs "$openip"` ; then
-                        OPENIP="$openip/${ee}"
-
-                        # Used to recommend IP ranges in [-g] guided mode
-                        cycle=255 && eval "ip0_255=\${$ip0}.\${$ip1}.x.\${$ip3}/$subnet"
-                        break
-                else
-                        cycle=$(( cycle + 1 ))
-                        if [ $cycle -gt 254 ] ; then
-                                ERR="$e32"
-                        fi
-                fi
-        done
-}
-
-change_zroot() {        
-        # Check for an existing snapshot; create on if non-existent
-        rootsnap=$(zfs list -Ht snapshot | egrep -o "${jails_zfs}/${rootjail}@[^[:blank:]]+" | tail -1)
-        [ "$rootsnap" ] || zfs snapshot ${jails_zfs}/$rootjail@$datetime
-
-        rootsnap=$(zfs list -t snapshot | egrep -o "${jails_zfs}/${rootjail}@[^[:blank:]]+" | tail -1)
-        rootsize=$(zfs list -o used ${jails_zfs}/$rootjail | tail -1)
-
-        # A new rootjail is a full installation. Otherwise, appjails just use clones
-        if [ "$class" = "rootjail" ] ; then
-                printf "%b" "\nqb-create:  Copying $rootsize of data to new dataset: " \
-                        "${jails_zfs}/$newjail\nDepending on the size, this could take a minute"
-                zfs send -vP $rootsnap | zfs recv -v ${jails_zfs}/$newjail
-        else
-                zfs clone $rootsnap ${jails_zfs}/$newjail
-        fi
-}
-
-change_zusr() {
-	# Check for a snapshot; create if non-existant. 
-	if [ "$template" -a "$template" != "none" ] ; then
-		zusrsnap=$(zfs list -Ht snapshot | egrep -o "${zusr_zfs}/$template@[^[:blank:]]+" | tail -1)
-		if [ -z "$zusrsnap" ] ; then
-			snapped="true"
-			zfs snapshot ${zusr_zfs}/$template@$datetime
-		fi	
-		
-		zusrsnap=$(zfs list -Ht snapshot | egrep -o "${zusr_zfs}/$template@[^[:blank:]]+" | tail -1)
-		zusrsize=$(zfs list -o used ${zusr_zfs}/$template | tail -1)
-		
-		if [ "$class" = "dispjail" ] ; then
-			zfs clone $zusrsnap ${zusr_zfs}/$newjail
-
-		elif [ "$copyhome" ] ; then
-			printf "%b" "\nqb-create: Sending $zusrsize of data from" \
-				"${m_zusr}/$template to ${zusr_zfs}/$newjail\n\n"
-			zfs send -vP $zusrsnap | zfs recv -v ${zusr_zfs}/$newjail
-
-			# If we created a snapshot, destroy it if not needed. Prevents cluttering  
-			if [ "$class" != "dispjail" -a "$snapped" ] ; then
-				zfs destroy -rRf $zusrsnap
-				zfs destroy -rRf ${zusr_zfs}/$newjail@$datetime	
+			if ! get_jail_parameter $_param "$PULLFROM" >> "$_TMP_WARN" ; then
+				# Bad return on any parameter is acceptable, except CLASS and ROOTJAIL 
+				[ "$_P" = "CLASS" ]    && get_msg_create "_e2" "exit_1" 
+				[ "$_P" = "ROOTJAIL" ] && get_msg_create "_e2" "exit_1" 
 			fi
 
-		elif [ "$class" = "appjail" ] ; then
-			zfs create ${zusr_zfs}/${newjail}
-			[ -e ${m_zusr}/$template/rw ] && cp -a ${m_zusr}/$template/rw ${m_zusr}/$newjail/
-		fi
-
-		# /home directory must be renamed
-		if [ -e ${m_zusr}/$newjail/usr/home/$template ] ; then 
-			mv ${m_zusr}/$newjail/usr/home/$template ${m_zusr}/$newjail/usr/home/$newjail
-		fi
-	else
-		zfs create ${zusr_zfs}/${newjail}
-
-		if [ "$template" -a -e ${m_zusr}/$template/rw ] ; then
-			cp -a ${m_zusr}/$template/rw ${m_zusr}/$newjail/
 		else
-			mkdir -p ${m_zusr}/$newjail/rw/etc/
-			head -1 /etc/fstab > ${m_zusr}/$newjail/rw/etc/fstab
+			# Parameter assigned at cl, needs checked. Critical params already checked, so just _WARN
+			eval "chk_valid_${_param}" \"\${$_P}\"  >>  "$_TMP_WARN"
+		fi 
 
-			printf "%b" "\nqb-create: ALERT: No fstab entries, rc.conf, or pwd were " \
-				"\ncreated, because [-T template] was not specified.\n"
-		fi
+		# IPv4 validity was checked, but conformance with quBSD conventions was not. 
+		[ "$_P" = "IPV4" ] && chk_isqubsd_ipv4 "$IPV4" "$NEWJAIL"  >>  "$_TMP_WARN" 
+
+		# Record the final param value to _TMP_PARAMS
+		eval echo "$NEWJAIL  $_param  \${$_P}" >> "$_TMP_PARAMS"
+	done
+}
+
+assign_datasets() {
+	# To prevent ambiguity/conflicts, all combos of [-c <class>], and class of the <template> are
+	# considered. Case statement provides clarity, and opportunity to handle special cases. 
+
+	CLASS_TEMP=$(get_jail_parameter -eq class "$TEMPLATE")
+
+	case "${CLASS}_${CLASS_TEMP}" in 
+
+		dispjail_|rootjail_|ephemeral_)
+			# Dispjails and rootjails require [-t <template>].
+			get_msg_create "_e3" "exit_1"
+		;;
+
+      # Assume what the user wants, based on jmap #default.
+		appjail_|appjail_rootjail)
+			# [-Z] is only for creating rootjails, not appjails from rootjails 
+	     	[ "$R_ZOPT" ] && get_msg_create "_e4" "exit_1" 
+			R_ZPARENT="${JAILS_ZFS}/${ROOTJAIL}"
+			U_ZPARENT="${ZUSR_ZFS}/${ROOTJAIL}-template" 
+
+			# Verify that the assumed $ROOTJAIL-template exists; or at least that it's not needed.
+			! chk_valid_zfs "$U_ZPARENT" && ! [ "$U_ZOPT" = "empty" ] && get_msg_create "_e5" "exit_1"
+		;;
+
+		appjail_appjail|appjail_dispjail)
+			# [-Z] is only for creating rootjails
+	     	[ "$R_ZOPT" ] && get_msg_create "_e4" "exit_1" 
+			R_ZPARENT="${JAILS_ZFS}/${ROOTJAIL}"
+			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"  
+
+			# dispjail template might not have zusr (if disp of rootjail). Check U_ZPARENT exists 
+			chk_valid_zfs "$U_ZPARENT" || get_msg_create "_e7" "exit_1"
+		;;
+		
+		dispjail_appjail)
+			# [-Z] is only for creating rootjails
+	     	[ "$R_ZOPT" ] && get_msg_create "_e4" "exit_1" 
+			R_ZPARENT="${JAILS_ZFS}/${ROOTJAIL}"
+			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"  
+
+			# Dispjails always clone from another jail 
+			U_ZOPT="clone"	
+
+			# Is a dispjail. Needs to have the appjail as a <template> in jailmap 
+			echo "$NEWJAIL  template  $TEMPLATE" >> "$_TMP_PARAMS"
+		;;
+
+		# New rootjail from any other rootjail. Can create a dispjail of a rootjail too. 
+		rootjail_rootjail|dispjail_rootjail)
+			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
+			U_ZOPT="skip"
+
+			# Add <template> to jailmap parameters if dispjail
+			[ "$CLASS" = "dispjail" ] && echo "$NEWJAIL  template  $ROOTJAIL" >> "$_TMP_PARAMS"
+		;;
+
+		# New rootjail, but checks for [-Z]. Ensures user intends new rootjail from app/disp jail. 
+		rootjail_appjail|rootjail_dispjail)
+			[ "$R_ZOPT" ] || get_msg_create "_e8" "exit_1"
+			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}" 
+			U_ZOPT="skip"
+		;;
+
+		# Provide a way to simply copy an existing dispjail. This is NOT creating a disp of a disp. 
+		dispjail_dispjail)
+			R_ZPARENT="${JAILS_ZFS}/${ROOTJAIL}"
+
+			# Pass the template of the <template> to the copycat new dispjail parameters
+			TEMP_TEMP=$(get_jail_parameter -eq template $TEMPLATE)
+			echo "$NEWJAIL  template  $TEMP_TEMP" >> "$_TMP_PARAMS"
+
+			# Either assign the valid zusr dataset to clone dispjail, or set it to skip later on.
+			if chk_valid_zfs "${ZUSR_ZFS}/${TEMP_TEMP}" ; then
+				U_ZPARENT="${ZUSR_ZFS}/${TEMP_TEMP}" 
+				U_ZOPT="clone" 
+			else 
+				U_ZOPT="skip"
+			fi
+		;;
+	
+		# Ephemeral will clone both zroot and zusr, and make a special jail and launch sequence	
+		ephemeral_*)
+			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
+			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
+		;;
+	esac
+
+	# If U_ZOPT wasn't specified, assign the default value: <dupl> 
+	[ "$U_ZPARENT" ] && [ -z "$U_ZOPT" ] && U_ZOPT="dupl"
+
+	# Root dataset was derived from <template>. Check that it exists. 
+	chk_valid_zfs "$R_ZPARENT" || get_msg_create "_e9" "exit_1"
+
+	# Temporary snapshots to be used for jail duplication.
+	if [ "${CLASS}" = rootjail ] ; then 
+		R_SNAP="${R_ZPARENT}@$(date +%s)"
+		zfs snapshot "$R_SNAP" > /dev/null 2>&1
+
+		# The new rootjail should reference itself as the rootjail, and not the template	
+		sed -i '' -E "s/rootjail[[:blank:]]+${ROOTJAIL}/rootjail ${NEWJAIL}/g"  $_TMP_PARAMS
+
+	elif [ "$CLASS" = "appjail" ] && [ "$U_ZOPT" = "dupl" ] ; then
+		U_SNAP="${U_ZPARENT}@$(date +%s)"
+		zfs snapshot "$U_SNAP" > /dev/null 2>&1
 	fi
 }
 
-change_config_files() {
-	# Remove schg on /rw files for new jail
-	[ -e ${m_zusr}/$newjail/rw ] && chflags -R noschg ${m_zusr}/$newjail/rw /dev/null 2>&1
+confirm_creation() {
+	# Show the final result of jail parameters
+	get_msg_create "_w1" "_cont" 
 
-	# Modify fstab
-	sed -i '' -E "s/${template}/${newjail}/g" ${m_zusr}/$newjail/rw/etc/fstab >> /dev/null 2>&1
+	# Show the disksize that will be occupied by creating the new jail
+	if [ "$CLASS" = "rootjail" ] ; then
+		get_msg_create "_w2" "_cont"
 
-	# Modify pw user 1001, if it exists 
-	pw -V ${m_zusr}/$newjail/rw/etc/ usershow 1001 >> /dev/null 2>&1
-	if [ "$?" = "0" ] ; then 
-		[ -e ${m_zusr}/$newjail/usr/home/$newjail ] || mkdir -p ${m_zusr}/$newjail/usr/home/$newjail
-		pw -V ${m_zusr}/$newjail/rw/etc/ usermod 1001 -l $newjail
-		pw -V ${m_zusr}/$newjail/rw/etc/ groupmod 1001 -l $newjail
-		pw -V ${m_zusr}/$newjail/rw/etc/ usermod 1001 -d /usr/home/$newjail  >> /dev/null 2>&1
+	elif [ "${CLASS}_${U_ZOPT}" = "appjail_dupl" ] ; then
+		get_msg_create "_w3" "_cont"  
 	fi
-	
-	# If no template, just use rootjail for convenience
-	[ -z "$template" ] && template="$rootjail"
-	
-	# Copy lines from template and modify with newjail 
-	sed -nE "/^$template[[:blank:]]+/s/^$template/$newjail/p" $JMAP >> $JMAP
 
-	# Any parameters that are non-blank, were specified and should be changed
-	qb-edit -qf $newjail class $class	
-	qb-edit -qf $newjail cpuset $cpuset	
-	qb-edit -qf $newjail schg $schg	
-	qb-edit -qf $newjail IPV4 $IPV4	
-	qb-edit -qf $newjail maxmem $maxmem
-	qb-edit -qf $newjail seclvl $seclvl
-	qb-edit -qf $newjail gateway $gateway
+	# Warnings for jail parameters. 
+	if [ -s "$_TMP_WARN" ] ; then 
+		get_msg_create "_w4" "_cont" 
 
-	# New rootjails need to redirect the rootjail line to self
-	if [ "$class" = "rootjail" ] ; then 
-		qb-edit -qf $newjail rootjail $newjail   >> /dev/null
+		# Regularizes a single blank line at the end (instead of none, or multiple blank lines).
+		printf '%s\n' "$(cat $_TMP_WARN)" | sed '/./,$!d' ; echo ""
+	fi
+
+	# Get final confirmation, unless [-y] was specified
+	if ! [ "$_ASSM_Y" ] ; then 
+		get_msg_create "_w5" "_cont" 
+		get_user_response || exit 0
+	fi
+}
+
+change_datasets() {        
+	# ZROOT changes: Only new rootjails are duplicated. Everything else is cloned from a rootjail.
+	if [ "$CLASS" = "rootjail" ] ; then
+		echo ''
+		zfs send -P "$R_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${JAILS_ZFS}/${NEWJAIL}"
+		
 	else
-		qb-edit -qf $newjail rootjail $rootjail  >> /dev/null
+		reclone_zroot "$NEWJAIL" "$ROOTJAIL"	
 	fi
 
-	# Dispjails have one extra line for template
-	if [ "$class" = "dispjail" -a ! `egrep -qs "^$newjail[[:blank:]]+template" $JMAP` ] ; then
-		printf "%b" "$newjail\ttemplate\t$template\n" >> $JMAP
+	# U_ZOPT should've been define already. Handle zusr dataset 
+	case "$U_ZOPT" in
+		skip) 
+			# Is rootjail or disp of roojail. 
+			return 0
+		;;
+
+		dupl)
+			echo ''
+			zfs send -vP "$U_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
+		;;
+
+		clone)
+
+			# Renaming of datasets and files is handled internally to the function
+			reclone_zusr "$NEWJAIL" "$TEMPLATE" 
+			return 0
+		;;
+
+		none)
+			# Create the empty dataset with autosnap option
+			zfs create -o qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
+
+			# Create the directory mapping of the template
+			for _dir in $(find "${M_ZUSR}/${TEMPLATE}" -type d) ; do
+			   _newdir=$(echo $_dir | sed -e "s#${M_ZUSR}/${TEMPLATE}#${M_ZUSR}/${NEWJAIL}#")
+				mkdir -p "$_newdir" > /dev/null 2>&1
+			done
+		;;
+
+		empty)
+			# Create the empty dataset with autosnap option
+			zfs create -o qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
+		;;
+	esac		
+
+	# Jail types that don't need the edits below, have already exited the function.
+	# Make sure flags are down for rw/etc directory 
+	chflags -R noschg ${M_ZUSR}/$NEWJAIL/rw/etc > /dev/null 2>&1
+
+   # Fix fstab 
+	if [ -e "${M_ZUSR}/${NEWJAIL}/rw/etc/fstab" ] ; then
+
+		# Replace template with newjail name
+		sed -i '' -E "s/${TEMPLATE}/${NEWJAIL}/g" ${M_ZUSR}/${NEWJAIL}/rw/etc/fstab
+	else
+
+		# fstab is required for jail to start, even if everything else is empty 
+		mkdir -p ${M_ZUSR}/$NEWJAIL/rw/etc/
+		head -1 /etc/fstab > ${M_ZUSR}/$NEWJAIL/rw/etc/fstab
+	fi
+
+	# If a special pw user file was copied over, it needs to be modified. 
+	if pw -V ${M_ZUSR}/$NEWJAIL/rw/etc/ usershow 1001 >> /dev/null 2>&1 ; then 
+		[ -e ${M_ZUSR}/$NEWJAIL/usr/home/$NEWJAIL ] || mkdir -p ${M_ZUSR}/$NEWJAIL/usr/home/$NEWJAIL
+		pw -V ${M_ZUSR}/$NEWJAIL/rw/etc/ usermod 1001 -l $NEWJAIL
+		pw -V ${M_ZUSR}/$NEWJAIL/rw/etc/ groupmod 1001 -l $NEWJAIL
+		pw -V ${M_ZUSR}/$NEWJAIL/rw/etc/ usermod 1001 -d /usr/home/$NEWJAIL  >> /dev/null 2>&1
 	fi
 	
-	printf "%b" "Here are the jailmap settings for $newjail:\n"
-	qb-list -j $newjail
+	# home directory must be renamed (if it exists)
+	mv ${M_ZUSR}/$NEWJAIL/usr/home/$TEMPLATE ${M_ZUSR}/$NEWJAIL/usr/home/$NEWJAIL > /dev/null 2>&1
+}
 
-	# jail.conf settings
-	mktemp /tmp/qb-create > /dev/null
-	sed -nE "/^${template}[[:blank:]]*\{/,/\}/p" $JCONF >> /tmp/qb-create 
-	sed -i '' -E "s/${template}/${newjail}/" /tmp/qb-create
+change_configs() {
 
-	if [ "$class" = "rootjail" ] ; then
-		sed -i '' -e "/# Rootjails/r /tmp/qb-create" $JCONF
+	# Add the parameters to jailmap 
+	cat "$_TMP_PARAMS" | column -t >> $JMAP
 
-	elif [ -z "${newjail##net-*}" ] ; then
-		sed -i '' -e "/# Net Jails/r /tmp/qb-create" $JCONF
+	# Make a tmp file for /etc/jail.conf edits 
+	_TMP_JCONF="/tmp/qb_create_jconf"
+	mktemp $_TMP_JCONF > /dev/null
 
-	elif [ "$class" = "dispjail" ] ; then
-		sed -i '' -e "/# Disp Jails/r /tmp/qb-create" $JCONF
+	# 
+	sed -nE "/^${TEMPLATE}[[:blank:]]*\{/,/\}/p" $JCONF >> $_TMP_JCONF 
+	sed -i '' -E "s/${TEMPLATE}/${NEWJAIL}/" $_TMP_JCONF 
+
+	if [ "$CLASS" = "rootjail" ] ; then
+		sed -i '' -e "/# Rootjails/r $_TMP_JCONF" $JCONF
+
+	elif [ -z "${NEWJAIL##net-*}" ] ; then
+		sed -i '' -e "/# Net Jails/r $_TMP_JCONF" $JCONF
+
+	elif [ "$CLASS" = "dispjail" ] ; then
+		sed -i '' -e "/# Disp Jails/r $_TMP_JCONF" $JCONF
 
 	else
-		sed -i '' -e "/# Production Jails/r /tmp/qb-create" $JCONF
-	fi
-
-	rm /tmp/qb-create
-}
-
-guided() {
-	get_parents
-	if [ -z "$skipguided" ] ; then
-		get_networking
-		get_security
-		get_rctl
+		sed -i '' -e "/# Production Jails/r $_TMP_JCONF" $JCONF
 	fi
 }
 
+cleanup_finished() {
+	# Once complete, only certain temporary item need removed.  
+		
+	# Remove the TMP files if they exist (ignore if they dont)
+	rm $_TMP_WARN $_TMP_PARAMS $_TMP_JCONF > /dev/null 2>&1 
 
-define_variables
-define_errors
-define_messages
-checks_main
-change_zroot
-if [ "$class" != "rootjail" ] ; then
-	change_zusr
-fi
-change_config_files
+	# Remove the snapshots if they exist (ignore if they dont)
+	[ "$R_SNAP" ] && zfs destroy $R_SNAP > /dev/null 2>&1
+	[ "$U_SNAP" ] && zfs destroy $U_SNAP > /dev/null 2>&1
+
+	# Helps to standardize having a newline if program is ctrl-c stopped
+	echo ''
+}
+
+cleanup_trapped() {
+	# Can't be leaving partially transferred datasets and pieces of newjail laying around 
+	zfs destroy -rRf "${JAILS_ZFS}/${NEWJAIL}" > /dev/null 2>&1
+	zfs destroy -rRf "${ZUSR_ZFS}/${NEWJAIL}" > /dev/null 2>&1
+
+   sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $JMAP > /dev/null 2>&1
+	sed -i '' -E "/^${NEWJAIL}(\{|[[:blank:]])/,/^}/d" $JCONF > /dev/null 2>&1
+
+	# Items above should only be removed if the operation was incomplete
+	cleanup_finished
+}
+
+main() {
+
+	trap "cleanup_trapped" INT TERM HUP QUIT 
+
+	assign_jail_parameters
+
+	assign_datasets
+
+	confirm_creation	
+
+	change_datasets
+
+	change_configs
+
+	cleanup_finished
+}
+
+get_global_variables
+
+get_options "$@"
+
+main 
 
 
 
