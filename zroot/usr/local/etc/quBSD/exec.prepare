@@ -5,13 +5,14 @@
 get_parameters() {
 	# Define script variables
 	JAIL="$1"
-	echo "Starting $JAIL. $(date "+%Y-%m-%d_%H:%M")" >> $QBLOG
+	echo "STARTING JAIL: $JAIL. $(date "+%Y-%m-%d_%H:%M")" >> $QBLOG
 
 	# Parameters and checks
 	get_jail_parameter -d class    "$JAIL"  ||  exit 1
 	get_jail_parameter -d rootjail "$JAIL"  ||  exit 1
-	get_jail_parameter gateway  "$JAIL"  ||  exit 1
+	get_jail_parameter -d gateway  "$JAIL"  ||  exit 1
 
+	# Find any remaining mounts for the jail
 	JMOUNT=$(mount | grep -Eo "${M_JAILS}/${JAIL}/[^[:blank:]]+") 
 }
 
@@ -26,57 +27,22 @@ preparation_actions() {
 	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f 
 }
 
-reclone_appjail() {
-
-	# Check the dataset exists, and destroy it 
-	chk_valid_zfs "${JAILS_ZFS}/${JAIL}" && zfs destroy -rRf "${JAILS_ZFS}/${JAIL}" 
-		
-	ROOTSNAP=$(zfs list -t snapshot -Ho name ${JAILS_ZFS}/${ROOTJAIL} | tail -1)
-	zfs clone $ROOTSNAP ${JAILS_ZFS}/${JAIL}
-	zfs set qubsd:autosnap=- "${JAILS_ZFS}/${JAIL}"
-
-	chflags -R noschg ${M_ZUSR}/${JAIL}
-
-	pw -V ${M_JAILS}/${JAIL}/etc/ \
-			useradd -n $JAIL -u 1001 -d /usr/home/${JAIL} -s /bin/csh 2>&1
-}
-
-reclone_dispjail() {
-	# template and homesnap are needed to clone dispjail 
-	get_jail_parameter template "$JAIL" || exit 1
-	HOMESNAP=$(zfs list -t snapshot -Ho name ${ZUSR_ZFS}/${TEMPLATE} | tail -1)
-
-	# Check the dataset exists, and destroy it 
-	chk_valid_zfs "${ZUSR_ZFS}/${JAIL}" && zfs destroy -rRf ${ZUSR_ZFS}/${JAIL} 
-
-	# Reclone the rootjail, and make sure that the clone isn't set to autosnap
-	zfs clone ${HOMESNAP} ${ZUSR_ZFS}/${JAIL} 
-	zfs set qubsd:autosnap=- "${ZUSR_ZFS}/${JAIL}"
-
-	chflags -R noschg ${M_ZUSR}/${JAIL}
-
-	# Rename directories 
-	[ -e ${M_ZUSR}/${JAIL}/usr/home/${TEMPLATE} ] && \
-		mv ${M_ZUSR}/${JAIL}/usr/home/${TEMPLATE} ${M_ZUSR}/${JAIL}/usr/home/${JAIL} 
-
-	# Replace the <template> jailname in fstab with the <jail> (dispjail)
-	sed -i '' -e "s/${TEMPLATE}/${JAIL}/g" ${M_ZUSR}/${JAIL}/rw/etc/fstab 
-}
-
 main() {
 	# Misc things to do/check before recloning the datasets
 	preparation_actions
 
-	# Roojails have schg until started. Appjails are re-cloned from rootjails
 	case $CLASS in 
 		appjail) 
-			# Appjails have their root filesystem destroyed/recloned
-			reclone_appjail
+			# Reclone the root filesystem for JAIL
+			reclone_zroot "$JAIL" "$ROOTJAIL"
 		;;
 		dispjail) 
-			# Dispjails also get /zusr recloned from their template jail 
-			reclone_appjail
-			reclone_dispjail
+			# Reclone the root filesystem for JAIL
+			reclone_zroot "$JAIL" "$ROOTJAIL"
+			
+			# Dispjails also reclone the zusr portion from template (if it exists)
+			get_jail_parameter template "$JAIL" || exit 1
+			chk_valid_zfs "${ZUSR_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE"
 		;;
 	esac
 
