@@ -57,7 +57,7 @@ ENDOFMSG
 	;;
 	_cj5_1) cat << ENDOFMSG
 
-ERROR: Dispjails must reference an appjail as a template. 
+ERROR: Dispjail templates cannot be dispjails themselves. 
 ENDOFMSG
 	;;
 	_cj6) cat << ENDOFMSG
@@ -75,21 +75,21 @@ ENDOFMSG
 	;;
 	_cj7_1) cat << ENDOFMSG
 
-ERROR: < $_value > is the gateway for < $_passvar > 
-       and needs a valid tap interface specified in
-       jailmap.conf, for the parameter: < virt_intf >
+ERROR: < $_value > is a rootjail, and for security
+       reasons, should never be used as a gateway. 
+
 ENDOFMSG
 	;;
 	_cj7_2) cat << ENDOFMSG
 
-WARNING: < net-firewall > should always have a gateway,
-       as it's the connection point to the outside internet.       
+ALERT: < net-firewall > should usually have a gateway, 
+         a connection point to the outside internet.       
 ENDOFMSG
 	;;
 	_cj7_3) cat << ENDOFMSG
 
-WARNING: < net-firewall > should typically connect to nicvm
-       as it's the connection point to the outside internet.       
+ALERT: < net-firewall > usually connects to nicvm,
+         the connection point to the outside internet.       
 ENDOFMSG
 	;;
 	_cj8) cat << ENDOFMSG
@@ -102,14 +102,14 @@ ENDOFMSG
 	;;
 	_cj9) cat << ENDOFMSG
 
-WARNING: < $_passvar > is the gateway jail for all external 
+ALERT: < $_passvar > is the gateway jail for all external 
          network traffic. Setting IP to < $_value > will 
          prevent all traffic to outside networks (internet). 
 ENDOFMSG
 	;;
 	_cj10) cat << ENDOFMSG
 
-ERROR: Invalid IPv4. Use CIDR notation: a.b.c.d/subnet
+WARNING: Invalid IPv4. Use CIDR notation, <auto>, or <none>.
 ENDOFMSG
 	;;
 	_cj11) cat << ENDOFMSG
@@ -123,7 +123,6 @@ ENDOFMSG
 
 ALERT: < $_value > diverges from quBSD convention.
        See table below for typical assignments. 
-
 JAIL              GATEWAY        IPv4 Range
 net-firewall      nicvm          External Router Dependent
 net-<gateway>     net-firewall   10.255.x.2/30
@@ -135,7 +134,7 @@ ENDOFMSG
 	;;
 	_cj13) cat << ENDOFMSG
 
-WARNING: < $_passvar > is a < net- > jail, which typically 
+ALERT: < $_passvar > is a < net- > jail, which typically 
          pass external traffic for client jails. Setting IP 
          to < $_value > will prevent < $_passvar > and its
          clients from reaching the outside internet.
@@ -148,9 +147,17 @@ ENDOFMSG
 	;;
 	_cj15) cat << ENDOFMSG
 
-######################
-######  UNUSED  ######
-######################
+ERROR: Proposed jailname < $_value > is disallowed.
+
+ENDOFMSG
+	;;
+	_cj15_1) cat << ENDOFMSG
+
+ERROR: Proposed jailname < $_value > is already in use 
+       for at least one of the following:  jail.conf,
+       jailmap.conf, or has a zfs dataset under quBSD.
+
+Use \`qb-destroy' to remove any lingering pieces of a jail
 
 ENDOFMSG
 	;;
@@ -162,18 +169,30 @@ ENDOFMSG
 	;;
 	_cj17) cat << ENDOFMSG
 
-WARNING: < $_value > was not found in jailmap.conf 
-         < #default > was applied instead. 
+ALERT: < $_value > for jail:< $_jail > was not found in
+         jailmap.conf. #default was applied instead.
+ENDOFMSG
+	;;
+	_cj17_1) cat << ENDOFMSG
+
+WARNING: < $_value > was not found in jailmap.conf, and 
+         < $_passvar > was blank in jmap. Manually edit
+         $_passvar in /usr/local/etc/quBSD/jailmap.conf
 ENDOFMSG
 	;;
 	_cj18) cat << ENDOFMSG
 
-WARNING: MTU is outside of sanity bounds (1000 to 2000)
+ALERT: MTU is outside of sanity bounds (1200 to 1600)
+ENDOFMSG
+	;;
+	_cj18_1) cat << ENDOFMSG
+
+ERROR: MTU: < $_value > is invalid. Must be a number.
 ENDOFMSG
 	;;
 	_cj19) cat << ENDOFMSG
 
-ERROR: < $_passvar > is binary. Must be:  true or false
+ERROR: < $_passvar > Must be <true or false>
 ENDOFMSG
 	;;
 	_jf1) cat << ENDOFMSG
@@ -224,6 +243,15 @@ ENDOFMSG
 
 ERROR: Parameter < $_value > for < $_passvar > 
        had a null value in $QBDIR/jailmap.conf
+
+ENDOFMSG
+	;;
+	_jo1) cat << ENDOFMSG
+
+ERROR: < $_value > needs a rootjail clone; however, there are
+       no existing clones, and the rootjail at: < $_passvar > 
+       is either being updated, or installing pkgs. New clone
+       shouldn't be taken until these operations are complete. 
 
 ENDOFMSG
 	;;
