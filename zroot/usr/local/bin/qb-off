@@ -54,7 +54,7 @@ remove() {
 		stop_jail "$_jail" > /dev/null 2>&1 &
 	
 		# Jails with common epairs will error if stopped simultaneously. Wait a moment
-		get_info -q _CLIENTS $_jail && sleep .5
+		get_info -q _CLIENTS $_jail && sleep 1
 
 	done
 }
