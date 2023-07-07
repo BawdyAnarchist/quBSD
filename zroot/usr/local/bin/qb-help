@@ -1,7 +1,6 @@
 #!/bin/sh
 
 cat << ENDOFUSAGE
-
 qb-autosnap: Tool to automate the creation, management, and thinning
              of ZFS snapshots. Works in combination with /etc/crontab.
 qb-autostart: Starts all jails flagged with autostart. sysrc started. 
@@ -30,4 +29,3 @@ qb-rename:   Renames a jail. Option to update downstream dependencies
 qb-snap:     Create jail snapshot. Necessary for rootjails and dispjails
 qb-stat:     Continuously running status script for quBSD and jail status
 ENDOFUSAGE
-
