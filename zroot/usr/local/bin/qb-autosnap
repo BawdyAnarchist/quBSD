@@ -97,24 +97,6 @@ list_datasets() {
 	exit 0	
 }		
 
-destroy_snapshots() {
-	# Assemble list of all snapshots with a destroy date
-	SNAPLIST=$(zfs list -H -t snapshot -o name,qubsd:destroy-date \
-							| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
-
-	# Thin (destroy) snapshots older than their time-to-live 
-	for _snap in $SNAPLIST ; do
-
-		# Acquire the isolated unix-time destroy date 
-		snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
-
-		if [ "$snap_dd" -lt "$DATE_UNIX" ] ; then
-			zfs destroy "$_snap"
-		fi	
-
-	done
-}
-
 new_snapshots() {
 	# Datasets tagged with qubsd:autosnap. Includes extra columns for [-l]
 	ZLIST=$(zfs list -rH -o name,qubsd:autosnap \
@@ -147,7 +129,7 @@ main() {
 	[ -n "$LIST" ] && list_datasets
 
 	# Destroy snapshots tagged with a TTL
-	[ -n "$DESTROY" ] && destroy_snapshots 
+	[ -n "$DESTROY" ] && cleanup_oldsnaps 
 
 	# Create new snapshots
 	[ -n "$SNAPSHOT" ] && new_snapshots 
