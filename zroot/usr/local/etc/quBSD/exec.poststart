@@ -16,7 +16,9 @@ security_flags() {
 		all)  _jdir="/bin /sbin /boot /etc /home /lib /libexec /root /rw /usr"
 		;;
 		sys)  _jdir="/boot /rw /bin /sbin /etc /lib /libexec /usr/bin /usr/sbin \
-					/usr/lib /usr/libexec /usr/libdata /usr/lib32 /usr/local"
+					/usr/lib /usr/libexec /usr/libdata /usr/lib32 /usr/local/bin \
+               /usr/local/etc /usr/local/lib /usr/local/libdata /usr/local/libexec \
+					/usr/local/man /usr/local/openssl /usr/local/sbin /usr/local/share"
 		;;
 	esac
 
