@@ -13,19 +13,18 @@ ENDOFMSG
 	;;	
 	_1) cat << ENDOFMSG
 
-ERROR: Must specify < new_jailname >
-ENDOFMSG
-	;;	
-	_1_1) cat << ENDOFMSG
+#############################################
+###### UNUSED ERROR MESSAGE DESIGNATOR ######
+#############################################
 
-ERROR: < $JAIL > failed checks. Fix errors and try again.
 ENDOFMSG
 	;;	
 	_2) cat << ENDOFMSG
 
-ERROR: < none > is an invalid name. Using "none" for a 
-       jailname will cause errors during quBSD operations, 
-       as it's often an exception during various checks.
+#############################################
+###### UNUSED ERROR MESSAGE DESIGNATOR ######
+#############################################
+       
 ENDOFMSG
 	;;	
 	_3) cat << ENDOFMSG
