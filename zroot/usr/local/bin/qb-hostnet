@@ -70,7 +70,7 @@ main() {
 		# start_jail command handles most error messages 
 		start_jail "$GATEWAY" ||  get_msg_hostnet "_3" "usage_1"
 
-		connect_client_gateway "host"
+		connect_client_gateway "host" "$GATEWAY" "$IPV4"
 		
 		# Change pf to file that passes internet from host to outside. 
 		pfctl -f /etc/pf_pass.conf
