@@ -1,54 +1,74 @@
 ### BEST PRACTICES / CLEANUP
 
-qb-create 
-	- Really should have some trap functions set when zfs cloning
-	- apparently -g selecting "none" template is having zfs problems
-	- Failed to create /etc/jail.conf entry for: qb-create -T net-vpn net-wireguard
-	- It's still screwed up somehow. Not accepting a creation with all options. 
-	- Need to go through with a fine tooth comb. And/or do some fuzzing.
-	- Need to add an option for copying usrlocal
-	- Add option for "auto" IP assignment during guided
-	- Logic on "Would you like to also .... something about /home directory of template"
-		needs fixed, because no template shouldn't ask you to copy a non existent home.
-	- autostart option
-	- autosnap options - the custom zfs props need to be set
-		- be careful. Cloned datasets should not be autosnapped
-	- While in guided mode, add option to enter "auto" for IP assignment 
-	- You need to disallow 'none' and 'quBSD' as jailnames
-	- Add the new jail to the i3gen.conf and execute keybindings
+qb-off
+	- Integrate the functions you wrote for qb-start 
+
+- Create 0base-template
+
+Jailmap.conf autosnap option 
+	- qb-autosnap modificaitons 
+		- Should read both zfs and jmap autosnap
+		- Then syncronize anything that was off. Sync to jmap
+	- qb-edit
+		- will needed added. and zfs mod takes place 
+
+Decide on MTU, global or not. 
+
+qb-disp with -Z option for cloning root dataset as well? 
 
 pf.conf
 	- wgIP constant really should be called "endpointIP" or something like that
 
 /usr/local/share/quBSD 
-	- Needs to document that the rootjails must stay lowered schg
 	- Needs updated in general after you're done
+	- Needs to document that the rootjails must stay lowered schg
 	- Update the guides regarding #defaults in jailmap.
 
+qb-create 
+	- GUIDED MODE needs to be completely redone.
+	- Add the new jail to the i3gen.conf and execute keybindings
+	- NEXT IN LINE
+
 quBSD.sh 
-	- Maybe destroy epairs / remove from jails could be put in there?
 	- remove_tap needs polished up 
 
-jail -r <net-jail> is causing an "Operation not permitted" error
+jail -r 
+	- <net-jail> is causing an "Operation not permitted" error
 
-Should cycle all scripts through shellcheck again. Install shellcheck
+Should cycle all scripts through shellcheck again. 
 	- Case statements need catchalls to trap invalid options provided
+	- Primarily with scripts that should error on invalid option
+
+qb-list
+	- Apparently I haven't integrated: get_jail_parameter
+	- Also, would be good to evaluate each of the parameters at each list
+     to show whether or not they're good/valid.
+
+qb-destroy
+	- Defining variables CLASS and NO_DESTROY can probably be offloaded to library
 
 qb-edit
 	- [-i] combined with gateway should assign both ipv4 and gateway at the same time
-
-qb-off
-	- still causing problems, this time for netjails with -r option. It's something to do with the background processes I'm sure.
+   - Should add autosnap as an option
 
 qb-connect
 	- could figure out what about stupid pf is preventing network connection for adhoc connected jails 
 
 ntpd
-	- Host time drifts because it's not connected. Need to create a crontab or something, which syncs the time once a day or something
+	- ntpd only runs during qb-hostnet. Needs a more "correct" solution.
 
 devfs.rules
 	- The rulenames should include "qubsd" so as not to have a chance of overlapping other rules
 	- Maybe the file should be added to the get_global_variables assignments library
+
+jailmap.conf
+	- Would be better if you could just ipv4 "auto," and assign adhoc at jail creation.
+
+the word "template" really ought to be "parent." Create dispjail from PARENT. TEMPLATE should probably be relegated to the 0root-templates and to qb-create. 
+
+I think it's time to capitalize all jmap parameters
+
+qme-firefox needs fixed (personal note)
 
 ### UPGRADES
 
@@ -102,6 +122,9 @@ qubsd_installer
 		- the new one for webcam
 
 ### VIRTUAL MACHINE INTEGRATION
+## Notes - the way to do this, is put bhyve VMs in jails.
+	- Internal networking now all looks identical, between jail and VM
+	- External networking can be managed exactly how you manage jails now
 
 quBSD.conf 
 	- ppt_nic and usb should probably be more like: check /boot/loader.conf against pciconf 
