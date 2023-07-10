@@ -15,7 +15,9 @@ get_parameters() {
 	# Check/warn if outside of quBSD IPv4 convention, but don't fail 
 	chk_isqubsd_ipv4 "$IPV4" "$JAIL"
 
-	if ! [ gateway = "none" ] ; then
+	if [ gateway = "none" ] ; then
+		IPV4="none"
+	else
 		# We will need the class of the gateway later for VM vs jails handling
 		_class_gw=$(get_jail_parameter -eq class "$GATEWAY")
 
@@ -24,27 +26,51 @@ get_parameters() {
 	fi
 }
 
-connect_jail_to_clients() {
-	connect_client_gateway -e -i "$_cIP" "$_client" "$JAIL" > /dev/null
+connect_to_gateway() {
+	# Jails connected to VMs must have handling of the tap interface 
+	if [ "$_class_gw" == "VM" ] ; then
 
-	# If there are wg interfaces on <_client> , down/up to re-establish connection. 
-	wg_intf=$(jexec -l -U root $_client ifconfig -g tun | grep "wg")
+		# Get the tap interface for the VM
+		get_jail_parameter vif "$GATEWAY" ||  exit 1
+		
+		# Send vintf to the jail and bring it up. The <jail> rc.conf handles the rest.
+		ifconfig $VIF vnet $JAIL 
+		jexec -l -U root $JAIL ifconfig $VIF mtu $MTU up
 
-	for _wg in $wg_intf ; do 
-		jexec -l -U root $_client wg-quick down $_wg
-		jexec -l -U root $_client wg-quick up $_wg 
+	else
+		# If auto, then assign the global variable IPV4 to have a real IP addr
+		[ "$IPV4" = "auto" ] && assign_ipv4_auto "$JAIL" 
+
+		# Connect jail, to it's gateway. Global $VIF is assigned inside func.
+		chk_isrunning "$GATEWAY" && connect_client_gateway "$JAIL" "$GATEWAY" "$IPV4"
+	fi
+}
+
+connect_to_clients() {
+	# If <jail> serves a network connection, bring those connections up 
+	for _client in $(get_info -e _CLIENTS "$JAIL") ; do
+
+		if chk_isrunning "$_client" ; then
+
+			# Get IP of client from jmap 
+			_cIP=$(get_jail_parameter -deq ipv4 "$_client") 
+
+			# Assign auto IP to client and connect it to jail.
+			[ "$_cIP" = "auto" ] && _cIP=$(assign_ipv4_auto -e "$_client")
+			echo connect_client_gateway "$_client" "$JAIL" "$_cIP" >> /root/2log
+			connect_client_gateway "$_client" "$JAIL" "$_cIP" 
+		fi
 	done
 }
 
 modify_pf() {
+
 	# Numerous variables need to be modified for pf.conf
 	if [ -e "$JPF" ] ; then
-	
-		# exec.created IPs and interfaces	
+
+		# $VIF was assigned during the connect_client_gateway func. Modify pf.conf 
 		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"$VIF\"@" $JPF
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"$IPV4\"@" $JPF
-		sed -i '' -e "s@^routerIP[[:blank:]]*=.*@routerIP = \"${IPV4%.*/*}.1\"@" $JPF
-		sed -i '' -e "s@^table <pass_ips>.*@table <pass_ips> { $nat_table}@" "$JPF"
 
 		# net-jail internal wireguard parameters
 		[ -n "$ENDPOINT" ] \
@@ -52,9 +78,6 @@ modify_pf() {
 
 		[ -n "$WGPORTS" ] \
 			&& sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"$WGPORTS\"@" $JPF  
-
-		# Get the ports being passed by client's pf's, and add to gateway (usually net-firewall)
-		# Todo: Add the above	
 	fi
 }
 
@@ -67,39 +90,32 @@ resource_control() {
 	[ "$CPUSET" = "none" ] || cpuset -j $JAIL -cl $CPUSET
 }
 
-main() {
-	# Jails connected to VMs must have handling of the tap interface 
-	if [ "$_class_gw" == "VM" ] ; then
-		# Get the tap interface for the VM
-		get_jail_parameter vif "$GATEWAY" ||  exit 1
-		
-		# Send vintf to the jail and bring it up. The <jail> rc.conf handles the rest.
-		ifconfig $VIF vnet $JAIL 
-		jexec -l -U root $JAIL ifconfig $VIF mtu $MTU up
+remove_tmp_ip() {
+	# TMP_IP file might exist, if this jail was started via qb-start
+	_TMP_IP='/tmp/qb-start_temp_ip'
 
-	else
-		# Connect <jail> as a client, to it's gateway. epairs, IPs, and $VIF is assigned
-		chk_isrunning "$GATEWAY" && connect_client_gateway "$JAIL"
+	if [ -e "$_TMP_IP" ] ; then
+
+		# Remove the jail from the TMP file, and remove any blank lines
+		sed -i '' -E "/^[[:blank:]]*${JAIL}[[:blank:]]+/ d" $_TMP_IP
+		sed -i '' -E "/^[[:blank:]]*\$/ d" $_TMP_IP
+
+		# If the file is empty, then it's no longer needed. Remove it.	
+		[ -s "$_TMP_IP" ] || rm "$_TMP_IP"
 	fi
+}
 
-	# If <jail> serves a network connection, bring those connections up 
-	for _client in $(get_info -e _CLIENTS "$JAIL") ; do
+main() {
+	
+	connect_to_gateway
 
-		# Build the pf table of allowable client IPs.
-		_cIP=$(get_jail_parameter -deq ipv4 "$_client") && ! [ "$_cIP" = "none" ] \
-				&& nat_table="${_cIP} ${nat_table}"
-
-		if chk_isrunning "$_client" ; then
-			# Connect to all clients that are running. 
-			connect_jail_to_clients
-		fi
-	done
-
-	# Modify pf.conf for the jail
 	modify_pf			
 
-	# Implement some of the resource controls
+	connect_to_clients
+
 	resource_control
+
+	remove_tmp_ip	
 }
 
 
@@ -110,7 +126,4 @@ get_parameters "$@"
 get_networking_variables
 
 main
-
-
-
 
