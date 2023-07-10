@@ -127,7 +127,7 @@ configure_connection() {
 	chk_isrunning "$GATEWAY" || start_jail "$GATEWAY" || exit 1
 	
 	# Make the connection beteween jails
-	connect_client_gateway "$JAIL" "$GATEWAY"
+	connect_client_gateway "$JAIL" "$GATEWAY" "$IPV4"
 
 	# Temporarily modify running pf tables
 	[ -n "$_pfG" ] && jexec -l -U root $GATEWAY pfctl -t pass_ips -T add $IPV4
