@@ -47,7 +47,7 @@ start_jails() {
 	grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}' | uniq > $JAILS
 
 	# Turn on any jails not started
-	qb-autostart -f $JAILS > /dev/null 2>&1
+	qb-start -f $JAILS > /dev/null 2>&1
 	
 	# Remove the temporary monitoring pop	
 	kill -15 $_pid_stat
