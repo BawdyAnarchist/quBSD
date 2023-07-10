@@ -161,6 +161,13 @@ Use \`qb-destroy' to remove any lingering pieces of a jail
 
 ENDOFMSG
 	;;
+	_cj15_2) cat << ENDOFMSG
+
+ERROR: Jail must start with alpha/numeric, and then only 
+       \`-' or \`_' (dash or underscore) as special chars
+
+ENDOFMSG
+	;;
 	_cj16) cat << ENDOFMSG
 
 ERROR: < $_value > needs to be designated as a
@@ -230,10 +237,9 @@ WARNING: < $_value > could not be stopped. Attempt to
          /var/log/quBSD.log
 ENDOFMSG
 	;;
-	_ip7) cat << ENDOFMSG
+	_jf7) cat << ENDOFMSG
 
 ERROR: Failed to find open IP for < $_value > 
-       in the quBSD designated range of < $_passvar > 
 
        It's permissible to use the same IP twice; but ensure that 
        jails with the same IP aren't connected to the same gateway. 
