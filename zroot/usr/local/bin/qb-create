@@ -294,7 +294,7 @@ change_datasets() {
 change_configs() {
 
 	# Add the parameters to jailmap 
-	cat "$_TMP_PARAMS" | column -t >> $JMAP
+	column -t < "$_TMP_PARAMS"  >> $JMAP
 
 	# Make a tmp file for /etc/jail.conf edits 
 	_TMP_JCONF="/tmp/qb_create_jconf"
