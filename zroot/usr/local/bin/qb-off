@@ -50,12 +50,16 @@ remove() {
 		# Add restart jails to tmp file, to be used later  
 		[ -n "$RESTART" ] && echo "$_jail" >> $_restarts
 
-		# Stop jail and send process to background (for time-efficiency).
-		stop_jail "$_jail" > /dev/null 2>&1 &
-	
-		# Jails with common epairs will error if stopped simultaneously. Wait a moment
-		get_info -q _CLIENTS $_jail && sleep 1
+		# Check if jail has network clients (implies a common epair)
+		if get_info _CLIENTS $_jail ; then 
 
+			# Will error if epair -vnet both jails simultaneously. Wait for completion
+			stop_jail "$_jail" > /dev/null 2>&1
+		else
+			# Stop jail and send process to background (for time-efficiency).
+			stop_jail "$_jail" > /dev/null 2>&1 &
+		fi
+	
 	done
 }
 
@@ -80,10 +84,10 @@ handle_restarts() {
 	# Transient shutdown ops need another moment, or start_jail will fail 
 	sleep .7
 
-	# For time-efficient restarts without networking conflicts, use qb-autostart 
-	[ -s "$_restarts" ] && qb-autostart -f "$_restarts" 
-	
-	# Wait a moment. qb-autostart must copy $_restarts before trap rm (I think that's why)
+	# For time-efficient restarts without networking conflicts, use qb-start 
+	[ -s "$_restarts" ] && qb-start -f "$_restarts" 
+
+	# Give qb-start a moment to copy the _restarts, before trap removal
 	sleep .5
 }
 
