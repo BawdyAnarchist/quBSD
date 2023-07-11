@@ -89,21 +89,6 @@ resource_control() {
 	[ "$CPUSET" = "none" ] || cpuset -j $JAIL -cl $CPUSET
 }
 
-remove_tmp_ip() {
-	# TMP_IP file might exist, if this jail was started via qb-start
-	_TMP_IP='/tmp/qb-start_temp_ip'
-
-	if [ -e "$_TMP_IP" ] ; then
-
-		# Remove the jail from the TMP file, and remove any blank lines
-		sed -i '' -E "/^[[:blank:]]*${JAIL}[[:blank:]]+/ d" $_TMP_IP
-		sed -i '' -E "/^[[:blank:]]*\$/ d" $_TMP_IP
-
-		# If the file is empty, then it's no longer needed. Remove it.	
-		[ -s "$_TMP_IP" ] || rm "$_TMP_IP"
-	fi
-}
-
 main() {
 	
 	connect_to_gateway
@@ -113,8 +98,6 @@ main() {
 	connect_to_clients
 
 	resource_control
-
-	remove_tmp_ip	
 }
 
 
