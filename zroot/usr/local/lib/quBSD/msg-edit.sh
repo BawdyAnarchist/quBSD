@@ -77,10 +77,18 @@ ALERT: net-firewall connects to the external internet, so its
        assigned by your router, and this file.
 ENDOFMSG
 	;;
+		_10) cat << ENDOFMSG
+
+ALERT: Changing GATEWAY to < $VAL > but IPV4 is set to
+       'none' in jailmap.conf. IP is necessary in order
+       to connect < $JAIL > to < $VAL >
+
+ENDOFMSG
+echo -e "Would you like to change this to auto? (Y/n): \c"
+	;;
 
 	# End of _message 
 	esac
-
 
 	# Secondary message - informs about the [-f] option 
 	[ -z "$QUIET" ] && case $_msg2 in 
