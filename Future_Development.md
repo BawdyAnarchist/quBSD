@@ -2,14 +2,21 @@
 
 - Create 0base-template
 
-Jailmap.conf autosnap option 
-	- qb-autosnap modificaitons 
-		- Should read both zfs and jmap autosnap
-		- Then syncronize anything that was off. Sync to jmap
+- qb-autosnap modificaitons 
+	- Should read both zfs and jmap autosnap
+	- Then syncronize anything that was off. Sync to jmap
 	- qb-edit
 		- will needed added. and zfs mod takes place 
 
-Decide on MTU, global or not. 
+qubsd
+	- reclone_zusr probably needs same snapshot protections as reclone_zroot
+	
+
+qb-destroy
+	- Defining variables CLASS and NO_DESTROY can probably be offloaded to library
+
+qb-autosnap
+	- Maybe it should do a "diff" and only snap when relevant. Reduces clutter
 
 qb-disp with -Z option for cloning root dataset as well? 
 
@@ -26,11 +33,9 @@ qb-create
 	- Add the new jail to the i3gen.conf and execute keybindings
 	- NEXT IN LINE
 
-quBSD.sh 
-	- remove_tap needs polished up 
+the word "template" really ought to be "parent." Create dispjail from PARENT. TEMPLATE should probably be relegated to the 0root-templates and to qb-create. 
 
-jail -r 
-	- <net-jail> is causing an "Operation not permitted" error
+Decide on MTU, global or not. 
 
 Should cycle all scripts through shellcheck again. 
 	- Case statements need catchalls to trap invalid options provided
@@ -40,9 +45,6 @@ qb-list
 	- Apparently I haven't integrated: get_jail_parameter
 	- Also, would be good to evaluate each of the parameters at each list
      to show whether or not they're good/valid.
-
-qb-destroy
-	- Defining variables CLASS and NO_DESTROY can probably be offloaded to library
 
 qb-edit
 	- [-i] combined with gateway should assign both ipv4 and gateway at the same time
@@ -58,14 +60,19 @@ devfs.rules
 	- The rulenames should include "qubsd" so as not to have a chance of overlapping other rules
 	- Maybe the file should be added to the get_global_variables assignments library
 
-jailmap.conf
-	- Would be better if you could just ipv4 "auto," and assign adhoc at jail creation.
-
-the word "template" really ought to be "parent." Create dispjail from PARENT. TEMPLATE should probably be relegated to the 0root-templates and to qb-create. 
-
-I think it's time to capitalize all jmap parameters
-
 qme-firefox needs fixed (personal note)
+
+### TROUBLE NOTES (uncertain, things to monitor)
+
+It seems like exec.created might not *always* be updated pf.conf with the new epair.
+	- On one restart immediately after pushing the big upgrade with qb-start/stop to github, one net-vpn jail didn't update
+	- I'm not sure if it's because I'm defining VIF as a global in connect_client_gateway, with simultaneous starts.
+
+jail -r 
+	- <net-jail> is causing an "Operation not permitted" error
+
+Renamed all JMAP parameters to CAPS
+	- I think it's good, but there's alot of stuff in the scripts. Maybe missed something
 
 ### UPGRADES
 
@@ -171,3 +178,5 @@ net-firewall
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 qb-update - Update rootjails, create snapshots
 Crons - I have no crons running. This is probably something long term security that should be integrated and automated.
+man pages
+

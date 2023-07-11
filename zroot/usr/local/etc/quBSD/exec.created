@@ -57,7 +57,6 @@ connect_to_clients() {
 
 			# Assign auto IP to client and connect it to jail.
 			[ "$_cIP" = "auto" ] && _cIP=$(assign_ipv4_auto -e "$_client")
-			echo connect_client_gateway "$_client" "$JAIL" "$_cIP" >> /root/2log
 			connect_client_gateway "$_client" "$JAIL" "$_cIP" 
 		fi
 	done

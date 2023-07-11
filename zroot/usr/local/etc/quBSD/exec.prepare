@@ -34,15 +34,15 @@ main() {
 	case $CLASS in 
 		appjail) 
 			# Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTJAIL"
+			reclone_zroot "$JAIL" "$ROOTJAIL" || exit 1
 		;;
 		dispjail) 
 			# Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTJAIL"
+			reclone_zroot "$JAIL" "$ROOTJAIL" || exit 1
 			
 			# Dispjails also reclone the zusr portion from template (if it exists)
 			get_jail_parameter template "$JAIL" || exit 1
-			chk_valid_zfs "${ZUSR_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE"
+			chk_valid_zfs "${ZUSR_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE" || exit 1
 		;;
 	esac
 
