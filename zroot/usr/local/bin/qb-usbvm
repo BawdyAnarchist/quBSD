@@ -27,13 +27,13 @@ m_jails=$(zfs get -H mountpoint $jails_zfs | awk '{print $3}')
 jail="$1"
 
 define_variables() {
-	usbvmIP=$(egrep "^usbvm[[:blank:]]+ipv4" $JMAP | awk '{print $3}')
+	usbvmIP=$(egrep "^usbvm[[:blank:]]+IPV4" $JMAP | awk '{print $3}')
 	jailconnectIP="${usbvmIP%.*/*}.2/${usbvmIP#*.*.*.*/}"
-	tap=$(egrep "^usbvm[[:blank:]]+gateway" $JMAP | awk '{print $3}')
+	tap=$(egrep "^usbvm[[:blank:]]+GATEWAY" $JMAP | awk '{print $3}')
 	ppt_usb1=$(sed -nE "s:ppt_usb1[[:blank:]]+:: p" $QBCONF) 
 	ppt_usb2=$(sed -nE "s:ppt_usb2[[:blank:]]+:: p" $QBCONF) 
 	
-	JMAPIPs=$(qb-list -p ipv4 | awk '{print $3}')
+	JMAPIPs=$(qb-list -p IPV4 | awk '{print $3}')
 	usedIPs=$(qb-connect -l | awk '{print $3}')
 
 	# Determine if usbvm process is running

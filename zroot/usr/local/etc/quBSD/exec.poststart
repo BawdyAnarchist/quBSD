@@ -5,8 +5,8 @@
 get_options() {
 	JAIL="$1"
 
-	get_jail_parameter schg "$JAIL"
-	get_jail_parameter seclvl "$JAIL" 
+	get_jail_parameter SCHG "$JAIL"
+	get_jail_parameter SECLVL "$JAIL" 
 }
 
 security_flags() {

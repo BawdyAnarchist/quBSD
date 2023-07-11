@@ -278,7 +278,7 @@ Rootjail:               qb-create -t <existing_rootjail> <newjail>
 
 If no opts or <template> are specified, jailmap \'#default' are used. 
   #default can be viewed with:   qb-list -j #default
-  #default can be changed with:  qb-edit #default <param> <value> 
+  #default can be changed with:  qb-edit #default <PARAM> <value> 
 
 ENDOFMSG
 	;;

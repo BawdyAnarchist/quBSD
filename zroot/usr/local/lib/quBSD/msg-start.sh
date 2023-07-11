@@ -9,11 +9,12 @@ get_msg_start() {
 
 	_e0) cat << ENDOFMSG
 
-ERROR: qb-start already has another instance running. It 
-       should never be run simultaneously with another
-       instance, due to the high probability of conflicts. 
+ERROR: An instance of qb-start or qb-stop is already running.
+       Absolutely should never run these in in parallel, due 
+       to the high probability of errors, hangs, and loops.
 
-       PID: $(pgrep -f qb-start)
+$(pgrep -fl qb-start)
+$(pgrep -fl qb-stop)
 	
 ENDOFMSG
 	;;	

@@ -6,11 +6,11 @@ get_parameters() {
 	JAIL="$1"
 
 	# Get parameters. Class was already verified, so skip checks. 
-	get_jail_parameter -dqs class  "$JAIL" ||  exit 1
-	get_jail_parameter ipv4    "$JAIL"     ||  exit 1
-	get_jail_parameter gateway "$JAIL"     ||  exit 1
-	get_jail_parameter maxmem  "$JAIL"     ||  exit 1
-	get_jail_parameter cpuset  "$JAIL"     ||  exit 1
+	get_jail_parameter -dqs CLASS  "$JAIL" ||  exit 1
+	get_jail_parameter IPV4    "$JAIL"     ||  exit 1
+	get_jail_parameter GATEWAY "$JAIL"     ||  exit 1
+	get_jail_parameter MAXMEM  "$JAIL"     ||  exit 1
+	get_jail_parameter CPUSET  "$JAIL"     ||  exit 1
 
 	# Check/warn if outside of quBSD IPv4 convention, but don't fail 
 	chk_isqubsd_ipv4 "$IPV4" "$JAIL"
@@ -19,10 +19,10 @@ get_parameters() {
 		IPV4="none"
 	else
 		# We will need the class of the gateway later for VM vs jails handling
-		_class_gw=$(get_jail_parameter -eq class "$GATEWAY")
+		_class_gw=$(get_jail_parameter -eq CLASS "$GATEWAY")
 
 		# MTU only with valid IP. Quiet messages (MTU is not critical) 
-		get_jail_parameter -q mtu "$JAIL" 
+		get_jail_parameter -q MTU "$JAIL" 
 	fi
 }
 
@@ -31,7 +31,7 @@ connect_to_gateway() {
 	if [ "$_class_gw" == "VM" ] ; then
 
 		# Get the tap interface for the VM
-		get_jail_parameter vif "$GATEWAY" ||  exit 1
+		get_jail_parameter VIF "$GATEWAY" ||  exit 1
 		
 		# Send vintf to the jail and bring it up. The <jail> rc.conf handles the rest.
 		ifconfig $VIF vnet $JAIL 
@@ -53,7 +53,7 @@ connect_to_clients() {
 		if chk_isrunning "$_client" ; then
 
 			# Get IP of client from jmap 
-			_cIP=$(get_jail_parameter -deq ipv4 "$_client") 
+			_cIP=$(get_jail_parameter -deq IPV4 "$_client") 
 
 			# Assign auto IP to client and connect it to jail.
 			[ "$_cIP" = "auto" ] && _cIP=$(assign_ipv4_auto -e "$_client")

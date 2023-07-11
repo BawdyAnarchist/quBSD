@@ -10,7 +10,6 @@
 
 qubsd
 	- reclone_zusr probably needs same snapshot protections as reclone_zroot
-	
 
 qb-destroy
 	- Defining variables CLASS and NO_DESTROY can probably be offloaded to library

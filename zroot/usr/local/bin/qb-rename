@@ -19,10 +19,10 @@ get_options() {
 
 define_variables() {
 	# Finds jails dependent on the jail to be renamed
-	get_jail_parameter -sqd rootjail $JAIL
+	get_jail_parameter -sqd ROOTJAIL $JAIL
 	get_info _CLIENTS $JAIL
-	ROOTJ_FOR=$(sed -nE "s/[[:blank:]]+rootjail[[:blank:]]+${JAIL}\$//p" $JMAP)
-	TEMPL_FOR=$(sed -nE "s/[[:blank:]]*template[[:blank:]]+${JAIL}\$//p" $JMAP)
+	ROOTJ_FOR=$(get_jail_parameter -eqs ROOTJAIL "$JAIL")
+	TEMPL_FOR=$(get_jail_parameter -eqs TEMPLATE "$JAIL")
 	ALLJAILS="$ROOTJ_FOR $TEMPL_FOR $_CLIENTS"
 }
 
@@ -59,7 +59,7 @@ rename_jail() {
 
 	# Modify jailmap. Roojails should update their own rootjail to self
 	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}  /g" $JMAP
-	[ "${JAIL}" = "${ROOTJAIL}" ] && qb-edit -fq ${NEWNAME} rootjail ${NEWNAME}
+	[ "${JAIL}" = "${ROOTJAIL}" ] && qb-edit -fq ${NEWNAME} ROOTJAIL ${NEWNAME}
 
 	# Modify /etc/jail.conf
 	sed -i '' -E "s/^${JAIL}[[:blank:]]+\{/${NEWNAME} \{/g" $JCONF 
@@ -93,15 +93,15 @@ update_dependencies() {
 	if [ -n "$UPDATE" ] ; then
 
 		for _jail in $ROOTJ_FOR ; do
-			[ "$_jail" = "$JAIL" ] || qb-edit -fq $_jail rootjail $NEWNAME
+			[ "$_jail" = "$JAIL" ] || qb-edit -fq $_jail ROOTJAIL $NEWNAME
 		done
 
 		for _jail in $TEMPJ_FOR ; do
-			qb-edit -fq $_jail template $NEWNAME
+			qb-edit -fq $_jail TEMPLATE $NEWNAME
 		done
 
 		for _jail in $_CLIENTS ; do
-			qb-edit -fq $_jail gateway $NEWNAME
+			qb-edit -fq $_jail GATEWAY $NEWNAME
 		done
 
 		# Restart dependencies that were already on

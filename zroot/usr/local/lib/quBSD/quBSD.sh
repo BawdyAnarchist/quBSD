@@ -162,8 +162,6 @@ get_jail_parameter() {
 
 	# Positional variables:
 	 # $1: _param : The parameter to pull from JMAP
-	     # _PARAM : <_param> name converted to UPPER. eval statement is used to
-	 	  # to save <value> to the ALL CAPS <param> name stored in: $_PARAM
 	 # $2: _jail  : <jail> to reference in JMAP
 
 	while getopts deqs opts ; do
@@ -180,7 +178,7 @@ get_jail_parameter() {
 
 	# Positional variables
 	local _param="$1"
-	local _PARAM=$(echo "$_param" | tr '[:lower:]' '[:upper:]')
+	local _low_param=$(echo "$_param" | tr '[:upper:]' '[:lower:]')
 	local _jail="$2"
 	local _value=''
 
@@ -203,14 +201,14 @@ get_jail_parameter() {
 	fi
 
 	# Either echo <value> , or assign global variable (as specified by caller).
-	[ "$_ep" ] && echo "$_value" || eval $_PARAM=\"$_value\"
+	[ "$_ep" ] && echo "$_value" || eval $_param=\"$_value\"
 
 	# If -s was provided, checks are skipped by this eval
 	eval $_sp
 
 	#NOTE!: Not all functions are used, so they're not included later.
 	# Variable indirection for checks. Escape \" avoids word splitting
-	eval "chk_valid_${_param}" $_qp \"$_value\" \"$_jail\" \
+	eval "chk_valid_${_low_param}" $_qp \"$_value\" \"$_jail\" \
 		&& return 0 || return 1
 }
 
@@ -236,7 +234,7 @@ get_info() {
 
 	case $_info in
 		_CLIENTS)
-			_value=$(sed -nE "s/[[:blank:]]+gateway[[:blank:]]+${_jail}//p" $JMAP)
+			_value=$(sed -nE "s/[[:blank:]]+GATEWAY[[:blank:]]+${_jail}//p" $JMAP)
 		;;
 		_ONJAILS)
 			# Prints a list of all jails that are currently running
@@ -244,8 +242,8 @@ get_info() {
 		;;
 		_TAP)
 			# If <jail> has VM gateway, the tap interface is returned. Else return 1.
-			_gateway=$(get_jail_parameter -deqs gateway $_jail)
-			_value=$(get_jail_parameter -deqs vif $_gateway)
+			_gateway=$(get_jail_parameter -deqs GATEWAY $_jail)
+			_value=$(get_jail_parameter -deqs VIF $_gateway)
 		;;
 		_USED_IPS)
 			# Assemble list of ifconfig inet addresses for all running jails
@@ -440,17 +438,17 @@ remove_tap() {
 	# If TAP is not already on host, find it and bring it to host
 	# Return 1 on failure, otherwise return 0 (even if tap was already on host)
 
-	# Assign name of tap
-	[ -n "$1" ] && _tap="$1" || return 1
+	# Assign name of tap 
+	local _tap="$1"
+	local _jail="$2"
 
 	# Check if it's already on host
 	ifconfig "$_tap" > /dev/null 2>&1  &&  return 0
 
-### NOTE: THIS NEEDS REVISED A BIT AND CLEANED UP
-### Probably, add a line to pull the $_tap from jmap, and check if it's inside
-### the specified jail, and remove it. If not, only *then* run the cycle below.
-### All scripts which reference `&& $TAP down`, remove TAP down (done here).
-	# First find all jails that are on
+	# If a specific jail was passed, check that as the first possibility to find/remove tap
+	[ "$_jail" ] && ifconfig "$_tap" -vnet "$_jail" > /dev/null 2>&1  && return 0
+
+	# If the above fails, then check all jails
 	for _jail in $(get_info -e _ONJAILS) ; do
 		if jexec -l -U root $_jail ifconfig -l | grep -Eqs "$_tap" ; then
 			ifconfig $_tap -vnet $_jail
@@ -480,7 +478,7 @@ connect_client_gateway() {
 	local _client="$1"
 	local _gateway="$2"
 	local _ipv4="$3"
-	local _mtu="${MTU:=$(get_jail_parameter -es mtu '#default')}"
+	local _mtu="${MTU:=$(get_jail_parameter -es MTU '#default')}"
 
 	# Create virtual interface. Gateway <_intf> can always be sent
 	local _intf=$(ifconfig epair create)
@@ -747,7 +745,7 @@ chk_valid_jail() {
 	[ -z "$_value" ] && get_msg $_qv "_0" "jail" && return 1
 
 	# Must have class in JMAP. Used later to find the correct zfs dataset
-	_class=$(sed -nE "s/^${_value}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+	_class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
 	chk_valid_class $_class || return 1
 
 	case $_class in
@@ -774,13 +772,13 @@ chk_valid_jail() {
 
 			# Verify the dataset of the template for dispjail
 			local _template=$(sed -nE \
-					"s/^${_value}[[:blank:]]+template[[:blank:]]+//p" $JMAP)
+					"s/^${_value}[[:blank:]]+TEMPLATE[[:blank:]]+//p" $JMAP)
 
 			# First ensure that it's not blank
 			[ -z "$_template" ] && get_msg $_qv "_cj5" "$_value" && return 1
 
 			local _class_of_temp=$(sed -nE \
-				"s/^${_template}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+				"s/^${_template}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
 
 			# Dispjails can only reference appjails.
 			[ "$_class_of_temp" = "dispjail" ] \
@@ -794,13 +792,13 @@ chk_valid_jail() {
 					# But I might want to add the temporary cloned datasets. We'll see. Prob not.
 		;;
 		# Any other class is invalid
-		*) get_msg $_qv "_cj2" "$_class" "class"  && return 1
+		*) get_msg $_qv "_cj2" "$_class" "CLASS"  && return 1
 		;;
 	esac
 
 	# Must have a designated rootjail in JMAP
-	! grep -Eqs "^${_value}[[:blank:]]+rootjail[[:blank:]]+" $JMAP \
-			&& get_msg $_qv "_cj1" "$_value" "rootjail" && return 1
+	! grep -Eqs "^${_value}[[:blank:]]+ROOTJAIL[[:blank:]]+" $JMAP \
+			&& get_msg $_qv "_cj1" "$_value" "ROOTJAIL" && return 1
 
 	# Must have an entry in JCONF
 	! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
@@ -819,7 +817,7 @@ chk_valid_autostart() {
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
-	chk_truefalse $_q "$1" "autostart"
+	chk_truefalse $_q "$1" "AUTOSTART"
 }
 
 chk_valid_autosnap() {
@@ -830,7 +828,7 @@ chk_valid_autosnap() {
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
-	chk_truefalse $_q "$1" "autosnap"
+	chk_truefalse $_q "$1" "AUTOSNAP"
 }
 
 chk_valid_class() {
@@ -842,12 +840,12 @@ chk_valid_class() {
 	shift $(( OPTIND - 1 ))
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "class" && return 1
+	[ -z "$_value" ] && get_msg $_q "_0" "CLASS" && return 1
 
 	# Valid inputs are: appjail | rootjail | dispjail
 	case $_value in
 		appjail|dispjail|ephemeral|rootjail|VM) return 0 ;;
-		*) get_msg $_q "_cj2" "$_value" "class" && return 1 ;;
+		*) get_msg $_q "_cj2" "$_value" "CLASS" && return 1 ;;
 	esac
 }
 
@@ -861,7 +859,7 @@ chk_valid_cpuset() {
 
 	# Positional parmeters / check.
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "cpuset" && return 1
+	[ -z "$_value" ] && get_msg $_q "_0" "CPUSET" && return 1
 
 	# None is always a valid cpuset
 	[ "$_value" = "none" ] && return 0
@@ -871,7 +869,7 @@ chk_valid_cpuset() {
 
 	# Test for negative numbers and dashes in the wrong place
 	echo "$_value" | grep -Eq "(,-|,[[:blank:]]*-|^[^[:digit:]])" \
-			&& get_msg $_q "_cj2" "$_value" "cpuset" && return 1
+			&& get_msg $_q "_cj2" "$_value" "CPUSET" && return 1
 
 	# Remove `-' and `,' to check that all numbers are valid CPU numbers
 	_cpuset_mod=$(echo $_value | sed -E "s/(,|-)/ /g")
@@ -879,7 +877,7 @@ chk_valid_cpuset() {
 	for _cpu in $_cpuset_mod ; do
 		# Every number is followed by a comma except the last one
 		! echo $_validcpuset | grep -Eq "${_cpu},|${_cpu}\$" \
-			&& get_msg $_q "_cj2" "$_value" "cpuset" && return 1
+			&& get_msg $_q "_cj2" "$_value" "CPUSET" && return 1
 	done
 
 	return 0
@@ -899,7 +897,7 @@ chk_valid_gateway() {
 	local _jail="$2"
 
 	# Nonlocal var, class of the gateway is important for jail startups
-	local _class_gw=$(sed -nE "s/^${_value}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+	local _class_gw=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
 
 	# Split log for checking a valid VM vs a valid jail
 	if [ "$_class_gw" = "VM" ] ; then
@@ -953,7 +951,7 @@ chk_valid_ipv4() {
 
 	# Positional parmeter / check.
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "IPv4" && return 1
+	[ -z "$_value" ] && get_msg $_q "_0" "IPV4" && return 1
 
 	# Temporary variables used for checking ipv4 CIDR
 	local _b1 ; local _b2 ; local _b3
@@ -1018,7 +1016,7 @@ chk_isqubsd_ipv4() {
 	define_ipv4_convention "$_jail"
 
 	# No value specified
-	[ -z "$_value" ] && get_msg $_q "_0" "IPv4"
+	[ -z "$_value" ] && get_msg $_q "_0" "IPV4"
 
 	# Check the net-jails for IP values of none
 	case ${_value}_${_jail} in
@@ -1052,7 +1050,7 @@ chk_isqubsd_ipv4() {
 	! [ "$_a0.$_a1.$_a3/$_a4" = "$_ip0.$_ip1.$_ip3/$_subnet" ] \
 			&& get_msg $_q "_cj12" "$_value" "$_jail" && return 1
 
-	_gateway=$(sed -nE "s/^${_jail}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
+	_gateway=$(sed -nE "s/^${_jail}[[:blank:]]+GATEWAY[[:blank:]]+//p" $JMAP)
 
 	# Assigning IP to jail that has no gateway
 	[ "$_gateway" = "none" ] && get_msg $_q "_cj14" "$_value" "$_jail" \
@@ -1073,14 +1071,14 @@ chk_valid_maxmem() {
 
 	# Positional parmeter / check
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "maxmem" && return 1
+	[ -z "$_value" ] && get_msg $_q "_0" "MAXMEM" && return 1
 
 	# None is always a valid maxmem
 	[ "$_value" = "none" ] && return 0
 
 	# Per man 8 rctl, user can assign units: G|g|M|m|K|k
    ! echo "$_value" | grep -Eqs "^[[:digit:]]+(G|g|M|m|K|k)\$" \
-			&& get_msg $_q "_cj2" "$_value" "maxmem" && return 1
+			&& get_msg $_q "_cj2" "$_value" "MAXMEM" && return 1
 
 	return 0
 }
@@ -1098,11 +1096,11 @@ chk_valid_mtu() {
 	local _jail="$2"
 
 	# If MTU is not a number
-	echo "$_value" | ! grep -Eq '^[0-9]*$' && get_msg $_q "_cj18_1" "mtu" && return 1
+	echo "$_value" | ! grep -Eq '^[0-9]*$' && get_msg $_q "_cj18_1" "MTU" && return 1
 
 	# Just push a warning, but don't error for MTU
-	[ "$_value" -lt 1200 ] > /dev/null 2>&1 && get_msg $_q "_cj18" "mtu"
-	[ "$_value" -gt 1600 ] > /dev/null 2>&1 && get_msg $_q "_cj18" "mtu"
+	[ "$_value" -lt 1200 ] > /dev/null 2>&1 && get_msg $_q "_cj18" "MTU"
+	[ "$_value" -gt 1600 ] > /dev/null 2>&1 && get_msg $_q "_cj18" "MTU"
 
 	return 0
 }
@@ -1115,7 +1113,7 @@ chk_valid_no_destroy() {
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
-	chk_truefalse $_q "$1" "no_destroy"
+	chk_truefalse $_q "$1" "NO_DESTROY"
 }
 
 chk_valid_rootjail() {
@@ -1128,10 +1126,10 @@ chk_valid_rootjail() {
 
 	# Positional parmeter / check
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "class" && return 1
+	[ -z "$_value" ] && get_msg $_q "_0" "CLASS" && return 1
 
 	# Must be designated as a rootjail in jailmap.con
-	_rootj=$(sed -nE "s/${_value}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+	_rootj=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
 	! [ "$_rootj" = "rootjail" ] && get_msg $_q "_cj16" "$_value" && return 1
 
 	# Must have an entry in JCONF
@@ -1158,14 +1156,14 @@ chk_valid_seclvl() {
 		_value="$_opt"
 	fi
 
-	[ -z "$_value" ] && get_msg $_q "_0" "seclvl" && return 1
+	[ -z "$_value" ] && get_msg $_q "_0" "SECLVL" && return 1
 
 	# None is always a valid seclvl
 	[ "$_value" = "none" ] && return 0
 
 	# If SECLVL is not a number
 	echo "$_value" | ! grep -Eq '^(-1|-0|0|1|2|3)$' \
-			&& get_msg $_q "_cj2" "$_value" "seclvl" && return 1
+			&& get_msg $_q "_cj2" "$_value" "SECLVL" && return 1
 
 	return 0
 }
@@ -1180,7 +1178,7 @@ chk_valid_schg() {
 
 	# Positional parmeter / check
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "schg" && return 1
+	[ -z "$_value" ] && get_msg $_q "_0" "SCHG" && return 1
 
 	# None is always a valid schg
 	[ "$_value" = "none" ] && return 0
@@ -1188,7 +1186,7 @@ chk_valid_schg() {
 	# Valid inputs are: none | sys | all
 	case $_value in
 		none|sys|all) return 0 ;;
-		*) get_msg $_q "_cj2" "$_value" "schg"  ;  return 1
+		*) get_msg $_q "_cj2" "$_value" "SCHG"  ;  return 1
 	esac
 }
 
@@ -1204,11 +1202,11 @@ chk_valid_template() {
 	# Positional parmeters.
 	local _value="$1"
 	local _jail="$2"
-	local _class=$(sed -nE "s/^${_value}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+	local _class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
 
 	[ "$_class" = "dispjail" ] &&
 
-	! chk_valid_jail $_qt "$_value" && get_msg $_qt "_cj6" "$_value" "template" && return 1
+	! chk_valid_jail $_qt "$_value" && get_msg $_qt "_cj6" "$_value" "TEMPLATE" && return 1
 
 	return 0
 }

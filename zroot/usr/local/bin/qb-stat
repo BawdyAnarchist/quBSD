@@ -55,7 +55,7 @@ assemble_header() {
 
 define_variables() {
 	#Jails data
-	jails=$(grep -E "[^[:blank:]]+[[:blank:]]+class[[:blank:]]+" $JMAP | awk '{print $1}') 
+	jails=$(grep -E "[^[:blank:]]+[[:blank:]]+CLASS[[:blank:]]+" $JMAP | awk '{print $1}') 
 	zfs_list=$(zfs list -ro name,used)
 
 	# Jailname of the active window is assigned to: $_XJAIL 
@@ -76,11 +76,11 @@ define_variables() {
 
 get_jails_loop() {
 	for _j in $jails ; do
-		class=$(sed -nE "s/^${_j}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+		class=$(get_jail_parameter -eqs CLASS "$_j")
 		class="${class%jail}"
-		gateway=$(sed -nE "s/^${_j}[[:blank:]]+gateway[[:blank:]]+//p" $JMAP)
+		gateway=$(get_jail_parameter -eqs GATEWAY "$_j")
 		gateway="${gateway:--}"
-		rootjail=$(sed -nE "s/^${_j}[[:blank:]]+rootjail[[:blank:]]+//p" $JMAP)
+		rootjail=$(get_jail_parameter -eqs ROOTJAIL "$_j")
 		rootjail="${rootjail:--}"
 		disk="-"
 		jid="-"

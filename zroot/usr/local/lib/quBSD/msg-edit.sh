@@ -42,12 +42,12 @@ ENDOFMSG
 		;;
 		_4) cat << ENDOFMSG
 
-ERROR: < no_destroy > must be either true or false
+ERROR: < NO_DESTROY > must be either true or false
 ENDOFMSG
 		;;
 		_5) cat << ENDOFMSG
 
-ERROR: Parameter < class > cannot be changed with qb-edit.
+ERROR: Parameter < CLASS > cannot be changed with qb-edit.
 ENDOFMSG
 		;;
 		_6) cat << ENDOFMSG
@@ -114,7 +114,7 @@ ENDOFMSG
 usage() { cat << ENDOFUSAGE 
 qb-edit:  Modify jail parameters in jailmap.conf
 
-Usage: qb-edit <jail> <parameter> <value>
+Usage: qb-edit <jail> <PARAMETER> <value>
        qb-edit [-f][-h][-i][-r] <jail> <parameter> <value>
 
    -f: (f)orce. Ignore errors and modify anyways. Error msgs
@@ -125,27 +125,29 @@ Usage: qb-edit <jail> <parameter> <value>
    -r: (r)estart the required jails for changes to take effect
 
 PARAMETERS SAVED AT /usr/local/etc/quBSD/jailmap.conf
-autostart:   Automatically start with rc script during host boot.  
-class:       Cannot be modified. Use qb-create instead.
-cpuset:      CPUs a jail may use. Comma separated integers, or a
+AUTOSTART:   Snapshot jail with qb-autosnap /etc/crontab
+AUTOSTART:   Automatically start with rc script during host boot.  
+CLASS:       Cannot be modified. Use qb-create instead.
+CPUSET:      CPUs a jail may use. Comma separated integers, or a
              range.  For example: 0,1,2,3 is the same as 0-3
              \`none' places no restrictions on jail's CPU access
+GATEWAY:      Gateway for <jail> to receive network connectivity
 IPV4:         IPv4 address for the jail.
-maxmem:      RAM maximum allocation:  <integer><G|M|K> 
+MAXMEM:      RAM maximum allocation:  <integer><G|M|K> 
              For example: 4G or 3500M, or \'none' for no limit
-no_destroy:  Prevents accidental destruction of <jail>
+MTU:         MTU for connections made when jail comes up. 
+NO_DESTROY:  Prevents accidental destruction of <jail>
              Change to \`false' in order to use qb-destroy
-rootjail:    Which rootjail system to clone for <jail> . If <jail>
+ROOTJAIL:    Which rootjail system to clone for <jail> . If <jail>
              is a rootjail; then this entry is self referential,
              but important for script funcitonality.
-schg:        Directories to receive schg flags: all|sys|none
+SCHG:        Directories to receive schg flags: all|sys|none
              \`sys' are files like: /boot /bin /lib , and others
              \`all includes /usr and /home as well
-seclvl:      kern.securelevel to protect <jail>: -1|0|1|2|3
+SECLVL:      kern.securelevel to protect <jail>: -1|0|1|2|3
              \`1' or higher is required for schg to take effect
-template:    Only applicable for dispjail. Designates jail to
+TEMPLATE:    Only applicable for dispjail. Designates jail to
              clone (including /home) for dispjail
-gateway:      Gateway for <jail> to receive network connectivity
 
 ENDOFUSAGE
 }

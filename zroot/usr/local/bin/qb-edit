@@ -10,7 +10,7 @@ get_options() {
 			   # [-f] acts on msg-edit function, rather than main script 
 			f) FORCE="true" ; _q='-q' ;; 
 			h) get_msg_edit "none" "usage_0" ;; 
-			i) PARAM="ipv4" ; VAL="auto" ;;
+			i) PARAM="IPV4" ; VAL="auto" ;;
 			q) QUIET="true" ; _q='-q' ;;
 			r) RESTART="true" ;;
 		esac
@@ -46,33 +46,33 @@ checks() {
 
 	# Sanity checks to make sure values are reasonable
 	case $PARAM in
-		autostart|no_destroy)
+		AUTOSTART|NO_DESTROY)
 				chk_truefalse $_q "$VAL" "$PARAM" || get_msg_edit "_4" "usage_1"
 		;;
-		class)
+		CLASS)
 				get_msg_edit "_5" "usage_1" "_f"  
 		;;
-		cpuset)
+		CPUSET)
 				chk_valid_cpuset $_q "$VAL" || get_msg_edit "none" "usage_1" 
 		;;
-		maxmem)
+		MAXMEM)
 				chk_valid_maxmem $_q "$VAL" || get_msg_edit "none" "usage_1" 
 		;;
-		rootjail|template)
+		ROOTJAIL|TEMPLATE)
 				# Check that rootjail or template has jmap and zroot zfs 
 				chk_valid_jail $_q "$VAL" || get_msg_edit "none" "exit_1" "_f"
 		;;
-		schg) 
+		SCHG) 
 				chk_valid_schg $_q "$VAL" ||  get_msg_edit "none" "usage_1" 
 		;;	
-		seclvl)		
+		SECLVL)		
 				chk_valid_seclvl $_q "$VAL" ||  get_msg_edit "none" "usage_1" 
 		;;
-		gateway)  
+		GATEWAY)  
 				chk_valid_gateway $_q "$VAL" "$JAIL" \
 						|| get_msg_edit "none" "exit_1" "_f"
 		;;
-		ipv4) 
+		IPV4) 
 				# It's possible user might try to assign DHCP from command line
 				if [ "$VAL" = "auto" ] ; then 
 
@@ -100,11 +100,11 @@ handle_restarts() {
 	# Logic could be written to change running jails, but simpler just to restart.
 	case $PARAM in 
 
-		cpuset|maxmem|rootjail|schg|seclvl|template)
+		CPUSET|MAXMEM|ROOTJAIL|SCHG|SECLVL|TEMPLATE)
 			chk_isrunning $JAIL && _restart1="$JAIL"
 		;;
-		ipv4|gateway)
-			_gateway=$(get_jail_parameter -deqs gateway $JAIL)
+		IPV4|GATEWAY)
+			_gateway=$(get_jail_parameter -deqs GATEWAY $JAIL)
 
 			# If jail is running it needs restarted
 			if chk_isrunning $JAIL ; then
@@ -136,8 +136,8 @@ handle_restarts() {
 handle_vm_gateway() {
 		
 		# Relevant variables. 
-		_gateway=$(get_jail_parameter -deqs gateway $JAIL)
-		_tap=$(get_jail_parameter -deqs vif $_gateway)
+		_gateway=$(get_jail_parameter -deqs GATEWAY $JAIL)
+		_tap=$(get_jail_parameter -deqs VIF $_gateway)
 		_rcconf="${M_ZUSR}/net-firewall/rw/etc/rc.conf"
 		chflags noschg "$_rcconf"	
 
@@ -171,7 +171,7 @@ main() {
 	echo "$_newJMAP" > $JMAP
 
 	# Special case for net-firwell. Will need to eventually be generalized with VM handling. 
-	[ "$JAIL" = "net-firewall" ] && [ "$PARAM" = "ipv4" ] && handle_vm_gateway 
+	[ "$JAIL" = "net-firewall" ] && [ "$PARAM" = "IPV4" ] && handle_vm_gateway 
 		
 	handle_restarts
 }

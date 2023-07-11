@@ -17,8 +17,8 @@ get_options() {
 
 define_variables() {
 	# Important parameters for checks 
-	CLASS=$(sed -nE "s/^${JAIL}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
-	NO_DESTROY=$(sed -nE "s/^$JAIL[[:blank:]]+no_destroy[[:blank:]]+//p" $JMAP) 
+	get_jail_parameter CLASS "$JAIL"
+	get_jail_parameter NO_DESTROY "$JAIL"
 	OFFJAILS=$(zfs list -o name,origin | grep -E "$JAIL\@.*\$" \
 									| awk '{print $1}' | sed "s@.*/@@")
 

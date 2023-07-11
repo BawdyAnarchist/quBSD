@@ -22,10 +22,10 @@ qb-i3-launch:  Starts jails and launches programes based on: launch.conf
 qb-i3-windows: Lists all i3 workspaces, and the windows/programs in them.
 qb-ivpn:     Change ivpn servers for gateway jail
 qb-list:     List jailmap settings for a particular jail or parameter
-qb-off:      Remove/restart specified jails. Options for -all and -except
 qb-pefs:     Creation pefs directory, mount, or decrypt pefs-kmod in jail
 qb-rename:   Renames a jail. Option to update downstream dependencies
 qb-snap:     Create jail snapshot. Necessary for rootjails and dispjails
 qb-start:    Start jails in parallel. from list, file, or jmap autostarts
 qb-stat:     Continuously running status script for quBSD and jail status
+qb-stop:    Remove/restart specified jails. Options for -all and -except
 ENDOFUSAGE

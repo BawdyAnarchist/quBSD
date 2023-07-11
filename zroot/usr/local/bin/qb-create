@@ -17,7 +17,7 @@ get_options() {
 			i) IPV4="$OPTARG" ;; 
 			m) MAXMEM="$OPTARG" ;;
 			M) MTU="$OPTARG" ;;
-			n) NO_DEST="$OPTARG" ;;
+			n) NO_DESTROY="$OPTARG" ;;
 			r) ROOTJAIL="$OPTARG"; chk_valid_rootjail "$ROOTJAIL" || get_msg_create "none" "exit_1" ;;
 			s) SECLVL="$OPTARG" ;;
 			S) SCHG="$OPTARG" ;;
@@ -50,7 +50,7 @@ assign_jail_parameters() {
 	mktemp "$_TMP_PARAMS" > /dev/null
 
 	# Jail defining parameters that must be specified and valid 
-	PARAMS="AUTOSTART AUTOSNAP CLASS CPUSET GATEWAY IPV4 MAXMEM MTU NO_DESTROY ROOTJAIL SCHG SECLVL"
+	PARAMS="AUTOSNAP AUTOSTART CLASS CPUSET GATEWAY IPV4 MAXMEM MTU NO_DESTROY ROOTJAIL SCHG SECLVL"
 
 	# Assign jail parameters based on 1) command line ; 2) template ; 3) #defaults in jmap
 	[ "$TEMPLATE" ] && PULLFROM="$TEMPLATE" || PULLFROM='#default'
@@ -64,7 +64,7 @@ assign_jail_parameters() {
 		# Parameter was not assigned at the command line 
 		if [ -z $(eval echo "\${$_P}") ] ; then
 			
-			if ! get_jail_parameter $_param "$PULLFROM" >> "$_TMP_WARN" ; then
+			if ! get_jail_parameter "$_P" "$PULLFROM" >> "$_TMP_WARN" ; then
 				# Bad return on any parameter is acceptable, except CLASS and ROOTJAIL 
 				[ "$_P" = "CLASS" ]    && get_msg_create "_e2" "exit_1" 
 				[ "$_P" = "ROOTJAIL" ] && get_msg_create "_e2" "exit_1" 
@@ -79,7 +79,7 @@ assign_jail_parameters() {
 		[ "$_P" = "IPV4" ] && chk_isqubsd_ipv4 "$IPV4" "$NEWJAIL"  >>  "$_TMP_WARN" 
 
 		# Record the final param value to _TMP_PARAMS
-		eval echo "$NEWJAIL  $_param  \${$_P}" >> "$_TMP_PARAMS"
+		eval echo "$NEWJAIL  $_P  \${$_P}" >> "$_TMP_PARAMS"
 	done
 }
 
@@ -87,7 +87,7 @@ assign_datasets() {
 	# To prevent ambiguity/conflicts, all combos of [-c <class>], and class of the <template> are
 	# considered. Case statement provides clarity, and opportunity to handle special cases. 
 
-	CLASS_TEMP=$(get_jail_parameter -eq class "$TEMPLATE")
+	CLASS_TEMP=$(get_jail_parameter -eq CLASS "$TEMPLATE")
 
 	case "${CLASS}_${CLASS_TEMP}" in 
 
@@ -100,8 +100,9 @@ assign_datasets() {
 		appjail_|appjail_rootjail)
 			# [-Z] is only for creating rootjails, not appjails from rootjails 
 	     	[ "$R_ZOPT" ] && get_msg_create "_e4" "exit_1" 
+			TEMPLATE="${ROOTJAIL}-template"
 			R_ZPARENT="${JAILS_ZFS}/${ROOTJAIL}"
-			U_ZPARENT="${ZUSR_ZFS}/${ROOTJAIL}-template" 
+			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
 
 			# Verify that the assumed $ROOTJAIL-template exists; or at least that it's not needed.
 			! chk_valid_zfs "$U_ZPARENT" && ! [ "$U_ZOPT" = "empty" ] && get_msg_create "_e5" "exit_1"
@@ -127,7 +128,7 @@ assign_datasets() {
 			U_ZOPT="clone"	
 
 			# Is a dispjail. Needs to have the appjail as a <template> in jailmap 
-			echo "$NEWJAIL  template  $TEMPLATE" >> "$_TMP_PARAMS"
+			echo "$NEWJAIL  TEMPLATE  $TEMPLATE" >> "$_TMP_PARAMS"
 		;;
 
 		# New rootjail from any other rootjail. Can create a dispjail of a rootjail too. 
@@ -136,7 +137,7 @@ assign_datasets() {
 			U_ZOPT="skip"
 
 			# Add <template> to jailmap parameters if dispjail
-			[ "$CLASS" = "dispjail" ] && echo "$NEWJAIL  template  $ROOTJAIL" >> "$_TMP_PARAMS"
+			[ "$CLASS" = "dispjail" ] && echo "$NEWJAIL  TEMPLATE  $ROOTJAIL" >> "$_TMP_PARAMS"
 		;;
 
 		# New rootjail, but checks for [-Z]. Ensures user intends new rootjail from app/disp jail. 
@@ -151,8 +152,8 @@ assign_datasets() {
 			R_ZPARENT="${JAILS_ZFS}/${ROOTJAIL}"
 
 			# Pass the template of the <template> to the copycat new dispjail parameters
-			TEMP_TEMP=$(get_jail_parameter -eq template $TEMPLATE)
-			echo "$NEWJAIL  template  $TEMP_TEMP" >> "$_TMP_PARAMS"
+			TEMP_TEMP=$(get_jail_parameter -eq TEMPLATE $TEMPLATE)
+			echo "$NEWJAIL  TEMPLATE  $TEMP_TEMP" >> "$_TMP_PARAMS"
 
 			# Either assign the valid zusr dataset to clone dispjail, or set it to skip later on.
 			if chk_valid_zfs "${ZUSR_ZFS}/${TEMP_TEMP}" ; then
@@ -182,7 +183,7 @@ assign_datasets() {
 		zfs snapshot "$R_SNAP" > /dev/null 2>&1
 
 		# The new rootjail should reference itself as the rootjail, and not the template	
-		sed -i '' -E "s/rootjail[[:blank:]]+${ROOTJAIL}/rootjail ${NEWJAIL}/g"  $_TMP_PARAMS
+		sed -i '' -E "s/ROOTJAIL[[:blank:]]+${ROOTJAIL}/ROOTJAIL ${NEWJAIL}/g"  $_TMP_PARAMS
 
 	elif [ "$CLASS" = "appjail" ] && [ "$U_ZOPT" = "dupl" ] ; then
 		U_SNAP="${U_ZPARENT}@$(date +%s)"
@@ -300,7 +301,7 @@ change_configs() {
 	_TMP_JCONF="/tmp/qb_create_jconf"
 	mktemp $_TMP_JCONF > /dev/null
 
-	# 
+	# Modify /etc/jail.conf
 	sed -nE "/^${TEMPLATE}[[:blank:]]*\{/,/\}/p" $JCONF >> $_TMP_JCONF 
 	sed -i '' -E "s/${TEMPLATE}/${NEWJAIL}/" $_TMP_JCONF 
 

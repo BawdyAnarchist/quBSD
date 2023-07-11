@@ -24,8 +24,8 @@ get_parameters() {
 	[ "$_TIME" -ge 0 ] || get_msg_hostnet "_6" "usage_1"
 
 	# Must get host network parameters. 
-	get_jail_parameter gateway "host" || exit 1
-	get_jail_parameter ipv4 "host" || exit 1 
+	get_jail_parameter GATEWAY "host" || exit 1
+	get_jail_parameter IPV4 "host" || exit 1 
 }
 
 connection_down() {

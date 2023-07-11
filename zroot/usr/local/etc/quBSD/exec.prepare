@@ -8,9 +8,9 @@ get_parameters() {
 	echo "STARTING JAIL: $JAIL. $(date "+%Y-%m-%d_%H:%M")" >> $QBLOG
 
 	# Parameters and checks
-	get_jail_parameter -d class    "$JAIL"  ||  exit 1
-	get_jail_parameter -d rootjail "$JAIL"  ||  exit 1
-	get_jail_parameter -d gateway  "$JAIL"  ||  exit 1
+	get_jail_parameter -d CLASS    "$JAIL"  ||  exit 1
+	get_jail_parameter -d ROOTJAIL "$JAIL"  ||  exit 1
+	get_jail_parameter -d GATEWAY  "$JAIL"  ||  exit 1
 
 	# Find any remaining mounts for the jail
 	JMOUNT=$(mount | grep -Eo "${M_JAILS}/${JAIL}/[^[:blank:]]+") 
@@ -41,7 +41,7 @@ main() {
 			reclone_zroot "$JAIL" "$ROOTJAIL" || exit 1
 			
 			# Dispjails also reclone the zusr portion from template (if it exists)
-			get_jail_parameter template "$JAIL" || exit 1
+			get_jail_parameter TEMPLATE "$JAIL" || exit 1
 			chk_valid_zfs "${ZUSR_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE" || exit 1
 		;;
 	esac

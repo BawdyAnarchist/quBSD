@@ -30,7 +30,7 @@ checks() {
 
 	# Define _ZJAIL variable, which sets the zfs dataset being targeted 
 		# Class will determine what the target dataset is 
-		CLASS=$(sed -nE "s/^${JAIL}[[:blank:]]+class[[:blank:]]+//p" $JMAP)
+		get_jail_parameter CLASS "$JAIL"
 	
 		# var $_ZFS prevents multiple if/then statements later on.
 		[ "$CLASS" = "rootjail" ] && _ZFS="${JAILS_ZFS}" || _ZFS="${ZUSR_ZFS}"
