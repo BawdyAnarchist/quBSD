@@ -594,6 +594,15 @@ reclone_zusr() {
 	local _newsnap="${_templzfs}@${_date}"
 	local _presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
 
+	# `zfs-diff` from other jails causes a momentary snapshot which the reclone operation 
+	while [ -z "${_presnap##*@zfs-diff*}" ] ; do
+
+		# Loop until a proper snapshot is found
+		sleep .1
+		_presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
+	done
+
+	# Determine if there are any updates or pkg installations taking place inside the jail
 	# If there's a presnap, and no changes since then, use it for the snapshot.
 	[ "$_presnap" ] && ! [ "$(zfs diff "$_presnap" "$_templzfs")" ] && _newsnap="$_presnap"
 
