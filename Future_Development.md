@@ -1,25 +1,11 @@
-### BEST PRACTICES / CLEANUP
-
-qb-destroy
-	- Defining variables CLASS and NO_DESTROY can probably be offloaded to library
+### BEST PRACTICES / FIXES 
 
 qb-autosnap
 	- Maybe it should do a "diff" and only snap when relevant. Reduces clutter
-
-- qb-autosnap modificaitons 
 	- Should read both zfs and jmap autosnap
 	- Then syncronize anything that was off. Sync to jmap
 	- qb-edit
 		- will needed added. and zfs mod takes place 
-
-qb-list
-	- Apparently I haven't integrated: get_jail_parameter
-	- Also, would be good to evaluate each of the parameters at each list
-     to show whether or not they're good/valid.
-
-qb-edit
-	- [-i] combined with gateway should assign both ipv4 and gateway at the same time
-   - Should add autosnap as an option
 
 qb-disp with -Z option for cloning root dataset as well? 
 
@@ -33,26 +19,25 @@ qb-create
 
 the word "template" really ought to be "parent." Create dispjail from PARENT. TEMPLATE should probably be relegated to the 0root-templates and to qb-create. 
 
-Should cycle all scripts through shellcheck again. 
-	- Case statements need catchalls to trap invalid options provided
-	- Primarily with scripts that should error on invalid option
-
 qb-connect
 	- could figure out what about stupid pf is preventing network connection for adhoc connected jails 
-
-ntpd
-	- ntpd only runs during qb-hostnet. Needs a more "correct" solution.
 
 devfs.rules
 	- The rulenames should include "qubsd" so as not to have a chance of overlapping other rules
 	- Maybe the file should be added to the get_global_variables assignments library
 
-qme-firefox needs fixed (personal note)
+ntpd
+	- ntpd only runs during qb-hostnet. Needs a more "correct" solution.
+
+Should cycle all scripts through shellcheck again. 
+	- Case statements need catchalls to trap invalid options provided
+	- Primarily with scripts that should error on invalid option
 
 /usr/local/share/quBSD 
 	- Needs updated in general after you're done
 	- Needs to document that the rootjails must stay lowered schg
 	- Update the guides regarding #defaults in jailmap.
+
 
 ### TROUBLE NOTES (uncertain, things to monitor)
 
@@ -70,6 +55,12 @@ Further networking ghosts
 	- It seems like sometimes the restarting of net-firewall or net-vpn causes downstream connection issues.
      But then restarting again in sequence fixes the problem. I can't quite replicate it.
 
+### MINOR UPGRADES
+
+qme-firefox needs fixed (personal note)
+
+qb-list - [-e] (evaluate) option to check jail-param combos for validity.
+	 
 ### UPGRADES
 
 pwd
