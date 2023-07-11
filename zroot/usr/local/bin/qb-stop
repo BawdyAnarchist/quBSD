@@ -1,0 +1,85 @@
+#!/bin/sh
+
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-stop.sh
+
+get_options() {
+	while getopts aAeE:hf:r opts ; do
+		case $opts in
+			a) _SOURCE="auto" ;;
+			A) [ "$_SOURCE" ] && get_msg_stop "_e1" "usage_1" || _SOURCE="all" ;;
+			e) _EXCLUDE="true" ;;
+			E) [ "$_EXCLUDE" ] && get_msg_stop "_e2" "usage_1" || _EXFILE="${OPTARG}" ;;
+			h) get_msg_stop "none" "usage_0" ;;
+			f) [ "$_SOURCE" ] && get_msg_stop "_e1" "usage_1" || _SOURCE="$OPTARG" ;; 
+			r) _RESTART="true" ;;
+			*) exit 1 ;;
+		esac
+	done
+
+	shift $(( OPTIND - 1 ))
+
+	# This makes it so that _POSPARAMS has one parameter per line
+	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
+
+   # Absolutely do not run if another instance of qb-start or qb-stop is already running
+	pgrep -fl '/bin/sh /usr/local/bin/qb-start' && get_msg_stop "_e0" "" && return 1
+	pgrep -fl '/bin/sh /usr/local/bin/qb-stop' && get_msg_stop "_e0" "" && return 1
+}
+
+remove_jails() {
+	# To make this func time-efficient, some creative license is required. 
+	for _jail in $_JLIST ; do
+
+		# Check if jail has network clients (implies a common epair)
+		if get_info _CLIENTS $_jail ; then 
+
+			# Will error if epair -vnet both jails simultaneously. Wait for completion
+			stop_jail "$_jail" > /dev/null 2>&1
+		else
+			# Stop jail and send process to background (for time-efficiency).
+			stop_jail "$_jail" > /dev/null 2>&1 &
+		fi
+	done
+}
+
+handle_restarts() {
+
+	if [ "$_RESTART" ] ; then
+
+		# Wait for all jails to shut down before attempting restart
+		_count=1
+		for _jail in $_JLIST; do 
+			
+			while chk_isrunning $_jail ; do	
+				# Keep track, in case a jail stop hangs. 
+				_count=$(( _count + 1 ))
+			
+				# Break from script after about 10 seconds for any jail that hangs	
+				[ "$_count" -gt 33 ] && get_msg_stop "_e11" "exit_1" && exit 1
+
+				# Wait a moment and check again
+				sleep .3	
+			done		
+
+		done
+
+		# Give transient ops (like exec.release) a moment, before attempting restart 
+		sleep .7
+
+		# Only qb-start should be used for parallel jail starts. 
+		qb-start "$_JLIST"
+	fi	
+}
+
+
+get_global_variables
+
+get_options "$@"
+
+compile_jlist
+
+remove_jails
+
+handle_restarts
+
