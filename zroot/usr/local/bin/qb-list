@@ -17,6 +17,9 @@ get_options() {
 	shift $(( OPTIND - 1 ))
 	
 	[ "$1" ] && get_msg_list "_6" "usage_1"
+
+	# Convert lower-case entered PARAM to upper (user-friendly)
+	[ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
 }
 
 main() {
