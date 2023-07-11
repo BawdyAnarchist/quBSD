@@ -1,8 +1,5 @@
 ### BEST PRACTICES / CLEANUP
 
-qb-off
-	- Integrate the functions you wrote for qb-start 
-
 - Create 0base-template
 
 Jailmap.conf autosnap option 
