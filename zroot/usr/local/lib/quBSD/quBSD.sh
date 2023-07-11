@@ -35,6 +35,7 @@
 	# _XJAIL           - Jailname (or 'host') for the currently active X window
 	# _XNAME           - Name of the process for the current active X window
 	# _XPID            - PID for the currently active X window
+# compile_jlist       - Used for qb-start/stop, to get list of jails to act on
 
 ############################  JAIL HANDLING / ACTIONS  #############################
 # start_jail          - Performs checks before starting, creates log
@@ -284,6 +285,52 @@ get_info() {
 	return 0
 }
 
+compile_jlist() {
+	# Called only by qb-start and qb-stop. Uses global variables, which isn't best practice,
+	# but they should be unique, and not found in other programs. 
+
+	case "${_SOURCE}" in
+		'')
+			# If both SOURCE and POSPARAMS are empty, there is no JLIST. 
+			[ -z "$_POSPARAMS" ] && get_msg_start "_e4" "usage_1" || _JLIST="$_POSPARAMS"
+
+			# If there was no SOURCE, then [-e] makes the positional params ambiguous 
+			[ "$_EXCLUDE" ] && get_msg_start "_e3" "usage_1" 	
+		;;  
+
+		auto)	
+			# Find jails tagged with autostart in jmap. 
+			_JLIST=$(grep -E "autostart[[:blank:]]+true" $JMAP | awk '{print $1}' | uniq)
+		;;
+
+		all)	
+			# ALL jails from jailmap, except commented lines
+			_JLIST=$(awk '{print $1}' $JMAP | sed "/^#/d" | uniq)
+		;;
+	
+		?*)
+			# Only possibility remaining is [-f]. Check it exists, and assign JLIST
+			[ -e "$_SOURCE" ] && _JLIST=$(tr -s '[:space:]' '\n' < "$_SOURCE" | uniq) \
+					|| get_msg_start "_e5" "usage_1"
+		;;
+	esac
+
+	# If [-e], then the exclude list is just the JLIST, but error if null. 
+	[ "$_EXCLUDE" ] && _EXLIST="$_POSPARAMS" && [ -z "$_EXLIST" ] && get_msg_start "_e6" "usage_1" 
+
+	# If [-E], make sure the file exists, and if so, make it the exclude list 
+	if [ "$_EXFILE" ] ; then
+
+		[ -e "$_EXFILE" ] && _EXLIST=$(tr -s '[:space:]' '\n' < "$_EXFILE")	\
+			|| get_msg_start "_e7" "usage_1"
+	fi	
+
+	# Remove any jail on EXLIST, from the JLIST
+	for _exlist in $_EXLIST ; do
+		_JLIST=$(echo "$_JLIST" | grep -Ev "^[[:blank:]]*${_exlist}[[:blank:]]*\$")
+	done
+}
+
 
 ##################################################################################
 ###########################  JAIL HANDLING / ACTIONS  ############################
@@ -478,11 +525,13 @@ reclone_zroot() {
 	local _newsnap="${_rootzfs}@${_date}"
 	local _presnap=$(zfs list -t snapshot -Ho name ${_rootzfs} | tail -1)
 
-### BUG. It seems the ZFS DIFF peration causes a new temporary snapshot to appear for a moment.
-### This screws up the snapshot assignment.
-echo "$_jail : newsnap: $_newsnap" >> $QBLOG 
-echo "$_jail : presnap: $_presnap" >> $QBLOG 
+	# `zfs-diff` from other jails causes a momentary snapshot which errors the reclone operation 
+	while [ -z "${_presnap##*@zfs-diff*}" ] ; do
 
+		# Loop until a proper snapshot is found
+		sleep .1
+		_presnap=$(zfs list -t snapshot -Ho name ${_rootzfs} | tail -1)
+	done
 
 	# Determine if there are any updates or pkg installations taking place inside the jail
 	if pgrep -qf "/usr/sbin/freebsd-update -b ${M_JAILS}/${_rootjail}" \
@@ -594,6 +643,8 @@ cleanup_oldsnaps() {
 		[ "$_snap_dd" -lt "$_date" ] && zfs destroy $_snap > /dev/null 2>&1
 	done
 }
+
+
 
 ##################################################################################
 ################################  STATUS  CHECKS  ################################
@@ -1356,5 +1407,6 @@ poweroff_vm() {
 	done
 
 }
+
 
 
