@@ -125,7 +125,7 @@ Usage: qb-edit <jail> <PARAMETER> <value>
    -r: (r)estart the required jails for changes to take effect
 
 PARAMETERS SAVED AT /usr/local/etc/quBSD/jailmap.conf
-AUTOSTART:   Snapshot jail with qb-autosnap /etc/crontab
+AUTOSNAP:    Snapshot jail with qb-autosnap /etc/crontab
 AUTOSTART:   Automatically start with rc script during host boot.  
 CLASS:       Cannot be modified. Use qb-create instead.
 CPUSET:      CPUs a jail may use. Comma separated integers, or a
