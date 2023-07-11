@@ -1,44 +1,16 @@
 ### BEST PRACTICES / CLEANUP
 
-- Create 0base-template
-
-- qb-autosnap modificaitons 
-	- Should read both zfs and jmap autosnap
-	- Then syncronize anything that was off. Sync to jmap
-	- qb-edit
-		- will needed added. and zfs mod takes place 
-
-qubsd
-	- reclone_zusr probably needs same snapshot protections as reclone_zroot
-
 qb-destroy
 	- Defining variables CLASS and NO_DESTROY can probably be offloaded to library
 
 qb-autosnap
 	- Maybe it should do a "diff" and only snap when relevant. Reduces clutter
 
-qb-disp with -Z option for cloning root dataset as well? 
-
-pf.conf
-	- wgIP constant really should be called "endpointIP" or something like that
-
-/usr/local/share/quBSD 
-	- Needs updated in general after you're done
-	- Needs to document that the rootjails must stay lowered schg
-	- Update the guides regarding #defaults in jailmap.
-
-qb-create 
-	- GUIDED MODE needs to be completely redone.
-	- Add the new jail to the i3gen.conf and execute keybindings
-	- NEXT IN LINE
-
-the word "template" really ought to be "parent." Create dispjail from PARENT. TEMPLATE should probably be relegated to the 0root-templates and to qb-create. 
-
-Decide on MTU, global or not. 
-
-Should cycle all scripts through shellcheck again. 
-	- Case statements need catchalls to trap invalid options provided
-	- Primarily with scripts that should error on invalid option
+- qb-autosnap modificaitons 
+	- Should read both zfs and jmap autosnap
+	- Then syncronize anything that was off. Sync to jmap
+	- qb-edit
+		- will needed added. and zfs mod takes place 
 
 qb-list
 	- Apparently I haven't integrated: get_jail_parameter
@@ -48,6 +20,22 @@ qb-list
 qb-edit
 	- [-i] combined with gateway should assign both ipv4 and gateway at the same time
    - Should add autosnap as an option
+
+qb-disp with -Z option for cloning root dataset as well? 
+
+pf.conf
+	- wgIP constant really should be called "endpointIP" or something like that
+
+qb-create 
+	- GUIDED MODE needs to be completely redone.
+	- Add the new jail to the i3gen.conf and execute keybindings
+	- NEXT IN LINE
+
+the word "template" really ought to be "parent." Create dispjail from PARENT. TEMPLATE should probably be relegated to the 0root-templates and to qb-create. 
+
+Should cycle all scripts through shellcheck again. 
+	- Case statements need catchalls to trap invalid options provided
+	- Primarily with scripts that should error on invalid option
 
 qb-connect
 	- could figure out what about stupid pf is preventing network connection for adhoc connected jails 
@@ -61,6 +49,11 @@ devfs.rules
 
 qme-firefox needs fixed (personal note)
 
+/usr/local/share/quBSD 
+	- Needs updated in general after you're done
+	- Needs to document that the rootjails must stay lowered schg
+	- Update the guides regarding #defaults in jailmap.
+
 ### TROUBLE NOTES (uncertain, things to monitor)
 
 It seems like exec.created might not *always* be updated pf.conf with the new epair.
@@ -72,6 +65,10 @@ jail -r
 
 Renamed all JMAP parameters to CAPS
 	- I think it's good, but there's alot of stuff in the scripts. Maybe missed something
+
+Further networking ghosts
+	- It seems like sometimes the restarting of net-firewall or net-vpn causes downstream connection issues.
+     But then restarting again in sequence fixes the problem. I can't quite replicate it.
 
 ### UPGRADES
 
