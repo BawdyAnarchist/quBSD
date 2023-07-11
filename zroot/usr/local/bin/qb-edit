@@ -10,7 +10,6 @@ get_options() {
 			   # [-f] acts on msg-edit function, rather than main script 
 			f) FORCE="true" ; _q='-q' ;; 
 			h) get_msg_edit "none" "usage_0" ;; 
-			i) PARAM="IPV4" ; VAL="auto" ;;
 			q) QUIET="true" ; _q='-q' ;;
 			r) RESTART="true" ;;
 		esac
@@ -24,8 +23,8 @@ get_options() {
 	VAL="${VAL:-"$3"}"
 	OLDSETTING=$(sed -nE "s@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+@@p" $JMAP)
 
-	# If the user wants to mod both gateway and ipv4 simultanously, this will handle it later.
-	PARAM2="$2"
+	# Convert lower-case entered parameters to upper (user-friendly)
+	[ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
 }
 
 checks() {
@@ -46,7 +45,7 @@ checks() {
 
 	# Sanity checks to make sure values are reasonable
 	case $PARAM in
-		AUTOSTART|NO_DESTROY)
+		AUTOSTART|AUTOSNAP|NO_DESTROY)
 				chk_truefalse $_q "$VAL" "$PARAM" || get_msg_edit "_4" "usage_1"
 		;;
 		CLASS)
@@ -57,6 +56,9 @@ checks() {
 		;;
 		MAXMEM)
 				chk_valid_maxmem $_q "$VAL" || get_msg_edit "none" "usage_1" 
+		;;
+		MTU)
+				chk_valid_mtu $_q "$VAL" || get_msg_edit "none" "usage_1" 
 		;;
 		ROOTJAIL|TEMPLATE)
 				# Check that rootjail or template has jmap and zroot zfs 
@@ -71,23 +73,22 @@ checks() {
 		GATEWAY)  
 				chk_valid_gateway $_q "$VAL" "$JAIL" \
 						|| get_msg_edit "none" "exit_1" "_f"
+
+				get_jail_parameter -qs IPV4 "$JAIL"
+
+				# Offer to change IPV4 from 'none' to 'auto', if gateway is valid
+				if ! [ "$VAL" = "none" ] && [ "$IPV4" = "none" ] ; then
+					get_msg_edit "_10"
+					get_user_response && _IPAUTO="true" 
+				fi
 		;;
 		IPV4) 
-				# It's possible user might try to assign DHCP from command line
-				if [ "$VAL" = "auto" ] ; then 
+				# Check IP addresses for validity and quBSD convention adherence 
+				chk_valid_ipv4 $_q "$VAL" \
+						|| get_msg_edit "none" "exit_1" 
 
-					# Function returns available IPv4. Or for net-firewall returns "DHCP"
-					VAL=$(discover_open_ipv4 $_q "$JAIL") \
-							|| get_msg_edit "none" "exit_1"
-
-				else
-					# Check IP addresses for validity and quBSD convention adherence 
-					chk_valid_ipv4 $_q "$VAL" \
-							|| get_msg_edit "none" "exit_1" 
-
-					chk_isqubsd_ipv4 $_q "$VAL" "$JAIL" \
-							|| get_msg_edit "none" "exit_1" "_f"
-				fi
+				chk_isqubsd_ipv4 $_q "$VAL" "$JAIL" \
+						|| get_msg_edit "none" "exit_1" "_f"
 		;; 
 		# Catch all. Any other entries for $PARAM return an error.
 		*)	get_msg_edit "_6" "usage_1"  ;;
@@ -100,7 +101,7 @@ handle_restarts() {
 	# Logic could be written to change running jails, but simpler just to restart.
 	case $PARAM in 
 
-		CPUSET|MAXMEM|ROOTJAIL|SCHG|SECLVL|TEMPLATE)
+		CPUSET|MAXMEM|MTU|ROOTJAIL|SCHG|SECLVL|TEMPLATE)
 			chk_isrunning $JAIL && _restart1="$JAIL"
 		;;
 		IPV4|GATEWAY)
@@ -124,7 +125,7 @@ handle_restarts() {
 
 	if [ -z "$QUIET" ] ; then 
 		get_msg_edit "_7"
-		get_user_response || exit 0 
+		get_user_response || return 0 
 	fi
 	
 	# Restart jails (otherwise, would've already exited)	
@@ -165,6 +166,10 @@ main() {
 	# Modify JMAP and print new settings on success
 	sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VAL}@" $JMAP \
 			&& get_msg_edit "_8" 
+
+	# Set IPV4 to auto in JMAP, if the user approved it 
+	[ "$_IPAUTO" ] \
+		&& sed -i '' -E "\@^${JAIL}[[:blank:]]+IPV4@s@[^[:blank:]]+\$@auto@" $JMAP 
 
 	# Clean up the columns 
 	_newJMAP=$(column -t $JMAP)
