@@ -103,6 +103,64 @@ checks() {
 	esac
 }
 
+modify_jmap() {
+
+	# Modify JMAP and print new settings on success
+	sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VAL}@" $JMAP \
+			&& get_msg_edit "_8" 
+
+	# Set IPV4 to auto in JMAP, if the user approved it 
+	[ "$_IPAUTO" ] \
+		&& sed -i '' -E "\@^${JAIL}[[:blank:]]+IPV4@s@[^[:blank:]]+\$@auto@" $JMAP 
+
+	# Clean up the columns 
+	_newJMAP=$(column -t $JMAP)
+	echo "$_newJMAP" > $JMAP
+}
+
+modify_autosnap() {
+
+	# Class is necessary to know which dataset to operate on (zroot or zusr)
+	get_jail_parameter CLASS $JAIL	
+
+	# zusr mod for appjails. Dispjails may or may not need zusr. Do both, no harm, lazy code
+	! [ "$CLASS" = "rootjail" ] && _ZFS="${ZUSR_ZFS}/${JAIL}" \
+			&& chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VAL}" "$_ZFS" \
+					&& zfs get qubsd:autosnap "$_ZFS"
+
+	# zroot mod for rootjails. Dispjails may or may not need zroot. Do both, no harm, lazy code
+	! [ "$CLASS" = "appjail" ] && _ZFS="${JAILS_ZFS}/${JAIL}" \
+			&& chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VAL}" "$_ZFS" \
+					&& zfs get qubsd:autosnap "$_ZFS"
+}
+
+handle_vm_gateway() {
+		
+		# Relevant variables. 
+		_gateway=$(get_jail_parameter -deqs GATEWAY $JAIL)
+		_tap=$(get_jail_parameter -deqs VIF $_gateway)
+		_rcconf="${M_ZUSR}/net-firewall/rw/etc/rc.conf"
+		chflags noschg "$_rcconf"	
+
+		if [ "$VAL" = "DHCP" ] ; then
+			sed -i '' -E "s/ifconfig_${_tap}.*/ifconfig_${_tap}=\"DHCP\"/" $_rcconf
+			sed -i '' -E "/defaultrouter=/ d" $_rcconf
+
+		else
+
+			# Using `#' as sed separator, because `/' interferes with variable expansion
+			sed -i '' -E "s#ifconfig_${_tap}.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
+			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
+			
+			# This might not be completley robust. Generally a.b.c.1 should be the default.
+			sed -i '' -E "/^ifconfig_${_tap}.*/ a\\
+defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
+		fi
+
+		# Warn about having modified IP for net-firewall		
+		get_msg_edit "_9"
+}
+
 handle_restarts() {
 	# Logic could be written to change running jails, but simpler just to restart.
 	case $PARAM in 
@@ -138,64 +196,6 @@ handle_restarts() {
 	for _jail in $_restart2 $_restart1 ; do
 		[ "$_jail" = "none" ] || restart_jail "$_jail" 
 	done
-}
-
-handle_vm_gateway() {
-		
-		# Relevant variables. 
-		_gateway=$(get_jail_parameter -deqs GATEWAY $JAIL)
-		_tap=$(get_jail_parameter -deqs VIF $_gateway)
-		_rcconf="${M_ZUSR}/net-firewall/rw/etc/rc.conf"
-		chflags noschg "$_rcconf"	
-
-		if [ "$VAL" = "DHCP" ] ; then
-			sed -i '' -E "s/ifconfig_${_tap}.*/ifconfig_${_tap}=\"DHCP\"/" $_rcconf
-			sed -i '' -E "/defaultrouter=/ d" $_rcconf
-
-		else
-
-			# Using `#' as sed separator, because `/' interferes with variable expansion
-			sed -i '' -E "s#ifconfig_${_tap}.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
-			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
-			
-			# This might not be completley robust. Generally a.b.c.1 should be the default.
-			sed -i '' -E "/^ifconfig_${_tap}.*/ a\\
-defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
-		fi
-
-		# Warn about having modified IP for net-firewall		
-		get_msg_edit "_9"
-}
-
-modify_jmap() {
-
-	# Modify JMAP and print new settings on success
-	sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VAL}@" $JMAP \
-			&& get_msg_edit "_8" 
-
-	# Set IPV4 to auto in JMAP, if the user approved it 
-	[ "$_IPAUTO" ] \
-		&& sed -i '' -E "\@^${JAIL}[[:blank:]]+IPV4@s@[^[:blank:]]+\$@auto@" $JMAP 
-
-	# Clean up the columns 
-	_newJMAP=$(column -t $JMAP)
-	echo "$_newJMAP" > $JMAP
-}
-
-modify_autosnap() {
-
-	# Class is necessary to know which dataset to operate on (zroot or zusr)
-	get_jail_parameter CLASS $JAIL	
-
-	# zusr mod for appjails. Dispjails may or may not need zusr. Do both, no harm, lazy code
-	! [ "$CLASS" = "rootjail" ] && _ZFS="${ZUSR_ZFS}/${JAIL}" \
-			&& chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VAL}" "$_ZFS" \
-					&& zfs get qubsd:autosnap "$_ZFS"
-
-	# zroot mod for rootjails. Dispjails may or may not need zroot. Do both, no harm, lazy code
-	! [ "$CLASS" = "appjail" ] && _ZFS="${JAILS_ZFS}/${JAIL}" \
-			&& chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VAL}" "$_ZFS" \
-					&& zfs get qubsd:autosnap "$_ZFS"
 }
 
 main() {
