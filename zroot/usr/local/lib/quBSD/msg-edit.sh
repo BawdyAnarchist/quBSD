@@ -86,6 +86,11 @@ ALERT: Changing GATEWAY to < $VAL > but IPV4 is set to
 ENDOFMSG
 echo -e "Would you like to change this to auto? (Y/n): \c"
 	;;
+		_11) cat << ENDOFMSG
+
+ERROR: dispjails cannot have auto snapshots, as their
+       dataset is a dependent clone of a template jail.
+ENDOFMSG
 
 	# End of _message 
 	esac
