@@ -73,7 +73,32 @@ calculate_variables() {
 	fi
 }
 
+sync_from_jmap() {
+
+	# Get list of all jails with an AUTOSNAP setting in JMAP
+	_jlist=$(qb-list -p AUTOSNAP | grep -E "(true|false)" | awk '{print $1}') 
+
+	# Check/set each entry one by one	
+	for _jail in $_jlist ; do
+
+		# Pull the value of the autosnap option in JMAP 
+		_value=$(sed -En "s/^${_jail}[[:blank:]]+AUTOSNAP[[:blank:]]+//gp" $JMAP)
+
+		# zroot vs zusr dataset depending on CLASS 
+		case "$(get_jail_parameter -eqs CLASS "$_jail")" in
+			appjail)  chk_valid_zfs "${ZUSR_ZFS}/${_jail}" \
+						 && zfs set qubsd:autosnap="$_value" "${ZUSR_ZFS}/${_jail}" 
+			;;
+			rootjail) chk_valid_zfs "${ROOT_ZFS}/${_jail}" \
+						 && zfs set qubsd:autosnap="$_value" "${ZROOT_ZFS}/${_jail}" 
+			;;
+		esac
+
+	done
+}
+
 list_datasets() {
+
 	if [ "$LIST" != "snapshot" ] ; then
 		# Get list of datasets tagged for autosnap 
 		ZLIST=$(zfs list -rH -o name,qubsd:autosnap,qubsd:backup-location \
@@ -98,7 +123,8 @@ list_datasets() {
 }		
 
 new_snapshots() {
-	# Datasets tagged with qubsd:autosnap. Includes extra columns for [-l]
+
+	# Datasets tagged with qubsd:autosnap. 
 	ZLIST=$(zfs list -rH -o name,qubsd:autosnap \
 								| grep -E "[[:blank:]]+true\$" | awk '{print $1}')
 	
@@ -108,7 +134,7 @@ new_snapshots() {
 		calculate_variables
 
 		# Snapshot datasets from the auto list 
-		zfs snapshot "${_dataset}@${SNAPNAME}" 
+		zfs snapshot "${_dataset}@${SNAPNAME}"
 		zfs set qubsd:autocreated=yes "${_dataset}@${SNAPNAME}"
 		zfs set qubsd:autosnap="-" "${_dataset}@${SNAPNAME}"
 		
@@ -120,18 +146,21 @@ new_snapshots() {
 			zfs set qubsd:time-to-live="-" "${_dataset}@${SNAPNAME}" 
 			zfs set qubsd:destroy-date="-" "${_dataset}@${SNAPNAME}" 
 		fi
-
 	done
 }
 
 main() {
+	# Sync from JMAP just in case.
+	sync_from_jmap	
+
 	# List first
 	[ -n "$LIST" ] && list_datasets
 
-	# Destroy snapshots tagged with a TTL
-	[ -n "$DESTROY" ] && cleanup_oldsnaps 
+	# Destroy snaps with a TTL, or null `zfs-diff` to parent.
+	[ -n "$DESTROY" ] && cleanup_snapshots
 
-	# Create new snapshots
+	# Cleanup first, then create; ensures most recent snapshot (even if 0B) is present.
+	# This helps user identify that snaps are working correctly, with recent snap for dataset.
 	[ -n "$SNAPSHOT" ] && new_snapshots 
 }
 
