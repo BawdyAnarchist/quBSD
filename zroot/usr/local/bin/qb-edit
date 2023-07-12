@@ -40,12 +40,18 @@ checks() {
 	elif [ "$VAL" = "$OLDSETTING" ] ; then
 		# New value is unchanged from old value 
 		get_msg_edit "_3" "usage_0"
-
 	fi	
 
 	# Sanity checks to make sure values are reasonable
 	case $PARAM in
-		AUTOSTART|AUTOSNAP|NO_DESTROY)
+		AUTOSNAP)
+				get_jail_parameter CLASS $JAIL
+
+				# Only appjails and rootjails can have autosnaps=true
+				[ $CLASS = "dispjail" ] && [ "$VAL" = "true" ] \
+						&& get_msg_edit "_11" "exit_1"
+		;;
+		AUTOSTART|NO_DESTROY)
 				chk_truefalse $_q "$VAL" "$PARAM" || get_msg_edit "_4" "usage_1"
 		;;
 		CLASS)
@@ -161,7 +167,7 @@ defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
 		get_msg_edit "_9"
 }
 
-main() {
+modify_jmap() {
 
 	# Modify JMAP and print new settings on success
 	sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VAL}@" $JMAP \
@@ -174,10 +180,35 @@ main() {
 	# Clean up the columns 
 	_newJMAP=$(column -t $JMAP)
 	echo "$_newJMAP" > $JMAP
+}
+
+modify_autosnap() {
+
+	# Class is necessary to know which dataset to operate on (zroot or zusr)
+	get_jail_parameter CLASS $JAIL	
+
+	# zusr mod for appjails. Dispjails may or may not need zusr. Do both, no harm, lazy code
+	! [ "$CLASS" = "rootjail" ] && _ZFS="${ZUSR_ZFS}/${JAIL}" \
+			&& chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VAL}" "$_ZFS" \
+					&& zfs get qubsd:autosnap "$_ZFS"
+
+	# zroot mod for rootjails. Dispjails may or may not need zroot. Do both, no harm, lazy code
+	! [ "$CLASS" = "appjail" ] && _ZFS="${JAILS_ZFS}/${JAIL}" \
+			&& chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VAL}" "$_ZFS" \
+					&& zfs get qubsd:autosnap "$_ZFS"
+}
+
+main() {
+
+	# jailmap.conf edits	
+	modify_jmap
+
+	# Autosnap requires zfs changes
+	[ "$PARAM" = "AUTOSNAP" ] && modify_autosnap
 
 	# Special case for net-firwell. Will need to eventually be generalized with VM handling. 
 	[ "$JAIL" = "net-firewall" ] && [ "$PARAM" = "IPV4" ] && handle_vm_gateway 
-		
+	
 	handle_restarts
 }
 
