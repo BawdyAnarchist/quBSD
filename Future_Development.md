@@ -1,8 +1,6 @@
 ### BEST PRACTICES / FIXES 
 
-qb-stop 
-	- Has a thing where it throws error on qb-stop -ar , for running another instance
-	- But then it still works.
+root snapshot out from under it. Need to check.
 
 qb-disp with -Z option for cloning root dataset as well? 
 
