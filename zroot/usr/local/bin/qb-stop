@@ -68,7 +68,8 @@ handle_restarts() {
 		sleep .7
 
 		# Only qb-start should be used for parallel jail starts. 
-		qb-start "$_JLIST"
+		qb-start "$_JLIST" &
+		exit 0
 	fi	
 }
 
