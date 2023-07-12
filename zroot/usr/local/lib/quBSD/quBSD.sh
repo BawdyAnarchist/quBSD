@@ -45,7 +45,7 @@
 # connect_client_gateway - Connects a client jail to its gateway
 # reclone_zroot       - Destroys and reclones jails dependent on rootjail
 # reclone_zusr        - Destroy and reclones jails with zusr dependency (dispjails)
-# cleanup_oldsnaps    - Destroys old snaps taken automatically for jail operations
+# cleanup_snapshots   - Destroys old snaps taken automatically for jail operations
 
 #################################  STATUS  CHECKS  #################################
 # chk_isblank          - Posix workaround: Variable is [-z <null> OR [[:blank:]]*]
@@ -298,7 +298,7 @@ compile_jlist() {
 
 		auto)	
 			# Find jails tagged with autostart in jmap. 
-			_JLIST=$(grep -E "autostart[[:blank:]]+true" $JMAP | awk '{print $1}' | uniq)
+			_JLIST=$(grep -E "AUTOSTART[[:blank:]]+true" $JMAP | awk '{print $1}' | uniq)
 		;;
 
 		all)	
@@ -560,21 +560,21 @@ reclone_zroot() {
 	# If they're equal, then the valid/current snapshot already exists. Otherwise, make one.
 	if ! [ "$_newsnap" = "$_presnap" ] ; then
 		# Clone and set zfs params so snapshot will get auto deleted later.
-		zfs snapshot "${_newsnap}" && zfs set qubsd:destroy-date="$_ttl" "$_newsnap" \
-				&& zfs set qubsd:autosnap='-' "$_newsnap" \
-				&& zfs set qubsd:autocreated="yes" "$_newsnap"
+		zfs snapshot -o qubsd:destroy-date="$_ttl" \
+	 					 -o qubsd:autosnap='-' \
+						 -o qubsd:autocreated="yes" "${_newsnap}" 
 	fi
 
    # Destroy the dataset and reclone it
 	zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1
-	zfs clone ${_newsnap} ${_jailzfs}
+	zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs}
 
 	# Drop the flags for etc directory and add the user for the jailname
 	chflags -R noschg ${M_JAILS}/${_jail}/etc/
 	pw -V ${M_JAILS}/${_jail}/etc/ useradd -n $_jail -u 1001 -d /usr/home/${_jail} -s /bin/csh 2>&1
 
 	# Remove old snapshots past their ttl and no longer being used.
-	cleanup_oldsnaps "$_rootzfs" &
+	cleanup_snapshots "$_rootzfs" &
 	return 0
 }
 
@@ -609,14 +609,14 @@ reclone_zusr() {
 	# If they're equal, then the valid/current snapshot already exists. Otherwise, make one.
 	if ! [ "$_newsnap" = "$_presnap" ] ; then
 		# Clone and set zfs params so snapshot will get auto deleted later.
-		zfs snapshot "${_newsnap}" && zfs set qubsd:destroy-date="$_ttl" "$_newsnap" \
-				&& zfs set qubsd:autosnap='-' "$_newsnap" \
-				&& zfs set qubsd:autocreated="yes" "$_newsnap"
+		zfs snapshot -o qubsd:destroy-date="$_ttl" "$_newsnap" \
+		 				 -o qubsd:autosnap='-' "$_newsnap" \
+						 -o qubsd:autocreated="yes" "$_newsnap"
 	fi
 
    # Destroy the dataset and reclone it
 	zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1
-	zfs clone ${_newsnap} ${_jailzfs}
+	zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs}
 
 	# Drop the flags for etc directory and add the user for the jailname
 	chflags -R noschg ${M_ZUSR}/${_jail}/rw
@@ -629,25 +629,27 @@ reclone_zusr() {
 	mv ${M_ZUSR}/${_jail}/usr/home/${_template} ${M_ZUSR}/${_jail}/usr/home/${_jail} > /dev/null 2>&1
 
 	# Remove old snapshots past their ttl and no longer being used.
-	cleanup_oldsnaps "$_templzfs" &
+	cleanup_snapshots "$_templzfs" &
 	return 0
 }
 
-cleanup_oldsnaps() {
+cleanup_snapshots() {
 	# Removes old snapshots for the given jail. Routine cleanup, necessary due to autosnapping.
 	local _dataset="$1"
 	local _date=$(date +%s)
 
-	# Assemple list of datasets in zroot, tagged with a ttl, to clean up old ones
+	# Assemple list of datasets in zroot, tagged ttl. Note that empty $1 , pulls all datasets
 	local _snaplist=$(zfs list -Hr -t snapshot -o name,qubsd:destroy-date $_dataset \
 		| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
 
 	for _snap in $_snaplist ; do
-		# Get the destroy-date for each snap
-		local _snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
-
-		# Compare the destroy date to the current date, and destroy old snaps.
+		# Get the destroy-date for each snap, and destroy if past their date
+		chk_valid_zfs "$_snap" && local _snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
 		[ "$_snap_dd" -lt "$_date" ] && zfs destroy $_snap > /dev/null 2>&1
+
+		# Get data used by snap, destroy if 0B. Check exists first, b/c above might've deleted it.
+		chk_valid_zfs "$_snap" && local _snap_used=$(zfs list -Ho used $_snap)
+		[ "$_snap_used" = "0B" ] && zfs destroy $_snap > /dev/null 2>&1 
 	done
 }
 
