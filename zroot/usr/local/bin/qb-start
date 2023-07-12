@@ -39,7 +39,7 @@ get_options() {
 
 climb_hierarchy() {
 	# Prevent infinite loop. Unlikely to be 50 gateways; more likely circular reference.
-	[ "$_depth" -gt 50 ] && get_msg_start "_8" "exit_1"
+	[ "$_depth" -gt 50 ] && get_msg_start "_e8" "exit_1"
 	_depth=$(( _depth + 1 ))
 
 	local _jail="$1"
@@ -159,15 +159,17 @@ main() {
 
 	# FULLIST will also need to add any gateway dependencies.   
 	_FULLIST="$_JLIST"
-	_depth=1
 
 	# For each jail, find the hierarchy top (gateway of its gateway of its gateway ...) 
 	for _jlist in $_JLIST ; do
 
-		# Function is recursive, and adding all jails in the gateway path, to FULLIST 
+		# Function is recursive, so _depth tracks # of cycles to prevent infinite loop. 
+		_depth=1
+
+		# Adds all jails in the gateway path to FULLIST.
 		climb_hierarchy "$_jlist"
 	done
-	
+
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
 	determine_ips
 
