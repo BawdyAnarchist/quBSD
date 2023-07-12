@@ -1,5 +1,9 @@
 ### BEST PRACTICES / FIXES 
 
+qb-stop 
+	- Has a thing where it throws error on qb-stop -ar , for running another instance
+	- But then it still works.
+
 qb-disp with -Z option for cloning root dataset as well? 
 
 pf.conf
@@ -45,6 +49,11 @@ Renamed all JMAP parameters to CAPS
 Further networking ghosts
 	- It seems like sometimes the restarting of net-firewall or net-vpn causes downstream connection issues.
      But then restarting again in sequence fixes the problem. I can't quite replicate it.
+
+chflags operations on multistarts
+   - they sure seem to persist for an awfully long time, consuming an entire CPU. Like for a minute
+	- There's probably something wrong there. Probably to do with parallel starts, yet again
+  
 
 ### MINOR UPGRADES
 
