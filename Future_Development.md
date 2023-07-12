@@ -1,12 +1,5 @@
 ### BEST PRACTICES / FIXES 
 
-qb-autosnap
-	- Maybe it should do a "diff" and only snap when relevant. Reduces clutter
-	- Should read both zfs and jmap autosnap
-	- Then syncronize anything that was off. Sync to jmap
-	- qb-edit
-		- will needed added. and zfs mod takes place 
-
 qb-disp with -Z option for cloning root dataset as well? 
 
 pf.conf
@@ -16,8 +9,6 @@ qb-create
 	- GUIDED MODE needs to be completely redone.
 	- Add the new jail to the i3gen.conf and execute keybindings
 	- NEXT IN LINE
-
-the word "template" really ought to be "parent." Create dispjail from PARENT. TEMPLATE should probably be relegated to the 0root-templates and to qb-create. 
 
 qb-connect
 	- could figure out what about stupid pf is preventing network connection for adhoc connected jails 
