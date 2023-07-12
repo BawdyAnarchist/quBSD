@@ -34,6 +34,7 @@ get_options() {
 
 	# Absolutely do not run if another instance of qb-start or qb-stop is already running
 	pgrep -fl '/bin/sh /usr/local/bin/qb-start' && get_msg_start "_e0" "" && return 1
+	sleep .3    # Wait a moment in case qb-stop -r called the script 
 	pgrep -fl '/bin/sh /usr/local/bin/qb-stop' && get_msg_start "_e0" "" && return 1
 }
 
@@ -107,9 +108,8 @@ begin_waterfall() {
 
 	for _gw in $_gateways ; do
 		
-		# Only continue the waterfall if jail started successfully
-		if start_jail "$_gw" > /dev/null 2>&1 ; then
-			
+		# Only continue the waterfall if jail started successfully (and is not VM)
+		if start_jail "$_gw" > /dev/null 2>&1 && [ -z "$_isVM" ] ; then
 			classify_clients "$_gw"
 
 			[ -n "$_ENDPOINTS" ] && start_jails_in_background "$_ENDPOINTS" &
@@ -177,7 +177,7 @@ main() {
 	for _jail in $_HIERTOP; do
 
 		# Each hierarchy top is independent of each other, and can be started in parallel. 
-		begin_waterfall $_HIERTOP &
+		begin_waterfall $_jail &
 	done
 }
 
