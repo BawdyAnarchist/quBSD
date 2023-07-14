@@ -23,8 +23,7 @@ get_options() {
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
 
    # Absolutely do not run if another instance of qb-start or qb-stop is already running
-	pgrep -fl '/bin/sh /usr/local/bin/qb-start' && get_msg_stop "_e0" "" && return 1
-	pgrep -fl '/bin/sh /usr/local/bin/qb-stop' && get_msg_stop "_e0" "" && return 1
+	monitor_startstop "1" "" || get_msg_stop "_e0" "exit_1" 
 }
 
 remove_jails() {
@@ -35,44 +34,33 @@ remove_jails() {
 		if get_info _CLIENTS $_jail ; then 
 
 			# Will error if epair -vnet both jails simultaneously. Wait for completion
-			stop_jail "$_jail" > /dev/null 2>&1
+			stop_jail_in_background "$_jail" > /dev/null 2>&1
 		else
 			# Stop jail and send process to background (for time-efficiency).
-			stop_jail "$_jail" > /dev/null 2>&1 &
+			stop_jail_in_background "$_jail" > /dev/null 2>&1 &
 		fi
 	done
+}
+
+stop_jail_in_background() {
+	# Function can sent to background, but keeps qb-stop process alive, for monitoring purposes.
+
+	local _jail="$1"
+	stop_jail "$_jail" > /dev/null 2>&1
 }
 
 handle_restarts() {
 
 	if [ "$_RESTART" ] ; then
-
-		# Wait for all jails to shut down before attempting restart
-		_count=1
-		for _jail in $_JLIST; do 
-			
-			while chk_isrunning $_jail ; do	
-				# Keep track, in case a jail stop hangs. 
-				_count=$(( _count + 1 ))
-			
-				# Break from script after about 10 seconds for any jail that hangs	
-				[ "$_count" -gt 33 ] && get_msg_stop "_e11" "exit_1" && exit 1
-
-				# Wait a moment and check again
-				sleep .3	
-			done		
-
-		done
-
-		# Give transient ops (like exec.release) a moment, before attempting restart 
-		sleep .7
-
+	
+		# Give 30 secs for jails to stop, or error. Send empty file (nothing to rm after done).
+		monitor_startstop "60" '###_empty' || get_msg "_e9"
+	
 		# Only qb-start should be used for parallel jail starts. 
 		qb-start "$_JLIST" &
 		exit 0
 	fi	
 }
-
 
 get_global_variables
 
@@ -82,5 +70,5 @@ compile_jlist
 
 remove_jails
 
-handle_restarts
+handle_restarts &
 

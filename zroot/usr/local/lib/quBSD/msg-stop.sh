@@ -60,18 +60,9 @@ ENDOFMSG
 	;;	
 	_e8) cat << ENDOFMSG
 
-ERROR: Infinite loop detected. There likely a set of jails has
-      gateways that circularly reference each other. Example:
-      Jail-A has Jail-B as gateway,
-             Jail-B has Jail-C as gateway,
-                    Jail-C has Jail-A as gateway.
-ENDOFMSG
-	;;	
-	_e9) cat << ENDOFMSG
-
-ERROR: Jail: $_jail appears to be hung, and has not stopped.
+ERROR: One or more jails appear to be hung and havent stopped.
        Check /var/log/quBSD.sh for details, and check process
-       list to manuall kill all jail stop operations.
+       list to manually kill all jail stop operations.
 ENDOFMSG
 	;;	
 	esac

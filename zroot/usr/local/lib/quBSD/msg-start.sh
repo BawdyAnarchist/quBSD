@@ -87,7 +87,7 @@ usage() { cat << ENDOFUSAGE
 jails in parallel to avoid networking errors. User scripts
 should only start jails in serial, or call this script. 
 
-qb-start [-h] [-a|-A|-f <file>] [-e|-E <file>]  < jail list >
+qb-start [-h] [-a|-A|-f <file>] [-e|-E <file>] [-F] <jail list>
 
    If no [-a|-A|-f] is specified, the < jail list > (positional
    parameters) at the end are assumed to be jail starts. 
@@ -101,6 +101,8 @@ qb-start [-h] [-a|-A|-f <file>] [-e|-E <file>]  < jail list >
        but exlude any jails listed in <file>. 
    -h: (h)elp. Outputs this help message.
    -f: (f)ile. Use a file with a list of jails to start.
+   -F: (F)orce. Ignore checks for duplicate instances of 
+       qb-start in progress. Launch anyways.
 
 ENDOFUSAGE
 }

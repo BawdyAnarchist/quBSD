@@ -45,7 +45,8 @@
 # connect_client_gateway - Connects a client jail to its gateway
 # reclone_zroot       - Destroys and reclones jails dependent on rootjail
 # reclone_zusr        - Destroy and reclones jails with zusr dependency (dispjails)
-# cleanup_snapshots   - Destroys old snaps taken automatically for jail operations
+# cleanup_oldsnaps    - Destroys old snapshots beyond their time-to-live 
+# monitor_startstop   - Monitors whether qb-start or qb-stop is still alive
 
 #################################  STATUS  CHECKS  #################################
 # chk_isblank          - Posix workaround: Variable is [-z <null> OR [[:blank:]]*]
@@ -521,6 +522,7 @@ reclone_zroot() {
 	local _date=$(date +%s)
 	local _ttl=$(($_date + 30))
 	local _newsnap="${_rootzfs}@${_date}"
+
 	local _presnap=$(zfs list -t snapshot -Ho name ${_rootzfs} | tail -1)
 
 	# `zfs-diff` from other jails causes a momentary snapshot which errors the reclone operation 
@@ -574,7 +576,7 @@ reclone_zroot() {
 	pw -V ${M_JAILS}/${_jail}/etc/ useradd -n $_jail -u 1001 -d /usr/home/${_jail} -s /bin/csh 2>&1
 
 	# Remove old snapshots past their ttl and no longer being used.
-	cleanup_snapshots "$_rootzfs" &
+	cleanup_oldsnaps "$_rootzfs" &
 	return 0
 }
 
@@ -629,11 +631,17 @@ reclone_zusr() {
 	mv ${M_ZUSR}/${_jail}/usr/home/${_template} ${M_ZUSR}/${_jail}/usr/home/${_jail} > /dev/null 2>&1
 
 	# Remove old snapshots past their ttl and no longer being used.
-	cleanup_snapshots "$_templzfs" &
+	cleanup_oldsnaps "$_templzfs" &
 	return 0
 }
 
-cleanup_snapshots() {
+cleanup_oldsnaps() {
+
+	# Option for clearning up "zero bytes" (_zb) snapshots 
+	local _zb ; local _opts
+	getopts z _opts && _zb='true'
+	shift $(( OPTIND - 1 ))
+
 	# Removes old snapshots for the given jail. Routine cleanup, necessary due to autosnapping.
 	local _dataset="$1"
 	local _date=$(date +%s)
@@ -643,14 +651,47 @@ cleanup_snapshots() {
 		| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
 
 	for _snap in $_snaplist ; do
+
 		# Get the destroy-date for each snap, and destroy if past their date
 		chk_valid_zfs "$_snap" && local _snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
 		[ "$_snap_dd" -lt "$_date" ] && zfs destroy $_snap > /dev/null 2>&1
 
-		# Get data used by snap, destroy if 0B. Check exists first, b/c above might've deleted it.
-		chk_valid_zfs "$_snap" && local _snap_used=$(zfs list -Ho used $_snap)
-		[ "$_snap_used" = "0B" ] && zfs destroy $_snap > /dev/null 2>&1 
+		# Only remove 0B datasets if instructed to with [-z]	
+		if [ "$_zb" ] ; then
+			# Get data used by snap, destroy if 0B. Check exists first, b/c above might've deleted it.
+			chk_valid_zfs "$_snap" && local _snap_used=$(zfs list -Ho used $_snap)
+			[ "$_snap_used" = "0B" ] && zfs destroy $_snap > /dev/null 2>&1 
+		fi
 	done
+}
+
+monitor_startstop() {
+	# Need a way of monitoring qb-start, from outside of the process, to remove _TMP
+
+	local _timeout="$1"
+	local _file="$2"
+	local _cycle=0
+
+	# Assign a default value if not assigned.
+	_timeout="${_timeout:="1"}"
+
+	while [ "$_cycle" -lt "$_timeout" ] ; do
+		if ! pgrep -fl '/bin/sh /usr/local/bin/qb-start' > /dev/null 2>&1 \
+			 && ! pgrep -fl '/bin/sh /usr/local/bin/qb-stop' > /dev/null 2>&1
+		then
+			# The tmp file used for IP tracking can be discarded. 
+			[ "$_file" ] && rm "$_file" >> /dev/null 2>&1
+			return 0
+		fi
+		
+		_cycle=$(( _cycle + 1 ))
+		sleep .5
+	done
+
+	# Cleanup tmp file regardless
+	rm	"$_file" >> /dev/null 2>&1
+
+	return 1	
 }
 
 
@@ -751,6 +792,9 @@ chk_valid_jail() {
 	# Positional parmeters and function specific variables.
 	local _value="$1"
 	local _class ; local _rootjail ; local _template ; local _class_of_temp
+
+	# Must set variable back to null, since it's global.
+	_isVM=''
 
 	# Fail if no jail specified
 	[ -z "$_value" ] && get_msg $_qv "_0" "jail" && return 1
@@ -1356,7 +1400,7 @@ assign_ipv4_auto() {
 	local _tmp_ip="/tmp/qb-start_temp_ip"
 
 	# Try to pull pre-set IPV4 from the temp file if it exists.
-	[ -e "$_tmp_ip" ] && local _ipv4=$(sed -nE "s#^${_jail}[[:blank:]]+##p" $_tmp_ip) 
+	[ -e "$_tmp_ip" ] && local _ipv4=$(sed -nE "s#^[[:blank:]]*${_jail}[[:blank:]]+##p" $_tmp_ip) 
 
 	# If there was no ipv4 assigned to _jail in the temp file, then find an open ip for the jail.
 	[ -z "$_ipv4" ] && _ipv4=$(discover_open_ipv4 "$_jail")

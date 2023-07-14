@@ -15,7 +15,7 @@
 . /usr/local/lib/quBSD/msg-start.sh
 
 get_options() {
-	while getopts aAeE:hf: opts ; do
+	while getopts aAeE:hf:F opts ; do
 		case $opts in
 			a) _SOURCE="auto" ;;
 			A) [ "$_SOURCE" ] && get_msg_start "_e1" "usage_1" || _SOURCE="all" ;;
@@ -31,11 +31,18 @@ get_options() {
 
 	# This makes it so that _POSPARAMS has one parameter per line
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
+}
 
-	# Absolutely do not run if another instance of qb-start or qb-stop is already running
-	pgrep -fl '/bin/sh /usr/local/bin/qb-start' && get_msg_start "_e0" "" && return 1
-	sleep .3    # Wait a moment in case qb-stop -r called the script 
-	pgrep -fl '/bin/sh /usr/local/bin/qb-stop' && get_msg_start "_e0" "" && return 1
+checks() {
+
+	# Define TMP file variables
+	_TMP_IP="/tmp/qb-start_temp_ip"
+
+	# Absolutely do not run if another instance if qb-start or qb-stop is already running
+	monitor_startstop "1" "$_TMP_IP" || get_msg_start "_e0" "exit_1" 
+
+	# Set up new _TMP_IP	
+	mktemp "$_TMP_IP"	> /dev/null 2>&1
 }
 
 climb_hierarchy() {
@@ -51,6 +58,11 @@ climb_hierarchy() {
 		# _jail gateway path was already handled. Skip further checks.
 		return 0
 
+	# Neither invalid jails nor VMs should be included. _isVM is global var from chk_valid_jail
+	# Return conditions (no inclusion): jail invalid ; isVM ; already started
+	elif ! chk_valid_jail $_jail || chk_isrunning "$_jail" || [ "$_isVM" = "true" ] ; then
+		return 0
+
 	# _jail is an endpoint. Either has no network, or is top of hierarchy. 
 	elif [ "$_gateway" = "none" ] || [ "$_class_of_gateway" = "VM" ] ; then
 
@@ -60,7 +72,7 @@ climb_hierarchy() {
 
 		else
 			# _jail has no networking. Can start immediately in the background 
-			start_jail $_jail > /dev/null 2>&1 &
+			start_jail_in_background "$_jail" > /dev/null 2>&1 &
 
 			# It can also be removed from the FULLIST, as it's unimportant 
 			_FULLIST=$(echo "$_FULLIST" | grep -Ev "^[[:blank:]]*${_jail}[[:blank:]]*\$")	
@@ -85,13 +97,6 @@ climb_hierarchy() {
 
 determine_ips() {
 
-	# Create TMP file so exec.created can access the IP list when jails start
-	_TMP_IP="/tmp/qb-start_temp_ip"
-
-	[ -e "$_TMP_IP" ] && rm "$_TMP_IP" > /dev/null 2>&1
-
-	mktemp "$_TMP_IP"	> /dev/null 2>&1
-
 	# Map IPs in serial, write to TMP
 	for _jail in $_FULLIST ; do
 
@@ -103,16 +108,32 @@ determine_ips() {
 }
 
 begin_waterfall() {
-	local _jail
-	local _gateways="$1"
 
+	local _gateways="$1"
 	for _gw in $_gateways ; do
-		
+
 		# Only continue the waterfall if jail started successfully (and is not VM)
+		# isVM note: This is archaic and hacky for temp VM integration hold.
+		# This should be removed later.
 		if start_jail "$_gw" > /dev/null 2>&1 && [ -z "$_isVM" ] ; then
+
+			# Determine which clients are endpoints, and which serve clients in turn
 			classify_clients "$_gw"
 
-			[ -n "$_ENDPOINTS" ] && start_jails_in_background "$_ENDPOINTS" &
+			# Start each endpoint
+			if [ -n "$_ENDPOINTS" ] ; then
+
+				for _jail in $_ENDPOINTS ; do
+
+					# Maintain a small stagger between parallel starts. Helps prevent conflicts
+					sleep .2
+
+					# Create a lock file,	
+					start_jail_in_background "$_jail" & 
+				done
+			fi
+
+			# Subgateways need their own waterfall
 			[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS" 
 		fi
 	done
@@ -141,24 +162,17 @@ classify_clients() {
 	done
 }
 
-start_jails_in_background() {
-	local _jail ;
-	local _endpoints="$1"
+start_jail_in_background() {
+	# Function can sent to background, but keeps qb-stop process alive, for monitoring purposes.
 
-	for _jail in $_endpoints ; do
-		# Maintain a small stagger between parallel starts. Helps prevent conflicts
-		sleep .2
-		start_jail $_jail > /dev/null 2>&1 &
-	done
+	local _jail="$1"
+	start_jail "$_jail" > /dev/null 2>&1
 }
 
 main() {
 
 	# Assemble the list of jails tagged for start. 
 	compile_jlist
-
-	# FULLIST will also need to add any gateway dependencies.   
-	_FULLIST="$_JLIST"
 
 	# For each jail, find the hierarchy top (gateway of its gateway of its gateway ...) 
 	for _jlist in $_JLIST ; do
@@ -169,6 +183,9 @@ main() {
 		# Adds all jails in the gateway path to FULLIST.
 		climb_hierarchy "$_jlist"
 	done
+
+	# If the _FULLIST is empty, there's nothing to do. Remove TMP and exit.
+	[ -z "$_FULLIST" ] && rm "$_TMP_IP" && exit 0 
 
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
 	determine_ips
@@ -186,6 +203,11 @@ get_global_variables
 
 get_options "$@"
 
+checks
+
 main
+
+# Monitor completion of qb-start, 30 sec (60 0.5sec cycles). 
+monitor_startstop 60 "$_TMP_IP" &
 
 exit 0

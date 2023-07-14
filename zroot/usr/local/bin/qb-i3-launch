@@ -4,12 +4,12 @@
 . /usr/local/lib/quBSD/msg-i3-launch.sh
 
 get_options() {
-	while getopts f:Fhs opts ; do
+	while getopts f:Fht: opts ; do
 		case $opts in
 			f) FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
 			F) FORCE="true" ;;
 			h) get_msg_i3_launch "none" "usage_0" ;;
-			s) STARTONLY="true" ;;
+			t) _TIMEOUT="${OPTARG}" ;;  
 		esac
 	done
 
@@ -37,7 +37,7 @@ WORKSPACE")
 
 }
 
-start_jails() {
+qb_start_jails() {
 
 	# Create a popup so user can monitor jail starts, then remove it later
 	xterm -fs 12 -e csh -c 'i3-msg floating enable , resize set height 1000 ; qb-stat' &
@@ -46,14 +46,17 @@ start_jails() {
 	# Remove any non-jail line, and save to tmp file
 	grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}' | uniq > $JAILS
 
+	# Ensure that there's not already a startup operation in progress. (sends empty "" tmp $2).
+	! monitor_startstop "60" "" && echo "ERROR: Timeout on jail starts" | tee -a $QBLOG && exit 1
+
 	# Turn on any jails not started
 	qb-start -f $JAILS > /dev/null 2>&1
-	
-	# Remove the temporary monitoring pop	
+
+	# Ensure that there's not already a startup operation in progress. (sends empty "" tmp $2).
+	! monitor_startstop "60" "" && echo "ERROR: Timeout on jail starts" | tee -a $QBLOG && exit 1
+
+	# Remove the temporary monitoring pop  
 	kill -15 $_pid_stat
-	
-	# Exit after starting jails if [-s] was given
-	[ -n "$STARTONLY" ] && exit 0
 }
 
 check_existing() {
@@ -122,8 +125,8 @@ execute_commands() {
 }
 
 main() {
-	# Start jails first before launching (maybe change this order).
-	start_jails 
+	# Start jails first before launching 
+	qb_start_jails
 
 	_cycle=1
 	while : ; do 

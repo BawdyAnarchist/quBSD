@@ -6,7 +6,7 @@ main() {
 	JAIL="$1"
 
 	# class was already retrieved/check in exec.prepare. Don't check again [-sq]
-	get_jail_parameter -dqs class "$JAIL" || exit 1
+	get_jail_parameter -dqs CLASS "$JAIL" || exit 1
 
 	# /rw/ nullfs mounts are best symlinked from within the cloned appjail's root 
 	if [ "$CLASS" != "rootjail" ] ; then
