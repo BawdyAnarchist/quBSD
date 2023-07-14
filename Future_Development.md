@@ -1,6 +1,14 @@
 ### BEST PRACTICES / FIXES 
 
-root snapshot out from under it. Need to check.
+- There should be a timeout getopts [-t] for qb-start/stop. For user system preference
+
+qb-i3-launch
+	- Probably add/pass -F option here as well
+	- Intelligent resizing of fonts depending on dpi or xrandr resolution
+	- Needs a [-t] option to wait for jailstarts before giving up launch
+	- Seems you could do a qb-start [-t] and it should take care of the waiting
+		- maybe qb-start needs to pass a -t flag if called from other program?
+		- Either way, just remember to double check the excessive code in qb_start_jails
 
 qb-disp with -Z option for cloning root dataset as well? 
 
@@ -51,6 +59,8 @@ Further networking ghosts
 chflags operations on multistarts
    - they sure seem to persist for an awfully long time, consuming an entire CPU. Like for a minute
 	- There's probably something wrong there. Probably to do with parallel starts, yet again
+
+Why is 10.1.8.2/30 always skipped? Do some logging, find out why.
   
 
 ### MINOR UPGRADES
@@ -165,3 +175,4 @@ qb-update - Update rootjails, create snapshots
 Crons - I have no crons running. This is probably something long term security that should be integrated and automated.
 man pages
 
+Intelligent resizing of fonts depending on dpi or xrandr resolution
