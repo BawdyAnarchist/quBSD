@@ -1,14 +1,7 @@
 ### BEST PRACTICES / FIXES 
 
-- There should be a timeout getopts [-t] for qb-start/stop. For user system preference
-
-qb-i3-launch
-	- Probably add/pass -F option here as well
-	- Intelligent resizing of fonts depending on dpi or xrandr resolution
-	- Needs a [-t] option to wait for jailstarts before giving up launch
-	- Seems you could do a qb-start [-t] and it should take care of the waiting
-		- maybe qb-start needs to pass a -t flag if called from other program?
-		- Either way, just remember to double check the excessive code in qb_start_jails
+qb-stop
+	- Still not quite perfect. Seems to be overlap with net-firewall and charts-wm, causing epair on host error.
 
 qb-disp with -Z option for cloning root dataset as well? 
 
@@ -27,9 +20,6 @@ devfs.rules
 	- The rulenames should include "qubsd" so as not to have a chance of overlapping other rules
 	- Maybe the file should be added to the get_global_variables assignments library
 
-ntpd
-	- ntpd only runs during qb-hostnet. Needs a more "correct" solution.
-
 Should cycle all scripts through shellcheck again. 
 	- Case statements need catchalls to trap invalid options provided
 	- Primarily with scripts that should error on invalid option
@@ -38,7 +28,6 @@ Should cycle all scripts through shellcheck again.
 	- Needs updated in general after you're done
 	- Needs to document that the rootjails must stay lowered schg
 	- Update the guides regarding #defaults in jailmap.
-
 
 ### TROUBLE NOTES (uncertain, things to monitor)
 
@@ -176,3 +165,7 @@ Crons - I have no crons running. This is probably something long term security t
 man pages
 
 Intelligent resizing of fonts depending on dpi or xrandr resolution
+
+ntpd
+	- ntpd only runs during qb-hostnet. Needs a more "correct" solution.
+
