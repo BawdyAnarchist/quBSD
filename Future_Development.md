@@ -1,8 +1,5 @@
 ### BEST PRACTICES / FIXES 
 
-qb-stop
-	- Still not quite perfect. Seems to be overlap with net-firewall and charts-wm, causing epair on host error.
-
 qb-disp with -Z option for cloning root dataset as well? 
 
 pf.conf
@@ -20,9 +17,7 @@ devfs.rules
 	- The rulenames should include "qubsd" so as not to have a chance of overlapping other rules
 	- Maybe the file should be added to the get_global_variables assignments library
 
-Should cycle all scripts through shellcheck again. 
-	- Case statements need catchalls to trap invalid options provided
-	- Primarily with scripts that should error on invalid option
+Cycle all scripts through shellcheck again. 
 
 /usr/local/share/quBSD 
 	- Needs updated in general after you're done
@@ -31,15 +26,8 @@ Should cycle all scripts through shellcheck again.
 
 ### TROUBLE NOTES (uncertain, things to monitor)
 
-It seems like exec.created might not *always* be updated pf.conf with the new epair.
-	- On one restart immediately after pushing the big upgrade with qb-start/stop to github, one net-vpn jail didn't update
-	- I'm not sure if it's because I'm defining VIF as a global in connect_client_gateway, with simultaneous starts.
-
 jail -r 
 	- <net-jail> is causing an "Operation not permitted" error
-
-Renamed all JMAP parameters to CAPS
-	- I think it's good, but there's alot of stuff in the scripts. Maybe missed something
 
 Further networking ghosts
 	- It seems like sometimes the restarting of net-firewall or net-vpn causes downstream connection issues.
