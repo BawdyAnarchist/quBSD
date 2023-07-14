@@ -76,6 +76,9 @@ checks() {
 		;;	
 		SECLVL)		
 				chk_valid_seclvl $_q "$VAL" ||  get_msg_edit "none" "usage_1" 
+
+				# Alert user that high seclvl will make pf changes impossible
+				[ "$VAL" = "3" ] && [ -z "${JAIL##net-*}" ] && get_msg_edit "_12" "_cont"
 		;;
 		GATEWAY)  
 				chk_valid_gateway $_q "$VAL" "$JAIL" \
