@@ -91,7 +91,15 @@ echo -e "Would you like to change this to auto? (Y/n): \c"
 ERROR: dispjails cannot have auto snapshots, as their
        dataset is a dependent clone of a template jail.
 ENDOFMSG
+	;;
+	
+		_12) cat << ENDOFMSG
 
+ALERT: Setting SECLVL to 3 will make changes to pf
+       impossible for < $JAIL >, without restarting it.
+       Thus, restarting its gateway without restarting
+       < $JAIL > might result in no network connection.    
+ENDOFMSG
 	# End of _message 
 	esac
 
