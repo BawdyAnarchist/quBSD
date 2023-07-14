@@ -29,10 +29,6 @@ Cycle all scripts through shellcheck again.
 jail -r 
 	- <net-jail> is causing an "Operation not permitted" error
 
-Further networking ghosts
-	- It seems like sometimes the restarting of net-firewall or net-vpn causes downstream connection issues.
-     But then restarting again in sequence fixes the problem. I can't quite replicate it.
-
 chflags operations on multistarts
    - they sure seem to persist for an awfully long time, consuming an entire CPU. Like for a minute
 	- There's probably something wrong there. Probably to do with parallel starts, yet again
