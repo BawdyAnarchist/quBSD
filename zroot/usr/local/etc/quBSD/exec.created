@@ -67,16 +67,19 @@ modify_pf() {
 	# Numerous variables need to be modified for pf.conf
 	if [ -e "$JPF" ] ; then
 
+		# Make sure flags are down
+		chflags -R noschg "${M_ZUSR}/${JAIL}/rw/etc" 
+
 		# $VIF was assigned during the connect_client_gateway func. Modify pf.conf 
-		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"$VIF\"@" $JPF
-		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"$IPV4\"@" $JPF
+		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${VIF}\"@" $JPF    >> $QBLOG 
+		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${IPV4}\"@" $JPF
 
 		# net-jail internal wireguard parameters
 		[ -n "$ENDPOINT" ] \
-			&& sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"$ENDPOINT\"@" $JPF  
+			&& sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"${ENDPOINT}\"@" $JPF 
 
 		[ -n "$WGPORTS" ] \
-			&& sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"$WGPORTS\"@" $JPF  
+			&& sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"${WGPORTS}\"@" $JPF  
 	fi
 }
 
