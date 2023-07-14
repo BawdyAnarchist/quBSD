@@ -81,30 +81,26 @@ begin_waterfall() {
 	local _gateways="$1"
 	for _gw in $_gateways ; do
 
-		# Wait for _gw to stop before proceeding (and make sure is not VM). 
-		# isVM note: This is archaic and hacky for temp VM integration hold.
-		# This should be removed later.
-		if stop_jail "$_gw" > /dev/null 2>&1 && [ -z "$_isVM" ] ; then
+		# Wait for _gw to stop before proceeding 
+		echo "$_JLIST" | grep -Eq "^[[:blank:]]*${_gw}[[:blank:]]*\$" \
+				&& [ -z "$_isVM" ] && stop_jail "$_gw" > /dev/null 2>&1 
 
-			# Determine which clients are endpoints, and which serve clients in turn
-			classify_clients "$_gw"
+		# Determine which clients are endpoints, and which serve clients in turn
+		classify_clients "$_gw"
 
-			# Stop each endpoint
-			if [ -n "$_ENDPOINTS" ] ; then
+		# Stop each endpoint
+		if [ -n "$_ENDPOINTS" ] ; then
 
-				for _jail in $_ENDPOINTS ; do
+			for _jail in $_ENDPOINTS ; do
 
-					# Maintain a small stagger between parallel stops. Helps prevent conflicts
-					sleep .2
-
-					# Create a lock file,	
-					stop_jail_in_background "$_jail" & 
-				done
-			fi
-
-			# Subgateways need their own waterfall
-			[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS" 
+				# Maintain a small stagger between parallel stops. Helps prevent conflicts
+				sleep .2
+				stop_jail_in_background "$_jail" & 
+			done
 		fi
+
+		# Subgateways need their own waterfall
+		[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS" 
 	done
 }
 
@@ -134,7 +130,9 @@ classify_clients() {
 stop_jail_in_background() {
 	# Function can sent to background, but keeps qb-stop process alive, for monitoring purposes.
 	local _jail="$1"
-	stop_jail "$_jail" > /dev/null 2>&1
+
+	echo "$_JLIST" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" \
+			&& stop_jail "$_jail" > /dev/null 2>&1
 }
 
 handle_restarts() {
@@ -163,9 +161,6 @@ main() {
 		# Adds all jails in the gateway path to FULLIST.
 		climb_hierarchy "$_jlist"
 	done
-
-	# If the _FULLIST is empty, there's nothing to do. 
-	[ -z "$_FULLIST" ] && exit 0 
 
 	# Stop the hierarchy tops, then their clients, until all of FULLIST is stopped.
 	for _jail in $_HIERTOP; do
