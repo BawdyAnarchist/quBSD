@@ -12,6 +12,7 @@ get_options() {
 			h) get_msg_snap "none" "usage_0" ;; 
 			l) [ -z "$_CMD" ] && _CMD="list"  || get_msg_snap "_1" "exit_1" ;;
 			y) assume_yes="true" ;;
+			*) exit 1 ;;
 		esac
 	done
 

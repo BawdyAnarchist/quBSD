@@ -8,6 +8,7 @@ get_options() {
 			h) get_msg_dpi "none" "usage_0" ;;
 			r) DPI_START=96 ; REV_TIME=0 ; revert_dpi ;; 
 			t) REV_TIME="$OPTARG" ;;
+			*) exit 1 ;;
 		esac
 	done
 

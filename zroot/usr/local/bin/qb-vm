@@ -11,6 +11,7 @@ get_options() {
 			h) get_msg_nicvm "none" "usage_0" ;; 
 			n) NO_RUN="true" ;;
 			p) POWEROFF="true" ;;
+			*) exit 1 ;;
 		esac
 	done
 

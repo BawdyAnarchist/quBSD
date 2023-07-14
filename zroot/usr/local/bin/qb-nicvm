@@ -10,6 +10,7 @@ get_options() {
 			d) DESTROY="true" ;;
 			h) get_msg_nicvm "none" "usage_0" ;; 
 			n) NO_RUN="true" ;;
+			*) exit 1 ;;
 		esac
 	done
 

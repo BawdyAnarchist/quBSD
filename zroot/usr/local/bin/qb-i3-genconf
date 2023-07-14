@@ -9,6 +9,7 @@ get_options() {
 			f) [ -e "$OPTARG" ] && FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
 			h) get_msg_i3_genconf "none" "usage_0" ;;
 			r) RELOAD="false" ;; 
+			*) exit 1 ;;
 		esac
 	done
 	

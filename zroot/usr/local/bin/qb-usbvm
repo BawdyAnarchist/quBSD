@@ -7,6 +7,7 @@ while getopts cdhin o ; do
 		h) help="true" ;;
 		i) internet="true" ;;
 		n) no_run="true" ;;
+		*) exit 1 ;;
 	esac
 done
 

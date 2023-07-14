@@ -127,6 +127,7 @@ get_options() {
 			l) LIST="true" ;;
 			p) PORT="$OPTARG" ;;
 			x) CALLED="true" ;;
+			*) exit 1 ;;
   	   esac
 	done
 

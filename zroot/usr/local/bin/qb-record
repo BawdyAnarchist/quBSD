@@ -12,6 +12,7 @@ get_options() {
 			v) _VOL="$OPTARG"  ;; 
 			p) PURGE="true" ; _DEVICES="webcamd virtual_oss" ;; 
 			/?) get_msg_record "_1" "exit_1" ;;
+			*) exit 1 ;;
 		esac
 	done
 	

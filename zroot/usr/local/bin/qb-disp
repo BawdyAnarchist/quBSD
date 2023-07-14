@@ -11,6 +11,7 @@ get_options() {
 		case $opts in
 			h) get_msg_disp "none" "usage_0" ;;
 			i) _i3wm="true" ;;
+			*) exit 1 ;;
 		esac
 	done
 

@@ -8,6 +8,7 @@ get_options() {
 		case $opts in
 			a) UPDATE="true" ;;
 			h) get_msg_rename "none" "usage_0" ;; 
+			*) exit 1 ;;
 		esac
 	done
 

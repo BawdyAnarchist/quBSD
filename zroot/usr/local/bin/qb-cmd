@@ -13,6 +13,7 @@ get_options() {
         	r) _USER="root" ;;
 			u) _USER="${OPTARG}" ;;
 			v) _REDIRECT='' ;;
+			*) exit 1 ;;
 		esac
 	done
 

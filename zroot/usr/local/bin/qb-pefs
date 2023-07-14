@@ -16,6 +16,7 @@ get_options() {
 			d) U_FOLDER="$OPTARG" USERDIR="true" ;;
 			m) [ -z "$_CMD" ] && _CMD="mount" || get_msg_pefs "_1" "usage_1" ;; 
 			u) [ -z "$_CMD" ] && _CMD="unmount" || get_msg_pefs "_1" "usage_1" ;; 
+			*) exit 1 ;;
 		esac
 	done
 

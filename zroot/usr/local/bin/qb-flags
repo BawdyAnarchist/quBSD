@@ -10,6 +10,7 @@ get_options() {
 			h) get_msg_flags "none" "usage_0" ;;
 			u) UP="true" ;; 
 			r) RESTORE="true" ;; 
+			*) exit 1 ;;
 		esac
 	done
 

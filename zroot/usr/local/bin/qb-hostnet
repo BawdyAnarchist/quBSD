@@ -10,6 +10,7 @@ get_options() {
 			h) get_msg_hostnet "none" "usage_0" ;;
 			t) _TIME="$OPTARG" ;;
 			u) [ -z "$_CMD" ] && _CMD="up" || get_msg_hostnet "_1" "usage_1" ;;
+			*) exit 1 ;;
 		esac
 	done
 

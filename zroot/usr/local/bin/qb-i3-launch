@@ -11,6 +11,7 @@ get_options() {
 			h) get_msg_i3_launch "none" "usage_0" ;;
          t) _TIMEOUT="${OPTARG}" ; _TIMEOUT=$(( _TIMEOUT * 2 )) > /dev/null 2>&1 \
 					|| get_msg_launch "_2" "usage_1"  ;;
+			*) exit 1 ;;
 		esac
 	done
 

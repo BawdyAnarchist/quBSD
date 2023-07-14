@@ -12,6 +12,7 @@ get_options() {
 			h) get_msg_edit "none" "usage_0" ;; 
 			q) QUIET="true" ; _q='-q' ;;
 			r) RESTART="true" ;;
+			*) exit 1 ;;
 		esac
 	done
 

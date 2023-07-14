@@ -11,6 +11,7 @@ get_options() {
 			l) LIST="true" ;;
 			p) PARAM="${OPTARG}" ;;
 			z) ZFSLIST="true" ;; 
+			*) exit 1 ;;
 		esac
 	done
 

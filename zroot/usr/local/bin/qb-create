@@ -27,7 +27,7 @@ get_options() {
 		         echo "$U_ZOPT" | grep -Eq "^(dupl|none|empty)\$" \
 					|| get_msg_create "_e1" "exit_1" ;;
 			Z) R_ZOPT="true" ;;
-			*) exit 1
+			*) exit 1 ;;
 		esac
 	done
 	

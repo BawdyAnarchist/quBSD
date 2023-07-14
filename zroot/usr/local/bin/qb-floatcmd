@@ -16,6 +16,7 @@ get_options(){
 			r) _USER="root" ; ROOT="-r" ;;
 			u) _USER="$OPTARG" ;;
 			x) PASS="true" ;;
+			*) exit 1 ;;
 		esac
 	done
 
