@@ -32,42 +32,11 @@ ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
 
-ERROR: [-e] can only be used with [-a|-A|-f <file>], because
-       the positional params are assumed to be jail starts.  
-ENDOFMSG
-	;;	
-	_e4) cat << ENDOFMSG
-
-ERROR: No jails to start. Please specify [-a|-A|-f <file>],
-       or < jail list > at the end of the command.
-ENDOFMSG
-	;;	
-	_e5) cat << ENDOFMSG
-
-ERROR: The file < $_SOURCE > doesn't exist.
-ENDOFMSG
-	;;	
-	_e6) cat << ENDOFMSG
-
-ERROR: [-e] should come with a < jail list > as positional 
-       parameters at the end of the command. 
-ENDOFMSG
-	;;	
-	_e7) cat << ENDOFMSG
-
-ERROR: The file < $_EXFILE > doesn't exist.
-ENDOFMSG
-	;;	
-	_e8) cat << ENDOFMSG
-
 ERROR: Infinite loop detected. There likely a set of jails has
       gateways that circularly reference each other. Example:
       Jail-A has Jail-B as gateway,
              Jail-B has Jail-C as gateway,
                     Jail-C has Jail-A as gateway.
-ENDOFMSG
-	;;	
-	_7) cat << ENDOFMSG
 ENDOFMSG
 	;;	
 	esac
@@ -101,8 +70,6 @@ qb-start [-h] [-a|-A|-f <file>] [-e|-E <file>] [-F] <jail list>
        but exlude any jails listed in <file>. 
    -h: (h)elp. Outputs this help message.
    -f: (f)ile. Use a file with a list of jails to start.
-   -F: (F)orce. Ignore checks for duplicate instances of 
-       qb-start in progress. Launch anyways.
 
 ENDOFUSAGE
 }

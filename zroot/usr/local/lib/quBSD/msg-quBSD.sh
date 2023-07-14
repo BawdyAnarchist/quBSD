@@ -261,6 +261,34 @@ ERROR: < $_value > needs a rootjail clone; however, there are
 
 ENDOFMSG
 	;;
+	_je1) cat << ENDOFMSG
+
+ERROR: No jails to start. Please specify [-a|-A|-f <file>],
+or < jail list > at the end of the command.
+ENDOFMSG
+	;;
+	_je2) cat << ENDOFMSG
+
+ERROR: [-e] can only be used with [-a|-A|-f <file>], because
+the positional params are assumed to be jail starts.  
+ENDOFMSG
+	;;
+	_je3) cat << ENDOFMSG
+
+ERROR: The file < $_SOURCE > doesn't exist.
+ENDOFMSG
+	;;
+	_je4) cat << ENDOFMSG
+
+ERROR: [-e] should come with a < jail list > as positional 
+parameters at the end of the command. 
+ENDOFMSG
+	;;
+	_je5) cat << ENDOFMSG
+
+ERROR: The file < $_EXFILE > doesn't exist.
+ENDOFMSG
+	;;
 	esac
 }
 

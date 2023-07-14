@@ -54,7 +54,7 @@ handle_restarts() {
 	if [ "$_RESTART" ] ; then
 	
 		# Give 30 secs for jails to stop, or error. Send empty file (nothing to rm after done).
-		monitor_startstop "60" '###_empty' || get_msg "_e9"
+		monitor_startstop "60" '###_empty' || get_msg "_e3"
 	
 		# Only qb-start should be used for parallel jail starts. 
 		qb-start "$_JLIST" &

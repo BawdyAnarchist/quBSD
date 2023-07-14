@@ -29,36 +29,8 @@ ERROR: Conflicting options. Either use [-E <file>], or use
        [-e] and type a list of exclusion jails as positional 
        parameters (aka, at the end of the command).
 ENDOFMSG
-	;;
+	;;	
 	_e3) cat << ENDOFMSG
-
-ERROR: [-e] can only be used with [-a|-A|-f <file>], because
-       the positional params are assumed to be jail stops.  
-ENDOFMSG
-	;;	
-	_e4) cat << ENDOFMSG
-
-ERROR: No jails to stop. Please specify [-a|-A|-f <file>],
-       or < jail list > at the end of the command.
-ENDOFMSG
-	;;	
-	_e5) cat << ENDOFMSG
-
-ERROR: The file < $_SOURCE > doesn't exist.
-ENDOFMSG
-	;;	
-	_e6) cat << ENDOFMSG
-
-ERROR: [-e] should come with a < jail list > as positional 
-       parameters at the end of the command. 
-ENDOFMSG
-	;;	
-	_e7) cat << ENDOFMSG
-
-ERROR: The file < $_EXFILE > doesn't exist.
-ENDOFMSG
-	;;	
-	_e8) cat << ENDOFMSG
 
 ERROR: One or more jails appear to be hung and havent stopped.
        Check /var/log/quBSD.sh for details, and check process

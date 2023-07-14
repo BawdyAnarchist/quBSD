@@ -11,6 +11,11 @@ get_msg_i3_launch() {
 ERROR: < $FILE > does not exist.
 ENDOFMSG
 	;;	
+
+	_2) cat << ENDOFMSG
+
+ERROR: [-t] Must be an integer greater than zero.
+ENDOFMSG
 	esac
 
 	case $_pass_cmd in 
@@ -34,6 +39,8 @@ Usage: qb-i3-launch [-h][-f <conf_file>][-s]
        window with the same jail/program in the workspace.
        Default behavior would skip, but you can (F)orce. 
    -s: (s)start jails; but do not launch programs.
+   -t: (t)timeout before giving up on waiting for jail
+       starts and exiting. Default 30sec. 
    
 If no options are given, default conf is fully run.
 

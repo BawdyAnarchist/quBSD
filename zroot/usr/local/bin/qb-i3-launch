@@ -9,9 +9,14 @@ get_options() {
 			f) FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
 			F) FORCE="true" ;;
 			h) get_msg_i3_launch "none" "usage_0" ;;
-			t) _TIMEOUT="${OPTARG}" ;;  
+         t) _TIMEOUT="${OPTARG}" ; _TIMEOUT=$(( _TIMEOUT * 2 )) > /dev/null 2>&1 \
+					|| get_msg_launch "_2" "usage_1"  ;;
 		esac
 	done
+
+   # Set timeout to default of 60 cycles (about 30 seconds)
+	_TIMEOUT="${_TIMEOUT:=60}"
+	[ "$_TIMEOUT" -gt 0 ] || get_msg_launch "_2" "usage_1"
 
 	shift $(( OPTIND - 1 ))
 }
@@ -47,15 +52,17 @@ qb_start_jails() {
 	grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}' | uniq > $JAILS
 
 	# Ensure that there's not already a startup operation in progress. (sends empty "" tmp $2).
-	! monitor_startstop "60" "" && echo "ERROR: Timeout on jail starts" | tee -a $QBLOG && exit 1
+	! monitor_startstop "$_TIMEOUT" "" \
+			&& echo "ERROR: qb-i3-launch: Timeout on jail starts" | tee -a $QBLOG && exit 1
 
 	# Turn on any jails not started
 	qb-start -f $JAILS > /dev/null 2>&1
 
-	# Ensure that there's not already a startup operation in progress. (sends empty "" tmp $2).
-	! monitor_startstop "60" "" && echo "ERROR: Timeout on jail starts" | tee -a $QBLOG && exit 1
+	# Monitor jail starts until either they finish, or timeout. 
+	! monitor_startstop "$_TIMEOUT" "" \
+			&& echo "ERROR: qb-i3-launch: Timeout on jail starts" | tee -a $QBLOG && exit 1
 
-	# Remove the temporary monitoring pop  
+	# Remove the temporary monitoring popup 
 	kill -15 $_pid_stat
 }
 
