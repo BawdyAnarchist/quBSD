@@ -29,28 +29,12 @@ security_flags() {
 
 	# exec.poststart is always sent to background. Don't report seclvl change 
 	# exit 0 necessary or it doesn't return to command line
-	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL" > /dev/null 2>&1 && exit 0
+	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL" > /dev/null 2>&1
 }
 
-remove_tmp_ip() {
-	# TMP_IP file might exist, if this jail was started via qb-start
-	_TMP_IP='/tmp/qb-start_temp_ip'
-
-	if [ -e "$_TMP_IP" ] ; then
-
-		# Remove the jail from the TMP file, and remove any blank lines
-		sed -i '' -E "/^[[:blank:]]*${JAIL}[[:blank:]]+/ d" $_TMP_IP
-		sed -i '' -E "/^[[:blank:]]*\$/ d" $_TMP_IP
-
-		# If the file is empty, then it's no longer needed. Remove it. 
-		[ -s "$_TMP_IP" ] || rm "$_TMP_IP"
-	fi
-}    
 
 get_global_variables
 
 get_options "$@"
 
 security_flags
-
-remove_tmp_ip
