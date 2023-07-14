@@ -163,8 +163,7 @@ classify_clients() {
 }
 
 start_jail_in_background() {
-	# Function can sent to background, but keeps qb-stop process alive, for monitoring purposes.
-
+	# Function can sent to background, but keeps qb-start process alive, for monitoring purposes.
 	local _jail="$1"
 	start_jail "$_jail" > /dev/null 2>&1
 }
