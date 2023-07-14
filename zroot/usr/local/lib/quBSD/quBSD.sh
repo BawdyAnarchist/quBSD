@@ -76,6 +76,7 @@
 ##############################  NETWORKING  FUNCTIONS  #############################
 # define_ipv4_convention - Necessary for implementing quBSD IPv4 conventions
 # discover_open_ipv4     - Finds an unused IP address from the internal network
+# assign_ipv4_auto       - Handles the ip auto assignments when starting jails
 
 #############################  END  OF  FUNCTION  LIST  ############################
 ####################################################################################
@@ -689,7 +690,7 @@ monitor_startstop() {
 	done
 
 	# Cleanup tmp file regardless
-	rm	"$_file" >> /dev/null 2>&1
+	[ "$_file" ] && rm "$_file" >> /dev/null 2>&1
 
 	return 1	
 }
@@ -1368,7 +1369,7 @@ discover_open_ipv4() {
 
 		# Compare against JMAP, and the IPs already in use, including the temp file.
 		if grep -q "$_ipv4" $JMAP || echo "$_USED_IPS" | grep -q "$_ipv4" \
-				|| grep -q "$_ipv4" "$_tmp_ip" ; then
+				|| grep -qs "$_ipv4" "$_tmp_ip" ; then
 
 			# Increment for next cycle
 			_cycle=$(( _cycle + 1 ))
