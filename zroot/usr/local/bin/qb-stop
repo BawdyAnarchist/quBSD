@@ -23,28 +23,116 @@ get_options() {
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
 
    # Absolutely do not run if another instance of qb-start or qb-stop is already running
-	monitor_startstop "1" "" || get_msg_stop "_e0" "exit_1" 
+	monitor_startstop "1" || get_msg_stop "_e0" "exit_1" 
 }
 
-remove_jails() {
-	# To make this func time-efficient, some creative license is required. 
-	for _jail in $_JLIST ; do
+climb_hierarchy() {
+	# Prevent infinite loop. Unlikely to be 50 gateways; more likely circular reference.
+	[ "$_depth" -gt 50 ] && get_msg_stop "_e3" "exit_1"
+	_depth=$(( _depth + 1 ))
 
-		# Check if jail has network clients (implies a common epair)
-		if get_info _CLIENTS $_jail ; then 
+	local _jail="$1"
+	local _gateway=$(get_jail_parameter -deqs GATEWAY "$_jail")
+	local _class_of_gateway=$(get_jail_parameter -deqs CLASS "$_gateway")
 
-			# Will error if epair -vnet both jails simultaneously. Wait for completion
-			stop_jail_in_background "$_jail" > /dev/null 2>&1
+	if echo "$_CLIMBED" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" ; then
+		# _jail gateway path was already handled. Skip further checks.
+		return 0
+
+	# Neither invalid jails nor VMs should be included. _isVM is global var from chk_valid_jail
+	# Return conditions (no inclusion): jail invalid ; isVM ; already stopped 
+	elif ! chk_valid_jail $_jail || ! chk_isrunning "$_jail" || [ "$_isVM" = "true" ] ; then
+		return 0
+
+	# _jail is an endpoint. Either has no network, or is top of hierarchy. 
+	elif [ "$_gateway" = "none" ] || [ "$_class_of_gateway" = "VM" ] ; then
+
+		if get_info _CLIENTS $_jail ; then
+			# Has clients that need to wait for _jail to stop. 
+			_HIERTOP=$(printf "%b" "${_jail}\n${_HIERTOP}" | uniq) 
+
 		else
-			# Stop jail and send process to background (for time-efficiency).
+			# _jail has no networking. Can stop immediately in the background 
 			stop_jail_in_background "$_jail" > /dev/null 2>&1 &
+
+			# It can also be removed from the FULLIST, as it's unimportant 
+			_FULLIST=$(echo "$_FULLIST" | grep -Ev "^[[:blank:]]*${_jail}[[:blank:]]*\$")	
+		fi
+		
+		# Add _jail to the list of jails already climbed and checked.
+		_CLIMBED=$(printf "%b" "${_jail}\n${_CLIMBED}") 
+
+	# _jail depends on a gateway being stopped ahead of it.
+	else
+		# Make sure _jail is included in FULLIST. (some gateways might not have been on JLIST).
+		echo "$_FULLIST" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" \
+				|| _FULLIST=$(printf "%b" "${_FULLIST}\n${_jail}")
+
+		# Add _jail to the list of jails already climbed and checked.
+		_CLIMBED=$(printf "%b" "${_jail}\n${_CLIMBED}") 
+	
+		# Will continue recursively until hierarchy top is reached	
+		climb_hierarchy "$_gateway"
+	fi	
+}
+
+begin_waterfall() {
+
+	local _gateways="$1"
+	for _gw in $_gateways ; do
+
+		# Wait for _gw to stop before proceeding (and make sure is not VM). 
+		# isVM note: This is archaic and hacky for temp VM integration hold.
+		# This should be removed later.
+		if stop_jail "$_gw" > /dev/null 2>&1 && [ -z "$_isVM" ] ; then
+
+			# Determine which clients are endpoints, and which serve clients in turn
+			classify_clients "$_gw"
+
+			# Stop each endpoint
+			if [ -n "$_ENDPOINTS" ] ; then
+
+				for _jail in $_ENDPOINTS ; do
+
+					# Maintain a small stagger between parallel stops. Helps prevent conflicts
+					sleep .2
+
+					# Create a lock file,	
+					stop_jail_in_background "$_jail" & 
+				done
+			fi
+
+			# Subgateways need their own waterfall
+			[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS" 
+		fi
+	done
+}
+
+classify_clients() {
+	# Secondary clients of the jail that was just stopped
+	local _jail="$1"  ;  local _client
+
+	# Must clear these values so they return only relevant jails
+	_SUBGATEWAYS='' ; _ENDPOINTS=''
+
+	for _client in $(get_info -e _CLIENTS $_jail); do
+
+		# Must ensure that the jail is part of the FULLIST 
+		if echo "$_FULLIST" | grep -q "$_client" ; then 
+
+			if get_info _CLIENTS "$_client" ; then
+				# Lis of jails with clients
+				_SUBGATEWAYS="$_SUBGATEWAYS $_client"
+			else	
+				# Endpoints can be parallel/background stopped.
+				_ENDPOINTS="$_ENDPOINTS $_client"
+			fi
 		fi
 	done
 }
 
 stop_jail_in_background() {
 	# Function can sent to background, but keeps qb-stop process alive, for monitoring purposes.
-
 	local _jail="$1"
 	stop_jail "$_jail" > /dev/null 2>&1
 }
@@ -53,8 +141,8 @@ handle_restarts() {
 
 	if [ "$_RESTART" ] ; then
 	
-		# Give 30 secs for jails to stop, or error. Send empty file (nothing to rm after done).
-		monitor_startstop "60" '###_empty' || get_msg "_e3"
+		# Give 15 secs for jails to stop, or error. Send empty file.
+		monitor_startstop "30" || get_msg "_e3"
 	
 		# Only qb-start should be used for parallel jail starts. 
 		qb-start "$_JLIST" &
@@ -62,13 +150,38 @@ handle_restarts() {
 	fi	
 }
 
+main() {
+
+	compile_jlist
+
+	# For each jail, find the hierarchy top (gateway of its gateway of its gateway ...) 
+	for _jlist in $_JLIST ; do
+
+		# Function is recursive, so _depth tracks # of cycles to prevent infinite loop. 
+		_depth=1
+
+		# Adds all jails in the gateway path to FULLIST.
+		climb_hierarchy "$_jlist"
+	done
+
+	# If the _FULLIST is empty, there's nothing to do. 
+	[ -z "$_FULLIST" ] && exit 0 
+
+	# Stop the hierarchy tops, then their clients, until all of FULLIST is stopped.
+	for _jail in $_HIERTOP; do
+
+		# Each hierarchy top is independent of each other, and can be stopped in parallel. 
+		begin_waterfall $_jail &
+	done
+
+	handle_restarts &
+
+}
+
 get_global_variables
 
 get_options "$@"
 
-compile_jlist
+main
 
-remove_jails
-
-handle_restarts &
 
