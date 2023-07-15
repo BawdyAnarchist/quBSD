@@ -47,19 +47,31 @@ connect_to_gateway() {
 }
 
 connect_to_clients() {
-	# If <jail> serves a network connection, bring those connections up 
-	for _client in $(get_info -e _CLIENTS "$JAIL") ; do
 
-		if chk_isrunning "$_client" ; then
+	# Get IP of client from jmap 
+	_cIP=$(get_jail_parameter -deq IPV4 "$_client") 
 
-			# Get IP of client from jmap 
-			_cIP=$(get_jail_parameter -deq IPV4 "$_client") 
+	# Assign auto IP to client and connect it to jail.
+	[ "$_cIP" = "auto" ] && _cIP=$(assign_ipv4_auto -e "$_client")
+	connect_client_gateway "$_client" "$JAIL" "$_cIP" 
 
-			# Assign auto IP to client and connect it to jail.
-			[ "$_cIP" = "auto" ] && _cIP=$(assign_ipv4_auto -e "$_client")
-			connect_client_gateway "$_client" "$JAIL" "$_cIP" 
-		fi
-	done
+	# Need to modify the client pf.conf with the epair
+	_cPF="${M_ZUSR}/${_client}/${PFCONF}"
+
+	if [ -e "$_cPF" ] ; then 
+		# Make sure flags are down
+		chflags -R noschg "${M_ZUSR}/${_client}/rw/etc" 
+
+		# $VIF was assigned during the connect_client_gateway func. Modify pf.conf 
+		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${VIF}\"@" $_cPF
+		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${_cIP}\"@"  $_cPF
+
+		# Restart _client pf service
+		jexec -l -U root "$_client" service pf restart > /dev/null 2>&1
+
+		# Reapply jail flags from jmap 
+		qb-flags -r $_client > /dev/null 2>&1 &
+	fi
 }
 
 modify_pf() {
@@ -71,7 +83,7 @@ modify_pf() {
 		chflags -R noschg "${M_ZUSR}/${JAIL}/rw/etc" 
 
 		# $VIF was assigned during the connect_client_gateway func. Modify pf.conf 
-		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${VIF}\"@" $JPF    >> $QBLOG 
+		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${VIF}\"@" $JPF
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${IPV4}\"@" $JPF
 
 		# net-jail internal wireguard parameters
@@ -98,7 +110,11 @@ main() {
 
 	modify_pf			
 
-	connect_to_clients
+	# If <jail> serves a network connection, bring those connections up 
+	for _client in $(get_info -e _CLIENTS "$JAIL") ; do
+
+		chk_isrunning "$_client" && connect_to_clients
+	done
 
 	resource_control
 }
