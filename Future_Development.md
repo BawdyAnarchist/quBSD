@@ -1,6 +1,8 @@
 ### BEST PRACTICES / FIXES 
 
-qb-disp with -Z option for cloning root dataset as well? 
+could be a way at boot or i3 launch to reclone all jails?
+
+qb-disp with -Z option for cloning root dataset as well 
 
 pf.conf
 	- wgIP constant really should be called "endpointIP" or something like that
