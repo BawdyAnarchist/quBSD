@@ -1,7 +1,5 @@
 ### BEST PRACTICES / FIXES 
 
-thres an error with qb-stop -A
-
 Why is 10.1.8.2/30 always skipped? Do some logging, find out why.
 
 could be a way at boot or i3 launch to reclone all jails?
