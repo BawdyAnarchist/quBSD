@@ -305,7 +305,7 @@ compile_jlist() {
 
 		all)	
 			# ALL jails from jailmap, except commented lines
-			_JLIST=$(awk '{print $1}' $JMAP | sed "/^#/d" | uniq)
+			_JLIST=$(awk '{print $1}' $JMAP | uniq | sed "/^#/d")
 		;;
 	
 		?*)
@@ -802,7 +802,7 @@ chk_valid_jail() {
 
 	# Must have class in JMAP. Used later to find the correct zfs dataset
 	_class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
-	chk_valid_class $_class || return 1
+	chk_valid_class $_qv $_class || return 1
 
 	case $_class in
 		VM)
