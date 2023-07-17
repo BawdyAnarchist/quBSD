@@ -122,18 +122,6 @@ assemble_interface_list() {
 	_gateway_pairs=$(echo "$_ALL_INTF" | grep -Ev "^$JAIL" | grep -E "$_jail_eps")	
 }
 
-configure_connection() {
-	# Start gateway if it's off
-	chk_isrunning "$GATEWAY" || start_jail "$GATEWAY" || exit 1
-	
-	# Make the connection beteween jails
-	connect_client_gateway "$JAIL" "$GATEWAY" "$IPV4"
-
-	# Temporarily modify running pf tables
-	[ -n "$_pfG" ] && jexec -l -U root $GATEWAY pfctl -t pass_ips -T add $IPV4
-	[ -n "$_pfJ" ] && jexec -l -U root $JAIL    pfctl -t pass_ips -T add $IPV4
-}
-
 destroy_epairs() {
 	if [ -z "$GATEWAY" ] ; then
 		# If no gateway, destroy all epairs on JAIL
@@ -143,9 +131,9 @@ destroy_epairs() {
 		_destr_epairs=$(echo "$_gateway_pairs" | grep -E "^${GATEWAY}[[:blank:]]+epair" \
 														| awk '{print $2}')
 	fi
-
-	echo "${_destr_epairs%?}b" | xargs -I@ ifconfig @ -vnet $JAIL
-	echo "${_destr_epairs%?}b" | xargs -I@ ifconfig @ destroy 
+	
+	ifconfig $_destr_epairs -vnet $GATEWAY
+	ifconfig $_destr_epairs destroy 
 }
 
 list_output() {
@@ -167,7 +155,11 @@ list_output() {
 main() {
 	case $_CMD in 
 		create)
-				configure_connection
+				# Start gateway if it's off
+				chk_isrunning "$GATEWAY" || start_jail "$GATEWAY" || exit 1
+	
+				# Make the connection beteween jails
+				connect_client_gateway "$JAIL" "$GATEWAY" "$IPV4"
 		;;
 		destroy)
 				assemble_interface_list	
