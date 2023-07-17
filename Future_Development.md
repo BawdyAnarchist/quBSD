@@ -1,25 +1,24 @@
 ### BEST PRACTICES / FIXES 
 
+thres an error with qb-stop -A
+
+Why is 10.1.8.2/30 always skipped? Do some logging, find out why.
+
 could be a way at boot or i3 launch to reclone all jails?
 
 qb-disp with -Z option for cloning root dataset as well 
 
-pf.conf
-	- wgIP constant really should be called "endpointIP" or something like that
-
-qb-create 
-	- GUIDED MODE needs to be completely redone.
-	- Add the new jail to the i3gen.conf and execute keybindings
-	- NEXT IN LINE
-
 qb-connect
-	- could figure out what about stupid pf is preventing network connection for adhoc connected jails 
+	- could figure out what about pf is preventing network connection for adhoc connected jails 
 
 devfs.rules
 	- The rulenames should include "qubsd" so as not to have a chance of overlapping other rules
 	- Maybe the file should be added to the get_global_variables assignments library
 
 Cycle all scripts through shellcheck again. 
+
+qb-create 
+	- GUIDED MODE needs to be completely redone.
 
 /usr/local/share/quBSD 
 	- Needs updated in general after you're done
@@ -30,13 +29,6 @@ Cycle all scripts through shellcheck again.
 
 jail -r 
 	- <net-jail> is causing an "Operation not permitted" error
-
-chflags operations on multistarts
-   - they sure seem to persist for an awfully long time, consuming an entire CPU. Like for a minute
-	- There's probably something wrong there. Probably to do with parallel starts, yet again
-
-Why is 10.1.8.2/30 always skipped? Do some logging, find out why.
-  
 
 ### MINOR UPGRADES
 
