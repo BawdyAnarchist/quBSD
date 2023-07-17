@@ -74,20 +74,17 @@ ENDOFMSG
 
 usage() { cat << ENDOFUSAGE
 qb-connect: Create adhoc network connection between two jails.
-            Attempts to auto configure as much as possible. 
 
-Usage: qb-connect [-i <IP>] [-c|-d] <target-jail> <gateway-jail>
+Usage: qb-connect [-i <IP>] [-c|-d] <client-jail> <gateway-jail>
        qb-connect [-l] <target-jail>
 
-   -c: (c)create new connection between <target > and < gateway >
-       IP address is auto-assigned unless [-i] is selected.
+   -c: (c)create new connection between <client> and <gateway>.
+       IP=auto unless [-i]. Default route set only for client. 
    -d: (d)estroy all epairs for < target >. If < gateway > jail 
        is specified, only epairs common to both are destroyed. 
    -h: (h)elp. Outputs this help message
-   -i: (i)p. Override auto IP assignment. Must be valid IPv4 in 
-       CIDR notation. Include the subnet:  IP.IP.IP.IP/subnet
-   -l: (l)ist all interfaces and IPs for all running jails. If
-       <jail> is specified, only those interfaces are listed.
+   -i: (i)p. Override auto IP assignment. Must be CIDR notation. 
+   -l: (l)ist epairs/IPs of <jail> if specified; otherwise, all. 
 
 ENDOFUSAGE
 }
