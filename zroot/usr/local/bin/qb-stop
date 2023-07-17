@@ -27,6 +27,7 @@ get_options() {
 }
 
 climb_hierarchy() {
+
 	# Prevent infinite loop. Unlikely to be 50 gateways; more likely circular reference.
 	[ "$_depth" -gt 50 ] && get_msg_stop "_e3" "exit_1"
 	_depth=$(( _depth + 1 ))
@@ -41,7 +42,7 @@ climb_hierarchy() {
 
 	# Neither invalid jails nor VMs should be included. _isVM is global var from chk_valid_jail
 	# Return conditions (no inclusion): jail invalid ; isVM ; already stopped 
-	elif ! chk_valid_jail $_jail || ! chk_isrunning "$_jail" || [ "$_isVM" = "true" ] ; then
+	elif ! chk_valid_jail -q $_jail || ! chk_isrunning "$_jail" || [ "$_isVM" = "true" ] ; then
 		return 0
 
 	# _jail is an endpoint. Either has no network, or is top of hierarchy. 
