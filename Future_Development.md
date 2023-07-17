@@ -1,12 +1,5 @@
 ### BEST PRACTICES / FIXES 
 
-qb-connect
-	- could figure out what about pf is preventing network connection for adhoc connected jails 
-
-devfs.rules
-	- The rulenames should include "qubsd" so as not to have a chance of overlapping other rules
-	- Maybe the file should be added to the get_global_variables assignments library
-
 Cycle all scripts through shellcheck again. 
 
 /usr/local/share/quBSD 
@@ -79,6 +72,7 @@ qubsd_installer
 	- devfs.rules
 		- add qubsd to the naming convention
 		- the new one for webcam
+		- Maybe the file should be added to the get_global_variables assignments library
 
 ### VIRTUAL MACHINE INTEGRATION
 ## Notes - the way to do this, is put bhyve VMs in jails.
@@ -130,8 +124,11 @@ net-firewall
 
 
 ### MINOR UPGRADES IF ANYONE ELSE OUT THERE WANTS TO DO IT
+
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
+
 qb-update - Update rootjails, create snapshots
+
 Crons - I have no crons running. This is probably something long term security that should be integrated and automated.
 man pages
 
