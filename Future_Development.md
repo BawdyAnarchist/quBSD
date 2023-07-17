@@ -1,10 +1,8 @@
 ### BEST PRACTICES / FIXES 
 
-Why is 10.1.8.2/30 always skipped? Do some logging, find out why.
+10.1.8.2/30 is always skipped due to the '.' being wildcard. Maybe needs improved.
 
 could be a way at boot or i3 launch to reclone all jails?
-
-qb-disp with -Z option for cloning root dataset as well 
 
 qb-connect
 	- could figure out what about pf is preventing network connection for adhoc connected jails 
@@ -15,15 +13,10 @@ devfs.rules
 
 Cycle all scripts through shellcheck again. 
 
-qb-create 
-	- GUIDED MODE needs to be completely redone.
-
 /usr/local/share/quBSD 
 	- Needs updated in general after you're done
 	- Needs to document that the rootjails must stay lowered schg
 	- Update the guides regarding #defaults in jailmap.
-
-### TROUBLE NOTES (uncertain, things to monitor)
 
 jail -r 
 	- <net-jail> is causing an "Operation not permitted" error
@@ -33,7 +26,13 @@ jail -r
 qme-firefox needs fixed (personal note)
 
 qb-list - [-e] (evaluate) option to check jail-param combos for validity.
+
+qb-disp with -Z option for cloning root dataset as well 
 	 
+qb-create 
+	- GUIDED MODE needs to be completely redone.
+
+
 ### UPGRADES
 
 pwd
