@@ -299,7 +299,7 @@ Usage: qb-create [-e|-h|-G] [-a <true|false>] [-c <class>] [-C <cpuset>]
                  [-g <gateway>] [-i <IPv4>] [-m <maxmem>] [-M <MTU>]
                  [-n <true|false>] [-r <rootjail>] [-s <all|sys|none>]
                  [-S <-1|0|1|2|3>] [-t <template>] 
-                 [-z <dupl|clone|sys|none|empty>] [-Z] <newjail>
+                 [-z <dupl|none|empty>] [-Z] <newjail>
 
    -e: (e)examples. Print examples of how to use qb-create
    -h: (h)elp: Shows this message
