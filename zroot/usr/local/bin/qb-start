@@ -1,14 +1,11 @@
 #!/bin/sh
 
-### NOTES ###
-
-# Attempting to start multiple jails in parallel comes with many problems.
-	# Gateway dependencies cause multiple attempted starts of that gateway, locking the system
-	# auto IP assignments can be overlapping unless managed ahead of time (before jail starts)
+# Starting multiple jails in parallel comes with problems.
+	# Gateway dependencies can cause overlapping starts of the gateway, locking the system
+	# auto IP assignments will likely be overlapping unless managed ahead of time 
 	# Epair confusion when gateway and client are started simultaneously. 
 
-# This script resolves gateway dependencies and networking parameters. 
-# It starts jails in serial when necessary, and in parallel where possible.
+# This script deconflicts these, starting jails in serial when necessary, parallel if possible 
 
 
 . /usr/local/lib/quBSD/quBSD.sh
@@ -43,6 +40,25 @@ checks() {
 
 	# Set up new _TMP_IP	
 	mktemp "$_TMP_IP"	> /dev/null 2>&1
+}
+
+reclone_stale_zroots() {
+
+	# Pull the list of zroot datasets
+	_datasets=$(zfs list -rHo name,origin ${JAILS_ZFS} | grep -Ev "[[:blank:]]+\-" \
+					| awk '{print $1}' | sed -E "s#${JAILS_ZFS}/##g")
+
+	# Check all of them one by one
+	for _jail in $_datasets ; do
+
+		# Only reclone the dataset if it's not already on the _JLIST to be started
+		if ! echo "$_JLIST" | grep -Eq "$_jail" ; then
+			
+			# The reclone function needs the rootjail name, not the dataset
+			_rootzfs=$(zfs list -rHo origin zroot/quBSD/jails/${_jail} | sed "s/@.*//g")
+			reclone_zroot "${_jail}" "${_rootzfs##*/}"
+		fi
+	done
 }
 
 climb_hierarchy() {
@@ -174,6 +190,9 @@ main() {
 
 	# Assemble the list of jails tagged for start. 
 	compile_jlist
+
+	# Reclone stale zroot datasets occasionally. Assume that all jails off, is a larger reset
+	[ -z "$(get_info -e _ONJAILS)" ] && reclone_stale_zroots
 
 	# For each jail, find the hierarchy top (gateway of its gateway of its gateway ...) 
 	for _jlist in $_JLIST ; do
