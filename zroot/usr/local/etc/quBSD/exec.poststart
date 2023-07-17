@@ -13,28 +13,28 @@ security_flags() {
 	
 	# Different directories are schg flagged depending on user settings
 	case $SCHG in
-		all)  _jdir="/bin /sbin /boot /etc /home /lib /libexec /root /rw /usr"
+		all)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw /usr"
 		;;
-		sys)  _jdir="/boot /rw /bin /sbin /etc /lib /libexec /usr/bin /usr/sbin \
-					/usr/lib /usr/libexec /usr/libdata /usr/lib32 /usr/local/bin \
-               /usr/local/etc /usr/local/lib /usr/local/libdata /usr/local/libexec \
-					/usr/local/man /usr/local/openssl /usr/local/sbin /usr/local/share"
+		sys)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw \
+						/usr/bin /usr/lib /usr/lib32 /usr/libdata /usr/libexec /usr/sbin \
+						/usr/local/bin /usr/local/lib /usr/local/lib32 /usr/local/libdata \
+						/usr/local/libexec /usr/local/sbin"
 		;;
 	esac
 
 	for _d in $_jdir; do
+
 		[ -e "${M_JAILS}/${JAIL}${_d}" ] \
 				&& chflags -R schg "${M_JAILS}/${JAIL}${_d}" > /dev/null 2>&1
 	done 
 
 	# exec.poststart is always sent to background. Don't report seclvl change 
-	# exit 0 necessary or it doesn't return to command line
 	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL" > /dev/null 2>&1
 }
-
 
 get_global_variables
 
 get_options "$@"
 
 security_flags
+
