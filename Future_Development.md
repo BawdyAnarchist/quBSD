@@ -1,7 +1,5 @@
 ### BEST PRACTICES / FIXES 
 
-10.1.8.2/30 is always skipped due to the '.' being wildcard. Maybe needs improved.
-
 could be a way at boot or i3 launch to reclone all jails?
 
 qb-connect
