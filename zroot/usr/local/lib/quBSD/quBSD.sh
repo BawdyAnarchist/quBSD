@@ -240,7 +240,7 @@ get_info() {
 		;;
 		_ONJAILS)
 			# Prints a list of all jails that are currently running
-			_value=$(jls | awk '{print $2}' | tail -n +2)
+			_value=$(jls | sed "1 d" | awk '{print $2}') 
 		;;
 		_TAP)
 			# If <jail> has VM gateway, the tap interface is returned. Else return 1.
@@ -1351,7 +1351,7 @@ discover_open_ipv4() {
 	local _jail="$1"
 	local _ipv4
 	local _tmp_ip="/tmp/qb-start_temp_ip"
-		
+
 	# net-firewall connects to external network. Assign DHCP, and skip checks.
 	[ "$_jail" = "net-firewall" ] && echo "DHCP" && return 0
 
