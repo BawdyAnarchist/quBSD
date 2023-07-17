@@ -1368,8 +1368,8 @@ discover_open_ipv4() {
 		eval "_ipv4=${_ip0}.${_ip1}.\${$_ip2}.${_ip3}"
 
 		# Compare against JMAP, and the IPs already in use, including the temp file.
-		if grep -q "$_ipv4" $JMAP || echo "$_USED_IPS" | grep -q "$_ipv4" \
-				|| grep -qs "$_ipv4" "$_tmp_ip" ; then
+		if grep -Fq "$_ipv4" $JMAP || echo "$_USED_IPS" | grep -Fq "$_ipv4" \
+				|| grep -Fqs "$_ipv4" "$_tmp_ip" ; then
 
 			# Increment for next cycle
 			_cycle=$(( _cycle + 1 ))
