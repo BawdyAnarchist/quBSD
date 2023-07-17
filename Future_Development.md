@@ -1,7 +1,5 @@
 ### BEST PRACTICES / FIXES 
 
-could be a way at boot or i3 launch to reclone all jails?
-
 qb-connect
 	- could figure out what about pf is preventing network connection for adhoc connected jails 
 
@@ -17,7 +15,7 @@ Cycle all scripts through shellcheck again.
 	- Update the guides regarding #defaults in jailmap.
 
 jail -r 
-	- <net-jail> is causing an "Operation not permitted" error
+	- <net-jails> are getting an "Operation not permitted" error, I think on wg attempted changing of resolv.conf
 
 ### MINOR UPGRADES
 
