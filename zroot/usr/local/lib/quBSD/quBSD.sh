@@ -682,6 +682,7 @@ monitor_startstop() {
 		then
 			# The tmp file used for IP tracking can be discarded. 
 			[ "$_file" ] && rm "$_file" >> /dev/null 2>&1
+			get_msg "_jo2" "$0"
 			return 0
 		fi
 		
@@ -692,6 +693,8 @@ monitor_startstop() {
 	# Cleanup tmp file regardless
 	[ "$_file" ] && rm "$_file" >> /dev/null 2>&1
 
+	# Send error message that gave up waiting, return error
+	get_msg "_jo3" "$0"
 	return 1	
 }
 
@@ -924,7 +927,7 @@ chk_valid_cpuset() {
 	_validcpuset=$(cpuset -g | sed "s/pid -1 mask: //" | sed "s/pid -1 domain.*//")
 
 	# Test for negative numbers and dashes in the wrong place
-	echo "$_value" | grep -Eq "(,-|,[[:blank:]]*-|^[^[:digit:]])" \
+	echo "$_value" | grep -Eq "(,,+|--+|,-|-,|,[[:blank:]]*-|^[^[:digit:]])" \
 			&& get_msg $_q "_cj2" "$_value" "CPUSET" && return 1
 
 	# Remove `-' and `,' to check that all numbers are valid CPU numbers
@@ -1257,12 +1260,8 @@ chk_valid_template() {
 
 	# Positional parmeters.
 	local _value="$1"
-	local _jail="$2"
-	local _class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
 
-	[ "$_class" = "dispjail" ] &&
-
-	! chk_valid_jail $_qt "$_value" && get_msg $_qt "_cj6" "$_value" "TEMPLATE" && return 1
+	! chk_valid_jail $_qt "$_value" && return 1
 
 	return 0
 }
