@@ -682,7 +682,9 @@ monitor_startstop() {
 		then
 			# The tmp file used for IP tracking can be discarded. 
 			[ "$_file" ] && rm "$_file" >> /dev/null 2>&1
-			get_msg "_jo2" "$0"
+
+			# Long timeout means it's at the end of the script (rather than beginning).
+			[ "$_timeout" -gt 10 ] && get_msg "_jo2" "$0"
 			return 0
 		fi
 		
