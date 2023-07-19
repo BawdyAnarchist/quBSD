@@ -1,5 +1,9 @@
 ### BEST PRACTICES / FIXES 
 
+exec.poststart - 
+	for schg on selected files, you should scan zusr/usr/directories and remove them from the schg list
+	schg all still needs reviewed as it probably locks the system with /usr
+
 Cycle all scripts through shellcheck again. 
 
 /usr/local/share/quBSD 
@@ -14,13 +18,8 @@ jail -r
 
 qme-firefox needs fixed (personal note)
 
-qb-list - [-e] (evaluate) option to check jail-param combos for validity.
-
 qb-disp with -Z option for cloning root dataset as well 
 	 
-qb-create 
-	- GUIDED MODE needs to be completely redone.
-
 
 ### UPGRADES
 
@@ -136,4 +135,6 @@ Intelligent resizing of fonts depending on dpi or xrandr resolution
 
 ntpd
 	- ntpd only runs during qb-hostnet. Needs a more "correct" solution.
+
+qb-list - [-e] (evaluate) option to check jail-param combos for validity.
 
