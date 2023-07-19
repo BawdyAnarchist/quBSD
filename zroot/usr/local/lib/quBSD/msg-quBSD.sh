@@ -261,6 +261,16 @@ ERROR: < $_value > needs a rootjail clone; however, there are
 
 ENDOFMSG
 	;;
+	_jo2) cat << ENDOFMSG
+${_value##*/}: All jails have ${_value#*qb-}ed
+
+ENDOFMSG
+	;;
+	_jo3) cat << ENDOFMSG
+ERROR: ${_value##*/qb-} timeout. Gave up waiting for jails to ${_value#*qb-}
+
+ENDOFMSG
+	;;
 	_je1) cat << ENDOFMSG
 
 ERROR: No jails to start. Please specify [-a|-A|-f <file>],
