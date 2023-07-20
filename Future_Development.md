@@ -1,21 +1,10 @@
-### BEST PRACTICES / FIXES 
-
-Cycle all scripts through shellcheck again. 
-
-/usr/local/share/quBSD 
-	- Needs updated in general after you're done
-	- Needs to document that the rootjails must stay lowered schg
-	- Update the guides regarding #defaults in jailmap.
-
-jail -r 
-	- <net-jails> are getting an "Operation not permitted" error, I think on wg attempted changing of resolv.conf
-
-### MINOR UPGRADES
-
-qme-firefox needs fixed (personal note)
-
-
 ### UPGRADES
+
+usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
+
+ZFS Encrypted Jails
+
+Tor and I2P Jails
 
 qb-disp
 	- Implement ephemeral jails, which clone the zroot dataset as well 
@@ -26,12 +15,6 @@ qb-disp
 pwd
 	- I think the right way to do this, is export any existing pwd db in /rw, and import it into the created jail (or maybe vice versa) 
 	- Right now I'm not so confident on how that's working
-
-usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
-
-ZFS Encrypted Jails
-
-Tor and I2P Jails
 
 Host as Unprivileged user     
 	- All jails will have an epair to an offline *Control Jail*      
@@ -122,11 +105,37 @@ net-firewall
 		  because people making servers might not want an auto setting
 
 
+### BEST PRACTICES / FIXES / CLEANUP
+
+Cycle all scripts through shellcheck again. 
+
+/usr/local/share/quBSD 
+	- Needs updated in general after you're done
+	- Needs to document that the rootjails must stay lowered schg
+	- Update the guides regarding #defaults in jailmap.
+
+jail -r 
+	- <net-jails> are getting an "Operation not permitted" error, I think on wg attempted changing of resolv.conf
+
+quBSD.sh and msg-qubsd.sh
+	- Error messages feel a bit disorganized now.
+		- Rework the name/numbering scheme.
+		- Review if there are extra/excess. Trim them
+		- Sometimes errors seem too specific and not general enough.
+			Example - instead of "jail invalid" often we get a generic: "needs a class" 
+		
+	- There might be some consideration to further generalization of functions
+		- Passing through the -q [quiet] -s [skipchecks] and even a new [-f force] 
+			This enables easier to implement features (like with ephemeral jails that use appjail clones as rootjails
+
+
 ### MINOR UPGRADES IF ANYONE ELSE OUT THERE WANTS TO DO IT
 
-qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
-
 qb-update - Update rootjails, create snapshots
+
+qb-list - [-e] (evaluate) option to check jail-param combos for validity.
+
+qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 
 Crons - I have no crons running. This is probably something long term security that should be integrated and automated.
 man pages
@@ -136,5 +145,4 @@ Intelligent resizing of fonts depending on dpi or xrandr resolution
 ntpd
 	- ntpd only runs during qb-hostnet. Needs a more "correct" solution.
 
-qb-list - [-e] (evaluate) option to check jail-param combos for validity.
-
+qme-firefox needs fixed (personal note)
