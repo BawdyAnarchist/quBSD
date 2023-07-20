@@ -37,6 +37,11 @@ ERROR: One or more jails appear to be hung and havent stopped.
        list to manually kill all jail stop operations.
 ENDOFMSG
 	;;	
+	_m1) cat << ENDOFMSG
+
+ALERT: Waiting for all jails to stop. Timeout after 15 seconds.
+ENDOFMSG
+	;;
 	esac
 
 	case $_pass_cmd in 

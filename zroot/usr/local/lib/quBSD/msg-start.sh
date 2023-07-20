@@ -39,6 +39,10 @@ ERROR: Infinite loop detected. There likely a set of jails has
                     Jail-C has Jail-A as gateway.
 ENDOFMSG
 	;;	
+	_m1) cat << ENDOFMSG
+Jail(s) were already running
+ENDOFMSG
+	;;
 	esac
 
 	case $_pass_cmd in 

@@ -139,7 +139,10 @@ stop_jail_in_background() {
 handle_restarts() {
 
 	if [ "$_RESTART" ] ; then
-	
+
+		# Alert that waiting for jails to stop
+		get_msg_stop "_m1" 	
+
 		# Give 15 secs for jails to stop, or error. Send empty file.
 		monitor_startstop "30" || get_msg "_e3"
 	
@@ -180,4 +183,8 @@ get_options "$@"
 
 main
 
+# Give 30 secs for jails to stop, or error. Send empty file.
+monitor_startstop "60" || get_msg "_e3"
 
+exit 0
+	

@@ -692,7 +692,7 @@ monitor_startstop() {
 		sleep .5
 	done
 
-	# Cleanup tmp file regardless
+	# Cleanup tmp file, regardless
 	[ "$_file" ] && rm "$_file" >> /dev/null 2>&1
 
 	# Send error message that gave up waiting, return error

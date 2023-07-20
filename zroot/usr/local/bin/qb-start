@@ -93,9 +93,7 @@ climb_hierarchy() {
 		else
 			# _jail has no networking. Can start immediately in the background 
 			start_jail_in_background "$_jail" > /dev/null 2>&1 &
-
-			# It can also be removed from the FULLIST, as it's unimportant 
-			_FULLIST=$(echo "$_FULLIST" | grep -Ev "^[[:blank:]]*${_jail}[[:blank:]]*\$")	
+			# Note, jails stays on full list, for end of script messaging
 		fi
 		
 		# Add _jail to the list of jails already climbed and checked.
@@ -205,7 +203,7 @@ main() {
 	done
 
 	# If the _FULLIST is empty, there's nothing to do. Remove TMP and exit.
-	[ -z "$_FULLIST" ] && rm "$_TMP_IP" && exit 0 
+	[ -z "$_FULLIST" ] && rm "$_TMP_IP" && get_msg_start "_m1" && exit 0 
 
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
 	determine_ips
