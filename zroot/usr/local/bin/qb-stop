@@ -173,7 +173,7 @@ main() {
 		begin_waterfall $_jail &
 	done
 
-	handle_restarts &
+	handle_restarts
 
 }
 
