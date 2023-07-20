@@ -677,6 +677,7 @@ monitor_startstop() {
 	_timeout="${_timeout:="1"}"
 
 	while [ "$_cycle" -lt "$_timeout" ] ; do
+		# -Note- this only works because csh doesnt include self (or caller?) process in output
 		if ! pgrep -fl '/bin/sh /usr/local/bin/qb-start' > /dev/null 2>&1 \
 			 && ! pgrep -fl '/bin/sh /usr/local/bin/qb-stop' > /dev/null 2>&1
 		then
