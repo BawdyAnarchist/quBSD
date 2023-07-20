@@ -81,25 +81,16 @@ climb_hierarchy() {
 	# _jail is an endpoint. Either has no network, or is top of hierarchy. 
 	elif [ "$_gateway" = "none" ] || [ "$_class_of_gateway" = "VM" ] ; then
 
-		if get_info _CLIENTS $_jail ; then
+		# Has clients that need to wait for _jail to start. 
+		_HIERTOP=$(printf "%b" "${_jail}\n${_HIERTOP}" | uniq) 
 
-			# Has clients that need to wait for _jail to start. 
-			_HIERTOP=$(printf "%b" "${_jail}\n${_HIERTOP}" | uniq) 
-
-			# Include jail on _FULLIST 
-			echo "$_FULLIST" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" \
+		# Include jail on _FULLIST 
+		echo "$_FULLIST" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" \
 				|| _FULLIST=$(printf "%b" "${_FULLIST}\n${_jail}")
 
-		else
-			# _jail has no networking. Can start immediately in the background 
-			start_jail_in_background "$_jail" > /dev/null 2>&1 &
-			# Note, jails stays on full list, for end of script messaging
-		fi
-		
 		# Add _jail to the list of jails already climbed and checked.
 		_CLIMBED=$(printf "%b" "${_jail}\n${_CLIMBED}") 
 
-	# _jail depends on a gateway being started ahead of it.
 	else
 		# Make sure _jail is included in FULLIST. (some gateways might not have been on JLIST).
 		echo "$_FULLIST" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" \
