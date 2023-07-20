@@ -141,7 +141,6 @@ Usage: qb-edit <jail> <PARAMETER> <value>
    -f: (f)orce. Ignore errors and modify anyways. Error msgs
        suppressed, but final state of <jail><param> is shown 
    -h: (h)elp. Outputs this help message
-   -i: (i)pv4. Auto-assign IP address along quBSD conventions
    -q: (q)uiet output, do not print anything to stdout 
    -r: (r)estart the required jails for changes to take effect
 
@@ -152,8 +151,8 @@ CLASS:       Cannot be modified. Use qb-create instead.
 CPUSET:      CPUs a jail may use. Comma separated integers, or a
              range.  For example: 0,1,2,3 is the same as 0-3
              \`none' places no restrictions on jail's CPU access
-GATEWAY:      Gateway for <jail> to receive network connectivity
-IPV4:         IPv4 address for the jail.
+GATEWAY:     Gateway for <jail> to receive network connectivity
+IPV4:        IPv4 address for the jail.
 MAXMEM:      RAM maximum allocation:  <integer><G|M|K> 
              For example: 4G or 3500M, or \'none' for no limit
 MTU:         MTU for connections made when jail comes up. 
