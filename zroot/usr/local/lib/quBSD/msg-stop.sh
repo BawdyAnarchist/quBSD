@@ -39,7 +39,7 @@ ENDOFMSG
 	;;	
 	_m1) cat << ENDOFMSG
 
-ALERT: Waiting for all jails to stop. Timeout after 15 seconds.
+ALERT: Waiting for all jails to stop. Will timeout in 15 sec.
 ENDOFMSG
 	;;
 	esac
