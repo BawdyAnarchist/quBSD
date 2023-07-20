@@ -1,9 +1,5 @@
 ### BEST PRACTICES / FIXES 
 
-exec.poststart - 
-	for schg on selected files, you should scan zusr/usr/directories and remove them from the schg list
-	schg all still needs reviewed as it probably locks the system with /usr
-
 Cycle all scripts through shellcheck again. 
 
 /usr/local/share/quBSD 
@@ -18,10 +14,14 @@ jail -r
 
 qme-firefox needs fixed (personal note)
 
-qb-disp with -Z option for cloning root dataset as well 
-	 
 
 ### UPGRADES
+
+qb-disp
+	- Implement ephemeral jails, which clone the zroot dataset as well 
+	- Needs significant rework, to allow for using an appjail as a rootjail
+     and the reclone operation for that appjail's zroot.
+	- Might not be worth it tbh.
 
 pwd
 	- I think the right way to do this, is export any existing pwd db in /rw, and import it into the created jail (or maybe vice versa) 
