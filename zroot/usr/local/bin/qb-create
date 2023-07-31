@@ -276,7 +276,7 @@ change_datasets() {
 
 	# Jail types that don't need the edits below, have already exited the function.
 	# Make sure flags are down for rw/etc directory 
-	chflags -R noschg ${M_ZUSR}/$NEWJAIL/rw/etc > /dev/null 2>&1
+	chflags -R noschg ${M_ZUSR}/${NEWJAIL}/rw/etc > /dev/null 2>&1
 
    # Fix fstab 
 	if [ -e "${M_ZUSR}/${NEWJAIL}/rw/etc/fstab" ] ; then
@@ -286,20 +286,20 @@ change_datasets() {
 	else
 
 		# fstab is required for jail to start, even if everything else is empty 
-		mkdir -p ${M_ZUSR}/$NEWJAIL/rw/etc/
-		head -1 /etc/fstab > ${M_ZUSR}/$NEWJAIL/rw/etc/fstab
+		mkdir -p ${M_ZUSR}/${NEWJAIL}/rw/etc/
+		head -1 /etc/fstab > ${M_ZUSR}/${NEWJAIL}/rw/etc/fstab
 	fi
 
 	# If a special pw user file was copied over, it needs to be modified. 
-	if pw -V ${M_ZUSR}/$NEWJAIL/rw/etc/ usershow 1001 >> /dev/null 2>&1 ; then 
-		[ -e ${M_ZUSR}/$NEWJAIL/usr/home/$NEWJAIL ] || mkdir -p ${M_ZUSR}/$NEWJAIL/usr/home/$NEWJAIL
-		pw -V ${M_ZUSR}/$NEWJAIL/rw/etc/ usermod 1001 -l $NEWJAIL
-		pw -V ${M_ZUSR}/$NEWJAIL/rw/etc/ groupmod 1001 -l $NEWJAIL
-		pw -V ${M_ZUSR}/$NEWJAIL/rw/etc/ usermod 1001 -d /usr/home/$NEWJAIL  >> /dev/null 2>&1
+	if pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usershow 1001 >> /dev/null 2>&1 ; then 
+		[ -e ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL} ] || mkdir -p ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}
+		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usermod 1001 -l $NEWJAIL
+		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ groupmod 1001 -l $NEWJAIL
+		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usermod 1001 -d /usr/home/${NEWJAIL}  >> /dev/null 2>&1
 	fi
 	
 	# home directory must be renamed (if it exists)
-	mv ${M_ZUSR}/$NEWJAIL/usr/home/$TEMPLATE ${M_ZUSR}/$NEWJAIL/usr/home/$NEWJAIL > /dev/null 2>&1
+	mv ${M_ZUSR}/${NEWJAIL}/usr/home/${TEMPLATE} ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL} > /dev/null 2>&1
 }
 
 change_configs() {
