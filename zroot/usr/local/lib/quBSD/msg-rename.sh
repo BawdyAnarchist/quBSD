@@ -57,11 +57,6 @@ echo -e "                                    Enter (y/n): \c"
 ERROR: < $_jail > could not be stopped. Aborting qb-rename.
 ENDOFMSG
 	;;
-	_7_1) cat << ENDOFMSG
-
-ERROR: \`chflags noschg\` failed. schg could prevent rename. 
-ENDOFMSG
-	;;
 	_8) cat << ENDOFMSG
 
 Final confirmation to change < $JAIL > to < $NEWNAME >
