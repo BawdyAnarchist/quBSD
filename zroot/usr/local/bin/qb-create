@@ -167,6 +167,7 @@ assign_datasets() {
 			# Either assign the valid zusr dataset to clone dispjail, or set it to skip later on.
 			if chk_valid_zfs "${ZUSR_ZFS}/${TEMP_TEMP}" ; then
 				U_ZPARENT="${ZUSR_ZFS}/${TEMP_TEMP}" 
+				TEMPLATE="$TEMP_TEMP"
 				U_ZOPT="clone" 
 			else 
 				U_ZOPT="skip"
