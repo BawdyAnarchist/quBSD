@@ -147,18 +147,19 @@ handle_vm_gateway() {
 		chflags noschg "$_rcconf"	
 
 		if [ "$VAL" = "DHCP" ] ; then
-			sed -i '' -E "s/ifconfig_${_tap}.*/ifconfig_${_tap}=\"DHCP\"/" $_rcconf
+			sed -i '' -E "s/ifconfig_.*/ifconfig_${_tap}=\"DHCP\"/" $_rcconf
 			sed -i '' -E "/defaultrouter=/ d" $_rcconf
 
 		else
 
 			# Using `#' as sed separator, because `/' interferes with variable expansion
-			sed -i '' -E "s#ifconfig_${_tap}.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
+			sed -i '' -E "s#ifconfig_.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
 			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
 			
 			# This might not be completley robust. Generally a.b.c.1 should be the default.
 			sed -i '' -E "/^ifconfig_${_tap}.*/ a\\
-defaultrouter=\"${VAL%.*/*}.1\"" $_rcconf
+defaultrouter=\"${VAL%.*/*}.1\"
+" $_rcconf
 		fi
 
 		# Warn about having modified IP for net-firewall		
