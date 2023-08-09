@@ -1018,8 +1018,8 @@ chk_valid_ipv4() {
 	# Temporary variables used for checking ipv4 CIDR
 	local _b1 ; local _b2 ; local _b3
 
-	# None and auto are always considered valid.
-	[ "$_value" = "none" -o "$_value" = "auto" ] && return 0
+	# None, auto, and DHCP are always considered valid.
+	[ "$_value" = "none" -o "$_value" = "auto" -o "$_value" = "DHCP" ] && return 0
 
 	# Not as technically correct as a regex, but it's readable and functional
 	# IP represented by the form: a0.a1.a2.a3/a4 ; b-variables are local/ephemeral
