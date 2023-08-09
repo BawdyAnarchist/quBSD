@@ -69,12 +69,12 @@ echo -e "Should qb-edit to restart these jails? (y/n):  \c"
 			qb-list -j $JAIL -p $PARAM
 		;;
 		_9) cat << ENDOFMSG
-
 ALERT: net-firewall connects to the external internet, so its
        IP depends on your router. The following was modified: 
        ${M_ZUSR}/net-firewall/rw/etc/rc.conf 
        It's highly recommended to double check the IP address,
        assigned by your router, and this file.
+
 ENDOFMSG
 	;;
 		_10) cat << ENDOFMSG
