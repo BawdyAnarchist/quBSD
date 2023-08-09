@@ -1,6 +1,49 @@
-### UPGRADES
 
-usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
+### VIRTUAL MACHINE INTEGRATION
+quBSD.conf 
+	- ppt_nic and usb should probably be more like: check /boot/loader.conf against pciconf 
+	- This would leave only the quBSD_root (zroot/quBSD). I prefer to remove this file entirely	
+	- Maybe this value can just get stored in quBSD.sh
+
+A full management scheme for ZFS datasets that will serve as VM templates for VMs 
+
+Generalize staticIP vs auto vs DHCP
+	- DHCP requires a split in the logic of starting the jail, where no IP is assigned to the client
+	- Requires modifying exec.created ; and the rc.conf for the jail.
+
+A set of start/stop scripts that plug into JMAP
+
+net-jails
+	- Now they're dhcpd servers for tap interfaces
+	- MTU will need to be targeted and changed in dhcpd.conf at every net-jail start
+
+USBVM 
+	- Auto-install various useful mounting stuff for common devices     
+	- Create a proper unprivileged user with devd.conf and automounts     
+	- Auto remove password from unprivleged usbvm user     
+	- When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
+	- usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
+
+NICVM 
+  - Make it a Linux VM so that it can use all the wireless protocols.
+     - Someone made a post about this in FreeBSD
+
+net-firewall
+	- There are many exceptions for net-firewall across the board in the scripts
+		- qb-edit ; quBSD.sh ; exec scripts
+	- Perhaps it's time to give jails a "purpose" or a "type", in addition to class.
+		- Type: firewall jail ; nicvm ; usbvm ; gateway VM ;
+	- pf.conf 
+		- Currently does not integrate all unique wireguard ports of clients (net-jails).
+		- needs careful review. Use chatGPT-4
+
+qb-pci
+	- summary of PCI devices relevant to user
+	- USB, NIC, maybe others
+	- Show what was is currently passthrough'd
+
+
+### UPGRADES
 
 ZFS Encrypted Jails
 
@@ -56,54 +99,10 @@ qubsd_installer
 		- the new one for webcam
 		- Maybe the file should be added to the get_global_variables assignments library
 
-### VIRTUAL MACHINE INTEGRATION
-## Notes - the way to do this, is put bhyve VMs in jails.
-	- Internal networking now all looks identical, between jail and VM
-	- External networking can be managed exactly how you manage jails now
-
-quBSD.conf 
-	- ppt_nic and usb should probably be more like: check /boot/loader.conf against pciconf 
-	- This would leave only the quBSD_root (zroot/quBSD). I prefer to remove this file entirely	
-	- Maybe this value can just get stored in quBSD.sh
-
-A full management scheme for ZFS datasets that will serve as VM templates for VMs 
-
-A set of start/stop scripts that plug into JMAP
-
-Integration into the existing qb-scripts, especially quBSD.sh
-
-USBVM - As a temporary/initial solution, could zfs clone a template for USBVM.
-	- Make the usbvm disposable/ephemeral, as a malware countermeasure      
-	- Auto-install various useful mounting stuff for common devices     
-	- Create a proper unprivileged user with devd.conf and automounts     
-	- Auto remove password from unprivleged usbvm user     
-	- When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
-	- Need to rework usbvm automatic internet with option (due to general net rework)
-
-NICVM 
-  - Make it a Linux VM so that it can use all the wireless protocols.
-     - Someone made a post about this in FreeBSD
-
-net-firewall
-	There are lingering issues with making specific exceptions for 'net-firewall', when it should be generalized.
-	OVERALL - I would like to wait on cleaning this up, because there should be alot of improvement when the 
-	VM integrations are completed. These are some of the problems of net-firewall as they stand now.
-
-	- There is quite alot of work to do, to make this proerly generalized. Exceptions are made for 'net-firewall' in numerous places.
-		- qb-edit ; quBSD.sh 
-	
-	- There could be some problems with the way IP addys are handled.
-		- net-firewall default gateway is assumed to be a.b.c.1 (dot-one) ; which I think is okay, but maybe some research/thought is needed 
-	- pf.conf 
-		- Currently does not integrate all unique wireguard ports of clients (net-jails).
-		- DHCP has not been verified to work. Needs tested 
-	- The pass in from clients would also let servers do it
-  		- Segregate the servers from clients more carefully
-		- Maybe even segregate the wg gateways from clients as well
-	- jail start should auto update the servIPs in pf.conf
-		- This might require some thought about setting an "auto" option in the settings.
-		  because people making servers might not want an auto setting
-
+	- net-jails
+		- isc-dhcp44-server installed
+		- /jails/0net/usr/local/etc/dhcpd.conf 
+		- Check that pf conf is updated with required dhcp port, and the simplified version
 
 ### BEST PRACTICES / FIXES / CLEANUP
 
