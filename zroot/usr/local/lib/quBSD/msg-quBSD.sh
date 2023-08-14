@@ -69,8 +69,8 @@ ENDOFMSG
 	;;
 	_cj7) cat << ENDOFMSG
 
-ERROR: < $_value > is not a valid < virt_intf > name 
-       for < $_passvar >.  
+ERROR: < $_value > is not a valid virtual interface
+       (VIF) for < $_passvar >.  
 ENDOFMSG
 	;;
 	_cj7_1) cat << ENDOFMSG
@@ -194,12 +194,25 @@ ENDOFMSG
 	;;
 	_cj18_1) cat << ENDOFMSG
 
-ERROR: MTU: < $_value > is invalid. Must be a number.
+ERROR: < $_passvar >: < $_value > is invalid. Must be a number.
 ENDOFMSG
 	;;
 	_cj19) cat << ENDOFMSG
 
 ERROR: < $_passvar > Must be <true or false>
+ENDOFMSG
+	;;
+	_cj20) cat << ENDOFMSG
+
+ERROR: VCPUS must be less than or equal to the number
+       of physical cores on host < $_passvar > ; AND
+       less than or equal to the bhyve limit of 16. 
+ENDOFMSG
+	;;
+	_cj21) cat << ENDOFMSG
+
+ERROR: RAM allocation < $_value > should be less than the
+       host's available RAM < $_passvar bytes >
 ENDOFMSG
 	;;
 	_jf1) cat << ENDOFMSG
@@ -268,7 +281,7 @@ ENDOFMSG
 	;;
 	_jo3) cat << ENDOFMSG
 
-ERROR: ${_value##*/qb-} timeout. Gave up waiting for jails to ${_value#*qb-}
+ERROR: ${_value##*/} timeout. Gave up waiting for jails to ${_value#*qb-}
 ENDOFMSG
 	;;
 	_je1) cat << ENDOFMSG
