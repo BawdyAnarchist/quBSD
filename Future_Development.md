@@ -1,11 +1,69 @@
 
 ### VIRTUAL MACHINE INTEGRATION
+
+#########################################
+
+##### qubsd.sh ######
+
+rename zdata/qubsd/zusr/
+	- Probably need to look at your installer script again, to see how you handle zusr if it already exists
+
+connect_client_gateway
+	- $_intf needs split out to _cli_intf and _gtwy_intf
+		- This will be dependent on if epair or tap
+	- If/then for if client=VM or not (cant add IP addy to VM)
+
+reclone_zroot
+	- probably all the zfs stuff is good, but you'll need to cuidar the positional variables 
+	- the chflags and pw operations need a if/then switch
+
+reclone_zusr - yes, coz I want disposable jails
+	- chflags and sed for sure if/then switched
+
+chk_valid_jail
+	- Fill out VM portion
+
+chk_valid_gateway
+	- Needs the VM portion filled out
+	!! there's a "net-firewall" switch right here. Potetial for TYPE implementation !!
+
+chk_isqubsd_ipv4
+	!! Net-firewall switch !!
+
+define_ipv4_convention
+	!! there's a "net-firewall" switch right here. Potetial for TYPE implementation !!
+		- additionally, would have "gateway" "server" "app" "usbvm"
+
+discover_open_ipv4
+	!! Net-firewall switch !!
+
+ADD chk_valid_____ ROOTVM
+
+STEPWISE
+1. qubsd.sh
+	- Find the special exceptions for net-firewall
+	- Determine how to eliminate them (maybe container types)
+
+#########################################
+## jailmap
+
+Add parameter for passthrough devices 
+Add parameter for "wire guest memory"
+
+
+
+3. VM launch
+	- qubsd start_jail Probably needs to split to a new function. 
+
+5. Scripts that could integrate VMs
+	- qb-create, qb-destroy, qb-disp, qb-edit?, qb-rename, qb-stat?, qb-stop, qb-start
+
+9. Automate file copies somehow
+
 quBSD.conf 
 	- ppt_nic and usb should probably be more like: check /boot/loader.conf against pciconf 
 	- This would leave only the quBSD_root (zroot/quBSD). I prefer to remove this file entirely	
 	- Maybe this value can just get stored in quBSD.sh
-
-A full management scheme for ZFS datasets that will serve as VM templates for VMs 
 
 Generalize staticIP vs auto vs DHCP
 	- DHCP requires a split in the logic of starting the jail, where no IP is assigned to the client
@@ -16,6 +74,7 @@ A set of start/stop scripts that plug into JMAP
 net-jails
 	- Now they're dhcpd servers for tap interfaces
 	- MTU will need to be targeted and changed in dhcpd.conf at every net-jail start
+
 
 USBVM 
 	- Auto-install various useful mounting stuff for common devices     
@@ -104,9 +163,17 @@ qubsd_installer
 		- /jails/0net/usr/local/etc/dhcpd.conf 
 		- Check that pf conf is updated with required dhcp port, and the simplified version
 
+	- JAILS_ZFS and ZUSR_ZFS ; and mountpoints changed. Less cumbersome, more straightforward
+
 ### BEST PRACTICES / FIXES / CLEANUP
 
+qb-destroy 
+	- problem where a non-existent jail will throw all the errors. Like, all of them
+
 Cycle all scripts through shellcheck again. 
+	- local variables need to be removed and func variables checked for clean/sanitary
+	- the && || constructions are NOT if/then/else
+		-- Sometimes this is fine, you're just calling messages, but other times might not be
 
 /usr/local/share/quBSD 
 	- Needs updated in general after you're done
@@ -127,6 +194,15 @@ quBSD.sh and msg-qubsd.sh
 		- Passing through the -q [quiet] -s [skipchecks] and even a new [-f force] 
 			This enables easier to implement features (like with ephemeral jails that use appjail clones as rootjails
 
+qubsd_ipv4 - there's probably room for IP expansion for multiple strings of gateways .. maybe.
+
+zusr fstabs
+	- They're hand jammed, but maybe qb-edit should come with a function for changing the zfs dataset and mounts
+	- This should probably also change the fstabs? 
+	- Really maybe a bit unnecessary, but maybe do it later
+
+Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file and code.
+https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
 
 ### MINOR UPGRADES IF ANYONE ELSE OUT THERE WANTS TO DO IT
 
@@ -145,3 +221,5 @@ ntpd
 	- ntpd only runs during qb-hostnet. Needs a more "correct" solution.
 
 qme-firefox needs fixed (personal note)
+
+
