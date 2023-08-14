@@ -104,7 +104,7 @@ get_global_variables() {
 
 	# Get datasets, mountpoints; and define files.
    QBROOT_ZFS=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $QBCONF)
-	JAILS_ZFS="${QBROOT_ZFS}/jails"
+	JAILS_ZFS="${QBROOT_ZFS}"
 	ZUSR_ZFS=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
 	M_JAILS=$(zfs get -H mountpoint $JAILS_ZFS | awk '{print $3}')
 	M_ZUSR=$(zfs get -H mountpoint $ZUSR_ZFS | awk '{print $3}')
@@ -492,7 +492,7 @@ connect_client_gateway() {
 		local _cmdmod='jexec -l -U root $_client'
 	fi
 
-	# If there is no IP, skip the assignment
+	# If there is no IP or it's DHCP, skip the assignment
 	if ! [ "$_ipv4" = "none" ] ; then
 		# Assign the gateway IP
 		jexec -l -U root "$_gateway" \
@@ -612,8 +612,8 @@ reclone_zusr() {
 	# If they're equal, then the valid/current snapshot already exists. Otherwise, make one.
 	if ! [ "$_newsnap" = "$_presnap" ] ; then
 		# Clone and set zfs params so snapshot will get auto deleted later.
-		zfs snapshot -o qubsd:destroy-date="$_ttl" "$_newsnap" \
-		 				 -o qubsd:autosnap='-' "$_newsnap" \
+		zfs snapshot -o qubsd:destroy-date="$_ttl" \
+		 				 -o qubsd:autosnap='-' \
 						 -o qubsd:autocreated="yes" "$_newsnap"
 	fi
 
@@ -716,10 +716,15 @@ chk_isblank() {
 }
 
 chk_isrunning() {
-	# Return 0 if jail is running; return 1 if not.
+	# Return 0 if jail/VM is running; return 1 if not.
 
-	# Check if jail is running.
-	jls -j "$1" > /dev/null 2>&1  && return 0  ||  return 1
+	local _jail="$1"	
+
+	if [ "$(get_jail_parameter -e CLASS "$_jail")" = "VM" ] ; then
+		pgrep -qf "bhyve: $_jail" > /dev/null 2>&1  && return 0 ||  return 1
+	else
+		jls -j "$1" > /dev/null 2>&1  && return 0  ||  return 1
+	fi
 }
 
 chk_truefalse() {
@@ -735,7 +740,7 @@ chk_truefalse() {
 
 	# Must be either true or false.
 	! [ "$_value" = "true" ] && ! [ "$_value" = "false" ] \
-			&& get_msg $_qf "_cj19" "$_value" "$_param" && return 1
+			&& get_msg $_qf "_cj19" "$_param" && return 1
 
 	return 0
 }
@@ -1142,6 +1147,34 @@ chk_valid_maxmem() {
    ! echo "$_value" | grep -Eqs "^[[:digit:]]+(G|g|M|m|K|k)\$" \
 			&& get_msg $_q "_cj2" "$_value" "MAXMEM" && return 1
 
+	# Set values as numbers without units 
+	_bytes=$(echo $_value | sed -nE "s/.\$//p")
+	_sysmem=$(grep "avail memory" /var/run/dmesg.boot | sed "s/.* = //" | sed "s/ (.*//")
+
+	# Unit conversion to bytes
+	case $_value in 
+		*G|*g) _bytes=$(( $_bytes * 1000000000 )) ;;
+		*M|*m) _bytes=$(( $_bytes * 1000000 ))    ;;
+		*K|*k) _bytes=$(( $_bytes * 1000 ))       ;;
+	esac
+
+	# Compare values, error if user input exceeds availabl RAM
+	[ "$_bytes" -ge "$_sysmem" ] && get_msg $_q "_cj21" "$_value" "$_sysmem" && return 1 
+
+	return 0
+}
+
+chk_valid_memsize() {
+	# Return 0 if proposed memsize is valid ; return 1 if invalid
+
+	# Quiet option
+	local _q ; local _opts
+	getopts q _opts && _q='-q'
+	shift $(( OPTIND - 1 ))
+
+	# It's the exact same program/routine. Different jmap params to be technically specific.
+	chk_valid_maxmem $_q "$1" || return 1
+
 	return 0
 }
 
@@ -1158,7 +1191,7 @@ chk_valid_mtu() {
 	local _jail="$2"
 
 	# If MTU is not a number
-	echo "$_value" | ! grep -Eq '^[0-9]*$' && get_msg $_q "_cj18_1" "MTU" && return 1
+	echo "$_value" | ! grep -Eq '^[0-9]*$' && get_msg $_q "_cj18_1" "$_value" "MTU" && return 1
 
 	# Just push a warning, but don't error for MTU
 	[ "$_value" -lt 1200 ] > /dev/null 2>&1 && get_msg $_q "_cj18" "MTU"
@@ -1269,6 +1302,34 @@ chk_valid_template() {
 	return 0
 }
 
+chk_valid_vcpus() {
+	# Return 0 if proposed vcpus are valid; false if not. 
+
+	# Quiet option
+	local _q ; local _opts
+	getopts q _opts && _q='-q'
+	shift $(( OPTIND - 1 ))
+
+	# Positional parmeters / check.
+	local _value="$1"
+	[ -z "$_value" ] && get_msg $_q "_0" "VCPUS" && return 1
+
+	# Get the number of CPUs on the system 
+	_syscpus=$(cpuset -g | head -1 | grep -oE "[^[:blank:]]+\$")
+	_syscpus=$(( _syscpus + 1 ))
+
+	# Ensure that the input is a number
+ 	! echo "$_value" | grep -qE "^[[:digit:]]+\$" \
+			&& get_msg $_q "_cj2" "$_value" "VCPUS" && return 1
+
+	# Ensure that vpcus doesnt exceed the number of system cpus or bhyve limits
+	if [ "$_value" -gt "$_syscpus" ] || [ "$_value" -gt 16 ] ; then
+		get_msg $_q "_cj20" "$_value" "$_syscpus" && return 1
+	fi
+
+	return 0
+}
+
 chk_valid_vif() {
 	# Return 0 if vif is valid ; return 1 if invalid
 
@@ -1281,15 +1342,10 @@ chk_valid_vif() {
 	local _value="$1"
 	local _jail="$2"
 
-	# Checks that it's a tap interface. Technically, fails after tap99
-	case $_value in
-		tap[[:digit:]])
-			return 0 ;;
-		tap[[:digit:]][[:digit:]])
-			return 0 ;;
-		*) get_msg $_q "_cj7" "$_value" "$_jail"
-			return 1 ;;
-	esac
+ 	! echo "$_value" | grep -qE "^tap[[:digit:]]+\$" \
+			&& get_msg $_q "_cj7" "$_value" "$_jail" && return 1
+
+	return 0
 }
 
 
