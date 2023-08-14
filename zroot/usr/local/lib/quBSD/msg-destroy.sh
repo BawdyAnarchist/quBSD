@@ -63,8 +63,10 @@ ENDOFMSG
 
 usage() { cat << ENDOFUSAGE
 
-qb-destroy: Destroys <jail> and purges jail from configs at:
+qb-destroy: Destroy <jail> and purge associated configs:
             jail.conf ; jailmap.conf ; zfs datasets
+
+Even if jail is partially created, this command will purge it.
 
 There is a protection mechanism for all jails. jailmap.conf	
 has a parameter called: \`no_destroy', which defaults to true.
