@@ -18,8 +18,8 @@ get_options() {
 
 define_variables() {
 	# Important parameters for checks 
-	get_jail_parameter CLASS "$JAIL"
-	get_jail_parameter NO_DESTROY "$JAIL"
+	get_jail_parameter -q CLASS "$JAIL"
+	get_jail_parameter -qd NO_DESTROY "$JAIL"
 	OFFJAILS=$(zfs list -o name,origin | grep -E "$JAIL\@.*\$" \
 									| awk '{print $1}' | sed "s@.*/@@")
 
@@ -36,8 +36,8 @@ define_variables() {
 }
 
 checks() {
-	# Alert that the jail is invalid, but do not error and exit
-	chk_valid_jail "$JAIL" 
+# Alert that the jail is invalid, but do not error and exit
+#chk_valid_jail "$JAIL" 
 
 	# no_destroy protection flag still active
 	[ "$NO_DESTROY" = "true" ] && get_msg_destroy "_2" "usage_1"	
@@ -67,8 +67,8 @@ main() {
 	done
 	
 	# Destroy datasets
-	[ "$zrootDestroy" ] && zfs destroy -rRf ${JAILS_ZFS}/${JAIL}
-	[ "$zusrDestroy" ] && zfs destroy -rRf ${ZUSR_ZFS}/${JAIL}
+	[ "$zrootDestroy" ] && zfs destroy -rRf ${JAILS_ZFS}/${JAIL} > /dev/null 2>&1
+	[ "$zusrDestroy" ]  && zfs destroy -rRf ${ZUSR_ZFS}/${JAIL}  > /dev/null 2>&1
 	
 	# Modify Files
 	sed -i '' -E "/^${JAIL}[[:blank:]]/d" $JMAP
