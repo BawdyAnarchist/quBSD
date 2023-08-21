@@ -1,80 +1,53 @@
 
-### VIRTUAL MACHINE INTEGRATION
+##### VIRTUAL MACHINE INTEGRATION
 
-#########################################
+1. qubsd.sh 
 
-##### qubsd.sh ######
+Fix the "net-firewall" switches.
+# the solution is: if [ ${_class_of_gateway##*VM} ] and also maybe _class_of_client
 
-rename zdata/qubsd/zusr/
-	- Probably need to look at your installer script again, to see how you handle zusr if it already exists
+#chk_valid_gateway
+	- Type implementation?  "firewall" "gateway" "server" "app"  
+	- chk_isqubsd_ipv4
+	- define_ipv4_convention
+	- discover_open_ipv4
+	- exec scripts
+	- exec.created
+	- qb-edit 
+		- rc.conf changes (no longer use rc.conf if IP is static
+		- Add check when assigning app or disp CLASS, that it doesnt have a zfs origin 
 
-connect_client_gateway
-	- $_intf needs split out to _cli_intf and _gtwy_intf
-		- This will be dependent on if epair or tap
-	- If/then for if client=VM or not (cant add IP addy to VM)
+2. jailmap
+	- Add a generic parameter that tacks on any "-s 99:0 <options>" 
+	- Add a line to override bhyve options 
 
-reclone_zroot
-	- probably all the zfs stuff is good, but you'll need to cuidar the positional variables 
-	- the chflags and pw operations need a if/then switch
+3. Scripts that should integrate VMs
+	- qb-stop , qb-start, qb-edit (now needs "add" function for multiple taps at least), qb-rename , qb-destroy, qb-stat, qb-create, qb-disp
+	
+4. New scripts
+	qb-pci
+		- summary of PCI devices relevant to user
+		- USB, NIC, maybe others
+		- Show what was is currently passthrough'd
+	qb-vm
+		- If you need to access via console
+		- Maybe also for create, since that might be non-trivial, and your qb-create is already pretty good
+		- -n option to output the command that would be run (so that can manual add options at VM launch)
 
-reclone_zusr - yes, coz I want disposable jails
-	- chflags and sed for sure if/then switched
+dhcpd
+	- dhcpd option-domain-name-servers <IP> should be copied from /resolv.conf 
 
-chk_valid_jail
-	- Fill out VM portion
-
-chk_valid_gateway
-	- Needs the VM portion filled out
-	!! there's a "net-firewall" switch right here. Potetial for TYPE implementation !!
-
-chk_isqubsd_ipv4
-	!! Net-firewall switch !!
-
-define_ipv4_convention
-	!! there's a "net-firewall" switch right here. Potetial for TYPE implementation !!
-		- additionally, would have "gateway" "server" "app" "usbvm"
-
-discover_open_ipv4
-	!! Net-firewall switch !!
-
-ADD chk_valid_____ ROOTVM
-
-STEPWISE
-1. qubsd.sh
-	- Find the special exceptions for net-firewall
-	- Determine how to eliminate them (maybe container types)
-
-#########################################
-## jailmap
-
-Add parameter for passthrough devices 
-Add parameter for "wire guest memory"
-
-
-
-3. VM launch
-	- qubsd start_jail Probably needs to split to a new function. 
-
-5. Scripts that could integrate VMs
-	- qb-create, qb-destroy, qb-disp, qb-edit?, qb-rename, qb-stat?, qb-stop, qb-start
-
-9. Automate file copies somehow
-
+# CLEANUP STUFF
 quBSD.conf 
-	- ppt_nic and usb should probably be more like: check /boot/loader.conf against pciconf 
-	- This would leave only the quBSD_root (zroot/quBSD). I prefer to remove this file entirely	
-	- Maybe this value can just get stored in quBSD.sh
+	- remove ppt_nic. It's now in jmap.
+	- Think of way to remove the file entirely. 
 
 Generalize staticIP vs auto vs DHCP
 	- DHCP requires a split in the logic of starting the jail, where no IP is assigned to the client
 	- Requires modifying exec.created ; and the rc.conf for the jail.
 
-A set of start/stop scripts that plug into JMAP
-
 net-jails
-	- Now they're dhcpd servers for tap interfaces
 	- MTU will need to be targeted and changed in dhcpd.conf at every net-jail start
-
 
 USBVM 
 	- Auto-install various useful mounting stuff for common devices     
@@ -84,22 +57,17 @@ USBVM
 	- usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
 
 NICVM 
-  - Make it a Linux VM so that it can use all the wireless protocols.
+  - Make a Linux VM so that it can use all the wireless protocols.
      - Someone made a post about this in FreeBSD
 
 net-firewall
-	- There are many exceptions for net-firewall across the board in the scripts
-		- qb-edit ; quBSD.sh ; exec scripts
-	- Perhaps it's time to give jails a "purpose" or a "type", in addition to class.
-		- Type: firewall jail ; nicvm ; usbvm ; gateway VM ;
 	- pf.conf 
 		- Currently does not integrate all unique wireguard ports of clients (net-jails).
 		- needs careful review. Use chatGPT-4
 
-qb-pci
-	- summary of PCI devices relevant to user
-	- USB, NIC, maybe others
-	- Show what was is currently passthrough'd
+Are there going to be differences to code into prepare_vm between Linux, Windows, and FreeBSD?
+
+ULTIMATE LAST CHECK, NEED TO SEARCH ALL "VM" instances, coz of new naming conventions"
 
 
 ### UPGRADES
@@ -164,11 +132,19 @@ qubsd_installer
 		- Check that pf conf is updated with required dhcp port, and the simplified version
 
 	- JAILS_ZFS and ZUSR_ZFS ; and mountpoints changed. Less cumbersome, more straightforward
+	
+	- VMs integration
+		- install bhyve-uefi firmware
 
 ### BEST PRACTICES / FIXES / CLEANUP
 
-qb-destroy 
-	- problem where a non-existent jail will throw all the errors. Like, all of them
+VMs
+	- the ability to put arbitrary options specifications lines for any VM
+	- the ability to turn off or replace some of the line options (the non -s lines)
+	- the ability to spit out the command that would be run (-n no-run option in qb-start)
+
+connect_client_to_gateway
+	- It could be space efficiencized. For now just uses dumb switches for VMs, duplicating lines 
 
 Cycle all scripts through shellcheck again. 
 	- local variables need to be removed and func variables checked for clean/sanitary
@@ -203,6 +179,7 @@ zusr fstabs
 
 Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file and code.
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
+
 
 ### MINOR UPGRADES IF ANYONE ELSE OUT THERE WANTS TO DO IT
 
