@@ -15,7 +15,7 @@ get_parameters() {
 	# Check/warn if outside of quBSD IPv4 convention, but don't fail 
 	chk_isqubsd_ipv4 "$IPV4" "$JAIL"
 
-	if [ gateway = "none" ] ; then
+	if [ $GATEWAY = "none" ] ; then
 		IPV4="none"
 	else
 		# We will need the class of the gateway later for VM vs jails handling
@@ -27,23 +27,11 @@ get_parameters() {
 }
 
 connect_to_gateway() {
-	# Jails connected to VMs must have handling of the tap interface 
-	if [ "$_class_gw" == "VM" ] ; then
+	# If auto, then assign the global variable IPV4 to have a real IP addr
+	[ "$IPV4" = "auto" ] && assign_ipv4_auto "$JAIL" 
 
-		# Get the tap interface for the VM
-		get_jail_parameter VIF "$GATEWAY" ||  exit 1
-		
-		# Send vintf to the jail and bring it up. The <jail> rc.conf handles the rest.
-		ifconfig $VIF vnet $JAIL 
-		jexec -l -U root $JAIL ifconfig $VIF mtu $MTU up
-
-	else
-		# If auto, then assign the global variable IPV4 to have a real IP addr
-		[ "$IPV4" = "auto" ] && assign_ipv4_auto "$JAIL" 
-
-		# Connect jail, to it's gateway. Global $VIF is assigned inside func.
-		chk_isrunning "$GATEWAY" && connect_client_gateway "$JAIL" "$GATEWAY" "$IPV4"
-	fi
+	# Connect jail, to it's gateway. Global $VIF is assigned inside func.
+	chk_isrunning "$GATEWAY" && connect_client_to_gateway "$JAIL" "$GATEWAY" "$IPV4"
 }
 
 connect_to_clients() {
@@ -53,7 +41,7 @@ connect_to_clients() {
 
 	# Assign auto IP to client and connect it to jail.
 	[ "$_cIP" = "auto" ] && _cIP=$(assign_ipv4_auto -e "$_client")
-	connect_client_gateway "$_client" "$JAIL" "$_cIP" 
+	connect_client_to_gateway "$_client" "$JAIL" "$_cIP" 
 
 	# Need to modify the client pf.conf with the epair
 	_cPF="${M_ZUSR}/${_client}/${PFCONF}"
@@ -62,7 +50,7 @@ connect_to_clients() {
 		# Make sure flags are down
 		chflags -R noschg "${M_ZUSR}/${_client}/rw/etc" 
 
-		# $VIF was assigned during the connect_client_gateway func. Modify pf.conf 
+		# $VIF was assigned during the connect_client_to_gateway func. Modify pf.conf 
 		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${VIF}\"@" $_cPF
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${_cIP}\"@"  $_cPF
 
@@ -82,7 +70,7 @@ modify_pf() {
 		# Make sure flags are down
 		chflags -R noschg "${M_ZUSR}/${JAIL}/rw/etc" 
 
-		# $VIF was assigned during the connect_client_gateway func. Modify pf.conf 
+		# $VIF was assigned during the connect_client_to_gateway func. Modify pf.conf 
 		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${VIF}\"@" $JPF
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${IPV4}\"@" $JPF
 
