@@ -40,13 +40,12 @@ climb_hierarchy() {
 		# _jail gateway path was already handled. Skip further checks.
 		return 0
 
-	# Neither invalid jails nor VMs should be included. _isVM is global var from chk_valid_jail
-	# Return conditions (no inclusion): jail invalid ; isVM ; already stopped 
-	elif ! chk_valid_jail -q $_jail || ! chk_isrunning "$_jail" || [ "$_isVM" = "true" ] ; then
+	# Don't include invalid jails, running jails, or VMs 
+	elif ! chk_valid_jail -q $_jail || ! chk_isrunning "$_jail" ; then
 		return 0
 
 	# _jail is an endpoint. Either has no network, or is top of hierarchy. 
-	elif [ "$_gateway" = "none" ] || [ "$_class_of_gateway" = "VM" ] ; then
+	elif [ "$_gateway" = "none" ] || [ "$_class_of_gateway" = "appVM" ] ; then
 
 		if get_info _CLIENTS $_jail ; then
 			# Has clients that need to wait for _jail to stop. 
@@ -84,7 +83,7 @@ begin_waterfall() {
 
 		# Wait for _gw to stop before proceeding 
 		echo "$_JLIST" | grep -Eq "^[[:blank:]]*${_gw}[[:blank:]]*\$" \
-				&& [ -z "$_isVM" ] && stop_jail "$_gw" > /dev/null 2>&1 
+				&& stop_jail "$_gw" > /dev/null 2>&1 
 
 		# Determine which clients are endpoints, and which serve clients in turn
 		classify_clients "$_gw"
