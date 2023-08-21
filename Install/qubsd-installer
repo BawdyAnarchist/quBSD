@@ -474,7 +474,7 @@ qubsd_files_modify() {
 	fi
 
 	# AMD CPU needs special kernel tuning 
-	if `dmesg | grep -qs "CPU: AMD"` ; then
+	if `dmesg | grep -Eqs "^CPU.*AMD"` ; then
 		if ! `grep -qs 'hw.vmm.amdvi.enable="1"' /boot/loader.conf` ; then
 			sed -i '' -E "/hw.vmm.amdvi.enable/ d" /boot/loader.conf
 			echo '' >> /boot/loader.conf
