@@ -42,7 +42,7 @@
 # stop_jail           - Performs checks before starting, creates log
 # restart_jail        - Self explanatory
 # remove_tap          - Removes tap interface from whichever jail it's in
-# connect_client_gateway - Connects a client jail to its gateway
+# connect_client_to_ gateway - Connects a client jail to its gateway
 # reclone_zroot       - Destroys and reclones jails dependent on rootjail
 # reclone_zusr        - Destroy and reclones jails with zusr dependency (dispjails)
 # cleanup_oldsnaps    - Destroys old snapshots beyond their time-to-live 
@@ -153,40 +153,43 @@ get_user_response() {
 get_jail_parameter() {
 	# Get corresponding <value> for <jail> <param> from JMAP.
 	# Assigns global variable of ALL CAPS <param> name, with <value>
-	 # -d: Function default is to get the <#default> from JMAP, whenever the
+	 # -dp: Function default is to get the <#default> from JMAP, whenever the
 	     # retrieved <value> for <jail> <param> is NULL. [-d] prevents this.
-	 # -e: echo <value> rather than setting the global variable
+	 # -ep: echo <value> rather than setting the global variable
 	     # Otherwise variable indirection will set <$_PARAM> with <_value>
 	 	 ## NOTE: If using [-e] in $(command_substitution), best to [-q]
 		 ## quiet any error messages to prevent unpredictable behavior.
-	 # -q: quiet any error/alert messages. Otherwise error messages are shown.
-	 # -s: skip checks and return 0. Otherwise, checks will be run.
+	 # -qp: quiet any error/alert messages. Otherwise error messages are shown.
+	 # -sp: Skip checks, and return 0 regardless of any failures 
+	 # -zp: don't error on zero/null values, just return 
 
 	# Positional variables:
 	 # $1: _param : The parameter to pull from JMAP
 	 # $2: _jail  : <jail> to reference in JMAP
 
-	while getopts deqs opts ; do
+	# Ensure all options variables are reset
+	_dp='' ; _ep='' ; _qp='' ; _sp='' ; _zp=''
+
+	while getopts deqsz opts ; do
 		case $opts in
-			d) local _dp="-d" ;;
-			e) local _ep="-e" ;;
-			q) local _qp="-q" ;;
-			s) local _sp="return 0" ;;
+			d) _dp="-d" ;;
+			e) _ep="-e" ;;
+			q) _qp="-q" ;;
+			s) _sp="true" ;;
+			z) _zp="true" ;;
 			*) get_msg "_1" ; return 1 ;;
 		esac
 	done
 
 	shift $(( OPTIND - 1 ))
 
-	# Positional variables
-	local _param="$1"
-	local _low_param=$(echo "$_param" | tr '[:upper:]' '[:lower:]')
-	local _jail="$2"
-	local _value=''
+	# Positional and function variables 
+	_param="$1"  ;  _low_param=$(echo "$_param" | tr '[:upper:]' '[:lower:]')
+	_jail="$2"   ; _value=''
 
 	# Either jail or param weren't provided
-	[ -z "$_jail" ] && get_msg $_qp "_0" "jail" && eval $_sp $RTRN
-	[ -z "$_param" ] && get_msg $_qp "_0" "parameter" && eval $_sp $RTRN
+	[ -z "$_jail" ] && get_msg $_qp "_0" "jail" && eval $_sp return 1 
+	[ -z "$_param" ] && get_msg $_qp "_0" "parameter" && eval $_sp return 1 
 
 	# Get the <_value> from JMAP.
 	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
@@ -194,24 +197,26 @@ get_jail_parameter() {
 	# Substitute <#default> values, so long as [-d] was not passed
 	if [ -z "$_value" ] && [ -z "$_dp" ] ; then
 		_value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
+	fi
 
-		# #default might still be blank.
-		[ -z "$_value" ] && get_msg $_qp "$_cj17_1" "$_param" "$_value" && eval $_sp $RTRN
+	# If still blank, check for -z or -s options. Otherwise err message and return 1 
+	if [ -z "$_value" ] ; then 
+		[ "$_zp" ] && return 0
+		[ "$_sp" ] && return 0
+		get_msg $_qp "$_cj17_1" "$_param" "$_value" && return 1 
+	fi
+		
+	# If -s was provided, checks are skipped by this eval
+	if ! [ $_sp ] ; then
 
-		# Print warning message that #default was substituted.
-		get_msg $_qp "_cj17" "$_param"
+		# Variable indirection for checks. Escape \" avoids word splitting
+		eval "chk_valid_${_low_param}" $_qp \"$_value\" \"$_jail\" || return 1
 	fi
 
 	# Either echo <value> , or assign global variable (as specified by caller).
 	[ "$_ep" ] && echo "$_value" || eval $_param=\"$_value\"
 
-	# If -s was provided, checks are skipped by this eval
-	eval $_sp
-
-	#NOTE!: Not all functions are used, so they're not included later.
-	# Variable indirection for checks. Escape \" avoids word splitting
-	eval "chk_valid_${_low_param}" $_qp \"$_value\" \"$_jail\" \
-		&& return 0 || return 1
+	return 0
 }
 
 get_info() {
@@ -341,7 +346,6 @@ start_jail() {
 	# return 0 on success ; 1 on failure.
 
 	# Quiet option
-	local _qs ; local _opts
 	getopts q _opts && _qs='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -360,12 +364,14 @@ start_jail() {
 
 			# If checks were good, start jail, make a log of it
 			get_msg "_jf1" "$_jail" | tee -a $QBLOG
-			jail -vc "$_jail"  >> $QBLOG 2>&1  ||  get_msg $_qs "_jf2" "$_jail"
+			
+			if chk_isvm "$_jail" ; then
+				# Launch in subshell, prevent variables from interfering with caller
+				(prepare_vm $_qs "$_jail")
 
-		else
-			# Was invalid jail. Error msgs already handled inside chk_valid_jail
-			# NOTE: Temporary exception for VMs during dev/integration
-			[ -n "$_isVM" ] && return 0 || return 1
+			else
+				jail -vc "$_jail"  >> $QBLOG 2>&1  ||  get_msg $_qs "_jf2" "$_jail"
+			fi
 		fi
 	fi
 
@@ -376,7 +382,6 @@ stop_jail() {
 	# If jail is running, remove it. Return 0 on success; return 1 if fail.
 
 	# Quiet option
-	local _qj ; local _opts
 	getopts q _opts && _qj='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -389,7 +394,11 @@ stop_jail() {
 
 		# If on, try to remove the jail normally
 		get_msg "_jf3" "$_jail" | tee -a $QBLOG
-		if ! jail -vr "$_jail"  >> $QBLOG ; then
+
+		if chk_isvm "$_jail" ; then
+			stop_vm $_qj "$_jail" && return 0 || return 1
+
+		elif ! jail -vr "$_jail"  >> $QBLOG ; then
 
 			# If normal removal failed, try forcible removal
 			get_msg "_jf4" "$_jail" | tee -a $QBLOG
@@ -420,7 +429,6 @@ restart_jail() {
 	# $2="hold" will override this default, so that an off jail stays off.
 
 	# Quiet option
-	local _qr ; local _opts
 	getopts q _opts && _qr='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -463,7 +471,7 @@ remove_tap() {
 	ifconfig $_tap down
 }
 
-connect_client_gateway() {
+connect_client_to_gateway() {
 	# Implements the client/gateway connection as specified in JMAP
 	# GLOBAL VARIABLES must have been assigned already: $GATEWAY ; $IPV4 ; $MTU
 
@@ -477,10 +485,48 @@ connect_client_gateway() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional variables
-	local _client="$1"
-	local _gateway="$2"
-	local _ipv4="$3"
-	local _mtu="${MTU:=$(get_jail_parameter -es MTU '#default')}"
+	_client="$1" ; _gateway="$2" ; _ipv4="$3"
+	_mtu="${MTU:=$(get_jail_parameter -es MTU '#default')}"
+
+	# VM client uses pre-determined tap interfaces and DHCP on the gateway jail
+	if chk_isvm "$_client" ; then
+
+		# If there are multiple taps, use the first one for the gateway 
+		_vif=$(echo "$_vifs" | grep -Eo "^[^[:blank:]]+")
+
+		# Wait for the tap to be created, which can sometimes delay a moment 
+		_count=1
+		while [ "$_count" -le 10 ] ; do
+			ifconfig $_vif > /dev/null 2>&1 && break || _count=$(( _count + 1 ))
+			sleep 0.5
+			
+			# Print timeout error if the tap never appeared
+			[ "$_count" -eq 10 ] && get_msg "_cj27" "$_client" "$_vif" && return 1
+		done
+	
+		# Connect the tap to the gateway
+		ifconfig "$_vif" vnet "$_gateway"
+		jexec -l -U root $_gateway ifconfig $_vif inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
+		jexec -l -U root $_gateway service isc-dhcpd restart
+		
+		return 0
+
+	elif chk_isvm "$_gateway" ; then
+
+		# Get tap. If there are multiple taps, use the first one for the gateway 
+	   _vif=$(get_jail_parameter VIF "$_gateway") || return 1
+		_vif=$(echo "$_vif" | grep -Eo "^[^[:blank:]]+")
+
+		# Send tap to client
+ 		ifconfig $_vif vnet $_client
+
+		# Unless DHCP is designated, add the IP address 
+		! [ "$IPV4" = "DHCP" ] \
+			&& jexec -l -U root $_client ifconfig $_vif inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up \
+			&& jexec -l -U root $_client route add default "${_ipv4%.*/*}.1" > /dev/null 2>&1
+	
+		return 0
+	fi
 
 	# Create virtual interface. Gateway <_intf> can always be sent
 	local _intf=$(ifconfig epair create)
@@ -514,6 +560,10 @@ reclone_zroot() {
 	# Detects changes since the last snapshot, creates a new snapshot if necessary,
 	# and destroys old snapshots when no longer needed.
 
+	# Quiet option
+	getopts q _opts && _qz='-q'
+	shift $(( OPTIND - 1 ))
+
 	# Variables definitions
 	local _jail="$1"
 	local _jailzfs="${JAILS_ZFS}/${_jail}"
@@ -526,7 +576,11 @@ reclone_zroot() {
 
 	local _presnap=$(zfs list -t snapshot -Ho name ${_rootzfs} | tail -1)
 
-	# `zfs-diff` from other jails causes a momentary snapshot which errors the reclone operation 
+	# Check that the _jail being destroyed/cloned has an origin (is a clone).
+	[ "$(zfs list -Ho origin "${JAILS_ZFS}/${_jail}")" = "-" ] \
+		&& get_msg $_qz "_jo0" "$_jail" && return 1
+
+	# `zfs diff` from simultaneous jail start, create momentary snapshot. Errors reclone 
 	while [ -z "${_presnap##*@zfs-diff*}" ] ; do
 
 		# Loop until a proper snapshot is found
@@ -545,8 +599,12 @@ reclone_zroot() {
 	# If there's a pre existing snapshot, there's always a fallback for the reclone operation
 	if [ "$_presnap" ] ; then
 
+		# zfs volmode=dev cant be analyzed with zfs diff. Use snapshot sizes instead 
+		if chk_isvm "$_jail" && [ "$(zfs list -Ho used "$_presnap")" = "0B" ] ; then
+			_newsnap="$_presnap"
+	
 		# Check for differences between pre existing snapshot, and current state of jail
-		if [ "$(zfs diff "$_presnap" "$_rootzfs")" ] ; then
+		elif [ "$(zfs diff "$_presnap" "$_rootzfs")" ] ; then
 
 			# There are differences and the jail is busy. Fallback on pre-existing snapshot
 			[ "$_busy" ] && _newsnap="$_presnap"
@@ -572,9 +630,12 @@ reclone_zroot() {
 	zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1
 	zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs}
 
-	# Drop the flags for etc directory and add the user for the jailname
-	chflags -R noschg ${M_JAILS}/${_jail}/etc/
-	pw -V ${M_JAILS}/${_jail}/etc/ useradd -n $_jail -u 1001 -d /usr/home/${_jail} -s /bin/csh 2>&1
+	if ! chk_isvm "$_jail" ; then
+		# Drop the flags for etc directory and add the user for the jailname
+		chflags -R noschg ${M_JAILS}/${_jail}/etc/
+		pw -V ${M_JAILS}/${_jail}/etc/ \
+				useradd -n $_jail -u 1001 -d /usr/home/${_jail} -s /bin/csh 2>&1
+	fi
 
 	# Remove old snapshots past their ttl and no longer being used.
 	cleanup_oldsnaps "$_rootzfs" &
@@ -605,7 +666,6 @@ reclone_zusr() {
 		_presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
 	done
 
-	# Determine if there are any updates or pkg installations taking place inside the jail
 	# If there's a presnap, and no changes since then, use it for the snapshot.
 	[ "$_presnap" ] && ! [ "$(zfs diff "$_presnap" "$_templzfs")" ] && _newsnap="$_presnap"
 
@@ -639,7 +699,6 @@ reclone_zusr() {
 cleanup_oldsnaps() {
 
 	# Option for clearning up "zero bytes" (_zb) snapshots 
-	local _zb ; local _opts
 	getopts z _opts && _zb='true'
 	shift $(( OPTIND - 1 ))
 
@@ -720,7 +779,7 @@ chk_isrunning() {
 
 	local _jail="$1"	
 
-	if [ "$(get_jail_parameter -e CLASS "$_jail")" = "VM" ] ; then
+	if $(get_jail_parameter -eqs CLASS "$_jail" | grep -qs "VM") ; then
 		pgrep -qf "bhyve: $_jail" > /dev/null 2>&1  && return 0 ||  return 1
 	else
 		jls -j "$1" > /dev/null 2>&1  && return 0  ||  return 1
@@ -729,7 +788,6 @@ chk_isrunning() {
 
 chk_truefalse() {
 	# Quiet option
-	local _qf ; local _opts
 	getopts q _opts && _qf='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -745,13 +803,19 @@ chk_truefalse() {
 	return 0
 }
 
+chk_isvm() {
+	# Checks if the positional variable is the name of a VM, return 0 if true 1 of not
+	_jail="$1"
+
+	$(get_jail_parameter -qse CLASS $_jail | grep -qs "VM") && return 0 || return 1
+}
+
 chk_avail_jailname() {
 	# Checks that the proposed new jailname does not have any entries or partial entries
 	# in JCONF, JMAP, and ZFS datasets
 	# Return 0 jailname available, return 1 for any failure
 
 	# Quiet option
-	local _qa ; local _opts
 	getopts q _opts && _qa='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -797,16 +861,12 @@ chk_valid_jail() {
 	# Return 0 for passed all checks, return 1 for any failure
 
 	# Quiet option
-	local _qv ; local _opts
 	getopts q _opts && _qv='-q'
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters and function specific variables.
 	local _value="$1"
 	local _class ; local _rootjail ; local _template ; local _class_of_temp
-
-	# Must set variable back to null, since it's global.
-	_isVM=''
 
 	# Fail if no jail specified
 	[ -z "$_value" ] && get_msg $_qv "_0" "jail" && return 1
@@ -816,18 +876,13 @@ chk_valid_jail() {
 	chk_valid_class $_qv $_class || return 1
 
 	case $_class in
-		VM)
-			# NOTE: This is just a placeholder for VM logic divergence
-			# Integration of commands between jail/VM may be tricky later on.
-			_isVM="true" && return 1
-		;;
 		"")
 			# Empty, no class exists in JMAP
 			get_msg $_qv "_cj1" "$_value" "class" && return 1
 		;;
 		rootjail)
-			# Rootjails require a dataset in zroot
-			! chk_valid_zfs ${JAILS_ZFS}/${_value} \
+			# Rootjail's zroot dataset should have no origin (not a clone) 
+			! zfs get -H origin ${JAILS_ZFS}/${_value} | awk '{print $3}' | grep -Eq '^-$' \
 					&& get_msg $_qv "_cj4" "$_value" "$JAILS_ZFS" && return 1
 		;;
 		appjail)
@@ -858,18 +913,35 @@ chk_valid_jail() {
 		ephemeral) # There are no checks for now. These are special types of dispjails
 					# But I might want to add the temporary cloned datasets. We'll see. Prob not.
 		;;
+		rootVM)
+			# VM zroot dataset should have no origin (not a clone) 
+			! zfs get -H origin ${JAILS_ZFS}/${_value} | awk '{print $3}' | grep -Eq '^-$' \
+					&& get_msg $_qv "_cj4" "$_value" "$JAILS_ZFS" && return 1
+		;;
+		*VM)
+		;;
 		# Any other class is invalid
 		*) get_msg $_qv "_cj2" "$_class" "CLASS"  && return 1
 		;;
 	esac
 
-	# Must have a designated rootjail in JMAP
-	! grep -Eqs "^${_value}[[:blank:]]+ROOTJAIL[[:blank:]]+" $JMAP \
-			&& get_msg $_qv "_cj1" "$_value" "ROOTJAIL" && return 1
+	# One more case statement for VMs vs jails
+	case $_class in
+		*jail)
+			# Must have a designated rootjail in JMAP
+			! grep -Eqs "^${_value}[[:blank:]]+ROOTJAIL[[:blank:]]+[^[:blank:]]+" $JMAP \
+					&& get_msg $_qv "_cj1" "$_value" "ROOTJAIL" && return 1
 
-	# Must have an entry in JCONF
-	! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
-			&& get_msg $_qv "_cj3" && return 1
+			# Must have an entry in JCONF
+			! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
+					&& get_msg $_qv "_cj3" && return 1
+		;;
+		*VM)
+			# Must have a designated rootVM in JMAP
+			! grep -Eqs "^${_value}[[:blank:]]+ROOTVM[[:blank:]]+[^[:blank:]]+" $JMAP \
+					&& get_msg $_qv "_cj1" "$_value" "ROOTVM" && return 1
+		;;
+	esac
 
 	return 0
 }
@@ -877,10 +949,9 @@ chk_valid_jail() {
 ############################  JAIL  PARAMETER CHECKS  ############################
 
 chk_valid_autostart() {
-	# Mostly for standardization/completeness with get_jail_parameter() func.
+	# Standardization/consistency with get_jail_parameter() func.
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -891,7 +962,6 @@ chk_valid_autosnap() {
 	# Mostly for standardization/completeness with get_jail_parameter() func.
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -902,7 +972,6 @@ chk_valid_class() {
 	# Return 0 if proposed class is valid ; return 1 if invalid
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -911,7 +980,7 @@ chk_valid_class() {
 
 	# Valid inputs are: appjail | rootjail | dispjail
 	case $_value in
-		appjail|dispjail|ephemeral|rootjail|VM) return 0 ;;
+		appjail|dispjail|ephemeral|rootjail|rootVM|appVM|VM) return 0 ;;
 		*) get_msg $_q "_cj2" "$_value" "CLASS" && return 1 ;;
 	esac
 }
@@ -920,7 +989,6 @@ chk_valid_cpuset() {
 	# Return 0 if proposed cpuset is valid ; return 1 if invalid
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -955,50 +1023,29 @@ chk_valid_gateway() {
 	# Return 0 if proposed gateway is valid ; return 1 if invalid
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
 	# Positional parmeters.
-	local _value="$1"
+	local _gw="$1"
 	local _jail="$2"
 
 	# Nonlocal var, class of the gateway is important for jail startups
-	local _class_gw=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
-
-	# Split log for checking a valid VM vs a valid jail
-	if [ "$_class_gw" = "VM" ] ; then
-		### NOTE: Future expansion will include a check for valid VM right here
-		# chk_valid_vm "$_value"
-		return 0
+	local _class_gw=$(sed -nE "s/^${_gw}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
 
 	# Class of gateway should never be a rootjail
-	elif [ "$_class_gw" = "rootjail" ] ; then
-		get_msg $_q "_cj7_1" "$_value" "$_jail" && return 1
-
-	# The case where net-firewall was not assigned a VM as a gateway.
-	elif [ "$_jail" = "net-firewall" ] ; then
-
-		if [ "$_value" = "none" ] ; then
-			# net-firewall should always have a gateway
-			get_msg $_q "_cj7_2"
-		else
-			# Alert to the fact that net-firewall doesn't have a VM gateway
-			get_msg $_q "_cj7_3"
-		fi
+	if [ "$_class_gw" = "rootjail" ] || [ "$_class_gw" = "rootVM" ] ; then
+		get_msg $_q "_cj7_1" "$_gw" "$_jail" && return 1
 
 	else
-		# `none' is valid for any other jail
-		[ "$_value" = "none" ] && return 0
+		# `none' is always a valid gateway 
+		[ "$_gw" = "none" ] && return 0
 
 		# Check that gateway is a valid jail.
- 		chk_valid_jail $_q "$_value" || return 1
+ 		chk_valid_jail $_q "$_gw" || return 1
 
-		# Checks that gateway starts with `net-'
-		case $_value in
-			net-*) return 0 ;;
-			  	 *) get_msg $_q "_cj8" "$_value" "$_jail"  ;  return 1 ;;
-		esac
+# UPGRADES: TYPE
+
 	fi
 }
 
@@ -1012,7 +1059,6 @@ chk_valid_ipv4() {
 	#   $_a0  $_a1  $_a2  $_a3  $_a4
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -1067,7 +1113,6 @@ chk_isqubsd_ipv4() {
 	# Returns 0 for IPv4 within convention ; return 1 if not.
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -1132,7 +1177,6 @@ chk_valid_maxmem() {
 	# IMPROVEMENT IDEA - check that proposal isn't greater than system memory
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -1168,7 +1212,6 @@ chk_valid_memsize() {
 	# Return 0 if proposed memsize is valid ; return 1 if invalid
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -1182,7 +1225,6 @@ chk_valid_mtu() {
 	# Return 0 if proposed mtu is valid ; return 1 if invalid
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -1204,18 +1246,67 @@ chk_valid_no_destroy() {
 	# Mostly for standardization/completeness with get_jail_parameter() func.
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
 	chk_truefalse $_q "$1" "NO_DESTROY"
 }
 
+chk_valid_ppt() {
+	# Mostly for standardization/completeness with get_jail_parameter() func.
+
+	# Quiet option
+	getopts q _opts && _q='-q'
+	shift $(( OPTIND - 1 ))
+
+	_value="$1"
+	[ -z "$_value" ] && get_msg $_q "_0" "PPT (passthru)" && return 1
+
+	# Get list of pci devices on the machine
+	_pciconf=$(pciconf -l | awk '{print $1}')
+
+	# Check all listed PPT devices from jmap 
+	for _val in $_value ; do
+
+		# convert _val to native pciconf format with :colon: instead of /fwdslash/
+		_val2=$(echo "$_val" | sed "s#/#:#g")
+
+		# Search for the individual device and specific device for devctl functions later
+		_pciline=$(echo "$_pciconf" | grep -Eo ".*${_val2}")
+		_pcidev=$(echo "$_pciline" | grep -Eo "pci.*${_val2}")
+
+		# PCI device doesnt exist on the machine
+		[ -z "$_pciline" ] && get_msg $_q "_cj22" "$_val" "PPT" && return 1 
+
+		# Extra set of checks for the PCI device, if it's about to be attached to a VM 
+		if [ "$_ppt_launch" = "true" ] ; then
+
+			# If the pci device is detached, try to attach it.
+			[ -z "${_pciline##none*}" ] && ! $(devctl attach "$_pcidev") && _attached="true" \
+					&& get_msg "_cj26" "$_pciline" && return 1
+
+			# Make sure the PCI device is designated for passthrough 
+			[ -n "${_pciline##ppt*}" ] && get_msg $_q "_cj23" "$_val" "$_passvar" && return 1 
+
+			# If the device was attached and is ppt, there's no need for dettach/attach test 
+			if [ -z "$_attached" ] ; then
+
+				# Check if the PCI device is busy, and would thus cause an error
+				! devctl detach "$_pcidev" && get_msg $_q "_cj24" "$_val" && return 1
+
+				# Re-attach PCI, or error if unable
+				! devctl attach "$_pcidev" && get_msg $_q "_cj25" && return 1
+			fi
+		fi
+	done
+
+	return 0
+}
+
 chk_valid_rootjail() {
 	# Return 0 if proposed rootjail is valid ; return 1 if invalid
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -1225,11 +1316,33 @@ chk_valid_rootjail() {
 
 	# Must be designated as a rootjail in jailmap.con
 	_rootj=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
-	! [ "$_rootj" = "rootjail" ] && get_msg $_q "_cj16" "$_value" && return 1
+	! [ "$_rootj" = "rootjail" ] && get_msg $_q "_cj16" "$_value" "rootjail" && return 1
 
 	# Must have an entry in JCONF
 	! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
 			&& get_msg $_q "_cj3" && return 1
+
+	# Rootjails require a dataset at zroot/quBSD/jails
+	! chk_valid_zfs ${JAILS_ZFS}/${_value} \
+			&& get_msg $_q "_cj4" "$_value" "$JAILS_ZFS" && return 1
+
+	return 0
+}
+
+chk_valid_rootvm() {
+	# Return 0 if proposed rootVM is valid ; return 1 if invalid
+
+	# Quiet option
+	getopts q _opts && _q='-q'
+	shift $(( OPTIND - 1 ))
+
+	# Positional parmeter / check
+	local _value="$1"
+	[ -z "$_value" ] && get_msg $_q "_0" "CLASS" && return 1
+
+	# Must be designated as a rootjail in jailmap.con
+	_rootvm=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
+	! [ "$_rootvm" = "rootVM" ] && get_msg $_q "_cj16" "$_value" "rootVM" && return 1
 
 	# Rootjails require a dataset at zroot/quBSD/jails
 	! chk_valid_zfs ${JAILS_ZFS}/${_value} \
@@ -1267,7 +1380,6 @@ chk_valid_schg() {
 	# Return 0 if proposed schg is valid ; return 1 if invalid
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -1290,7 +1402,6 @@ chk_valid_template() {
 	# Exists mostly so that the get_jail_parameters() function works seamlessly
 
 	# Quiet option
-	local _qt ; local _opts
 	getopts q _opts && _qt='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -1306,7 +1417,6 @@ chk_valid_vcpus() {
 	# Return 0 if proposed vcpus are valid; false if not. 
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -1330,11 +1440,26 @@ chk_valid_vcpus() {
 	return 0
 }
 
+chk_valid_vncres() {
+	# Make sure that the resolution is supported by bhyve
+
+	# Quiet option
+	getopts q _opts && _q='-q'
+	shift $(( OPTIND - 1 ))
+
+	_value="$1"
+	[ -z "$_value" ] && get_msg $_q "_0" "vnc viewer resolution" && return 1
+
+	case $_value in 
+		640x480|800x600|1024x768|1920x1080) return 0 ;;
+		*) get_msg $_q "_je6" "VNC viewer resolution" && return 1 ;;
+	esac
+}
+
 chk_valid_vif() {
 	# Return 0 if vif is valid ; return 1 if invalid
 
 	# Quiet option
-	local _q ; local _opts
 	getopts q _opts && _q='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -1342,13 +1467,26 @@ chk_valid_vif() {
 	local _value="$1"
 	local _jail="$2"
 
- 	! echo "$_value" | grep -qE "^tap[[:digit:]]+\$" \
-			&& get_msg $_q "_cj7" "$_value" "$_jail" && return 1
+	[ -z "$_value" ] && get_msg $_q "_0" "VIF" && return 1
+	[ -z "$_jail" ] && get_msg $_q "_0" "Jail" && return 1
+
+	for _vif in $_value ; do
+ 		! echo "$_vif" | grep -qE "^tap[[:digit:]]+\$" \
+				&& get_msg $_q "_cj7" "$_vif" "$_jail" && return 1
+	done
 
 	return 0
 }
 
+chk_valid_wiremem() {
+	# Standardization/consistency with get_jail_parameter() func.
 
+	# Quiet option
+	getopts q _opts && _q='-q'
+	shift $(( OPTIND - 1 ))
+
+	chk_truefalse $_q "$1" "WIREMEM"
+}
 
 ##################################################################################
 #######################  FUNCTIONS RELATED TO NETWORKING #########################
@@ -1402,7 +1540,6 @@ discover_open_ipv4() {
 	# Echo open IP on success; Returns 1 if failure to find an available IP
 
 	# Positional params and func variables.
-	local _qi ; local _opts
 	getopts q _opts && local _qi='-q'
 	shift $(( OPTIND - 1 ))
 
@@ -1474,32 +1611,15 @@ assign_ipv4_auto() {
 #######################  FUNCTIONS RELATED TO VM HANDLING ########################
 ##################################################################################
 
-chk_isrunning_vm() {
-	# Return 0 if bhyve VM is a running process; return 1 if not.
-
-	local _VM
-	[ -n "$1" ] && _VM="$1" || return 1
-
-	pgrep -qf "bhyve: $_VM"  >>  /dev/null 2>&1  ||  return 1
-}
-
-poweroff_vm() {
+stop_vm() {
 	# Tries to gracefully shutdown VM with SIGTERM, as per man bhyve
 	# Monitor process for 90 seconds. return 0 if removed, 1 if timeout
 	# Pass option "quiet" if no stdout is desired
 
-	local _vm
-	local _count
-	local _quiet
-
-	local _vm
 	[ -n "$1" ] && _vm="$1" || get_msg "$_q _0 $2"
-	local _if_err
+
 	# Action to take on failure. Default is return 1 to caller function
 	[ -z "$2" ] && _if_err="return 1" || _if_err="return 1"
-
-	# Error if $_jail provided is empty
-	[ -z "$_jail" ] &&
 
 	[ -n "$1" ] && _VM="$1" || return 1
 	[ "$2" = "quiet" ] && _quiet="true"
@@ -1517,8 +1637,153 @@ poweroff_vm() {
 		_count=$(( _count + 1 ))
 		[ "$_count" -gt 30 ] && get_msg_qb_vm "_5" "exit_1"
 	done
-
 }
+
+prepare_vm() {
+	# Starts VM. ALLCAPS variables are each a full line option for bhyve. Returns 1 if any errors. 
+
+	# Quiet option
+	getopts q _opts && _qvm='-q'
+	shift $(( OPTIND - 1 ))
+
+	# Assign _vm variable
+	_VM="$1"
+
+	# Get simple jmap variables
+	_gateway=$(get_jail_parameter -edz GATEWAY "$_VM")    || return 1 
+	_ipv4=$(get_jail_parameter -ez IPV4 "$_VM")           || return 1 
+	_memsize=$(get_jail_parameter -e MEMSIZE "$_VM")      || return 1 
+	_wiremem=$(get_jail_parameter -e WIREMEM "$_VM")      || return 1 
+	_rootvm=$(get_jail_parameter -ed ROOTVM "$_VM")       || return 1 
+	_vcpus=$(get_jail_parameter -e VCPUS "$_VM")          || return 1 
+	_vifs=$(get_jail_parameter -edz VIF "$_VM")           || return 1 
+	_vncres=$(get_jail_parameter -edz VNCRES "$_VM")      || return 1 
+
+	# Dirty hack to flag the extra checks for passthru devices (since about to start VM) 
+	_ppt_launch="true"
+	_ppt=$(get_jail_parameter -edz PPT "$_VM")            || return 1 
+
+	# For VMs that are clients, their tap still needs an IPV4 inside the gateway 
+	[ "$_ipv4" = "auto" ] && _ipv4=$(assign_ipv4_auto -e "$_VM")
+
+	# Assign CPU, memory, and wire variable
+	_CPU="-c $_vcpus"
+	_RAM="-m $_memsize"
+	[ "$_wiremem" = "true" ] && _WIRE='-S' || _WIRE=''
+	
+	# Assign hostbridge based on CPU 
+	grep -Eqs "^CPU.*AMD" /var/run/dmesg.boot \
+		&& _HOSTBRG="-s 0:0,amd_hostbridge" \
+		|| _HOSTBRG="-s 0:0,hostbridge"
+
+	# assign lpc, then start slot count for bhyve command construction
+	_LPC="-s 31:0,lpc"
+	_slot=1
+
+	# Assign zroot blk device 
+	_BLK_ROOT="-s ${_slot}:0,virtio-blk,/dev/zvol/${JAILS_ZFS}/${_VM}"
+	_slot=$(( _slot + 1 ))	
+
+	# Assign zusr blk device. Must be a volume; or should be blank
+	chk_valid_zfs "${ZUSR_ZFS}/${_VM}" \
+		&& zfs list -Ho type "${ZUSR_ZFS}/${_VM}" | grep -qs "volume" \
+		&& _BLK_ZUSR="-s ${_slot}:0,virtio-blk,/dev/zvol/${JAILS_ZFS}/${_VM}" \
+		&& _slot=$(( _slot + 1 ))	\
+		|| _BLK_ZUSR='' \
+
+	# Assign all taps to slots _VTNET. VM can have taps, even without gateway
+	for _tap in $_vifs ; do		
+		_VTNET=$(printf "%b" "${_VTNET} -s ${_slot}:0,virtio-net,${_tap}")
+		_slot=$(( _slot + 1 ))	
+	done
+
+	# Assign passthrough variable
+	for _pci in $_ppt ; do		
+		_PPT=$(printf "%b" "${_PPT} -s ${_slot}:0,passthru,\"${_pci}\"")
+		_WIRE="-S"
+		_slot=$(( _slot + 1 ))	
+	done
+
+	# Assign VNC FBUF options 
+	if [ "$_vncres" ] ; then
+
+		# Define height/width from the jmap entry
+		_w=$(echo "$_vncres" | grep -Eo "^[[:digit:]]+")
+		_h=$(echo "$_vncres" | grep -Eo "[[:digit:]]+\$")
+		
+		# Find all sockets in use, and define starting socket to search 
+		_socks=$(sockstat -P tcp | awk '{print $6}' | grep -Eo ":[[:digit:]]+")
+		_port=5900
+
+		# cycle through sockets until an unused one is found
+		while : ; do
+			echo "$_socks" | grep -qs "$_port" && _port=$(( _port + 1 )) || break 
+		done
+
+		echo "$_port" > /tmp/qb-vnc_${_VM}
+
+		_FBUF="-s 29,fbuf,tcp=0.0.0.0:${_port},w=${_w},h=${_h}"
+		_slot=$(( _slot + 1 ))	
+
+		_TAB="-s 30,xhci,tablet"
+		_slot=$(( _slot + 1 ))	
+	fi
+
+	# UEFI bootrom
+	_BOOT="-l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI.fd"
+
+	# Make sure we haven't exceed slot 28 (29-31 reserved for fbuf, tablet, and lpc)
+	[ "$_slot" -gt 28 ] && get_msg "_cj28" "$_VM" && return 1
+
+	reclone_zroot "$_VM" "$_rootvm"
+
+	launch_vm &
+
+	[ "$_gateway" ] && ! [ "$_gateway" = "none" ] \
+			&& connect_client_to_gateway "$_VM" "$_gateway" "$_ipv4"
+
+	[ "$_vncres" ] && vncviewer "0.0.0.0:$_port" &
+
+	return 0	
+}
+
+launch_vm() {
+	# Invoke the trap function for VM cleanup after completion.
+	trap 'cleanup_vm' INT TERM HUP QUIT
+
+	# Launch the VM to the background
+	eval "bhyve $_CPU $_RAM $_WIRE -AHP $_HOSTBRG $_BLK_ROOT $_BLK_ZUSR $_VTNET \
+			$_PPT $_FBUF $_TAB $_LPC $_BOOT $_VM"
+
+	# Trap function wont trigger at the end of the function. Need to call the cleanup
+	cleanup_vm
+}
+
+cleanup_vm() {
+	# Cleanup function after VM is stopped or killed in any way 
+
+	# remove port from vnc tracker
+	rm /tmp/qb-vnc_${_VM} > /dev/null 2>&1
+
+	pkill -fx -15 "bhyve: $_VM" || pkill -9 -fx "bhyve: $_VM"
+
+	# Pull the VIF from the gateway
+	_vif=$(echo "$_vifs" | grep -Eo "^[^[:blank:]]+")
+	if [ "$_vif" ] && [ "$_gateway" ] ; then
+		ifconfig $_vif -vnet $_gateway > /dev/null 2>&1
+		ifconfig $_vif destroy
+	fi
+
+	# Destroy the VM
+	bhyvectl --vm="$_VM" --destroy	
+
+	# Destroy the dataset
+	reclone_zroot -q "$_VM" "$_rootvm"	
+	
+	return 0
+}
+
+
 
 
 
