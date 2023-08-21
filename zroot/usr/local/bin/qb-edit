@@ -40,7 +40,7 @@ checks() {
 
 	elif [ "$VAL" = "$OLDSETTING" ] ; then
 		# New value is unchanged from old value 
-		get_msg_edit "_3" "usage_0"
+		get_msg_edit "_3" "exit_0"
 	fi	
 
 	# Sanity checks to make sure values are reasonable
@@ -143,7 +143,8 @@ handle_vm_gateway() {
 		# Relevant variables. 
 		_gateway=$(get_jail_parameter -deqs GATEWAY $JAIL)
 		_tap=$(get_jail_parameter -deqs VIF $_gateway)
-		_rcconf="${M_ZUSR}/net-firewall/rw/etc/rc.conf"
+		_mtu=$(get_jail_parameter -eq MTU $JAIL)
+		_rcconf="${M_ZUSR}/${JAIL}/rw/etc/rc.conf"
 		chflags noschg "$_rcconf"	
 
 		if [ "$VAL" = "DHCP" ] ; then
@@ -151,7 +152,6 @@ handle_vm_gateway() {
 			sed -i '' -E "/defaultrouter=/ d" $_rcconf
 
 		else
-
 			# Using `#' as sed separator, because `/' interferes with variable expansion
 			sed -i '' -E "s#ifconfig_.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
 			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
