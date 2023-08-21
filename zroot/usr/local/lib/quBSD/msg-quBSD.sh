@@ -45,8 +45,7 @@ ENDOFMSG
 	;;
 	_cj4) cat << ENDOFMSG
 
-ERROR: Invalid jail. 
-       < $_value > has no ZFS dataset at: < $_passvar > 
+ERROR: < $_value > has no ZFS dataset at: < $_passvar > 
 ENDOFMSG
 	;;
 	_cj5) cat << ENDOFMSG
@@ -75,8 +74,8 @@ ENDOFMSG
 	;;
 	_cj7_1) cat << ENDOFMSG
 
-ERROR: < $_value > is a rootjail, and for security
-       reasons, should never be used as a gateway. 
+ERROR: < $_value > is a rootjail or rootVM. For security
+       reasons, it should never be used as a gateway. 
 
 ENDOFMSG
 	;;
@@ -84,20 +83,6 @@ ENDOFMSG
 
 ALERT: < net-firewall > should usually have a gateway, 
          a connection point to the outside internet.       
-ENDOFMSG
-	;;
-	_cj7_3) cat << ENDOFMSG
-
-ALERT: < net-firewall > usually connects to nicvm,
-         the connection point to the outside internet.       
-ENDOFMSG
-	;;
-	_cj8) cat << ENDOFMSG
-
-ALERT: < $_value > doesn't start with < net- > . Typically, 
-       workstation jails connect to outside internet via 
-       gateway jails. However, it is possible/valid to  
-       configure a default connection between any two jails.  
 ENDOFMSG
 	;;
 	_cj9) cat << ENDOFMSG
@@ -171,7 +156,7 @@ ENDOFMSG
 	_cj16) cat << ENDOFMSG
 
 ERROR: < $_value > needs to be designated as a
-       rootjail in jailmap.conf
+       < $_passvar > in jailmap.conf
 ENDOFMSG
 	;;
 	_cj17) cat << ENDOFMSG
@@ -213,6 +198,48 @@ ENDOFMSG
 
 ERROR: RAM allocation < $_value > should be less than the
        host's available RAM < $_passvar bytes >
+ENDOFMSG
+	;;
+	_cj22) cat << ENDOFMSG
+
+ERROR: PCI device < $_value > doesn't exist on the host machine. 
+ENDOFMSG
+	;;
+	_cj23) cat << ENDOFMSG
+
+ERROR: PCI device < $_value > exists on host, but isn't
+       designated as ppt. Check that it's in /boot/loader.conf 
+       and reboot host. Note: In loader.conf, use the form:
+       pptdevs="$_passvar"
+ENDOFMSG
+	;;
+	_cj24) cat << ENDOFMSG
+
+ERROR: Cant access PCI device < $_value >
+       Likely attached to another VM. 
+ENDOFMSG
+	;;
+	_cj25) cat << ENDOFMSG
+
+ERROR: Was unable to re-attach PCI device < $_value >
+       after detaching (to probe if it was busy or not).
+ENDOFMSG
+	;;
+	_cj26) cat << ENDOFMSG
+
+ERROR: PCI device < $_value > is not attached.
+       Attempted to attach with devctl, but failed.
+ENDOFMSG
+	;;
+	_cj27) cat << ENDOFMSG
+
+ERROR: Waiting for < $_vif > to appear on host in order to 
+       connect < $_value > to its gateway, but timed out.
+ENDOFMSG
+	;;
+	_cj28) cat << ENDOFMSG
+
+ERROR: < $_value > attempts to use too many bhyve slots.
 ENDOFMSG
 	;;
 	_jf1) cat << ENDOFMSG
@@ -263,6 +290,12 @@ ENDOFMSG
 ERROR: Parameter < $_value > for < $_passvar > 
        had a null value in $QBDIR/jailmap.conf
 
+ENDOFMSG
+	;;
+	_jo0) cat << ENDOFMSG
+
+ERROR: < $_value > is not a clone (has no zfs origin).
+       Likely is a rootjail or rootVM
 ENDOFMSG
 	;;
 	_jo1) cat << ENDOFMSG
