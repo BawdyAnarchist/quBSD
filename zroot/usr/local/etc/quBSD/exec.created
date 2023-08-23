@@ -30,8 +30,8 @@ connect_to_gateway() {
 	# If auto, then assign the global variable IPV4 to have a real IP addr
 	[ "$IPV4" = "auto" ] && assign_ipv4_auto "$JAIL" 
 
-	# Connect jail, to it's gateway. Global $VIF is assigned inside func.
-	chk_isrunning "$GATEWAY" && connect_client_to_gateway "$JAIL" "$GATEWAY" "$IPV4"
+	# Connect jail, to it's gateway, and assign VIF used for gateway 
+	chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -e "$JAIL" "$GATEWAY" "$IPV4")
 }
 
 connect_to_clients() {
@@ -50,8 +50,8 @@ connect_to_clients() {
 		# Make sure flags are down
 		chflags -R noschg "${M_ZUSR}/${_client}/rw/etc" 
 
-		# $VIF was assigned during the connect_client_to_gateway func. Modify pf.conf 
-		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${VIF}\"@" $_cPF
+		# pf needs the external interface and jIP for filtering variables
+		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${_VIF}\"@" $_cPF
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${_cIP}\"@"  $_cPF
 
 		# Restart _client pf service
