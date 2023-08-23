@@ -68,8 +68,7 @@ ENDOFMSG
 	;;
 	_cj7) cat << ENDOFMSG
 
-ERROR: < $_value > is not a valid virtual interface
-       (VIF) for < $_passvar >.  
+ERROR: < $_value > is invalid. Must be a single digit integer.
 ENDOFMSG
 	;;
 	_cj7_1) cat << ENDOFMSG
@@ -240,6 +239,24 @@ ENDOFMSG
 	_cj28) cat << ENDOFMSG
 
 ERROR: < $_value > attempts to use too many bhyve slots.
+ENDOFMSG
+	;;
+	_cj29) cat << ENDOFMSG
+
+ERROR: < $_value > Contains an invalid argument for bhyve.
+       The only permissible bhyve options here, are those
+       which require no additiona args:  AaCDeHhPSuWwxY
+       !note! - do not include the '-'
+ENDOFMSG
+	;;
+	_cj30) cat << ENDOFMSG
+
+ERROR: < $_value > contains a duplicate character.
+ENDOFMSG
+	;;
+	_cj31) cat << ENDOFMSG
+
+ERROR: Could not find < ROOTVM > for < $_value > 
 ENDOFMSG
 	;;
 	_jf1) cat << ENDOFMSG
