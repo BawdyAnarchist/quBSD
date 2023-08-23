@@ -34,18 +34,17 @@ climb_hierarchy() {
 
 	local _jail="$1"
 	local _gateway=$(get_jail_parameter -deqs GATEWAY "$_jail")
-	local _class_of_gateway=$(get_jail_parameter -deqs CLASS "$_gateway")
 
 	if echo "$_CLIMBED" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" ; then
 		# _jail gateway path was already handled. Skip further checks.
 		return 0
 
-	# Don't include invalid jails, running jails, or VMs 
+	# Don't include invalid jails, or jails already off
 	elif ! chk_valid_jail -q $_jail || ! chk_isrunning "$_jail" ; then
 		return 0
 
 	# _jail is an endpoint. Either has no network, or is top of hierarchy. 
-	elif [ "$_gateway" = "none" ] || [ "$_class_of_gateway" = "appVM" ] ; then
+	elif [ "$_gateway" = "none" ] ; then 
 
 		if get_info _CLIENTS $_jail ; then
 			# Has clients that need to wait for _jail to stop. 
@@ -54,9 +53,6 @@ climb_hierarchy() {
 		else
 			# _jail has no networking. Can stop immediately in the background 
 			stop_jail_in_background "$_jail" > /dev/null 2>&1 &
-
-			# It can also be removed from the FULLIST, as it's unimportant 
-			_FULLIST=$(echo "$_FULLIST" | grep -Ev "^[[:blank:]]*${_jail}[[:blank:]]*\$")	
 		fi
 		
 		# Add _jail to the list of jails already climbed and checked.
@@ -81,9 +77,14 @@ begin_waterfall() {
 	local _gateways="$1"
 	for _gw in $_gateways ; do
 
-		# Wait for _gw to stop before proceeding 
-		echo "$_JLIST" | grep -Eq "^[[:blank:]]*${_gw}[[:blank:]]*\$" \
+		# If it's a VM gateway, can be stopped in the background, otherwise, wait
+		if chk_isvm "$_gw" ; then
+			stop_jail_in_background "$_gw" & 
+		else
+			# Double check it was on the list of jails to stop
+			echo "$_JLIST" | grep -Eq "^[[:blank:]]*${_gw}[[:blank:]]*\$" \
 				&& stop_jail "$_gw" > /dev/null 2>&1 
+		fi
 
 		# Determine which clients are endpoints, and which serve clients in turn
 		classify_clients "$_gw"
