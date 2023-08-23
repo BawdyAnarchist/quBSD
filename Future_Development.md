@@ -1,6 +1,12 @@
 
 ##### VIRTUAL MACHINE INTEGRATION
 
+still need to use bhyve uefi.fd to make nicvm
+
+dhcpd
+	- dhcpd option-domain-name-servers <IP> should be copied from /resolv.conf 
+	- mtu should also be drop and replaced
+
 1. qubsd.sh 
 
 Fix the "net-firewall" switches.
@@ -19,11 +25,10 @@ Fix the "net-firewall" switches.
 
 2. jailmap
 	- Add a generic parameter that tacks on any "-s 99:0 <options>" 
-	- Add a line to override bhyve options 
 
 3. Scripts that should integrate VMs
 	- qb-stop , qb-start, qb-edit (now needs "add" function for multiple taps at least), qb-rename , qb-destroy, qb-stat, qb-create, qb-disp
-	
+
 4. New scripts
 	qb-pci
 		- summary of PCI devices relevant to user
@@ -34,9 +39,6 @@ Fix the "net-firewall" switches.
 		- Maybe also for create, since that might be non-trivial, and your qb-create is already pretty good
 		- -n option to output the command that would be run (so that can manual add options at VM launch)
 
-dhcpd
-	- dhcpd option-domain-name-servers <IP> should be copied from /resolv.conf 
-
 # CLEANUP STUFF
 quBSD.conf 
 	- remove ppt_nic. It's now in jmap.
@@ -45,9 +47,6 @@ quBSD.conf
 Generalize staticIP vs auto vs DHCP
 	- DHCP requires a split in the logic of starting the jail, where no IP is assigned to the client
 	- Requires modifying exec.created ; and the rc.conf for the jail.
-
-net-jails
-	- MTU will need to be targeted and changed in dhcpd.conf at every net-jail start
 
 USBVM 
 	- Auto-install various useful mounting stuff for common devices     
@@ -65,10 +64,13 @@ net-firewall
 		- Currently does not integrate all unique wireguard ports of clients (net-jails).
 		- needs careful review. Use chatGPT-4
 
+Cleanup the github. You have scripts in there that arent relevant from full copies of $ubin
+
 Are there going to be differences to code into prepare_vm between Linux, Windows, and FreeBSD?
 
 ULTIMATE LAST CHECK, NEED TO SEARCH ALL "VM" instances, coz of new naming conventions"
 
+Integrate in qb-i3-launch as well
 
 ### UPGRADES
 
@@ -139,7 +141,6 @@ qubsd_installer
 ### BEST PRACTICES / FIXES / CLEANUP
 
 VMs
-	- the ability to put arbitrary options specifications lines for any VM
 	- the ability to turn off or replace some of the line options (the non -s lines)
 	- the ability to spit out the command that would be run (-n no-run option in qb-start)
 
@@ -169,6 +170,8 @@ quBSD.sh and msg-qubsd.sh
 	- There might be some consideration to further generalization of functions
 		- Passing through the -q [quiet] -s [skipchecks] and even a new [-f force] 
 			This enables easier to implement features (like with ephemeral jails that use appjail clones as rootjails
+		- Master -V (verbose) command could be included on all top level scripts, with -q as default 
+		- Could also beef up the log file, and make reference to it in error messages
 
 qubsd_ipv4 - there's probably room for IP expansion for multiple strings of gateways .. maybe.
 
