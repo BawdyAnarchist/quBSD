@@ -50,7 +50,7 @@ assemble_header() {
 	mktemp $TMP1 > /dev/null
 	mktemp $TMP2 > /dev/null
 
-	printf "%b" "${HILIT}CONTAINER\tJID\tGATEWAY\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" >> $TMP1
+	printf "%b" "${HILIT}CONTAINER\tPID\tGATEWAY\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" >> $TMP1
 }
 
 define_variables() {
@@ -77,7 +77,8 @@ define_variables() {
 get_jails_loop() {
 	for _j in $jails ; do
 		class=$(get_jail_parameter -eqs CLASS "$_j")
-		class="${class%jail}"
+#scheduled for deletion
+#class="${class%jail}"
 		gateway=$(get_jail_parameter -eqs GATEWAY "$_j")
 		gateway="${gateway:--}"
 		rootjail=$(get_jail_parameter -eqs ROOTJAIL "$_j")
@@ -88,18 +89,28 @@ get_jails_loop() {
 		ram="-"
 		
 		if chk_isrunning "$_j" ; then
-			jid=$(jls -j $_j -n jid | sed "s/jid=//") 
-			cpu=$(ps au -J $_j | awk '{sum+=$3;} END {print sum;}')
-			ram=$(ps au -J $_j | awk '{sum+=$4;} END {print sum;}')
+
+			if chk_isvm "$_j" ; then
+				jid=$(pgrep -f "bhyve: $_j")
+				cpu=unk
+				ram=unk
+				#cpu=$(ps au -J $_j | awk '{sum+=$3;} END {print sum;}')
+				#ram=$(ps au -J $_j | awk '{sum+=$4;} END {print sum;}')
+
+			else
+				jid=$(jls -j $_j -n jid | sed "s/jid=//") 
+				cpu=$(ps au -J $_j | awk '{sum+=$3;} END {print sum;}')
+				ram=$(ps au -J $_j | awk '{sum+=$4;} END {print sum;}')
+			fi
 		fi	
 
-		if [ "$class" = "root" -o -z "${_j##0*template}" ] ; then 
+		if [ "$class" = "rootjail" -o -z "${_j##0*template}" ] ; then 
 			disk=$(echo "$zfs_list" | sed -nE "s#^${JAILS_ZFS}/${_j}[[:blank:]]+##p")
 			sub=4
 
-		elif [ "$class" = "VM" ] ; then 
+		elif [ "$class" = "rootVM" ] ; then 
 			# Future functionality - bhyvectl or ping test for on/connected
-			disk=$(echo "$zfs_list" | sed -nE "s#^${QBROOT}/${_j}[[:blank:]]+##p")
+			disk=$(echo "$zfs_list" | sed -nE "s#^${JAILS_ZFS}/${_j}[[:blank:]]+##p")
 			sub=5
 		else 
 			disk=$(echo "$zfs_list" | sed -nE "s#^${ZUSR_ZFS}/${_j}[[:blank:]]+##p")
