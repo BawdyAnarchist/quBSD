@@ -256,7 +256,12 @@ ENDOFMSG
 	;;
 	_cj31) cat << ENDOFMSG
 
-ERROR: Could not find < ROOTVM > for < $_value > 
+ERROR: VM < $_value > failed to launch 
+ENDOFMSG
+	;;
+	_cj32) cat << ENDOFMSG
+
+quBSD msg: VM < $_value > has ended 
 ENDOFMSG
 	;;
 	_jf1) cat << ENDOFMSG
