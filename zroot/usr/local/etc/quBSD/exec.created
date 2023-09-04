@@ -18,9 +18,6 @@ get_parameters() {
 	if [ $GATEWAY = "none" ] ; then
 		IPV4="none"
 	else
-		# We will need the class of the gateway later for VM vs jails handling
-		_class_gw=$(get_jail_parameter -eq CLASS "$GATEWAY")
-
 		# MTU only with valid IP. Quiet messages (MTU is not critical) 
 		get_jail_parameter -q MTU "$JAIL" 
 	fi
@@ -36,12 +33,12 @@ connect_to_gateway() {
 
 connect_to_clients() {
 
-	# Get IP of client from jmap 
+	# Get client IP
 	_cIP=$(get_jail_parameter -deq IPV4 "$_client") 
-
-	# Assign auto IP to client and connect it to jail.
 	[ "$_cIP" = "auto" ] && _cIP=$(assign_ipv4_auto -e "$_client")
-	connect_client_to_gateway "$_client" "$JAIL" "$_cIP" 
+
+	# Bring up connection, and return the VIF used for the client
+	_cVIF=$(connect_client_to_gateway -e "$_client" "$JAIL" "$_cIP")
 
 	# Need to modify the client pf.conf with the epair
 	_cPF="${M_ZUSR}/${_client}/${PFCONF}"
@@ -51,7 +48,7 @@ connect_to_clients() {
 		chflags -R noschg "${M_ZUSR}/${_client}/rw/etc" 
 
 		# pf needs the external interface and jIP for filtering variables
-		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${_VIF}\"@" $_cPF
+		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${_cVIF}\"@" $_cPF
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${_cIP}\"@"  $_cPF
 
 		# Restart _client pf service
@@ -71,7 +68,7 @@ modify_pf() {
 		chflags -R noschg "${M_ZUSR}/${JAIL}/rw/etc" 
 
 		# $VIF was assigned during the connect_client_to_gateway func. Modify pf.conf 
-		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${VIF}\"@" $JPF
+		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${_VIF}\"@" $JPF
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${IPV4}\"@" $JPF
 
 		# net-jail internal wireguard parameters
@@ -98,11 +95,7 @@ main() {
 
 	modify_pf			
 
-	# If <jail> serves a network connection, bring those connections up 
-	for _client in $(get_info -e _CLIENTS "$JAIL") ; do
-
-		chk_isrunning "$_client" && connect_to_clients
-	done
+	connect_gateway_to_clients "$JAIL"
 
 	resource_control
 }
