@@ -6,13 +6,15 @@
 . /usr/local/lib/quBSD/msg-cmd.sh
 
 get_options() {
-	while getopts hnru:v opts ; do
+	while getopts hnrtu:vV opts ; do
 		case $opts in
 			h) get_msg_cmd "none" "usage_0" ;;
 			n) _NEWWIND="xterm -e" ;;
         	r) _USER="root" ;;
+        	t) _TMUX="-t" ;; 
 			u) _USER="${OPTARG}" ;;
 			v) _REDIRECT='' ;;
+        	V) _VNC="true" ;; 
 			*) exit 1 ;;
 		esac
 	done
@@ -21,6 +23,9 @@ get_options() {
 
 	JAIL="$1" ; shift
 	_CMD="$@"
+}
+
+parse_jail_vars() {
 
 	# Passing commands through another terminal is tricky. 
 	if [ -z "$_CMD" ] ; then
@@ -40,9 +45,7 @@ get_options() {
 		# NOTE: {paremeter-word} is not documented in man sh , but it works. 
 		_REDIRECT="${_REDIRECT- > /dev/null 2>&1 &}"
 	fi
-}
 
-main() {
 	# If X is running, get the jailname of the active window 
 	if pgrep -q Xorg ; then
 		# Jailname of the active window is assigned to: $_XJAIL 
@@ -52,23 +55,50 @@ main() {
 	# Unless already specified, JAIL and USER should be set to the active window 
 	JAIL="${JAIL:=$_XJAIL}"
 	_USER="${_USER:=$JAIL}"
+}
 
+connect_vm_session() {
+
+	# Attach tmux if specified, or if both are blank
+	if [ "$_TMUX" ] || [ -z "${_TMUX}${_VNC}" ] ; then
+		tmux attach -t $JAIL 2> /dev/null || _nomux="true"
+	fi
+
+	# Attach VNC if specified, or if both are blank
+	if [ "$_VNC" ] || [ -z "${_TMUX}${_VNC}" ] ; then
+		_vncport=$(cat /tmp/qb-vnc_${_jail} 2> /dev/null) || _novnc="true"
+		[ "$_vncport" ] && vncviewer 0.0.0.0:$_vncport &
+	fi
+
+	# Error message for nothing to connect to
+	[ "$_nomux" ] && [ "$_novnc" ] && get_msg_cmd "_2" "exit_1"
+}
+
+main() {
+
+	# If JAIL is still not assigned, assume user wants a host xterm
 	if [ -z "$JAIL" ] || [ "$JAIL" = "host" ] ; then
-		# If JAIL is still not assigned, assume user wants a host xterm
 		xterm &
 		exit 0
 	fi
 
 	# Start the jail or exit with failure messages. 
-	start_jail "$JAIL" || get_msg_cmd "none" "exit_1"
+	start_jail $_TMUX "$JAIL" || get_msg_cmd "_1" "exit_1"
 
-	# Final evaluation statement. Launches the window/commands 
-	eval $_NEWWIND "jexec -l -U $_USER $JAIL csh -c $_CMD $_REDIRECT"
+	# Either connect to the VM, or run the JAIL command 
+	if chk_isvm "$JAIL" ; then
+		
+		connect_vm_session	
+	else
+		eval $_NEWWIND "jexec -l -U $_USER $JAIL csh -c $_CMD $_REDIRECT"
+	fi
 }
 
 get_global_variables
 
 get_options "$@"
+
+parse_jail_vars
 
 main
 
