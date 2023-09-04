@@ -29,8 +29,9 @@ ENDOFMSG
 
 usage() { cat << ENDOFUSAGE
 
-qb-cmd: Runs command in a jail, or new xterm on host
-        If no command is specified, default is /bin/csh
+qb-cmd: Runs command in a jail, or connects to VM.
+        Jail default is /bin/csh ; VM defaults to
+        both tmux and VNC if no option specified.
 
 Usage: qb-cmd <jailname>
        qb-cmd [-n][-r][-v] <jailname> <command>
@@ -39,8 +40,11 @@ Usage: qb-cmd <jailname>
    -n: (n)ew window. Run command in new window. If jail is not
        specified, default environment is the active window
    -r: (r)oot. Run cmd as root. Default is unprivileged user
+   -t: (t)mux connection will be made to VM, if available.
+       Note: Press ctrl-b and then "d" to disconnect.
    -v: (v)erbose. Output of <command> will print to stdio.
        (Default behavior sends output to /dev/null)
+	-V: (V)NC connection to VM will be attempted.
 
 ENDOFUSAGE
 }
