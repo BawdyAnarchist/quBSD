@@ -235,7 +235,7 @@ get_info() {
 	# Local options for this function
 	while getopts e opts ; do
 		case $opts in
-			e) local _ei="-e" ;;
+			e) _ei="-e" ;;
 			*) get_msg "_1" ; return 1 ;;
 		esac
 	done
@@ -243,9 +243,9 @@ get_info() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional variables
-	local _info="$1"
-	local _jail="$2"
-	local _value=''
+	_info="$1"
+	_jail="$2"
+	_value=''
 
 	case $_info in
 		_CLIENTS)
@@ -353,8 +353,16 @@ start_jail() {
 	# Starts jail. Performs sanity checks before starting. Logs results.
 	# return 0 on success ; 1 on failure.
 
-	# Quiet option
-	getopts q _opts && _qs='-q'
+   # Options 
+	while getopts nqt opts ; do
+		case $opts in
+			n) _norun="-n" ;;
+			q) _qs="-q" ;;
+			t) _tmux="-t" ;;
+			*) return 1 ;;
+		esac
+	done
+
 	shift $(( OPTIND - 1 ))
 
 	# Positional parameter / checks
@@ -374,19 +382,10 @@ start_jail() {
 			get_msg "_jf1" "$_jail" | tee -a $QBLOG
 			
 			if chk_isvm "$_jail" ; then
-				# Launch in subshell, prevent variables from interfering with caller
-				exec_vm_coordinator $_qs "$_jail" 
-
+				exec_vm_coordinator $_norun $_tmux $_qs "$_jail"
 			else
 				jail -vc "$_jail"  >> $QBLOG 2>&1  ||  get_msg $_qs "_jf2" "$_jail"
 			fi
-		fi
-
-	else
-		# If it's a VM, and already running, check if it has a vnc port, and launch vncviewer	
-		if chk_isvm "$_jail" ; then 
-			_vncport=$(cat /tmp/qb-vnc_${_jail} 2> /dev/null)
-			[ "$_vncport" ] && vncviewer 0.0.0.0:$_vncport
 		fi
 	fi
 
@@ -404,18 +403,18 @@ stop_jail() {
 	local _jail="$1"
 	[ -z "$_jail" ] && get_msg $_qj "_0" "jail" && return 1
 
-	# Check if jail is on
+	# Check that the jail is on
 	if chk_isrunning "$_jail" ; then
-
-		# If on, try to remove the jail normally
+		# Print message to log
 		get_msg "_jf3" "$_jail" | tee -a $QBLOG
 
 		if chk_isvm "$_jail" ; then
-			stop_vm $_qj "$_jail" && return 0 || return 1
+			# Kill the process gracefully; or if not, then forcefully
+			pkill -15 -fx "bhyve: $_jail" || pkill -9 -fx "bhyve: $_jail"
 
 		elif ! jail -vr "$_jail"  >> $QBLOG ; then
 
-			# If normal removal failed, try forcible removal
+			# If normal removal failed, forcibly remove
 			get_msg "_jf4" "$_jail" | tee -a $QBLOG
 			if jail -vR "$_jail"  >> $QBLOG  ; then
 
@@ -468,7 +467,7 @@ remove_tap() {
 	local _jail="$2"
 
 	# Check if it's already on host
-	ifconfig "$_tap" > /dev/null 2>&1  &&  return 0
+	ifconfig "$_tap" > /dev/null 2>&1  && ifconfig "$_tap" down && return 0
 
 	# If a specific jail was passed, check that as the first possibility to find/remove tap
 	if [ "$_jail" ] && jexec -l -U root $_jail ifconfig -l | grep -Eqs "$_tap" ; then
@@ -480,19 +479,18 @@ remove_tap() {
 		if jexec -l -U root $_jail ifconfig -l | grep -Eqs "$_tap" ; then
 			ifconfig $_tap -vnet $_jail
 			ifconfig $_tap down
-			break
+			return 0
 		fi
 	done
 
-	# Bring tap down for host/network safety
-	ifconfig $_tap down && return 0 || return 1
+	return 1
 }
 
 connect_client_to_gateway() {
-	# Implements the client/gateway connection as specified in JMAP
+	# When a jail/VM is started, this connects to its gateway 
 	# GLOBAL VARIABLES must have been assigned already: $GATEWAY ; $IPV4 ; $MTU
 
-	while getopts ei: opts ; do
+	while getopts e opts ; do
 		case $opts in
 			e) local _ec="true" ;;
 			*) get_msg "_1" ; return 1 ;;
@@ -508,16 +506,6 @@ connect_client_to_gateway() {
 	# VM client uses pre-determined tap interfaces and DHCP on the gateway jail
 	if chk_isvm "$_client" ; then
 
-		# Wait for the tap to be created, which can sometimes delay a moment 
-		_count=1
-		while [ "$_count" -le 10 ] ; do
-			ifconfig $_vif > /dev/null 2>&1 && break || _count=$(( _count + 1 ))
-			sleep 0.5
-			
-			# Print timeout error if the tap never appeared
-			[ "$_count" -eq 10 ] && get_msg "_cj27" "$_client" "$_vif" && return 1
-		done
-	
 		# Connect the tap to the gateway
 		ifconfig "$_vif" vnet "$_gateway"
 		jexec -l -U root $_gateway ifconfig $_vif inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
@@ -526,29 +514,29 @@ connect_client_to_gateway() {
 		return 0
 
 	elif chk_isvm "$_gateway" ; then
-
-		# Wait for the tap to be created, which can sometimes delay a moment 
-		_count=1
-		while [ "$_count" -le 10 ] ; do
-			ifconfig $_vif > /dev/null 2>&1 && break || _count=$(( _count + 1 ))
-			sleep 0.5
-			
-			# Print timeout error if the tap never appeared
-			[ "$_count" -eq 10 ] && get_msg "_cj27" "$_client" "$_vif" && return 1
-		done
+		# This is called by exec scripts, which dont yet have the _vif (tap
+		_vif=$(head -1 /tmp/qb-taps_${_gateway} 2> /dev/null)
 
 		# Send tap to client
  		ifconfig $_vif vnet $_client
 
 		# If there's any mtu setting other than 1500, apply it 
-		! [ "$_mtu" = "1500" ] \
+		[ ! "$_mtu" = "1500" ] \
 				&& jexec -l -U root $_client ifconfig $_vif mtu $_mtu up
 
-		# Unless DHCP is designated, add the IP address 
-		! [ "$IPV4" = "DHCP" ] \
-			&& jexec -l -U root $_client ifconfig $_vif inet ${_ipv4} mtu $_mtu up \
-			&& jexec -l -U root $_client route add default "${_ipv4%.*/*}.1" > /dev/null 2>&1
-	
+		# Run DHCP, or manuall add IP address 
+		if [ "$_ipv4" = "DHCP" ] ; then
+			# First remove any running instances of dhclient
+			jexec -l -U root $_client pkill -f dhclient > /dev/null 2>&1
+			jexec -l -U root $_client dhclient $_vif > /dev/null 2>&1
+
+		else
+			jexec -l -U root $_client ifconfig $_vif inet ${_ipv4} mtu $_mtu up 
+			jexec -l -U root $_client route add default "${_ipv4%.*/*}.1" > /dev/null 2>&1
+		fi
+
+		[ "$_ec" ] && echo "$_vif"	
+
 		return 0
 	fi
 
@@ -579,6 +567,49 @@ connect_client_to_gateway() {
 	return 0
 }
 
+connect_gateway_to_clients() {
+	# When a jail/VM is started, this manages the connection to its downstream clients 
+	
+	# Quiet option
+	getopts q _opts && _qz='-q'
+	shift $(( OPTIND - 1 ))
+
+	_jail="$1"
+	[ -z "$_jail" ] && get_msg $_q "_0" "Jail/VM" && return 1
+
+	for _client in $(get_info -e _CLIENTS "$_jail") ; do
+		
+		if chk_isrunning "$_client" ; then 
+	
+			# Get client IP
+			_cIP=$(get_jail_parameter -deq IPV4 "$_client") 
+			[ "$_cIP" = "auto" ] && _cIP=$(assign_ipv4_auto -e "$_client")
+
+			# Bring up connection, and return the VIF used for the client
+			_cVIF=$(connect_client_to_gateway -e "$_client" "$_jail" "$_cIP")
+
+			# Need to modify the client pf.conf with the epair
+			_cPF="${M_ZUSR}/${_client}/${PFCONF}"
+
+			if [ -e "$_cPF" ] ; then 
+				# Make sure flags are down
+				chflags -R noschg "${M_ZUSR}/${_client}/rw/etc" 
+
+				# pf needs the external interface and jIP for filtering variables
+				sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${_cVIF}\"@" $_cPF
+				sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${_cIP}\"@"  $_cPF
+
+				# Restart _client pf service
+				jexec -l -U root "$_client" service pf restart > /dev/null 2>&1
+
+				# Reapply jail flags from jmap 
+				qb-flags -r $_client > /dev/null 2>&1 &
+			fi
+		fi
+	done
+	return 0
+}
+
 reclone_zroot() {
 	# Destroys the existing rootjail clone of <_jail>, and replaces it
 	# Detects changes since the last snapshot, creates a new snapshot if necessary,
@@ -601,8 +632,8 @@ reclone_zroot() {
 	_presnap=$(zfs list -t snapshot -Ho name ${_rootzfs} | tail -1)
 
 	# Check that the _jail being destroyed/cloned has an origin (is a clone).
-	[ "$(zfs list -Ho origin "${JAILS_ZFS}/${_jail}")" = "-" ] \
-		&& get_msg $_qz "_jo0" "$_jail" && return 1
+	chk_valid_zfs "$_jailzfs" && [ "$(zfs list -Ho origin "${JAILS_ZFS}/${_jail}")" = "-" ] \
+		&& get_msg $_qz "_jo0" "$_jail" && return 1 
 
 	# `zfs diff` from simultaneous jail start, create momentary snapshot. Errors reclone 
 	while [ -z "${_presnap##*@zfs-diff*}" ] ; do
@@ -615,20 +646,19 @@ reclone_zroot() {
 	# Determine if there are any updates or pkg installations taking place inside the jail
 	if pgrep -qf "/usr/sbin/freebsd-update -b ${M_JAILS}/${_rootjail}" \
 		|| pgrep -qj "$_rootjail" -qf '/usr/sbin/freebsd-update' > /dev/null 2>&1 \
-		|| pgrep -qj "$_rootjail" 'pkg' > /dev/null 2>&1
+		|| pgrep -qj "$_rootjail" 'pkg' > /dev/null 2>&1 
+#I'm not sure if taking a snapshot of a running rootVM is maybe a bad idea
+#||pgrep -qf "bhyve: $_jail" > /dev/null 2>&1
 	then
 		local _busy="true"
 	fi
 
 	# If there's a pre existing snapshot, there's always a fallback for the reclone operation
-	if [ "$_presnap" ] ; then
+	# Exclude vm, coz zfs volmode=dev cant be analyzed with zfs diff
+	if ! chk_isvm "$_jail" && [ "$_presnap" ] ; then
 
-		# zfs volmode=dev cant be analyzed with zfs diff. Use snapshot sizes instead 
-		if chk_isvm "$_jail" && [ "$(zfs list -Ho used "$_presnap")" = "0B" ] ; then
-			_newsnap="$_presnap"
-	
 		# Check for differences between pre existing snapshot, and current state of jail
-		elif [ "$(zfs diff "$_presnap" "$_rootzfs")" ] ; then
+		if [ "$(zfs diff "$_presnap" "$_rootzfs")" ] ; then
 
 			# There are differences and the jail is busy. Fallback on pre-existing snapshot
 			[ "$_busy" ] && _newsnap="$_presnap"
@@ -643,7 +673,7 @@ reclone_zroot() {
 	fi
 
 	# If they're equal, then the valid/current snapshot already exists. Otherwise, make one.
-	if ! [ "$_newsnap" = "$_presnap" ] ; then
+	if [ ! "$_newsnap" = "$_presnap" ] ; then
 		# Clone and set zfs params so snapshot will get auto deleted later.
 		zfs snapshot -o qubsd:destroy-date="$_ttl" \
 	 					 -o qubsd:autosnap='-' \
@@ -662,7 +692,8 @@ reclone_zroot() {
 	fi
 
 	# Remove old snapshots past their ttl and no longer being used.
-	cleanup_oldsnaps "$_rootzfs" &
+#cleanup_oldsnaps "$_rootzfs" &
+
 	return 0
 }
 
@@ -737,13 +768,13 @@ cleanup_oldsnaps() {
 	for _snap in $_snaplist ; do
 
 		# Get the destroy-date for each snap, and destroy if past their date
-		chk_valid_zfs "$_snap" && local _snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
+		chk_valid_zfs "$_snap" && _snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
 		[ "$_snap_dd" -lt "$_date" ] && zfs destroy $_snap > /dev/null 2>&1
 
 		# Only remove 0B datasets if instructed to with [-z]	
 		if [ "$_zb" ] ; then
 			# Get data used by snap, destroy if 0B. Check exists first, b/c above might've deleted it.
-			chk_valid_zfs "$_snap" && local _snap_used=$(zfs list -Ho used $_snap)
+			chk_valid_zfs "$_snap" && _snap_used=$(zfs list -Ho used $_snap)
 			[ "$_snap_used" = "0B" ] && zfs destroy $_snap > /dev/null 2>&1 
 		fi
 	done
@@ -752,9 +783,9 @@ cleanup_oldsnaps() {
 monitor_startstop() {
 	# Need a way of monitoring qb-start, from outside of the process, to remove _TMP
 
-	local _timeout="$1"
-	local _file="$2"
-	local _cycle=0
+	_timeout="$1"
+	_file="$2"
+	_cycle=0
 
 	# Assign a default value if not assigned.
 	_timeout="${_timeout:="1"}"
@@ -1440,6 +1471,14 @@ chk_valid_taps() {
 	return 0
 }
 
+chk_valid_tmux() {
+	# Quiet option
+	getopts q _opts && _q='-q'
+	shift $(( OPTIND - 1 ))
+
+	chk_truefalse $_q "$1" "TMUX"
+}
+
 chk_valid_schg() {
 	# Return 0 if proposed schg is valid ; return 1 if invalid
 
@@ -1629,13 +1668,12 @@ assign_ipv4_auto() {
 	# file is used for deconfliction during qb-start, and must be referenced by exec.created
 	
 	# Positional params and func variables.
-	local _ea ; local _opts
-	getopts e _opts && local _echo="true"
+	getopts e _opts && _echo="true"
 	shift $(( OPTIND - 1 ))
 
-	local _jail="$1"
-	local _ipv4=''
-	local _tmp_ip="/tmp/qb-start_temp_ip"
+	_jail="$1"
+	_ipv4=''
+	_tmp_ip="/tmp/qb-start_temp_ip"
 
 	# Try to pull pre-set IPV4 from the temp file if it exists.
 	[ -e "$_tmp_ip" ] && local _ipv4=$(sed -nE "s#^[[:blank:]]*${_jail}[[:blank:]]+##p" $_tmp_ip) 
@@ -1653,39 +1691,79 @@ assign_ipv4_auto() {
 #######################  FUNCTIONS RELATED TO VM HANDLING ########################
 ##################################################################################
 
-stop_vm() {
-	# Tries to gracefully shutdown VM with SIGTERM, as per man bhyve
-	# Monitor process for 90 seconds. return 0 if removed, 1 if timeout
-	# Pass option "quiet" if no stdout is desired
+cleanup_vm() {
+	# Cleanup function after VM is stopped or killed in any way 
 
-	[ -n "$1" ] && _vm="$1" || get_msg "$_q _0 $2"
-
-	# Action to take on failure. Default is return 1 to caller function
-	[ -z "$2" ] && _if_err="return 1" || _if_err="return 1"
-
-	[ -n "$1" ] && _VM="$1" || return 1
-	[ "$2" = "quiet" ] && _quiet="true"
-
-	# pkill default is SIGTERM (-15)
-	pkill -fl "bhyve: $_VM"  && get_msg_qb_vm "_3"
-
-	# Monitor for VM shutdown, via process disappearance
-	_count=1
-	while chk_isrunning "$_VM" ; do
-
-		# Prints	a period every second
-		[ -z "$quiet" ] && sleep 1 && get_msg_qb_vm "_4"
-
-		_count=$(( _count + 1 ))
-		[ "$_count" -gt 30 ] && get_msg_qb_vm "_5" "exit_1"
+	# Positional params and func variables.
+	while getopts nqx opts ; do
+		case $opts in
+			n) _norun="-n" ;;
+			q) _qcv="-q" ;;
+			x) _exit="true" ;;
+		esac
 	done
+
+	shift $(( OPTIND - 1 ))
+
+	# Positional variables
+	_VM="$1"
+	_rootvm="$2"
+
+	# Make sure a VM was provided, or return 
+	[ -z "$_VM" ] && get_msg $_qcv "_0" && return 1
+
+	# Bring all recorded taps back to host, and destroy 
+	for _tap in $(cat /tmp/qb-taps_${_VM} 2> /dev/null) ; do
+		
+		if [ -n "$_norun" ] ; then
+			ifconfig "$_tap" destroy 2> /dev/null
+		else
+			# Trying to prevent searching in all jails, by guessing where tap is 
+			_tapjail=$(get_info -e _CLIENTS "$_VM")
+			[ -z "$_tapjail" ] && _tapjail=$(get_jail_parameter -esqz GATEWAY ${_VM})
+
+			# Remove the tap
+			remove_tap "$_tap" "$_tapjail" && ifconfig "$_tap" destroy 2> /dev/null
+		fi
+	done	
+
+	# Remove the tracker files
+	rm /tmp/qb-vnc_${_VM} > /dev/null 2>&1
+	rm /tmp/qb-taps_${_VM} > /dev/null 2>&1
+
+	# Destroy the VM
+	bhyvectl --vm="$_VM" --destroy > /dev/null 2>&1
+
+	# If it was a norun, dont spend time recloning
+	[ -n "$_norun" ] && return 0
+	
+	# Pull rootvm in case it wasn't provided 
+	[ -z "$_rootvm" ] && ! _rootvm=$(get_jail_parameter -ed ROOTVM $_VM) \
+		&& get_msg "$_cj32" "$_VM" && return 1
+
+	# Destroy the dataset
+	reclone_zroot -q "$_VM" "$_rootvm"	
+
+	# Remove the /tmp file
+	rm /tmp/qb-bhyve_${_VM} 2> /dev/null
+
+	# If called with [-x] send an exit message and run exit 0	
+	[ -n "$_exit" ] && get_msg "_cj32" "$_VM" && exit 0
+
+	return 0
 }
 
 prep_bhyve_options() {
 	# Starts VM. ALLCAPS variables are each a full line option for bhyve. Returns 1 if any errors. 
 
-	# Quiet option
-	getopts q _opts && _qvm='-q'
+   # Options 
+	while getopts qt opts ; do
+		case $opts in
+			q) _qs="-q" ;;
+			t) _tmux="-t" ;;
+		esac
+	done
+
 	shift $(( OPTIND - 1 ))
 
 	# Assign _vm variable
@@ -1701,17 +1779,18 @@ prep_bhyve_options() {
 	_taps=$(get_jail_parameter -e TAPS "$_VM")            || return 1 
 	_vcpus=$(get_jail_parameter -e VCPUS "$_VM")          || return 1 
 	_vncres=$(get_jail_parameter -edz VNCRES "$_VM")      || return 1 
+	[ -z "$_tmux" ] && _tmux=$(get_jail_parameter -edz TMUX "$_VM") || return 1 
 
-	# Dirty hack to flag the extra checks for passthru devices (since about to start VM) 
+	# _ppt_launch is a dirty hack to flag extra checks for passthru devices 
 	_ppt_launch="true"
-	_ppt=$(get_jail_parameter -edz PPT "$_VM")            || return 1 
+	_ppt=$(get_jail_parameter -edz PPT "$_VM")            || return 1
 
 	# For VMs that are clients, their tap still needs an IPV4 inside the gateway 
 	[ "$_ipv4" = "auto" ] && _ipv4=$(assign_ipv4_auto -e "$_VM")
 
 	# Add leading '-' to _bhyveopts
 	_BHOPTS="-${_bhyveopts}"
-	
+
 	# Assign CPU, memory, and wire variable
 	_CPU="-c $_vcpus"
 	_RAM="-m $_memsize"
@@ -1733,7 +1812,7 @@ prep_bhyve_options() {
 	# Assign zusr blk device. Must be a volume; or should be blank
 	chk_valid_zfs "${ZUSR_ZFS}/${_VM}" \
 		&& zfs list -Ho type "${ZUSR_ZFS}/${_VM}" | grep -qs "volume" \
-		&& _BLK_ZUSR="-s ${_slot}:0,virtio-blk,/dev/zvol/${JAILS_ZFS}/${_VM}" \
+		&& _BLK_ZUSR="-s ${_slot}:0,virtio-blk,/dev/zvol/${ZUSR_ZFS}/${_VM}" \
 		&& _slot=$(( _slot + 1 ))	\
 		|| _BLK_ZUSR='' \
 
@@ -1771,8 +1850,15 @@ prep_bhyve_options() {
 
 	fi
 
+	# Launch a serial port if variable was passed	
+	[ "$_tmux" ] && _STDIO="-l com1,stdio" && _TMUX1="tmux new-session -d -s $_VM \"" \
+		&& _TMUX2='"'
+
 	# Tap virtio lines still need to be created. Slots 29-31 are reserved fbuf, tablet, lpc
 	[ "$(( _slot + _taps ))" -gt 28 ] && get_msg "_cj28" "$_VM" && return 1
+
+	# Invoke the trap function for VM cleanup, in case of any errors after modifying host/trackers
+	trap "cleanup_vm -n $_VM" INT TERM HUP EXIT
 
 	# Assign all taps to slots _VTNET. VM can have taps, even without gateway
 	while [ "$_taps" -gt 0 ] ; do		
@@ -1786,103 +1872,121 @@ prep_bhyve_options() {
 		echo "$_tap" >> /tmp/qb-taps_${_VM}
 	done
 
+	# First tap created is used for networking
 	_vif=$(head -1 /tmp/qb-taps_${_VM} 2> /dev/null)
 
 	# Wait till last moment to create tracker file for the vncview port
 	[ "$_vncport" ] && echo "${_vncport}" > /tmp/qb-vnc_${_VM}
 
+	# Define the full bhyve command
+	_BHYVE_CMD=$(echo $_TMUX1 bhyve $_CPU $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT $_BLK_ZUSR \
+			$_VTNET $_PPT $_FBUF $_TAB $_LPC $_BOOT $_STDIO $_VM $_TMUX2)
+	
+	# unset the trap
+	trap ":" INT TERM HUP EXIT
+
 	return 0
 }
 
 launch_vm() {
-	# Function is solely responsible for running the bhyve command
+	# To ensure VM is completely detached from caller AND trapped after finish, a /tmp script runs
+	# the launch and monitoring. qb-start/stop can only have one instance running (for race/safety)
+	# but VMs launched by qb-start would otherwise persist in the process list with the VM.
 
-	# Invoke the trap function for VM cleanup after completion.
-	trap "cleanup_vm $_VM $_rootvm" INT TERM HUP QUIT
+set -x
+exec > /root/debug 2>&1
+	# Send the commands to a temp file
+	cat << ENDOFCMD > /tmp/qb-bhyve_${_VM}
+		set -x
+		exec > /root/debug2 2>&1
+		# New script wont know about caller functions. Need to source them again 
+		. /usr/local/lib/quBSD/quBSD.sh
+		
+		get_global_variables
 
-	# Launch the VM to the background
-	eval "bhyve $_CPU $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT $_BLK_ZUSR $_VTNET \
-			$_PPT $_FBUF $_TAB $_LPC $_BOOT $_VM"
+		# Create trap for post VM exit 
+		trap "cleanup_vm -x $_VM $_rootvm" INT TERM HUP EXIT
 
-	# Trap function wont trigger at the end of the function. Need to call the cleanup
-	cleanup_vm "$_VM" "$_rootvm"
+		# Launch the VM to background
+		eval $_BHYVE_CMD
+
+		sleep 2
+
+		# Monitor the VM, perform cleanup after done	
+		while pgrep -fq "bhyve: $_VM" ; do sleep 1 ; done 
+
+		# Positively exiting the script prevents hanging at terminal
+		exit 0
+ENDOFCMD
+
+	# Make the file executabel
+	chmod +x /tmp/qb-bhyve_${_VM}
+
+	# Call the temp file with exec to separate it from the caller script
+	exec /tmp/qb-bhyve_${_VM} &
+	
+	return 0
 }
 
 exec_vm_coordinator() {
 	# Oversees the launching of a VM
 
-	# Quiet option
-	getopts q _opts && _qvm='-q'
+   # Options 
+	while getopts nqt opts ; do
+		case $opts in
+			n) _norun="-n" ;;
+			q) _qs="-q" ;;
+			t) _tmux="-t" ;;
+		esac
+	done
+
 	shift $(( OPTIND - 1 ))
 
 	# Assign _vm variable
 	_VM="$1"
 
 	# Ensure that there's nothing lingering from this VM before trying to start it 
-	cleanup_vm "$_VM" "$_rootvm"
+	cleanup_vm $_norun $_qs "$_VM"
 
 	# Pulls variables for the VM, and assembles them into bhyve line options
-	prep_bhyve_options "$_VM"
+	prep_bhyve_options $_qs $_tmux "$_VM"
 
-	# All commands that need to be trapped are run in this function
-	launch_vm &
+	# If norun, echo the bhyve start command, cleanup the taps/files, and return 0 
+	if [ -n "$_norun" ] ; then
 
-	# bhyve wont launch this. IDK why. Race condition for the next command? 
-	sleep 1
+		echo $_BHYVE_CMD 
+		cleanup_vm -n $_VM 
+		return 0
+	fi
 
-	# Connect tap interface to gateway or client
-	if [ "$_vif" ] && [ "$_gateway" ] && ! [ "$_gateway" = "none" ] ; then
-		connect_client_to_gateway "$_VM" "$_gateway" "$_ipv4" 
-	fi	
+	# Launch VM sent to background, so connections can be made (network, vnc, tmux)
+	launch_vm & 
 
-	# Launch the vncviewer 
-	[ "$_vncres" ] && vncviewer "0.0.0.0:$_vncport" &
+	# Monitor for VM start, before attempting connections. 3 secs to start
+	_count=1
+	while : ; do
+		sleep .5
+		pgrep -fq "bhyve: $_VM" && break
 
-	return 0
-}
+		[ "$_count" -ge 6 ] && get_msg get_msg "_cj31" "$_VM" && return 1
+		_count=$(( _count + 1 ))
+	done
 
-cleanup_vm() {
-	# Cleanup function after VM is stopped or killed in any way 
+	# The VM should be up and running, or function would've already returned 1 
+	if [ -n "$_vif" ] ; then
 
-	# Positional variables
-	_VM="$1"
-	_rootvm="$2"
-
-	# Make sure a VM was provided, or return 
-	[ -z "$_VM" ] && get_msg "_0" && return 1
-
-	# remove port from vnc tracker
-	rm /tmp/qb-vnc_${_VM} > /dev/null 2>&1
-
-	# Kill the process gracefully; or if not, then forcefully
-	pkill -15 -fx "bhyve: $_VM" || pkill -9 -fx "bhyve: $_VM"
-
-	# Bring all recorded taps back to host, and destroy 
-	for _tap in $(cat /tmp/qb-taps_${_VM} 2> /dev/null) ; do
-		
-		# Trying to prevent searching in all jails, by guessing where tap is 
-		_tapjail=$(get_info -e _CLIENTS "$_VM")
-		[ -z "$_tapjail" ] && _tapjail="$_gateway"
-
-		# Remove the tap
-		remove_tap "$_tap" "$_tapjail" && ifconfig "$_tap" destroy
-	done	
-
-	# Remove the tap tracker file
-	rm /tmp/qb-taps_${_VM} > /dev/null 2>&1
-
-	# Destroy the VM
-	bhyvectl --vm="$_VM" --destroy > /dev/null 2>&1
-
-	# Pull rootvm in case it wasn't provided 
-	[ -z "$_rootvm" ] && _rootvm=$(get_jail_parameter -ed ROOTVM $_VM) \
-		&& get_msg "$_cj32" "$_VM" && return 1
-
-	# Destroy the dataset
-	reclone_zroot "$_VM" "$_rootvm"	
+		# Connect to the upstream gateway
+		[ -n "$_gateway" ] && [ ! "$_gateway" = "none" ] && chk_isrunning "$_gateway" \
+			&& connect_client_to_gateway "$_VM" "$_gateway" "$_ipv4" > /dev/null 
 	
+		# Reconnect the downstream client. Will immediately return if there are no clients
+		connect_gateway_to_clients "$_VM"	
+	fi
+
+	[ -n "$_vncres" ] && vncviewer "0.0.0.0:$_vncport" &
+
 	return 0
 }
 
-
-
+#set -x
+#exec > /root/debug 2>&1
