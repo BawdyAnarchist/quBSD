@@ -43,27 +43,27 @@ calculate_variables() {
 
 	if [ -n "$TTL" ] ; then  
 		case $_UNITS in
-			m)	SNAPNAME=$(date +%b%d_%H:%M)
+			m)	SNAPNAME=$(date +%b%d_%H%M)
 				_ttl_unix=$(( _INT * 60 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
-			H)	SNAPNAME=$(date +%b%d_%H_Hourly)
+			H)	SNAPNAME=$(date +%b%d_%H_H)
 				_ttl_unix=$(( _INT * 3600 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
-			D)	SNAPNAME=$(date +%Y-%m-%d_Daily)
+			D)	SNAPNAME=$(date +%b%d_%H_D)
 				_ttl_unix=$(( _INT * 3600 * 24 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
-			W)	SNAPNAME=$(date +%Y-%W_Weekly)
+			W)	SNAPNAME=$(date +%b%d_%H_W)
 				_ttl_unix=$(( _INT * 3600 * 24 * 7 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
-			M)	SNAPNAME=$(date +%Y-%M_Monthly)
+			M)	SNAPNAME=$(date +%b%d_M)
 				_ttl_unix=$(( _INT * 3600 * 24 * 31 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
-			Y)	SNAPNAME=$(date +%Y_Annual)
+			Y)	SNAPNAME=$(date +%Y%b%d_Annual)
 				_ttl_unix=$(( _INT * 3600 * 24 * 365 )) 
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 		esac
