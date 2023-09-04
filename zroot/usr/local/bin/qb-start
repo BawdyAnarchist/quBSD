@@ -12,14 +12,14 @@
 . /usr/local/lib/quBSD/msg-start.sh
 
 get_options() {
-	while getopts aAeE:hf: opts ; do
+	while getopts aAeE:f:h opts ; do
 		case $opts in
 			a) _SOURCE="auto" ;;
 			A) [ "$_SOURCE" ] && get_msg_start "_e1" "usage_1" || _SOURCE="all" ;;
 			e) _EXCLUDE="true" ;;
 			E) [ "$_EXCLUDE" ] && get_msg_start "_e2" "usage_1" || _EXFILE="${OPTARG}" ;;
-			h) get_msg_start "none" "usage_0" ;;
 			f) [ "$_SOURCE" ] && get_msg_start "_e1" "usage_1" || _SOURCE="$OPTARG" ;; 
+			h) get_msg_start "none" "usage_0" ;;
 			*) exit 1 ;;
 		esac
 	done
@@ -36,7 +36,7 @@ checks() {
 	_TMP_IP="/tmp/qb-start_temp_ip"
 
 	# Absolutely do not run if another instance if qb-start or qb-stop is already running
-	monitor_startstop "1" "$_TMP_IP" || get_msg_start "_e0" "exit_1" 
+#	monitor_startstop "1" "$_TMP_IP" || get_msg_start "_e0" "exit_1" 
 
 	# Setup tmp file for IP tracking 
 	mktemp "$_TMP_IP"	> /dev/null 2>&1
@@ -55,44 +55,42 @@ reclone_stale_zroots() {
 		if ! echo "$_JLIST" | grep -Eq "$_jail" ; then
 			
 			# The reclone function needs the rootjail name, not the dataset
-			_rootzfs=$(zfs list -rHo origin zroot/quBSD/jails/${_jail} | sed "s/@.*//g")
+			_rootzfs=$(zfs list -rHo origin ${JAILS_ZFS}/${_jail} | sed "s/@.*//g")
+
 			reclone_zroot "${_jail}" "${_rootzfs##*/}"
 		fi
 	done
 }
 
 climb_hierarchy() {
+
 	# Prevent infinite loop. Unlikely to be 50 gateways; more likely circular reference.
 	[ "$_depth" -gt 50 ] && get_msg_start "_e3" "exit_1"
 	_depth=$(( _depth + 1 ))
 
-	local _jail="$1"
-	local _gateway=$(get_jail_parameter -deqs GATEWAY "$_jail")
-	local _class_of_gateway=$(get_jail_parameter -deqs CLASS "$_gateway")
+	_jail="$1"
+	_gateway=$(get_jail_parameter -deqs GATEWAY "$_jail")
 
-	if echo "$_CLIMBED" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" ; then
+	if echo "$_CLIMBED" | grep -Eq "(^|[[:blank:]]+)${_jail}([[:blank:]]+|\$)" ; then 
 		# _jail gateway path was already handled. Skip further checks.
 		return 0
 
-	# Invalid jails shouldnt be included. 
-	chk_valid_jail -q $_jail || return 0 
-
 	# _jail is an endpoint. Either has no network, or is top of hierarchy. 
-	elif [ "$_gateway" = "none" ] ; then 
+	elif [ "$_gateway" = "none" ] || [ -z "$_gateway" ] ; then 
 
-		# Has clients that need to wait for _jail to start. 
+		# Assemble list of hierarcy tops. Will later begin starts from this list 
 		_HIERTOP=$(printf "%b" "${_jail}\n${_HIERTOP}" | uniq) 
 
 		# Include jail on _FULLIST 
-		echo "$_FULLIST" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" \
+		echo "$_FULLIST" | grep -Eq "(^|[[:blank:]]+)${_jail}([[:blank:]]+|\$)" \
 				|| _FULLIST=$(printf "%b" "${_FULLIST}\n${_jail}")
 
 		# Add _jail to the list of jails already climbed and checked.
 		_CLIMBED=$(printf "%b" "${_jail}\n${_CLIMBED}") 
 
+	# Make sure _jail is included in FULLIST. (some gateways might not have been on JLIST).
 	else
-		# Make sure _jail is included in FULLIST. (some gateways might not have been on JLIST).
-		echo "$_FULLIST" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" \
+		echo "$_FULLIST" | grep -Eq "(^|[[:blank:]]+)${_jail}([[:blank:]]+|\$)" \
 				|| _FULLIST=$(printf "%b" "${_FULLIST}\n${_jail}")
 
 		# Add _jail to the list of jails already climbed and checked.
@@ -117,76 +115,57 @@ determine_ips() {
 
 begin_waterfall() {
 
-	local _gateways="$1"
-	for _gw in $_gateways ; do
+	_JAILS="$1"
+
+	for _JAIL in $_JAILS; do
 
 		# Only continue the waterfall if jail started successfully 
-		if start_jail "$_gw" > /dev/null 2>&1 ; then
+echo start_jail "$_JAIL"
+		start_jail "$_JAIL" || get_msg_start "_e4" "exit_1"
 
-			# Determine which clients are endpoints, and which serve clients in turn
-			classify_clients "$_gw"
+		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion) 
+		_SUBGATEWAYS='' ; _ENDPOINTS=''
 
-			# Start each endpoint
-			if [ -n "$_ENDPOINTS" ] ; then
+		for _client in $(get_info -e _CLIENTS $_JAIL); do
 
-				for _jail in $_ENDPOINTS ; do
+			# Check that _client is on the FULLIST (save time)
+			if echo "$_FULLIST" | grep -q "$_client" ; then 
 
-					# Maintain a small stagger between parallel starts. Helps prevent conflicts
-					sleep .2
-					start_jail_in_background "$_jail" & 
-				done
+				# If the _client has no further clients, it returns 1, and is an ENDPOINT	
+				get_info _CLIENTS "$_client" \
+					&& _SUBGATEWAYS="$_SUBGATEWAYS $_client" \
+					|| _ENDPOINTS="$_ENDPOINTS $_client"
 			fi
+		done
 
-			# Subgateways need their own waterfall
-			[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS" 
-		fi
+		# Start each endpoint
+		for _end in $_ENDPOINTS ; do
+
+			# Maintain a small stagger between parallel starts. Helps prevent conflicts
+			sleep .2
+echo start_jail $_end &
+			start_jail $_end &
+		done
+
+		# Subgateways need their own waterfall
+		[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS" 
 	done
-}
-
-classify_clients() {
-	# Secondary clients of the jail that was just started	
-	local _jail="$1"  ;  local _client
-
-	# Must clear these values so they return only relevant jails
-	_SUBGATEWAYS='' ; _ENDPOINTS=''
-
-	for _client in $(get_info -e _CLIENTS $_jail); do
-
-		# Must ensure that the jail is part of the FULLIST 
-		if echo "$_FULLIST" | grep -q "$_client" ; then 
-
-			if get_info _CLIENTS "$_client" ; then
-				# Lis of jails with clients
-				_SUBGATEWAYS="$_SUBGATEWAYS $_client"
-			else	
-				# Endpoints can be parallel/background started
-				_ENDPOINTS="$_ENDPOINTS $_client"
-			fi
-		fi
-	done
-}
-
-start_jail_in_background() {
-	# Function can sent to background, but keeps qb-start process alive, for monitoring purposes.
-	local _jail="$1"
-	start_jail "$_jail" > /dev/null 2>&1
 }
 
 main() {
 
-	# Assemble the list of jails tagged for start. 
+	# Returns $_JLIST, from options and positional arguments. Func shared with qb-start.
 	compile_jlist
 
-	# Reclone stale zroot datasets occasionally. Assume that all jails off, is a larger reset
-	[ -z "$(get_info -e _ONJAILS)" ] && reclone_stale_zroots
+# Reclone stale zroot datasets occasionally. Assume that all jails off, is a larger reset
+#	[ -z "$(get_info -e _ONJAILS)" ] && reclone_stale_zroots
+# get_info _ONJAILS needs to include VMs
 
-	# For each jail, find the hierarchy top (gateway of its gateway of its gateway ...) 
+	# Find gateway hierarchy top for each jail. Returns $_HIERTOP and $_FULLIST
 	for _jlist in $_JLIST ; do
 
 		# Function is recursive, so _depth tracks # of cycles to prevent infinite loop. 
 		_depth=1
-
-		# Adds all jails in the gateway path to FULLIST.
 		climb_hierarchy "$_jlist"
 	done
 
@@ -207,6 +186,8 @@ main() {
 
 get_global_variables
 
+get_networking_variables
+
 get_options "$@"
 
 checks
@@ -214,6 +195,6 @@ checks
 main
 
 # Monitor completion of qb-start, 30 sec (60 0.5sec cycles). 
-monitor_startstop 60 "$_TMP_IP" &
+#monitor_startstop 60 "$_TMP_IP" &
 
 exit 0
