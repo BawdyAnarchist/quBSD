@@ -39,6 +39,12 @@ ERROR: Infinite loop detected. There likely a set of jails has
                     Jail-C has Jail-A as gateway.
 ENDOFMSG
 	;;	
+	_e4) cat << ENDOFMSG
+
+ERROR: < $_JAIL > failed to start. It serves network to
+       client jails. Exiting
+ENDOFMSG
+	;;	
 	_m1) cat << ENDOFMSG
 Jail(s) were already running
 ENDOFMSG
