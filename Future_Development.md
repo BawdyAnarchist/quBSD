@@ -1,18 +1,29 @@
 
 ##### VIRTUAL MACHINE INTEGRATION
 
-still need to use bhyve uefi.fd to make nicvm
+Generalization of the VMs implementation (for fbsd vms)
+	- other dataset script
+		- change hostname
+		- configure network
+		- symlink files
+		- User profiles (if any) stored here
+		- possible you'll need early script (for symlinks) and later script (network, etc)
+		- Probably changing the swap space?
+	- 0vms will always gateway, like 0rootjails, for updates
+
+pretty sure reclone_zroot needs to be optimized
 
 dhcpd
 	- dhcpd option-domain-name-servers <IP> should be copied from /resolv.conf 
 	- mtu should also be drop and replaced
 
+make sure to add the new variables to [-h] for: qb-start , stop, cmd, 
+
 1. qubsd.sh 
+	Fix the "net-firewall" switches.
+		# the solution is: if [ ${_class_of_gateway##*VM} ] and also maybe _class_of_client
 
-Fix the "net-firewall" switches.
-# the solution is: if [ ${_class_of_gateway##*VM} ] and also maybe _class_of_client
-
-#chk_valid_gateway
+   #chk_valid_gateway
 	- Type implementation?  "firewall" "gateway" "server" "app"  
 	- chk_isqubsd_ipv4
 	- define_ipv4_convention
@@ -28,6 +39,7 @@ Fix the "net-firewall" switches.
 
 3. Scripts that should integrate VMs
 	- qb-stop , qb-start, qb-edit (now needs "add" function for multiple taps at least), qb-rename , qb-destroy, qb-stat, qb-create, qb-disp
+	- qb-edit really should be an eval command like in get_jail_parameter ... for ex: eval "chk_valid_param $_q $VALUE" 
 
 4. New scripts
 	qb-pci
@@ -35,9 +47,7 @@ Fix the "net-firewall" switches.
 		- USB, NIC, maybe others
 		- Show what was is currently passthrough'd
 	qb-vm
-		- If you need to access via console
-		- Maybe also for create, since that might be non-trivial, and your qb-create is already pretty good
-		- -n option to output the command that would be run (so that can manual add options at VM launch)
+		- For create, since that might be non-trivial, and your qb-create is already pretty good
 
 # CLEANUP STUFF
 quBSD.conf 
@@ -140,9 +150,7 @@ qubsd_installer
 
 ### BEST PRACTICES / FIXES / CLEANUP
 
-VMs
-	- the ability to turn off or replace some of the line options (the non -s lines)
-	- the ability to spit out the command that would be run (-n no-run option in qb-start)
+Xephyr is an absolute must. Wayland/sway might be a good bonus to run in a separate tty
 
 connect_client_to_gateway
 	- It could be space efficiencized. For now just uses dumb switches for VMs, duplicating lines 
@@ -183,6 +191,26 @@ zusr fstabs
 Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file and code.
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
 
+## When my system crashed with the power, it can leave things in a dirty state 
+	- DISP-torrents was still there
+	- Could /tmp files remain? I think /tmp is cleared
+
+chk_valid_ppt is having delays when the device is not tagged for passthru
+qb-autosnap might need looked at for leaving snapshots that could be deleted
+reclone_zroot - CHatgpt if theres a way to check differences in a volmode=dev
+
+get_jail_parameter needs more variables
+	-(x)tra check on chk_valid_{param}
+	-(r)esolve value (for stuff like ip auto)
+
+exec.created
+	- clean it up. I left the old function there coz was scurd. remove it
+
+You should make a check for a circular reference in the networking.
+	- firewall client is ivpn-bra. ivpn-bra client is torrents. torrents client is firewall
+
+qb-cmd should pull from the user's chosen shell, not default to csh
+	- I do worry tho, that the csh -c '<commands>' construction might fail if I do that
 
 ### MINOR UPGRADES IF ANYONE ELSE OUT THERE WANTS TO DO IT
 
