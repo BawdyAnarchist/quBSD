@@ -9,13 +9,28 @@ get_options() {
 	get_jail_parameter SECLVL "$JAIL" 
 }
 
+handle_dhcp() {
+	# This is a bit of a hack, since I couldnt figure out why rc 'ifconfig_tapX="DHCP"' was not
+	# working. Obviously cant start dhclient in exec.created before netif is up.
+
+	if [ "$(get_jail_parameter -esz IPV4 "$JAIL")" = "DHCP" ] ; then 
+
+		# Get gateway, VIF, then start dhclient in the jail
+		get_jail_parameter -sqz GATEWAY "$JAIL" 
+		VIF=$(head -1 /tmp/qb-taps_${GATEWAY} 2> /dev/null)
+
+		jexec -l -U root $JAIL dhclient $VIF > /dev/null 2>&1 &
+		jexec -l -U root $JAIL service qb_dhcpd onestart > /dev/null 2>&1 &
+	fi
+}
+
 security_flags() {
 	
 	# Different directories are schg flagged depending on user settings
 	case $SCHG in
 		all)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw /usr"
 		;;
-		sys)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw \
+		sys)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw/etc /rw/root \
 						/usr/bin /usr/lib /usr/lib32 /usr/libdata /usr/libexec /usr/sbin \
 						/usr/local/bin /usr/local/lib /usr/local/lib32 /usr/local/libdata \
 						/usr/local/libexec /usr/local/sbin"
@@ -35,6 +50,8 @@ security_flags() {
 get_global_variables
 
 get_options "$@"
+
+handle_dhcp
 
 security_flags
 
