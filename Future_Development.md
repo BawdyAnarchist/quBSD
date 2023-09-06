@@ -1,6 +1,8 @@
 
 ##### VIRTUAL MACHINE INTEGRATION
 
+problems with qb-start_temp_ip lingering and not getting removed before operation
+
 Generalization of the VMs implementation (for fbsd vms)
 	- other dataset script
 		- change hostname
@@ -10,12 +12,6 @@ Generalization of the VMs implementation (for fbsd vms)
 		- possible you'll need early script (for symlinks) and later script (network, etc)
 		- Probably changing the swap space?
 	- 0vms will always gateway, like 0rootjails, for updates
-
-pretty sure reclone_zroot needs to be optimized
-
-dhcpd
-	- dhcpd option-domain-name-servers <IP> should be copied from /resolv.conf 
-	- mtu should also be drop and replaced
 
 make sure to add the new variables to [-h] for: qb-start , stop, cmd, 
 
@@ -54,10 +50,6 @@ quBSD.conf
 	- remove ppt_nic. It's now in jmap.
 	- Think of way to remove the file entirely. 
 
-Generalize staticIP vs auto vs DHCP
-	- DHCP requires a split in the logic of starting the jail, where no IP is assigned to the client
-	- Requires modifying exec.created ; and the rc.conf for the jail.
-
 USBVM 
 	- Auto-install various useful mounting stuff for common devices     
 	- Create a proper unprivileged user with devd.conf and automounts     
@@ -77,8 +69,6 @@ net-firewall
 Cleanup the github. You have scripts in there that arent relevant from full copies of $ubin
 
 Are there going to be differences to code into prepare_vm between Linux, Windows, and FreeBSD?
-
-ULTIMATE LAST CHECK, NEED TO SEARCH ALL "VM" instances, coz of new naming conventions"
 
 Integrate in qb-i3-launch as well
 
@@ -132,6 +122,10 @@ qubsd_installer
 			- qb-create should in realtime copy over /usr/local/etc from 0serv
 			- There might even be problems with pkg-upgrade operating on this dir
 			- Make sure to chown the directories as appropriate
+
+	- 0net
+		- /usr/local/etc/rc.d/qb_dhcpd 
+		- /usr/local/etc/
 	
 	- devfs.rules
 		- add qubsd to the naming convention
@@ -193,11 +187,9 @@ https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
 
 ## When my system crashed with the power, it can leave things in a dirty state 
 	- DISP-torrents was still there
-	- Could /tmp files remain? I think /tmp is cleared
+		- Probably an rc that cleans up old states
 
-chk_valid_ppt is having delays when the device is not tagged for passthru
 qb-autosnap might need looked at for leaving snapshots that could be deleted
-reclone_zroot - CHatgpt if theres a way to check differences in a volmode=dev
 
 get_jail_parameter needs more variables
 	-(x)tra check on chk_valid_{param}
@@ -211,6 +203,11 @@ You should make a check for a circular reference in the networking.
 
 qb-cmd should pull from the user's chosen shell, not default to csh
 	- I do worry tho, that the csh -c '<commands>' construction might fail if I do that
+
+pretty sure reclone_zroot needs to be optimized
+
+new sed discovery
+	- -En with (parenthesis) and \1. Just solid amazing stuff
 
 ### MINOR UPGRADES IF ANYONE ELSE OUT THERE WANTS TO DO IT
 
