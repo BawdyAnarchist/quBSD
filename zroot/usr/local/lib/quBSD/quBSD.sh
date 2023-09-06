@@ -521,19 +521,18 @@ connect_client_to_gateway() {
  		ifconfig $_vif vnet $_client
 
 		# If there's any mtu setting other than 1500, apply it 
-		[ ! "$_mtu" = "1500" ] \
-				&& jexec -l -U root $_client ifconfig $_vif mtu $_mtu up
+		[ ! "$_mtu" = "1500" ] && jexec -l -U root $_client ifconfig $_vif mtu $_mtu up
 
-		# Run DHCP, or manuall add IP address 
-		if [ "$_ipv4" = "DHCP" ] ; then
-			# First remove any running instances of dhclient
-			jexec -l -U root $_client pkill -f dhclient > /dev/null 2>&1
-			jexec -l -U root $_client dhclient $_vif > /dev/null 2>&1
+# Run DHCP, or manuall add IP address 
+#if [ "$_ipv4" = "DHCP" ] ; then
+# First remove any running instances of dhclient
+# jexec -l -U root $_client pkill -f dhclient > /dev/null 2>&1
+#	jexec -l -U root $_client dhclient $_vif > /dev/null 2>&1
 
-		else
-			jexec -l -U root $_client ifconfig $_vif inet ${_ipv4} mtu $_mtu up 
-			jexec -l -U root $_client route add default "${_ipv4%.*/*}.1" > /dev/null 2>&1
-		fi
+#else
+#	jexec -l -U root $_client ifconfig $_vif inet ${_ipv4} mtu $_mtu up 
+#	jexec -l -U root $_client route add default "${_ipv4%.*/*}.1" > /dev/null 2>&1
+#fi
 
 		[ "$_ec" ] && echo "$_vif"	
 
@@ -545,13 +544,13 @@ connect_client_to_gateway() {
 	ifconfig "$_intf" vnet $_gateway
 
 	# If connecting two jails, send the epair, and assign a command modifier.
-	if ! [ "$_client" = "host" ] ; then
+	if [ ! "$_client" = "host" ] ; then
 		ifconfig "${_intf%?}b" vnet $_client
 		local _cmdmod='jexec -l -U root $_client'
 	fi
 
 	# If there is no IP or it's DHCP, skip the assignment
-	if ! [ "$_ipv4" = "none" ] ; then
+	if [ ! "$_ipv4" = "none" ] ; then
 		# Assign the gateway IP
 		jexec -l -U root "$_gateway" \
 				ifconfig "$_intf" inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
@@ -1893,12 +1892,9 @@ launch_vm() {
 	# the launch and monitoring. qb-start/stop can only have one instance running (for race/safety)
 	# but VMs launched by qb-start would otherwise persist in the process list with the VM.
 
-set -x
-exec > /root/debug 2>&1
 	# Send the commands to a temp file
 	cat << ENDOFCMD > /tmp/qb-bhyve_${_VM}
-		set -x
-		exec > /root/debug2 2>&1
+		
 		# New script wont know about caller functions. Need to source them again 
 		. /usr/local/lib/quBSD/quBSD.sh
 		
@@ -1988,5 +1984,7 @@ exec_vm_coordinator() {
 	return 0
 }
 
-#set -x
-#exec > /root/debug 2>&1
+setlog() {
+	set -x
+	exec > /root/debug 2>&1
+}
