@@ -17,7 +17,7 @@ handle_dhcp() {
 
 		# Get gateway, VIF, then start dhclient in the jail
 		get_jail_parameter -sqz GATEWAY "$JAIL" 
-		VIF=$(head -1 /tmp/qb-taps_${GATEWAY} 2> /dev/null)
+		VIF=$(head -1 "${QTMP}/qb-taps_${GATEWAY}" 2> /dev/null)
 
 		jexec -l -U root $JAIL dhclient $VIF > /dev/null 2>&1 &
 		jexec -l -U root $JAIL service qb_dhcpd onestart > /dev/null 2>&1 &

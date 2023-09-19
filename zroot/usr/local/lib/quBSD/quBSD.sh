@@ -105,6 +105,7 @@ get_global_variables() {
 	QBCONF="${QBDIR}/quBSD.conf"
 	JMAP="${QBDIR}/jailmap.conf"
 	QBLOG="/var/log/quBSD.log"
+	QTMP="/tmp/quBSD/"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
 	sed -i '' -E 's/[[:blank:]]*$//' $QBCONF
@@ -515,7 +516,7 @@ connect_client_to_gateway() {
 
 	elif chk_isvm "$_gateway" ; then
 		# This is called by exec scripts, which dont yet have the _vif (tap
-		_vif=$(head -1 /tmp/qb-taps_${_gateway} 2> /dev/null)
+		_vif=$(head -1 "${QTMP}/qb-taps_${_gateway}" 2> /dev/null)
 
 		# Send tap to client
  		ifconfig $_vif vnet $_client
@@ -783,19 +784,19 @@ monitor_startstop() {
 	# Need a way of monitoring qb-start, from outside of the process, to remove _TMP
 
 	_timeout="$1"
-	_file="$2"
+	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
 	_cycle=0
 
 	# Assign a default value if not assigned.
 	_timeout="${_timeout:="1"}"
 
 	while [ "$_cycle" -lt "$_timeout" ] ; do
-		# -Note- this only works because csh doesnt include self (or caller?) process in output
+		# -Note- this only works because /bin/sh doesnt include self/caller in pgrep output
 		if ! pgrep -fl '/bin/sh /usr/local/bin/qb-start' > /dev/null 2>&1 \
 			 && ! pgrep -fl '/bin/sh /usr/local/bin/qb-stop' > /dev/null 2>&1
 		then
 			# The tmp file used for IP tracking can be discarded. 
-			[ "$_file" ] && rm "$_file" >> /dev/null 2>&1
+			[ "$_TMP_IP" ] && rm "$_TMP_IP" >> /dev/null 2>&1
 
 			# Long timeout means it's at the end of the script (rather than beginning).
 			[ "$_timeout" -gt 10 ] && get_msg "_jo2" "$0"
@@ -807,7 +808,7 @@ monitor_startstop() {
 	done
 
 	# Cleanup tmp file, regardless
-	[ "$_file" ] && rm "$_file" >> /dev/null 2>&1
+	[ "$_TMP_IP" ] && rm "$_TMP_IP" >> /dev/null 2>&1
 
 	# Send error message that gave up waiting, return error
 	get_msg "_jo3" "$0"
@@ -1625,7 +1626,7 @@ discover_open_ipv4() {
 
 	local _jail="$1"
 	local _ipv4
-	local _tmp_ip="/tmp/qb-start_temp_ip"
+	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
 
 	# net-firewall connects to external network. Assign DHCP, and skip checks.
 	[ "$_jail" = "net-firewall" ] && echo "DHCP" && return 0
@@ -1644,7 +1645,7 @@ discover_open_ipv4() {
 
 		# Compare against JMAP, and the IPs already in use, including the temp file.
 		if grep -Fq "$_ipv4" $JMAP || echo "$_USED_IPS" | grep -Fq "$_ipv4" \
-				|| grep -Fqs "$_ipv4" "$_tmp_ip" ; then
+				|| grep -Fqs "$_ipv4" "$_TMP_IP" ; then
 
 			# Increment for next cycle
 			_cycle=$(( _cycle + 1 ))
@@ -1672,10 +1673,10 @@ assign_ipv4_auto() {
 
 	_jail="$1"
 	_ipv4=''
-	_tmp_ip="/tmp/qb-start_temp_ip"
+	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
 
 	# Try to pull pre-set IPV4 from the temp file if it exists.
-	[ -e "$_tmp_ip" ] && local _ipv4=$(sed -nE "s#^[[:blank:]]*${_jail}[[:blank:]]+##p" $_tmp_ip) 
+	[ -e "$_TMP_IP" ] && local _ipv4=$(sed -nE "s#^[[:blank:]]*${_jail}[[:blank:]]+##p" $_TMP_IP) 
 
 	# If there was no ipv4 assigned to _jail in the temp file, then find an open ip for the jail.
 	[ -z "$_ipv4" ] && _ipv4=$(discover_open_ipv4 "$_jail")
@@ -1712,7 +1713,7 @@ cleanup_vm() {
 	[ -z "$_VM" ] && get_msg $_qcv "_0" && return 1
 
 	# Bring all recorded taps back to host, and destroy 
-	for _tap in $(cat /tmp/qb-taps_${_VM} 2> /dev/null) ; do
+	for _tap in $(cat "${QTMP}/qb-taps_${_VM}" 2> /dev/null) ; do
 		
 		if [ -n "$_norun" ] ; then
 			ifconfig "$_tap" destroy 2> /dev/null
@@ -1727,8 +1728,8 @@ cleanup_vm() {
 	done	
 
 	# Remove the tracker files
-	rm /tmp/qb-vnc_${_VM} > /dev/null 2>&1
-	rm /tmp/qb-taps_${_VM} > /dev/null 2>&1
+	rm "${QTMP}/qb-vnc_${_VM}"  > /dev/null 2>&1
+	rm "${QTMP}/qb-taps_${_VM}" > /dev/null 2>&1
 
 	# Destroy the VM
 	bhyvectl --vm="$_VM" --destroy > /dev/null 2>&1
@@ -1744,7 +1745,7 @@ cleanup_vm() {
 	reclone_zroot -q "$_VM" "$_rootvm"	
 
 	# Remove the /tmp file
-	rm /tmp/qb-bhyve_${_VM} 2> /dev/null
+	rm "${QTMP}/qb-bhyve_${_VM}" 2> /dev/null
 
 	# If called with [-x] send an exit message and run exit 0	
 	[ -n "$_exit" ] && get_msg "_cj32" "$_VM" && exit 0
@@ -1868,14 +1869,14 @@ prep_bhyve_options() {
 		_taps=$(( _taps - 1 ))
 
 		# Tracker file for which taps are related to which VM
-		echo "$_tap" >> /tmp/qb-taps_${_VM}
+		echo "$_tap" >> "${QTMP}/qb-taps_${_VM}"
 	done
 
 	# First tap created is used for networking
-	_vif=$(head -1 /tmp/qb-taps_${_VM} 2> /dev/null)
+	_vif=$(head -1 "${QTMP}/qb-taps_${_VM}" 2> /dev/null)
 
 	# Wait till last moment to create tracker file for the vncview port
-	[ "$_vncport" ] && echo "${_vncport}" > /tmp/qb-vnc_${_VM}
+	[ "$_vncport" ] && echo "${_vncport}" > "${QTMP}/qb-vnc_${_VM}"
 
 	# Define the full bhyve command
 	_BHYVE_CMD=$(echo $_TMUX1 bhyve $_CPU $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT $_BLK_ZUSR \
@@ -1893,7 +1894,7 @@ launch_vm() {
 	# but VMs launched by qb-start would otherwise persist in the process list with the VM.
 
 	# Send the commands to a temp file
-	cat << ENDOFCMD > /tmp/qb-bhyve_${_VM}
+	cat << ENDOFCMD > "${QTMP}/qb-bhyve_${_VM}"
 		
 		# New script wont know about caller functions. Need to source them again 
 		. /usr/local/lib/quBSD/quBSD.sh
@@ -1916,10 +1917,10 @@ launch_vm() {
 ENDOFCMD
 
 	# Make the file executabel
-	chmod +x /tmp/qb-bhyve_${_VM}
+	chmod +x "${QTMP}/qb-bhyve_${_VM}"
 
 	# Call the temp file with exec to separate it from the caller script
-	exec /tmp/qb-bhyve_${_VM} &
+	exec "${QTMP}/qb-bhyve_${_VM}" &
 	
 	return 0
 }
@@ -1984,7 +1985,14 @@ exec_vm_coordinator() {
 	return 0
 }
 
-setlog() {
+setlog1() {
 	set -x
-	exec > /root/debug 2>&1
+	rm /root/debug1 > /dev/null 2>&1
+	exec > /root/debug1 2>&1
+}
+
+setlog2() {
+	set -x
+	rm /root/debug2 > /dev/null 2>&1
+	exec > /root/debug2 2>&1
 }

@@ -27,8 +27,8 @@ parse_config() {
 	FILE="${FILE:=${HOME}/.config/i3/i3launch.conf}"
 	
 	# Set variable, and trap to remove it on exit
-	CONF=$(mktemp  -t "i3-launch.conf")
-	JAILS=$(mktemp -t "i3-launch-jails")
+	CONF=$(mktemp  -t "quBSD/i3-launch.conf")
+	JAILS=$(mktemp -t "quBSD/i3-launch-jails")
 	trap "rm $CONF $JAILS > /dev/null 2>&1" INT TERM HUP QUIT EXIT
 	
 	# Copy the launch config to tmp ($CONF)

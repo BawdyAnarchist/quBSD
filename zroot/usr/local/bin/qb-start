@@ -1,11 +1,11 @@
 #!/bin/sh
 
-# Starting multiple jails in parallel comes with problems.
-	# Gateway dependencies can cause overlapping starts of the gateway, locking the system
-	# auto IP assignments will likely be overlapping unless managed ahead of time 
-	# Epair confusion when gateway and client are started simultaneously. 
+# Starting jails in parallel comes with race-condition type problems.
+	# Overlapping starts of a shared gateway can lock the system
+	# auto IP assignments will likely overlap unless managed ahead of time
+	# Epair race conditions and mishandling between gateway/client
 
-# This script deconflicts these, starting jails in serial when necessary, parallel if possible 
+# This script deconflicts these, starting jails in serial when necessary, parallel if possible
 
 
 . /usr/local/lib/quBSD/quBSD.sh
@@ -31,14 +31,11 @@ get_options() {
 }
 
 checks() {
+	# Temp file for IP tracking
+	_TMP_IP="${QTMP}/qb-start_temp_ip"
 
-# Absolutely do not run if another instance if qb-start or qb-stop is already running
-#	monitor_startstop "1" "$_TMP_IP" || get_msg_start "_e0" "exit_1" 
-
-	# Setup tmp file for IP tracking 
-	_TMP_IP="/tmp/qb-start_temp_ip"
-	rm $_TMP_IP > /dev/null 2>&1
-	mktemp "$_TMP_IP"	> /dev/null 2>&1
+	# Absolutely do not run if another instance if qb-start or qb-stop is already running
+	monitor_startstop "1" || get_msg_start "_e0" "exit_1"
 }
 
 reclone_stale_zroots() {

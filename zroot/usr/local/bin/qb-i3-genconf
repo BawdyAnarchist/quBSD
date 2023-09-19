@@ -22,12 +22,12 @@ get_options() {
 
 parse_config() {
 	# Create the tmp files for parsed i3gen.conf 
-	GEN1=$(mktemp  -t "i3-genconf1")		
-	GEN2=$(mktemp  -t "i3-genconf2")		
-	TMP=$(mktemp   -t "i3-genconf3")		
-	NEWCONF=$(mktemp -t "i3-genconf_newconf")
+	GEN1=$(mktemp  -t "quBSD/i3-genconf1")
+	GEN2=$(mktemp  -t "quBSD/i3-genconf2")
+	_TMP=$(mktemp   -t "quBSD/i3-genconf3")
+	NEWCONF=$(mktemp -t "quBSD/i3-genconf_newconf")
 	
-	trap "rm $GEN1 $GEN2 $TMP $NEWCONF" INT TERM HUP QUIT EXIT
+	trap "rm $GEN1 $GEN2 $_TMP $NEWCONF" INT TERM HUP QUIT EXIT
 
 	cp $CONF $NEWCONF
 
@@ -142,7 +142,7 @@ test_new_config() {
 
 generate_mode() {
 	# Print the mode opening line to the config
-	get_msg_i3_genconf "_3"  > $TMP
+	get_msg_i3_genconf "_3"  > $_TMP
 
 	_cycle=1
 	for _loop in $LOOP ; do
@@ -150,16 +150,16 @@ generate_mode() {
 		define_mode_variables
 
 		# Make sure it's not already there, and then add new bindsym 
-		grep -q "bindsym $_sym" $TMP || get_msg_i3_genconf "_4" "$_sym" "$_action" >> $TMP
+		grep -q "bindsym $_sym" $_TMP || get_msg_i3_genconf "_4" "$_sym" "$_action" >> $_TMP
 
 	_cycle=$(( _cycle + 1 ))
 	done
 
 	# Escape/Return and close mode (print to config)
-	get_msg_i3_genconf "_5" >> $TMP
+	get_msg_i3_genconf "_5" >> $_TMP
 
 	# Remove any duplicates created, and push to the main i3 config 
-	uniq $TMP >> $NEWCONF
+	uniq $_TMP >> $NEWCONF
 }
 
 main() {

@@ -66,7 +66,7 @@ connect_vm_session() {
 
 	# Attach VNC if specified, or if both are blank
 	if [ "$_VNC" ] || [ -z "${_TMUX}${_VNC}" ] ; then
-		_vncport=$(cat /tmp/qb-vnc_${_jail} 2> /dev/null) || _novnc="true"
+		_vncport=$(cat ${QTMP}/qb-vnc_${_jail} 2> /dev/null) || _novnc="true"
 		[ "$_vncport" ] && vncviewer 0.0.0.0:$_vncport &
 	fi
 

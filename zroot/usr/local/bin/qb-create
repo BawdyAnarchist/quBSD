@@ -38,7 +38,7 @@ get_options() {
 	chk_avail_jailname "$NEWJAIL" || exit 1 
 
 	# Need to track the resuls of assignements. Use a temp file
-	_TMP_WARN="/tmp/qb_create_warn"  ;  _TMP_PARAMS="/tmp/qb_create_params"
+	_TMP_WARN="${QTMP}/qb_create_warn"  ;  _TMP_PARAMS="${QTMP}/qb_create_params"
 
 	[ -e "$_TMP_WARN" ] && rm "$_TMP_WARN" 
 	[ -e "$_TMP_PARAMS" ] && rm "$_TMP_PARAMS"
@@ -309,7 +309,7 @@ change_configs() {
 	column -t < "$_TMP_PARAMS"  >> $JMAP
 
 	# Make a tmp file for /etc/jail.conf edits 
-	_TMP_JCONF="/tmp/qb_create_jconf"
+	_TMP_JCONF="${QTMP}/qb_create_jconf"
 	mktemp $_TMP_JCONF > /dev/null
 
 	# Modify /etc/jail.conf
