@@ -4,7 +4,7 @@
 . /usr/local/lib/quBSD/msg-destroy.sh
 
 get_options() {
-	while getopts ch opts ; do
+	while getopts h opts ; do
 		case $opts in
 			h) get_msg_destroy "none" "usage_0" ;;
 			*) exit 1 ;;
@@ -36,8 +36,6 @@ define_variables() {
 }
 
 checks() {
-# Alert that the jail is invalid, but do not error and exit
-#chk_valid_jail "$JAIL" 
 
 	# no_destroy protection flag still active
 	[ "$NO_DESTROY" = "true" ] && get_msg_destroy "_2" "usage_1"	
