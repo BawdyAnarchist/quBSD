@@ -25,7 +25,7 @@ done
 qb-pefs -u $JAIL | tee -a $QBLOG
 
 # Prevents error for wg-quick changing resolv.conf
-chflags -R noschg ${M_ZUSR}/${JAIL}/rw/etc/resolv.conf 2> /dev/null
+chflags -R noschg ${M_ZUSR}/${JAIL}/etc/resolv.conf 2> /dev/null
 
 # Exit success regardless of pefs command, to continue jail shutdown
 exit 0
