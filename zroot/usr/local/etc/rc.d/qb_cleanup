@@ -1,0 +1,50 @@
+#!/bin/sh
+
+# PROVIDE: qb_cleanup
+# REQUIRE: jail  
+# KEYWORD: shutdown 
+
+. /etc/rc.subr
+. /usr/local/lib/quBSD/quBSD.sh
+
+name="qb_cleanup"
+desc="Cleans up lingering pieces of quBSD at boot/poweroff" 
+rcvar="${name}_enable"
+start_cmd="${name}_start"
+
+qb_cleanup_start() {
+
+	# Source the global variables
+	get_global_variables
+
+	# Remove and replace the quBSD /tmp directory
+	rm /tmp/quBSD > /dev/null 2>&1
+	mkdir /tmp/quBSD > /dev/null 2>&1
+
+	# Unmount datasets which may still be mounted
+	for _mount in $(mount | awk '/DISP/ {print $3}') ; do
+		umount -f $_mount
+	done
+
+	# Remove lingering DISP datasets in qubsd's zroot 
+	for _disp in $(zfs list -Hro name "$JAILS_ZFS" | grep "DISP") ; do
+		zfs destroy -rRf $_disp > /dev/null 2>&1
+	done
+
+	# Remove lingering DISP datasets in qubsd's zusr
+	for _disp in $(zfs list -Hro name "$ZUSR_ZFS" | grep "DISP") ; do
+		zfs destroy -rRf $_disp > /dev/null 2>&1
+	done
+
+	# Remove anything that starts with ^DISP in jmap and jail.conf
+   sed -i '' -E "/^DISP/d" $JMAP
+	sed -i '' -E "/^DISP.*(\{|[[:blank:]])/,/^}/d" $JCONF
+}
+
+qb_cleanup_stop() {
+	qb_cleanup_start
+}
+
+load_rc_config $name
+run_rc_command "$1"
+
