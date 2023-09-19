@@ -1,8 +1,6 @@
 
 ##### VIRTUAL MACHINE INTEGRATION
 
-problems with qb-start_temp_ip lingering and not getting removed before operation
-
 Generalization of the VMs implementation (for fbsd vms)
 	- other dataset script
 		- change hostname
@@ -12,8 +10,6 @@ Generalization of the VMs implementation (for fbsd vms)
 		- possible you'll need early script (for symlinks) and later script (network, etc)
 		- Probably changing the swap space?
 	- 0vms will always gateway, like 0rootjails, for updates
-
-make sure to add the new variables to [-h] for: qb-start , stop, cmd, 
 
 1. qubsd.sh 
 	Fix the "net-firewall" switches.
@@ -35,20 +31,19 @@ make sure to add the new variables to [-h] for: qb-start , stop, cmd,
 
 3. Scripts that should integrate VMs
 	- qb-stop , qb-start, qb-edit (now needs "add" function for multiple taps at least), qb-rename , qb-destroy, qb-stat, qb-create, qb-disp
-	- qb-edit really should be an eval command like in get_jail_parameter ... for ex: eval "chk_valid_param $_q $VALUE" 
+	- qb-edit really should be an eval command like in get_jail_parameter ... for ex: eval "chk_valid_param _q $VALUE" 
+	- make sure to add the new variables to [-h] for: qb-start , stop, cmd, 
 
 4. New scripts
 	qb-pci
 		- summary of PCI devices relevant to user
 		- USB, NIC, maybe others
 		- Show what was is currently passthrough'd
-	qb-vm
-		- For create, since that might be non-trivial, and your qb-create is already pretty good
 
 # CLEANUP STUFF
+
 quBSD.conf 
-	- remove ppt_nic. It's now in jmap.
-	- Think of way to remove the file entirely. 
+	- Remove entirely. Maybe qb-edit option to change? Will need on installer as well 
 
 USBVM 
 	- Auto-install various useful mounting stuff for common devices     
@@ -78,11 +73,18 @@ ZFS Encrypted Jails
 
 Tor and I2P Jails
 
+Xephyr
+	- An absolute must for pw managers and pw entry
+	- You might be able to make it a wrapper?
+	- Maybe integrate an "X" option for qb-cmd and qb-disp.
+	- Wayland/sway might be a good bonus to run in a separate tty
+
 qb-disp
-	- Implement ephemeral jails, which clone the zroot dataset as well 
+	- Really should be called class=ephemeral
+	- Should clone zroot from template as well. 
+	- Make it so you can run a specific command directly at the command line.
 	- Needs significant rework, to allow for using an appjail as a rootjail
      and the reclone operation for that appjail's zroot.
-	- Might not be worth it tbh.
 
 pwd
 	- I think the right way to do this, is export any existing pwd db in /rw, and import it into the created jail (or maybe vice versa) 
@@ -144,8 +146,6 @@ qubsd_installer
 
 ### BEST PRACTICES / FIXES / CLEANUP
 
-Xephyr is an absolute must. Wayland/sway might be a good bonus to run in a separate tty
-
 connect_client_to_gateway
 	- It could be space efficiencized. For now just uses dumb switches for VMs, duplicating lines 
 
@@ -159,9 +159,6 @@ Cycle all scripts through shellcheck again.
 	- Needs to document that the rootjails must stay lowered schg
 	- Update the guides regarding #defaults in jailmap.
 
-jail -r 
-	- <net-jails> are getting an "Operation not permitted" error, I think on wg attempted changing of resolv.conf
-
 quBSD.sh and msg-qubsd.sh
 	- Error messages feel a bit disorganized now.
 		- Rework the name/numbering scheme.
@@ -169,10 +166,12 @@ quBSD.sh and msg-qubsd.sh
 		- Sometimes errors seem too specific and not general enough.
 			Example - instead of "jail invalid" often we get a generic: "needs a class" 
 		
-	- There might be some consideration to further generalization of functions
+	- There might be some consideration to further generalization of major functions like get_jail_parameter
 		- Passing through the -q [quiet] -s [skipchecks] and even a new [-f force] 
 			This enables easier to implement features (like with ephemeral jails that use appjail clones as rootjails
 		- Master -V (verbose) command could be included on all top level scripts, with -q as default 
+		- (x)tra check on chk_valid_{param} for certain circumstances
+		-(r)esolve value (for stuff like ip auto)
 		- Could also beef up the log file, and make reference to it in error messages
 
 qubsd_ipv4 - there's probably room for IP expansion for multiple strings of gateways .. maybe.
@@ -185,18 +184,7 @@ zusr fstabs
 Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file and code.
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
 
-## When my system crashed with the power, it can leave things in a dirty state 
-	- DISP-torrents was still there
-		- Probably an rc that cleans up old states
-
 qb-autosnap might need looked at for leaving snapshots that could be deleted
-
-get_jail_parameter needs more variables
-	-(x)tra check on chk_valid_{param}
-	-(r)esolve value (for stuff like ip auto)
-
-exec.created
-	- clean it up. I left the old function there coz was scurd. remove it
 
 You should make a check for a circular reference in the networking.
 	- firewall client is ivpn-bra. ivpn-bra client is torrents. torrents client is firewall
@@ -209,7 +197,8 @@ pretty sure reclone_zroot needs to be optimized
 new sed discovery
 	- -En with (parenthesis) and \1. Just solid amazing stuff
 
-### MINOR UPGRADES IF ANYONE ELSE OUT THERE WANTS TO DO IT
+
+### MINOR UPGRADES 
 
 qb-update - Update rootjails, create snapshots
 
