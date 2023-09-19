@@ -1,6 +1,9 @@
 
 ##### VIRTUAL MACHINE INTEGRATION
 
+monitor_startstop
+	- check both start/stop scripts for commented lines
+
 Generalization of the VMs implementation (for fbsd vms)
 	- other dataset script
 		- change hostname
