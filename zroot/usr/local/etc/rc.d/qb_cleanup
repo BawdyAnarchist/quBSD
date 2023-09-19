@@ -21,6 +21,9 @@ qb_cleanup_start() {
 	rm /tmp/quBSD > /dev/null 2>&1
 	mkdir /tmp/quBSD > /dev/null 2>&1
 
+	# Remove the quBSD log
+	rm /var/log/quBSD.log > /dev/null 2>&1
+
 	# Unmount datasets which may still be mounted
 	for _mount in $(mount | awk '/DISP/ {print $3}') ; do
 		umount -f $_mount
