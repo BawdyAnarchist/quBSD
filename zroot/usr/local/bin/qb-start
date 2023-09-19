@@ -32,13 +32,12 @@ get_options() {
 
 checks() {
 
-	# Define TMP file variables
-	_TMP_IP="/tmp/qb-start_temp_ip"
-
-	# Absolutely do not run if another instance if qb-start or qb-stop is already running
+# Absolutely do not run if another instance if qb-start or qb-stop is already running
 #	monitor_startstop "1" "$_TMP_IP" || get_msg_start "_e0" "exit_1" 
 
 	# Setup tmp file for IP tracking 
+	_TMP_IP="/tmp/qb-start_temp_ip"
+	rm $_TMP_IP > /dev/null 2>&1
 	mktemp "$_TMP_IP"	> /dev/null 2>&1
 }
 
@@ -120,7 +119,6 @@ begin_waterfall() {
 	for _JAIL in $_JAILS; do
 
 		# Only continue the waterfall if jail started successfully 
-echo start_jail "$_JAIL"
 		start_jail "$_JAIL" || get_msg_start "_e4" "exit_1"
 
 		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion) 
@@ -143,7 +141,6 @@ echo start_jail "$_JAIL"
 
 			# Maintain a small stagger between parallel starts. Helps prevent conflicts
 			sleep .2
-echo start_jail $_end &
 			start_jail $_end &
 		done
 
