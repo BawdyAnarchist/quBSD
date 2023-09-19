@@ -70,7 +70,7 @@ begin_waterfall() {
 
 	for _JAIL in $_JAILS; do
 
-		# Dont need to wait for VM gateway to stop before continuing. Set background switch.
+		# VMs can be stopped in background, as there's no epair race conditions. 
 		chk_isvm $_JAIL && _bkgnd='&' || _bkgnd=''
 
 		# If JAIL is on JLIST shut it down, and wait for the shutdown.
