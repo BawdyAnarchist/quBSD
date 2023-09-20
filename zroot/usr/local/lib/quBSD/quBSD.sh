@@ -1448,6 +1448,26 @@ chk_valid_seclvl() {
 	return 0
 }
 
+chk_valid_taps() {
+	# Return 0 if vif is valid ; return 1 if invalid
+
+	# Quiet option
+	getopts q _opts && _q='-q'
+	shift $(( OPTIND - 1 ))
+
+	# Positional parmeters.
+	local _value="$1"
+
+	[ -z "$_value" ] && get_msg $_q "_0" "VIF" && return 1
+
+	for _val in $_value ; do
+		! echo "$_val" | grep -qE "^[[:digit:]]\$" \
+				&& get_msg $_q "_cj7" "$_val" && return 1
+	done
+
+	return 0
+}
+
 chk_valid_tmux() {
 	# Quiet option
 	getopts q _opts && _q='-q'
