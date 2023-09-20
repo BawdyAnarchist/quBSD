@@ -43,6 +43,7 @@
 # restart_jail        - Self explanatory
 # remove_tap          - Removes tap interface from whichever jail it's in
 # connect_client_to_ gateway - Connects a client jail to its gateway
+# connect_gateway_to_clients - Connects a gateway jail to its clients
 # reclone_zroot       - Destroys and reclones jails dependent on rootjail
 # reclone_zusr        - Destroy and reclones jails with zusr dependency (dispjails)
 # cleanup_oldsnaps    - Destroys old snapshots beyond their time-to-live 
@@ -59,19 +60,29 @@
 # chk_valid_jail       - Makes sure the jail has minimum essential elements
 # chk_valid_autosnap   - true|false ; Include in qb-autosnap /etc/crontab snapshots
 # chk_valid_autostart  - true|false ; Autostart at boot
+# chk_valid_bhyveopts  - Checks bhyve options in jailmap for valid or not
 # chk_valid_class      - appjail | rootjail | dispjail
 # chk_valid_cpuset     - Must be in man 1 cpuset format. Limit jail CPUs
 # chk_valid_gateway    - Jail adheres to gateway jail norms
 # chk_valid_ipv4       - Adheres to CIDR notation
 # chk_isqubsd_ipv4     - Adheres to quBSD conventions for an IP address
 # chk_valid_maxmem     - Must be in man 8 rctl format. Max RAM allocated to jail
+# chk_valid_memsize    - Check memsize for bhyve (just references _valid_maxmem)
 # chk_valid_mtu        - Must be a number, typically between 1000 and 2000
 # chk_valid_no_destroy - true|false ; qb-destroy protection mechanism
+# chk_valid_ppt        - Checks ppt exists in pciconf and is available to passthru
 # chk_valid_rootjail   - Only certain jails qualify as rootjails
+# chk_valid_rootvm     - Only certain VMs qualify as rootVMs 
 # chk_valid_schg       - none | sys | all ; quBSD convention, schg flags on jail
 # chk_valid_seclvl     - -1|0|1|2|3 ; Applied to jail after start
 # chk_valid_template   - Somewhat redundant with: chk_valid_jail
+# chk_valid_taps       - jmap designates number of taps to add (must be :digit:)
+# chk_valid_tmux       - tmux for terminal access to FreeBSD jails. true/false
+# chk_valid_template   - Must be any valid jail 
+# chk_valid_vcpus      - Must be an integer less than cpuset -g 
+# chk_valid_vncres     - Must be one of few valid resolutions allowed by bhyve
 # chk_valid_vif        - Virtual Intf (vif) is valid
+# chk_valid_wiremem    - Must be true/false
 
 ##############################  NETWORKING  FUNCTIONS  #############################
 # define_ipv4_convention - Necessary for implementing quBSD IPv4 conventions
@@ -79,19 +90,23 @@
 # assign_ipv4_auto       - Handles the ip auto assignments when starting jails
 
 ##################################  VM  FUNCTIONS  #################################
-# prep_bhyve_options   - Retrieves VM variables and handles related functions 
-# exec_vm_coordinator  - Coordinates the clean launching and teardown of VMs
-# launch_vm            - Launches the VM to a background subshell
 # cleanup_vm           - Cleans up network connections, and dataset after shutdown
+# prep_bhyve_options   - Retrieves VM variables and handles related functions 
+# launch_vm            - Launches the VM to a background subshell
+# exec_vm_coordinator  - Coordinates the clean launching and teardown of VMs
+
+##################################  DEBUG LOGGING  #################################
+# setlog1              - For turning on debug log to /root/debug1
+# setlog2              - For turning on debug log to /root/debug2
 
 #############################  END  OF  FUNCTION  LIST  ############################
 ####################################################################################
 
 
 
-####################################################################################
-####################  VARIABLE ASSIGNMENTS and VALUE RETRIEVAL  ####################
-####################################################################################
+########################################################################################
+######################  VARIABLE ASSIGNMENTS and VALUE RETRIEVAL  ######################
+########################################################################################
 
 # Source error messages for library functions
 . /usr/local/lib/quBSD/msg-quBSD.sh
@@ -346,9 +361,10 @@ compile_jlist() {
 }
 
 
-##################################################################################
-###########################  JAIL HANDLING / ACTIONS  ############################
-##################################################################################
+
+########################################################################################
+##############################  JAIL HANDLING / ACTIONS  ###############################
+########################################################################################
 
 start_jail() {
 	# Starts jail. Performs sanity checks before starting. Logs results.
@@ -814,9 +830,9 @@ monitor_startstop() {
 
 
 
-##################################################################################
-################################  STATUS  CHECKS  ################################
-##################################################################################
+########################################################################################
+###################################  STATUS  CHECKS  ###################################
+########################################################################################
 
 chk_isblank() {
 	# Personally I think it's posix dumb that there are only VERBOSE ways of
@@ -896,9 +912,9 @@ chk_avail_jailname() {
 
 
 
-##################################################################################
-################################  SANITY  CHECKS  ################################
-##################################################################################
+########################################################################################
+###################################  SANITY  CHECKS  ###################################
+########################################################################################
 
 chk_valid_zfs() {
 	# Verifies the existence of a zfs dataset, returns 0, or 1 on failure
@@ -998,7 +1014,8 @@ chk_valid_jail() {
 	return 0
 }
 
-############################  JAIL  PARAMETER CHECKS  ############################
+
+###############################  JAIL  PARAMETER CHECKS  ###############################
 
 chk_valid_autostart() {
 	# Standardization/consistency with get_jail_parameter() func.
@@ -1566,9 +1583,11 @@ chk_valid_wiremem() {
 	chk_truefalse $_q "$1" "WIREMEM"
 }
 
-##################################################################################
-#######################  FUNCTIONS RELATED TO NETWORKING #########################
-##################################################################################
+
+
+########################################################################################
+###########################  FUNCTIONS RELATED TO NETWORKING  ##########################
+########################################################################################
 
 define_ipv4_convention() {
 	# Defines the quBSD internal IP assignment convention.
@@ -1684,9 +1703,11 @@ assign_ipv4_auto() {
 	return 0
 }
 
-##################################################################################
-#######################  FUNCTIONS RELATED TO VM HANDLING ########################
-##################################################################################
+
+
+########################################################################################
+##########################  FUNCTIONS RELATED TO VM HANDLING ###########################
+########################################################################################
 
 cleanup_vm() {
 	# Cleanup function after VM is stopped or killed in any way 
@@ -1981,6 +2002,12 @@ exec_vm_coordinator() {
 
 	return 0
 }
+
+
+
+########################################################################################
+###################################  DEBUG LOGGING  ####################################
+########################################################################################
 
 setlog1() {
 	set -x
