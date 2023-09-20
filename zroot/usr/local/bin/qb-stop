@@ -116,8 +116,13 @@ handle_restarts() {
 	
 		# Only qb-start should be used for parallel jail starts. 
 		qb-start "$_JLIST" &
-		exit 0
+
+	else
+		# Give 30 secs for jails to stop, or error. Send empty file.
+		monitor_startstop "60" || get_msg "_e3"
 	fi	
+
+	exit 0
 }
 
 main() {
@@ -139,9 +144,6 @@ main() {
 		# Hierarchy tops are independent, can be stopped in parallel.
 		begin_waterfall $_JAIL &
 	done
-
-exit 0
-	handle_restarts
 }
 
 get_global_variables
@@ -150,8 +152,5 @@ get_options "$@"
 
 main
 
-# Give 30 secs for jails to stop, or error. Send empty file.
-monitor_startstop "60" || get_msg "_e3"
+handle_restarts
 
-exit 0
-	

@@ -45,6 +45,11 @@ ERROR: < $_JAIL > failed to start. It serves network to
        client jails. Exiting
 ENDOFMSG
 	;;	
+	_e5) cat << ENDOFMSG
+
+ERROR: [-t <timeout>] must be integer from 5 to 300
+ENDOFMSG
+	;;	
 	_m1) cat << ENDOFMSG
 Jail(s) were already running
 ENDOFMSG

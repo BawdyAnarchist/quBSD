@@ -807,9 +807,6 @@ monitor_startstop() {
 		sleep .5
 	done
 
-	# Cleanup tmp file, regardless
-	[ "$_TMP_IP" ] && rm "$_TMP_IP" >> /dev/null 2>&1
-
 	# Send error message that gave up waiting, return error
 	get_msg "_jo3" "$0"
 	return 1	
@@ -1447,26 +1444,6 @@ chk_valid_seclvl() {
 	# If SECLVL is not a number
 	echo "$_value" | ! grep -Eq '^(-1|-0|0|1|2|3)$' \
 			&& get_msg $_q "_cj2" "$_value" "SECLVL" && return 1
-
-	return 0
-}
-
-chk_valid_taps() {
-	# Return 0 if vif is valid ; return 1 if invalid
-
-	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
-
-	# Positional parmeters.
-	local _value="$1"
-
-	[ -z "$_value" ] && get_msg $_q "_0" "VIF" && return 1
-
-	for _vif in $_value ; do
- 		! echo "$_vif" | grep -qE "^[[:digit:]]\$" \
-				&& get_msg $_q "_cj7" "$_vif" && return 1
-	done
 
 	return 0
 }

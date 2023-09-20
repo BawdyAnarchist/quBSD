@@ -12,14 +12,15 @@
 . /usr/local/lib/quBSD/msg-start.sh
 
 get_options() {
-	while getopts aAeE:f:h opts ; do
+	while getopts aAeE:f:h:t: opts ; do
 		case $opts in
 			a) _SOURCE="auto" ;;
 			A) [ "$_SOURCE" ] && get_msg_start "_e1" "usage_1" || _SOURCE="all" ;;
 			e) _EXCLUDE="true" ;;
-			E) [ "$_EXCLUDE" ] && get_msg_start "_e2" "usage_1" || _EXFILE="${OPTARG}" ;;
+			E) [ "$_EXCLUDE" ] && get_msg_start "_e2" "usage_1" || _EXFILE="$OPTARG" ;;
 			f) [ "$_SOURCE" ] && get_msg_start "_e1" "usage_1" || _SOURCE="$OPTARG" ;; 
 			h) get_msg_start "none" "usage_0" ;;
+			t) _TIMEOUT="$OPTARG" ;; 
 			*) exit 1 ;;
 		esac
 	done
@@ -28,14 +29,26 @@ get_options() {
 
 	# This makes it so that _POSPARAMS has one parameter per line
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
+	_TIMEOUT="${_TIMEOUT:=60}"
 }
 
 checks() {
+
+	# Timeout must be an integer less than 300 and greater than 5
+	if echo "$_TIMEOUT" | ! grep -Eq '^[[:digit:]]+$' \
+			|| [ "$_TIMEOUT" -gt 300 ] || [ "$_TIMEOUT" -lt 5 ]
+	then 
+		get_msg_start "_e5" "usage_1"
+	fi
+	
 	# Temp file for IP tracking
 	_TMP_IP="${QTMP}/qb-start_temp_ip"
 
 	# Absolutely do not run if another instance if qb-start or qb-stop is already running
 	monitor_startstop "1" || get_msg_start "_e0" "exit_1"
+
+	# Function above removes the temp_ip tracker
+	mktemp "$_TMP_IP" > /dev/null 2>&1
 }
 
 reclone_stale_zroots() {
@@ -188,7 +201,7 @@ checks
 
 main
 
-# Monitor completion of qb-start, 30 sec (60 0.5sec cycles). 
-#monitor_startstop 60 "$_TMP_IP" &
+# Monitor completion of qb-start 
+monitor_startstop "$_TIMEOUT" "$_TMP_IP" &
 
 exit 0
