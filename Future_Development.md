@@ -200,6 +200,9 @@ new sed discovery
 
 ### MINOR UPGRADES 
 
+monitor_startstop
+	- Could make this granular to each jail/VM
+
 qb-update - Update rootjails, create snapshots
 
 qb-list - [-e] (evaluate) option to check jail-param combos for validity.
