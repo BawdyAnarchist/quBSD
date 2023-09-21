@@ -11,17 +11,12 @@ Generalization of the VMs implementation (for fbsd vms)
 		- Probably changing the swap space?
 	- 0vms will always gateway, like 0rootjails, for updates
 
-1. qubsd.sh 
-	Fix the "net-firewall" switches.
-		# the solution is: if [ ${_class_of_gateway##*VM} ] and also maybe _class_of_client
+NOTE: The "net-firewall" switches solution is
+	if [ ${_class_of_gateway##*VM} ] and also maybe _class_of_client
 
-   #chk_valid_gateway
-	- Type implementation?  "firewall" "gateway" "server" "app"  
 	- chk_isqubsd_ipv4
 	- define_ipv4_convention
 	- discover_open_ipv4
-	- exec scripts
-	- exec.created
 	- qb-edit 
 		- rc.conf changes (no longer use rc.conf if IP is static
 		- Add check when assigning app or disp CLASS, that it doesnt have a zfs origin 
@@ -61,11 +56,6 @@ net-firewall
 		- Currently does not integrate all unique wireguard ports of clients (net-jails).
 		- needs careful review. Use chatGPT-4
 
-Cleanup the github. You have scripts in there that arent relevant from full copies of $ubin
-
-Are there going to be differences to code into prepare_vm between Linux, Windows, and FreeBSD?
-
-Integrate in qb-i3-launch as well
 
 ### UPGRADES
 
