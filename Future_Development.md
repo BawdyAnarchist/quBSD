@@ -30,9 +30,9 @@ Generalization of the VMs implementation (for fbsd vms)
 	- Add a generic parameter that tacks on any "-s 99:0 <options>" 
 
 3. Scripts that should integrate VMs
-	- qb-stop , qb-start, qb-edit (now needs "add" function for multiple taps at least), qb-rename , qb-destroy, qb-stat, qb-create, qb-disp
-	- qb-edit really should be an eval command like in get_jail_parameter ... for ex: eval "chk_valid_param _q $VALUE" 
-	- make sure to add the new variables to [-h] for: qb-start , stop, cmd, 
+	- qb-edit (now needs "add" function for multiple taps at least), qb-rename , qb-destroy, qb-stat, qb-create, qb-disp
+	- qb-edit really should be an eval command like in get_jail_parameter ... for ex: eval chk_valid_param _q VALUE
+	- Add new variables to [-h] for: qb-start , stop, cmd, 
 
 4. New scripts
 	qb-pci
@@ -147,7 +147,7 @@ qubsd_installer
 ### BEST PRACTICES / FIXES / CLEANUP
 
 connect_client_to_gateway
-	- It could be space efficiencized. For now just uses dumb switches for VMs, duplicating lines 
+	- It could be efficiencized. For now just uses dumb switches for VMs, duplicating lines 
 
 Cycle all scripts through shellcheck again. 
 	- local variables need to be removed and func variables checked for clean/sanitary

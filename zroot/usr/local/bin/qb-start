@@ -12,7 +12,7 @@
 . /usr/local/lib/quBSD/msg-start.sh
 
 get_options() {
-	while getopts aAeE:f:h:t: opts ; do
+	while getopts aAeE:f:ht: opts ; do
 		case $opts in
 			a) _SOURCE="auto" ;;
 			A) [ "$_SOURCE" ] && get_msg_start "_e1" "usage_1" || _SOURCE="all" ;;

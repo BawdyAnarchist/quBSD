@@ -126,6 +126,9 @@ get_global_variables() {
 	sed -i '' -E 's/[[:blank:]]*$//' $QBCONF
 	sed -i '' -E 's/[[:blank:]]*$//' $JMAP
 
+	# Make sure the quBSD /tmp directory exists
+	[ -d "$QTMP" ] || mkdir -p "$QTMP" 
+
 	# Get datasets, mountpoints; and define files.
    QBROOT_ZFS=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $QBCONF)
 	JAILS_ZFS="${QBROOT_ZFS}"
