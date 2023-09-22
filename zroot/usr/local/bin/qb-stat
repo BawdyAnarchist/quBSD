@@ -24,7 +24,6 @@ define_script_files() {
 	# Trap to remove TMP files when exiting
 	trap "trap_on_exit" INT TERM HUP QUIT EXIT
 
-	QBROOT=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $QBCONF) 
 	TMP1=$(mktemp -t "quBSD/qb-stat1")
 	TMP2=$(mktemp -t "quBSD/qb-stat2")
 	COL="${COL:=6,6}"
