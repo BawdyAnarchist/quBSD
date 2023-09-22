@@ -1,44 +1,29 @@
 
 ##### VIRTUAL MACHINE INTEGRATION
 
-Generalization of the VMs implementation (for fbsd vms)
-	- other dataset script
-		- change hostname
-		- configure network
-		- symlink files
+qb-list
+	- should show default value where none exists for jail/VM	
+
+qb-i3-launch
+	- It should have a monitoring time for qb-autostart to finish 
+
+VMs implementation 
+	zusr dataset, script internal, in /vmusr
+		- hostname ; configure network ; symlink files ;
 		- User profiles (if any) stored here
-		- possible you'll need early script (for symlinks) and later script (network, etc)
-		- Probably changing the swap space?
-	- 0vms will always gateway, like 0rootjails, for updates
 
-NOTE: The "net-firewall" switches solution is
-	if [ ${_class_of_gateway##*VM} ] and also maybe _class_of_client
+Scripts that should integrate VMs
+	- qb-rename , qb-destroy, qb-stat, qb-create, qb-disp
+	- Beef up [-h] for at least: qb-start , stop, cmd, 
 
-	- chk_isqubsd_ipv4
-	- define_ipv4_convention
-	- discover_open_ipv4
-	- qb-edit 
-		- rc.conf changes (no longer use rc.conf if IP is static
-		- Add check when assigning app or disp CLASS, that it doesnt have a zfs origin 
-
-2. jailmap
-	- Add a generic parameter that tacks on any "-s 99:0 <options>" 
-
-3. Scripts that should integrate VMs
-	- qb-edit (now needs "add" function for multiple taps at least), qb-rename , qb-destroy, qb-stat, qb-create, qb-disp
-	- qb-edit really should be an eval command like in get_jail_parameter ... for ex: eval chk_valid_param _q VALUE
-	- Add new variables to [-h] for: qb-start , stop, cmd, 
-
-4. New scripts
+New scripts
 	qb-pci
 		- summary of PCI devices relevant to user
 		- USB, NIC, maybe others
 		- Show what was is currently passthrough'd
 
-# CLEANUP STUFF
 
-quBSD.conf 
-	- Remove entirely. Maybe qb-edit option to change? Will need on installer as well 
+# CLEANUP STUFF
 
 USBVM 
 	- Auto-install various useful mounting stuff for common devices     
@@ -133,8 +118,12 @@ qubsd_installer
 	
 	- VMs integration
 		- install bhyve-uefi firmware
+	
+	- quBSD.conf removed. Everything now in jailmap.conf
 
 ### BEST PRACTICES / FIXES / CLEANUP
+
+Convert all JMAP to QCONF , and rename jailmap.conf quBSD.conf
 
 connect_client_to_gateway
 	- It could be efficiencized. For now just uses dumb switches for VMs, duplicating lines 
@@ -187,8 +176,18 @@ pretty sure reclone_zroot needs to be optimized
 new sed discovery
 	- -En with (parenthesis) and \1. Just solid amazing stuff
 
+NOTE: The "net-firewall" switches solution is
+	if [ ${_class_of_gateway##*VM} ] and also maybe _class_of_client
+	- chk_isqubsd_ipv4
+	- define_ipv4_convention
+	- discover_open_ipv4
+
+sed doesnt need /g for the substitutions. Just leave it be. g is only for multiple matches in same line (not document)
+	- go through and remove these g's. Unnecessary
 
 ### MINOR UPGRADES 
+
+qb-help: forget the docs, make the more in depth stuff part of qb-help. Like a man page
 
 monitor_startstop
 	- Could make this granular to each jail/VM
