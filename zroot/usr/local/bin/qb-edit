@@ -4,12 +4,12 @@
 . /usr/local/lib/quBSD/msg-edit.sh
 
 get_options() {
-	local OPTIND
-	while getopts fhiqr opts ; do
+	while getopts adfhiqr opts ; do
 		case $opts in
-			   # [-f] acts on msg-edit function, rather than main script 
-			f) FORCE="true" ; _q='-q' ;; 
-			h) get_msg_edit "none" "usage_0" ;; 
+			a) ACTION="add" ;;
+			d) ACTION="delete" ;;
+			f) FORCE="true" ; _q='-q' ;;
+			h) get_msg_edit "none" "usage_0" ;;
 			q) QUIET="true" ; _q='-q' ;;
 			r) RESTART="true" ;;
 			*) exit 1 ;;
@@ -17,158 +17,166 @@ get_options() {
 	done
 
 	shift $(( OPTIND - 1 ))
-	
-	# Script variables 
+
+	# Script variables
 	JAIL="$1"
-	PARAM="${PARAM:-"$2"}"
-	VAL="${VAL:-"$3"}"
+	PARAM="$2"
+
+	# If adding	a line, it might be '-s opt' for bhyve, need full line
+	if [ "$PARAM" = "BHYVE_CUSTM" ] ; then
+		shift 2
+		VALUE="$@"
+	else
+		VALUE="$3"
+	fi
+
+	# Create both (upper/lower) for VALUE. User convenience, and for checks later on
+	PARAM=$(echo  "$PARAM" | tr '[:lower:]' '[:upper:]')
+	_param=$(echo "$PARAM" | tr '[:upper:]' '[:lower:]')
+
+	# Necessary for checks
 	OLDSETTING=$(sed -nE "s@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+@@p" $JMAP)
 
-	# Convert lower-case entered parameters to upper (user-friendly)
-	[ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
+	# List out normal parameters which can be checked (vs BHYVE_CUSTM)
+	COMN_PARAMS="AUTOSTART AUTOSNAP CLASS GATEWAY IPV4 MTU NO_DESTROY TEMPLATE"
+	JAIL_PARAMS="CPUSET MAXMEM ROOTJAIL SCHG SECLVL TEMPLATE"
+	VM_PARAMS="BHYVEOPTS MEMSIZE PPT ROOTVM TAPS TMUX VCPUS WIREMEM"
 }
 
 checks() {
-	# Check for required inputs
-	if [ -z "$JAIL" -o -z "$PARAM" -o -z "$VAL" ] ; then
-		# Only exception to missing input, is for [-i] auto assign IP 
-		[ -z "$AUTO_IP" ]  &&  get_msg_edit "_1" "usage_1"
-	
-	elif ! grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP ; then
-		# Doesn't exist in jmap (thus, can't be edited)
-		get_msg_edit "_2" "usage_1"
 
-	elif [ "$VAL" = "$OLDSETTING" ] ; then
-		# New value is unchanged from old value 
-		get_msg_edit "_3" "exit_0"
-	fi	
+	if [ "$ACTION" = "delete" ] ; then
+		# Make sure that at JAIL and PARAM exist
+		[ -n "$JAIL" ] && [ -n "$PARAM" ] || get_msg_edit "_1" "usage_1"
 
-	# Sanity checks to make sure values are reasonable
+		# Make sure the combo of JAIL and PARAM (and VALUE if available)
+		if [ -n "$VALUE" ] ; then
+			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $JMAP) \
+				|| get_msg_edit "_2_1" "exit_0"
+		else
+			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP) \
+				|| get_msg_edit "_2_1" "exit_0"
+		fi
+
+	else
+		# Need all 3 parameters
+		[ -z "$JAIL" -o -z "$PARAM" -o -z "$VALUE" ] && get_msg_edit "_1" "usage_1"
+
+		# New value is unchanged from old value
+		[ "$VALUE" = "$OLDSETTING" ] && get_msg_edit "_2" "exit_0"
+	fi
+
+	# Check that PARAM selected is a valid parameter for jail or VM indicated
+	if chk_isvm "$JAIL" ; then
+		echo "BHYVE_CUSTM $VM_PARAMS $COMN_PARAMS" | grep -Eqs "$PARAM" \
+			|| get_msg_edit "_3" "usage_1"
+	else
+		echo "$JAIL_PARAMS $COMN_PARAMS" | grep -Eqs "$PARAM" \
+			|| get_msg_edit "_4" "usage_1"
+	fi
+
+	# BHYVE_CUSTM is special, but everything else can run through normal chk_valid functions
+	[ ! "$PARAM" = "BHYVE_CUSTM" ] && [ ! "$ACTION" = "delete" ] \
+		&& ! eval "chk_valid_${_param}" $_q \"$VALUE\" \"$JAIL\" && [ -z "$FORCE" ] && exit 1
+
+	# Extra checks/interaction for GATEWAY and IPV4
 	case $PARAM in
-		AUTOSNAP)
-				get_jail_parameter CLASS $JAIL
 
-				# Only appjails and rootjails can have autosnaps=true
-				[ $CLASS = "dispjail" ] && [ "$VAL" = "true" ] \
-						&& get_msg_edit "_11" "exit_1"
-		;;
-		AUTOSTART|NO_DESTROY)
-				chk_truefalse $_q "$VAL" "$PARAM" || get_msg_edit "_4" "usage_1"
-		;;
-		CLASS)
-				get_msg_edit "_5" "usage_1" "_f"  
-		;;
-		CPUSET)
-				chk_valid_cpuset $_q "$VAL" || get_msg_edit "none" "usage_1" 
-		;;
-		MAXMEM)
-				chk_valid_maxmem $_q "$VAL" || get_msg_edit "none" "usage_1" 
-		;;
-		MTU)
-				chk_valid_mtu $_q "$VAL" || get_msg_edit "none" "usage_1" 
-		;;
-		ROOTJAIL|TEMPLATE)
-				# Check that rootjail or template has jmap and zroot zfs 
-				chk_valid_jail $_q "$VAL" || get_msg_edit "none" "exit_1" "_f"
-		;;
-		SCHG) 
-				chk_valid_schg $_q "$VAL" ||  get_msg_edit "none" "usage_1" 
-		;;	
-		SECLVL)		
-				chk_valid_seclvl $_q "$VAL" ||  get_msg_edit "none" "usage_1" 
-
-				# Alert user that high seclvl will make pf changes impossible
-				[ "$VAL" = "3" ] && [ -z "${JAIL##net-*}" ] && get_msg_edit "_12" "_cont"
-		;;
-		GATEWAY)  
-				chk_valid_gateway $_q "$VAL" "$JAIL" \
-						|| get_msg_edit "none" "exit_1" "_f"
-
+		GATEWAY)
 				get_jail_parameter -qs IPV4 "$JAIL"
 
 				# Offer to change IPV4 from 'none' to 'auto', if gateway is valid
-				if ! [ "$VAL" = "none" ] && [ "$IPV4" = "none" ] ; then
+				if [ ! "$VALUE" = "none" ] && [ "$IPV4" = "none" ] ; then
 					get_msg_edit "_10"
-					get_user_response && _IPAUTO="true" 
+					get_user_response && _IPAUTO="true"
 				fi
 		;;
-		IPV4) 
-				# Check IP addresses for validity and quBSD convention adherence 
-				chk_valid_ipv4 $_q "$VAL" \
-						|| get_msg_edit "none" "exit_1" 
-
-				chk_isqubsd_ipv4 $_q "$VAL" "$JAIL" \
-						|| get_msg_edit "none" "exit_1" "_f"
-		;; 
-		# Catch all. Any other entries for $PARAM return an error.
-		*)	get_msg_edit "_6" "usage_1"  ;;
-	
-	# /PARAM
+		IPV4)
+				# Extra check for quBSD IPV4 convention.
+				chk_isqubsd_ipv4 $_q "$VALUE" "$JAIL" || get_msg_edit "none" "exit_1" "_f"
+		;;
 	esac
+
+	# Check if the line is already present, or if it needs to be added
+	if ! grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP ; then
+		[ "$ACTION" = "delete" ] && get_msg_edit "_5" "exit_1"
+		ACTION="add"
+	fi
 }
 
 modify_jmap() {
 
-	# Modify JMAP and print new settings on success
-	sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VAL}@" $JMAP \
-			&& get_msg_edit "_8" 
+	case $ACTION in
+		delete)
+			if [ -n "$VALUE" ] ; then
+				sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $JMAP
+			else
+				sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+@ d" $JMAP
+			fi
+		;;
+		add)
+			echo "$JAIL  $PARAM  $VALUE" >> $JMAP
+		;;
+		*)
+			# Modify JMAP and print new settings on success
+			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VALUE}@" $JMAP
+		;;
+	esac
 
-	# Set IPV4 to auto in JMAP, if the user approved it 
+	# Set IPV4 to auto in JMAP, if the user approved it
 	[ "$_IPAUTO" ] \
-		&& sed -i '' -E "\@^${JAIL}[[:blank:]]+IPV4@s@[^[:blank:]]+\$@auto@" $JMAP 
+		&& sed -i '' -E "\@^${JAIL}[[:blank:]]+IPV4@s@[^[:blank:]]+\$@auto@" $JMAP
 
-	# Clean up the columns 
+	# Clean up the columns and sorting
 	_newJMAP=$(column -t $JMAP)
+	_newJMAP=$(echo "$_newJMAP" | sort -k1,1 -k2,2)
 	echo "$_newJMAP" > $JMAP
+
+	# BHYVE_CUSTM has extra spaces. At least remove the first space
+	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $JMAP
+
+	# Print the new value
+	[ "$ACTION" = "delete" ] && get_msg_edit "_8_1" || get_msg_edit "_8"
 }
 
 modify_autosnap() {
 
 	# Class is necessary to know which dataset to operate on (zroot or zusr)
-	get_jail_parameter CLASS $JAIL	
+	get_jail_parameter CLASS $JAIL
 
-	# zusr mod for appjails. Dispjails may or may not need zusr. Do both, no harm, lazy code
-	! [ "$CLASS" = "rootjail" ] && _ZFS="${ZUSR_ZFS}/${JAIL}" \
-			&& chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VAL}" "$_ZFS" \
+	case $CLASS in
+
+		# Rootjail only needs zroot operation
+		rootjail)
+			_ZFS="${JAILS_ZFS}/${JAIL}"
+			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
+					&& zfs get qubsd:autosnap "$_ZFS"
+		;;
+
+		# Appjail/VM will have zusr. Dispjail might, but if not will fail to continue
+		appjail|dispjail|appVM)
+			_ZFS="${ZUSR_ZFS}/${JAIL}"
+			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
+					&& zfs get qubsd:autosnap "$_ZFS"
+		;;
+
+		# RootVM will almost certainly have both zroot and zusr (due to /vmusr mounted)
+		rootVM)
+
+			_ZFS="${JAILS_ZFS}/${JAIL}"
+			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
 					&& zfs get qubsd:autosnap "$_ZFS"
 
-	# zroot mod for rootjails. Dispjails may or may not need zroot. Do both, no harm, lazy code
-	! [ "$CLASS" = "appjail" ] && _ZFS="${JAILS_ZFS}/${JAIL}" \
-			&& chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VAL}" "$_ZFS" \
+			_ZFS="${ZUSR_ZFS}/${JAIL}"
+			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
 					&& zfs get qubsd:autosnap "$_ZFS"
-}
-
-handle_vm_gateway() {
-		
-		# Relevant variables. 
-		_gateway=$(get_jail_parameter -deqs GATEWAY $JAIL)
-		_tap=$(get_jail_parameter -deqs VIF $_gateway)
-		_mtu=$(get_jail_parameter -eq MTU $JAIL)
-		_rcconf="${M_ZUSR}/${JAIL}/rw/etc/rc.conf"
-		chflags noschg "$_rcconf"	
-
-		if [ "$VAL" = "DHCP" ] ; then
-			sed -i '' -E "s/ifconfig_.*/ifconfig_${_tap}=\"DHCP\"/" $_rcconf
-			sed -i '' -E "/defaultrouter=/ d" $_rcconf
-
-		else
-			# Using `#' as sed separator, because `/' interferes with variable expansion
-			sed -i '' -E "s#ifconfig_.*#ifconfig_${_tap}=\"inet ${VAL}\"#g" $_rcconf
-			sed -i '' -E "/^defaultrouter=.*/ d" $_rcconf
-			
-			# This might not be completley robust. Generally a.b.c.1 should be the default.
-			sed -i '' -E "/^ifconfig_${_tap}.*/ a\\
-defaultrouter=\"${VAL%.*/*}.1\"
-" $_rcconf
-		fi
-
-		# Warn about having modified IP for net-firewall		
-		get_msg_edit "_9"
+		;;
+	esac
 }
 
 handle_restarts() {
 	# Logic could be written to change running jails, but simpler just to restart.
-	case $PARAM in 
+	case $PARAM in
 
 		CPUSET|MAXMEM|MTU|ROOTJAIL|SCHG|SECLVL|TEMPLATE)
 			chk_isrunning $JAIL && _restart1="$JAIL"
@@ -179,46 +187,42 @@ handle_restarts() {
 			# If jail is running it needs restarted
 			if chk_isrunning $JAIL ; then
 				_restart1="$JAIL" ; _restart2="$_gateway"
-
 			else
 				chk_isrunning $_gateway && _restart2="$_gateway"
 			fi
-		;;	
+		;;
 	esac
 
 	# If there are no jails to restart, exit
 	[ -z "$_restart1" ] && [ -z "$_restart2" ] && exit 0
-	
+
 	# If QUIET tagged, only continue if user specified a restart
 	[ -n "$QUIET" ] && [ -z "$RESTART" ] && exit 0
 
-	if [ -z "$QUIET" ] ; then 
+	if [ -z "$QUIET" ] ; then
 		get_msg_edit "_7"
-		get_user_response || return 0 
+		get_user_response || return 0
 	fi
-	
-	# Restart jails (otherwise, would've already exited)	
+
+	# Restart jails (otherwise, would've already exited)
 	for _jail in $_restart2 $_restart1 ; do
-		[ "$_jail" = "none" ] || restart_jail "$_jail" 
+		[ "$_jail" = "none" ] || restart_jail "$_jail"
 	done
 }
 
 main() {
 
-	# jailmap.conf edits	
+	# jailmap.conf edits
 	modify_jmap
 
 	# Autosnap requires zfs changes
 	[ "$PARAM" = "AUTOSNAP" ] && modify_autosnap
 
-	# Special case for net-firwell. Will need to eventually be generalized with VM handling. 
-	[ "$JAIL" = "net-firewall" ] && [ "$PARAM" = "IPV4" ] && handle_vm_gateway 
-	
 	handle_restarts
 }
 
 
-get_global_variables 
+get_global_variables
 
 get_options "$@"
 
