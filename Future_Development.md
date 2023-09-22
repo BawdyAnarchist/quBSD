@@ -3,6 +3,9 @@
 
 qb-list
 	- should show default value where none exists for jail/VM	
+	- jail.conf devfs ruleset should integrate too
+
+figure out why your snapshots are being label with qubsd:autosnap
 
 qb-i3-launch
 	- It should have a monitoring time for qb-autostart to finish 
@@ -194,7 +197,12 @@ monitor_startstop
 
 qb-update - Update rootjails, create snapshots
 
-qb-list - [-e] (evaluate) option to check jail-param combos for validity.
+qb-list or qb-edit - [-e] (evaluate) option to check jail-param combos for validity.
+
+qb-autosnap and qb-snap
+	- you might review that to see if listing the autosnaps could be improved on a per-jail basis
+	- either that, or just remove the list function entirely and roll into qb-list
+	- I'm really thinking that "autosnap" should just be a specific case of the general qb-snap
 
 qb-mvpn - Mullvad VPN: Query and parse mullvad server json; apply to VPN
 
