@@ -117,19 +117,16 @@ get_global_variables() {
 	# Define variables for files
 	JCONF="/etc/jail.conf"
 	QBDIR="/usr/local/etc/quBSD"
-	QBCONF="${QBDIR}/quBSD.conf"
 	JMAP="${QBDIR}/jailmap.conf"
 	QBLOG="/var/log/quBSD.log"
 	QTMP="/tmp/quBSD/"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
-	sed -i '' -E 's/[[:blank:]]*$//' $QBCONF
 	sed -i '' -E 's/[[:blank:]]*$//' $JMAP
 
 	# Get datasets, mountpoints; and define files.
-   QBROOT_ZFS=$(sed -nE "s:quBSD_root[[:blank:]]+::p" $QBCONF)
-	JAILS_ZFS="${QBROOT_ZFS}"
-	ZUSR_ZFS=$(sed -En "s/^zusr_dataset[[:blank:]]+//p" $QBCONF)
+   JAILS_ZFS=$(sed -nE "s:#NONE[[:blank:]]+jails_zfs[[:blank:]]+::p" $JMAP)
+   ZUSR_ZFS=$(sed -nE "s:#NONE[[:blank:]]+zusr_zfs[[:blank:]]+::p" $JMAP)
 	M_JAILS=$(zfs get -H mountpoint $JAILS_ZFS | awk '{print $3}')
 	M_ZUSR=$(zfs get -H mountpoint $ZUSR_ZFS | awk '{print $3}')
 
@@ -862,10 +859,11 @@ chk_truefalse() {
 	# Positional parmeters / check.
 	local _value="$1"
 	local _param="$2"
+
 	[ -z "$_value" ] && get_msg $_qf "_0" "$_param" && return 1
 
 	# Must be either true or false.
-	! [ "$_value" = "true" ] && ! [ "$_value" = "false" ] \
+	[ ! "$_value" = "true" ] && [ ! "$_value" = "false" ] \
 			&& get_msg $_qf "_cj19" "$_param" && return 1
 
 	return 0
@@ -1608,10 +1606,6 @@ define_ipv4_convention() {
 				# Temporary, adhoc connections have the form: 10.99.x.2/30
 				_ip0=10 ; _ip1=99 ; _ip2="_cycle" ; _ip3=2 ; _subnet=30 ;;
 
-		*qb-usbvm)
-				# usbvm connects to usbjail with the address: 10.77.x.2/30
-				_ip0=10 ; _ip1=77 ; _ip2="_cycle" ; _ip3=2 ; _subnet=30 ;;
-
 		*) case $_jail in
 				net-firewall)
 					# firewall IP is not internally assigned, but router dependent.
@@ -1809,6 +1803,10 @@ prep_bhyve_options() {
 	# Add leading '-' to _bhyveopts
 	_BHOPTS="-${_bhyveopts}"
 
+	# Get wildcard bhyve option added by user 
+	_BHYVE_CUST=$(sed -En "s/${_VM}[[:blank:]]+BHYVE_CUST[[:blank:]]+//p" $JMAP \
+						| sed -En "s/[[:blank:]]+/ /p")
+
 	# Assign CPU, memory, and wire variable
 	_CPU="-c $_vcpus"
 	_RAM="-m $_memsize"
@@ -1898,7 +1896,7 @@ prep_bhyve_options() {
 
 	# Define the full bhyve command
 	_BHYVE_CMD=$(echo $_TMUX1 bhyve $_CPU $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT $_BLK_ZUSR \
-			$_VTNET $_PPT $_FBUF $_TAB $_LPC $_BOOT $_STDIO $_VM $_TMUX2)
+			$_VTNET $_PPT $_FBUF $_TAB $_LPC $_BOOT $_BHYVE_CUST $_STDIO $_VM $_TMUX2)
 	
 	# unset the trap
 	trap ":" INT TERM HUP EXIT
