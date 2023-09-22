@@ -153,6 +153,8 @@ Usage: qb-edit <jail> <PARAMETER> <value>
    -q: (q)uiet output, do not print anything to stdout 
    -r: (r)estart the required jails for changes to take effect
 
+For a list and description of PARAMETERS, run:
+   qb-help params
 ENDOFUSAGE
 }
 
