@@ -25,29 +25,34 @@ ENDOFMSG
 		;;
 		_1) cat << ENDOFMSG
 
-ERROR: Missing argument. Must specify jail, parameter, and new value
+ERROR: Missing argument. Need jail, parameter, and value (unless deleting line) 
 ENDOFMSG
 		;;	
 		_2) cat << ENDOFMSG
-
-ERROR: Combination of < $JAIL >< $PARAM > [jail and parameter]
-       doesn't exist in jailmap.conf
-ENDOFMSG
-		;;	
-		_3) cat << ENDOFMSG
 
 ALERT: The new value entered is the same as the old value.
        No changes were made.
 ENDOFMSG
 		;;
-		_4) cat << ENDOFMSG
+		_2_1) cat << ENDOFMSG
 
-ERROR: < NO_DESTROY > must be either true or false
+ALERT: There was no combination of: < $JAIL $PARAM > to delete.
+       No changes were made.
 ENDOFMSG
 		;;
+		_3) cat << ENDOFMSG
+
+ERROR: < $PARAM > isn't a valid parameter for a VM 
+ENDOFMSG
+		;;	
+		_4) cat << ENDOFMSG
+
+ERROR: < $PARAM > isn't a valid parameter for a jail
+ENDOFMSG
+		;;	
 		_5) cat << ENDOFMSG
 
-ERROR: Parameter < CLASS > cannot be changed with qb-edit.
+ERROR: The line: < $JAIL $PARAM > doesn't exist. Nothing to delete.
 ENDOFMSG
 		;;
 		_6) cat << ENDOFMSG
@@ -68,6 +73,11 @@ echo -e "Should qb-edit to restart these jails? (y/n):  \c"
 			echo -e "Success \c" 
 			qb-list -j $JAIL -p $PARAM
 		;;
+		_8_1) cat << ENDOFMSG
+Deleted the following line:
+$_delline
+ENDOFMSG
+		;;
 		_9) cat << ENDOFMSG
 ALERT: net-firewall connects to the external internet, so its
        IP depends on your router. The following was modified: 
@@ -79,9 +89,8 @@ ENDOFMSG
 	;;
 		_10) cat << ENDOFMSG
 
-ALERT: Changing GATEWAY to < $VAL > but IPV4 is set to
-       'none' in jailmap.conf. IP is necessary in order
-       to connect < $JAIL > to < $VAL >
+ALERT: Changing GATEWAY to < $VALUE > but IPV4 is set to 'none'.
+       IP is necessary to connect < $JAIL > to < $VALUE >.
 
 ENDOFMSG
 echo -e "Would you like to change this to auto? (Y/n): \c"
@@ -136,38 +145,13 @@ usage() { cat << ENDOFUSAGE
 qb-edit:  Modify jail parameters in jailmap.conf
 
 Usage: qb-edit <jail> <PARAMETER> <value>
-       qb-edit [-f][-h][-i][-r] <jail> <parameter> <value>
+       qb-edit [-h] | [-d][-f][-q][-r] <jail> <PARAM> <value>
 
-   -f: (f)orce. Ignore errors and modify anyways. Error msgs
-       suppressed, but final state of <jail><param> is shown 
+   -d: (d)elete line. Only need <jail> <PARAM> to do so
+   -f: (f)orce. Ignore errors and modify. Error msgs suppressed
    -h: (h)elp. Outputs this help message
    -q: (q)uiet output, do not print anything to stdout 
    -r: (r)estart the required jails for changes to take effect
-
-PARAMETERS SAVED AT /usr/local/etc/quBSD/jailmap.conf
-AUTOSNAP:    Snapshot jail with qb-autosnap /etc/crontab
-AUTOSTART:   Automatically start with rc script during host boot.  
-CLASS:       Cannot be modified. Use qb-create instead.
-CPUSET:      CPUs a jail may use. Comma separated integers, or a
-             range.  For example: 0,1,2,3 is the same as 0-3
-             \`none' places no restrictions on jail's CPU access
-GATEWAY:     Gateway for <jail> to receive network connectivity
-IPV4:        IPv4 address for the jail.
-MAXMEM:      RAM maximum allocation:  <integer><G|M|K> 
-             For example: 4G or 3500M, or \'none' for no limit
-MTU:         MTU for connections made when jail comes up. 
-NO_DESTROY:  Prevents accidental destruction of <jail>
-             Change to \`false' in order to use qb-destroy
-ROOTJAIL:    Which rootjail system to clone for <jail> . If <jail>
-             is a rootjail; then this entry is self referential,
-             but important for script funcitonality.
-SCHG:        Directories to receive schg flags: all|sys|none
-             \`sys' are files like: /boot /bin /lib , and others
-             \`all includes /usr and /home as well
-SECLVL:      kern.securelevel to protect <jail>: -1|0|1|2|3
-             \`1' or higher is required for schg to take effect
-TEMPLATE:    Only applicable for dispjail. Designates jail to
-             clone (including /home) for dispjail
 
 ENDOFUSAGE
 }
