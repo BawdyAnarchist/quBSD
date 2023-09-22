@@ -1,6 +1,25 @@
 #!/bin/sh
 
-cat << ENDOFUSAGE
+get_options() {
+	while getopts h opts ; do
+		case $opts in 
+			h) help_msg ; exit 0 ;;
+		esac
+	done
+
+	ACTION="$1"
+}
+
+help_msg() { cat << ENDOFMSG
+qb-help: Quick help for quBSD scripts
+
+Usage: qb-help list|show > Shows all scripts
+       qb-help params|parameters > Shows all quBSD.conf parameters
+       qb-help -h > shows this help message
+ENDOFMSG
+}
+
+list_scripts() { cat << ENDOFMSG
 qb-autosnap: Tool to automate the creation, management, and thinning
              of ZFS snapshots. Works in combination with /etc/crontab.
 qb-cmd:      Runs a command inside of a jail - starts the jail if off
@@ -29,4 +48,54 @@ qb-snap:     Create jail snapshot. Necessary for rootjails and dispjails
 qb-start:    Start jails in parallel. from list, file, or jmap autostarts
 qb-stat:     Continuously running status script for quBSD and jail status
 qb-stop:     Remove/restart specified jails. Options for -all and -except
-ENDOFUSAGE
+ENDOFMSG
+}
+
+print_parameters() { cat << ENDOFMSG
+
+PARAMETERS SAVED AT /usr/local/etc/quBSD/jailmap.conf
+
+AUTOSNAP:    Snapshot jail with qb-autosnap /etc/crontab
+AUTOSTART:   Automatically start with rc script during host boot.  
+CLASS:       Cannot be modified. Use qb-create instead.
+CPUSET:      CPUs a jail may use. Comma separated integers, or a
+             range.  For example: 0,1,2,3 is the same as 0-3
+             \`none' places no restrictions on jail's CPU access
+GATEWAY:     Gateway for <jail> to receive network connectivity
+IPV4:        IPv4 address for the jail.
+MAXMEM:      RAM maximum allocation:  <integer><G|M|K> 
+             For example: 4G or 3500M, or \'none' for no limit
+MTU:         MTU for connections made when jail comes up. 
+NO_DESTROY:  Prevents accidental destruction of <jail>
+             Change to \`false' in order to use qb-destroy
+ROOTJAIL:    Which rootjail system to clone for <jail> . If <jail>
+             is a rootjail; then this entry is self referential,
+             but important for script funcitonality.
+SCHG:        Directories to receive schg flags: all|sys|none
+             \`sys' are files like: /boot /bin /lib , and others
+             \`all includes /usr and /home as well
+SECLVL:      kern.securelevel to protect <jail>: -1|0|1|2|3
+             \`1' or higher is required for schg to take effect
+TEMPLATE:    Only applicable for dispjail. Designates jail to
+             clone (including /home) for dispjail
+
+ENDOFMSG
+}
+
+main() {
+	case $ACTION in 
+		list|show) list_scripts ;;		
+		param|params|PARAM|PARAMS|parameter|parameters|PARAMETER|PARAMETERS) print_parameters ;;
+		'') help_msg ;;
+	esac
+}
+
+
+get_options "$@"
+
+main
+
+
+
+
+
