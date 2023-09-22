@@ -57,12 +57,13 @@ main() {
 
 	fi
 
-	# Print results with a nice formatted header 
+	# Print results with a nice formatted header. sed removes extra column -t from BHYVE_CUSTM
 	echo ''
 	if [ "$ZFSLIST" ] ; then
 		printf "%b" "\nNAME USED MOUNTPOINT ORIGIN\n${_result}\n\n" | column -t
 	else		
-		printf "%b" "\nCONTAINER   PARAMETER   VALUE\n${_result}\n\n" | column -t 
+		printf "%b" "\nCONTAINER   PARAMETER   VALUE\n${_result}\n\n" | column -t \
+			| sed -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /"
 	fi
 	echo ''
 }
