@@ -4,74 +4,146 @@
 . /usr/local/lib/quBSD/msg-list.sh
 
 get_options() {
-	while getopts hj:lp:z opts ; do
+	while getopts ahj:lp:sz opts ; do
 		case $opts in
+			a) _zparams="qubsd:autosnap" ; ZLIST="t" ;;
 			h) get_msg_list "none" "usage_0" ;;
 			j) JAIL="${OPTARG}" ;;
-			l) LIST="true" ;;
+			l) LIST="t" ;;
 			p) PARAM="${OPTARG}" ;;
-			z) ZFSLIST="true" ;; 
+			s) _snaps="-t all" ; ZLIST="t" ;;
+			z) ZLIST="t" ;;
 			*) exit 1 ;;
 		esac
 	done
 
 	shift $(( OPTIND - 1 ))
-	
-	[ "$1" ] && get_msg_list "_6" "usage_1"
 
 	# Convert lower-case entered PARAM to upper (user-friendly)
 	[ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
+
+	# Assign zfs option for columns
+	_zparams="-o name,used,mountpoint,$_zparams"
+
+	# Case statements later, depend on 'none' and 'f' (false) being assignd instead of null
+	JAIL=${JAIL:=none}
+	PARAM=${PARAM:=none}
+	POS1="$1" ; POS1=${POS1:=none}
+	POS2="$2" ; POS2=${POS2:=none}
+	LIST=${LIST:=f}
+	ZLIST=${ZLIST:=f}
 }
 
-main() {
-	if [ -z "$JAIL" ] && [ -z "$PARAM" ] && [ -z "$ZFSLIST" ] || [ "$LIST" ] ; then
-		# None listed. Pulls just the list of container names 
-		_result=$(grep -v "host" $JMAP | tail -n +2 | awk '{print $1}' | uniq)
+check_and_adjust() {
+	# Script is intended to be robust against minor user errors. This function
+	# merges any positional parameters with -j and -p options, when able.
 
-	elif [ "$JAIL" ] && [ -z "$PARAM" ] && [ -z "$ZFSLIST" ] ; then
-		# JAIL only. All JMAP entries for JAIL.
-		_result=$(grep -E "^${JAIL}[[:blank:]]+" $JMAP) \
-											|| get_msg_list "_2" "usage_1"
-	
-	elif [ -z "$JAIL" ] && [ "$PARAM" ] && [ -z "$ZFSLIST" ] ; then
-		# PARAM only. All JMAP entries matching PARAM. 
-		_result=$(grep -E "^[^[:blank:]]+[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP) \
-											|| get_msg_list "_3" "usage_1"
+	case "${JAIL}_${POS1}_${PARAM}_${POS2}" in
 
-	elif [ -z "$JAIL" ] && [ -z "$PARAM" ] && [ "$ZFSLIST" ] ; then
-		# ZFS list only. All datasets relevant to quBSD jails.
-		_result=$(zfs list -r "$JAILS_ZFS" ; zfs list -r "$ZUSR_ZFS")
+		# No action. If POS1 wasnt assigned, then POS2 wasnt either
+		none_none_*|*_none_*_*) : ;;
 
-	elif [ "$JAIL" ] && [ "$PARAM" ] && [ -z "$ZFSLIST" ] ; then
-		# Combination of JAIL and PARAM 
-		_result=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $JMAP) \
-											|| get_msg_list "_4" "usage_1"
+		# In this case, we're nice to the user, and try to figure out if POS1 is JAIL or PARAM
+		none_*_none_none)
 
-	elif [ "$JAIL" ] && [ -z "$PARAM" ] && [ "$ZFSLIST" ] ; then
-		# All ZFS datasets related to JAIL 
-		_result=$(zfs list -rt all -Ho name,used,mountpoint,origin "${JAILS_ZFS}/${JAIL}"\
-		; zfs list -rt all -Ho name,used,mountpoint,origin "${ZUSR_ZFS}/${JAIL}") 
+			# Check if it's a parameter
+			awk '{print $2}' $JMAP | grep -Eqsi "$POS1" && PARAM="$POS1"
 
-	else
-		get_msg_list "_5" "usage_1"
+			# Check if it's a jail
+			chk_valid_jail -q "$POS1" && JAIL="$POS1"
 
-	fi
+			# If both are zero, then POS1 was not valid for anything. Send error
+			[ -z "$JAIL" ] && [ -z "$PARAM" ] && get_msg_list "_2_1" "usage_1"
 
-	# Print results with a nice formatted header. sed removes extra column -t from BHYVE_CUSTM
-	echo ''
-	if [ "$ZFSLIST" ] ; then
-		printf "%b" "\nNAME USED MOUNTPOINT ORIGIN\n${_result}\n\n" | column -t
-	else		
-		printf "%b" "\nCONTAINER   PARAMETER   VALUE\n${_result}\n\n" | column -t \
-			| sed -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /"
-	fi
-	echo ''
+			# If jail=param, then it's ambiguous what the user wanted
+			[ "$PARAM" = "$JAIL" ] && get_msg_list "_6" "usage_1"
+		;;
+
+		# Both POS1&2 should be assigned
+		none_*_none_*) JAIL="$POS1" ; PARAM="$POS2" ;;
+
+		# POS1 is clearly JAIL, as -p was assigned. Even if POS2 exists, use the -p <PARAM>
+		none_*_*_*) JAIL="$POS1" ;;
+	esac
+
+	# Convert lower-case entered PARAM to upper, again, in case POS2 replaced it
+	[ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
+
+	# Final checks on JAIL and PARAM
+	[ ! "$JAIL" = "none" ] && ! chk_valid_jail "$JAIL" && get_msg_list "_2" "exit_1"
+	[ ! "$PARAM" = "NONE" ] && ! awk '{print $2}' $JMAP | grep -Eqs "$PARAM" \
+																		&& get_msg_list "_3" "exit_1"
 }
 
+get_results() {
+	# Large case statement to handle the possible combinations
+	# Note: While there's some redundancy, it's a more clear/comprehensive solution
+	# Where possible, _$ZLIST_ is set as wildcard, with switch used inside case statement
+
+#	echo "${LIST}_${ZLIST}_${JAIL}_${PARAM}"
+	case "${LIST}_${ZLIST}_${JAIL}_${PARAM}" in
+
+		# List all jails (regardless of [-l] given or not)
+		*_f_none_NONE)
+			_RESULT=$(awk '{print $1}' $JMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
+		;;
+
+		# List all jails and then list their zfs's
+		t_t_none_NONE)
+			_RESULT=$(awk '{print $1}' $JMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
+			_ZRESULT=$(zfs list -r $_snaps $_zparams "$JAILS_ZFS" ;\
+							zfs list -r $_snaps $_zparams "$ZUSR_ZFS")
+		;;
+
+		# List all jails zfs's, but dont list the jails as a single named column like last case
+		f_t_none_NONE)
+			_ZRESULT=$(zfs list -r $_snaps $_zparams "$JAILS_ZFS" ;\
+							zfs list -r $_snaps $_zparams "$ZUSR_ZFS")
+		;;
+
+		# NOTE that $LIST is irrelevant from now on.
+		# Wildcard* for JAIL/PARAM works, caz the 'none' possibilities were already enumerated
+
+		# Show a particular jail
+		*_*_*_NONE)
+			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $JMAP)
+			[ "$ZLIST" = "t" ] \
+							&& _ZRESULT=$(zfs list -r $_snaps $_zparams "${JAILS_ZFS}/${JAIL}" ;\
+												zfs list -r $_snaps $_zparams "${ZUSR_ZFS}/${JAIL}")
+		;;
+
+		# Show a particular parameter
+		*_*_none_*)
+			_RESULT=$(grep -E "^[^[:blank:]]+[[:blank:]]+${PARAM}[[:blank:]]" $JMAP)
+		;;
+
+		# Show a jail/parameter combo
+		*_f_*_*)
+			_RESULT=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $JMAP)
+			[ "$ZLIST" = "t" ] \
+							&& _ZRESULT=$(zfs list -r $_snaps $_zparams "${JAILS_ZFS}/${JAIL}" ;\
+												zfs list -r $_snaps $_zparams "${ZUSR_ZFS}/${JAIL}")
+		;;
+	esac
+}
+
+print_results() {
+
+	if [ "$_RESULT" ] ; then
+		_RESULT=$(echo -e "CONTAINER   PARAMETER   VALUE\n${_RESULT}" | column -t)
+		echo -e "\n${_RESULT}\n"
+	fi
+
+	[ "$_ZRESULT" ] && echo -e "${_ZRESULT}\n" | column -t
+}
 
 get_global_variables
 
 get_options "$@"
 
-main
+check_and_adjust
+
+get_results
+
+print_results
 
