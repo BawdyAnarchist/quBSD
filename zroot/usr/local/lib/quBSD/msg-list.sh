@@ -16,6 +16,11 @@ ENDOFMSG
 ERROR: Jail: < $JAIL > doesn't exist or is not configured properly
 ENDOFMSG
 	;;	
+	_2_1) cat << ENDOFMSG
+
+ERROR: Argument < $POS1 > was neither valid jail, nor jailmap parameter.
+ENDOFMSG
+	;;
 	_3) cat << ENDOFMSG
 
 ERROR: The parameter < $param > wasn't found in jailmap.conf
@@ -34,7 +39,8 @@ ENDOFMSG
 	;;
 	_6) cat << ENDOFMSG
 
-ERROR: Use option [-j|-p|-z] to specify what to list.
+ERROR: Unable to differentiate betweeen desired JAIL and PARAM.
+       Use options [-j <jail>] and/or [-p <PARAM>] to deliniate.
 ENDOFMSG
 	;;
 	esac
@@ -50,35 +56,27 @@ ENDOFMSG
 
 usage() { cat << ENDOFUSAGE
 
-qb-list:  Lists jails and parameters from jailmap.conf,
-          or datasets associated with a jail.
+qb-list: List jails, VMs, and parameters from jailmap.conf; 
+         AND/OR list zfs datasets associated with jails/VMs.
 
-Usage: qb-list [-p <parameter>] 
-       qb-list [-j <jail>] [-p <parameter>]
-       qb-list [-h]|[-z] [-j <jail>] 
-   -h: (h)elp:  Outputs this help message
-   -j: (j)ail:  Show all settings for <jail>
-   -l: (l)ist:  List names of all unique jails and containers 
-   -p: (p)arameter:  Shows setting of PARAMETER for all jails
-   -z: (z)fs:  List all zfs datasets associated with <jail>
+Robust script that'll respond to any valid combo of: <opts>
+<jail> <parameter>. [-j] and [-p] normally arent needed. 
 
-   If no args provided, all jails and VMs listed 
-   inside jailmap.conf will be sent to stdout
+Usage: qb-list [-alsz]   {will show all jails/VMs}
+       qb-list [-alsz] <jail> <parameter>
+       qb-list <parameter> OR [-p <parameter>]
+       qb-list [-alsz] <jail> OR [-j <jail>] 
+       qb-list [-alsz] [-j <jail>] [-p <parameter>]
 
-PARAMETERS   Saved at:  /usr/local/etc/quBSD/jailmap.conf
-AUTOSNAP:    Include jail in qb-autosnap run by /etc/crontab.
-AUTOSTART:   Automatically start the jail during host boot. 
-CLASS:       appjail, dispjail, or rootjail
-CPUSET:      CPUs a jail may use, or \`none' for no limit
-GATEWAY:     Gateway to provides <jail> with network connection 
-IPV4:        IPv4 address for the jail.
-MAXMEM:      RAM maximum allocation, or \'none' for no limit 
-MTU:         MTU setting for network connections 
-NO_DESTROY:  Prevents accidental destruction of a jail
-ROOTJAIL:    Fully installed rootjail is cloned for <jail>
-SCHG:        Directories to receive schg flags: all|sys|none
-SECLVL:      kern.securelevel to protect <jail>: -1|0|1|2|3
-TEMPLATE:    Dispjails require a template to clone.
+   -a: (a)autosnap. Show qubsd:autosnap column in zfs output
+   -h: (h)elp: Outputs this help message
+   -j: (j)ail: Show jailmap settings for <jail>
+   -l: (l)ist: List names of all unique jails and VMs 
+   -p: (p)arameter: All jailmap entries with <parameter>
+   -s: (s)napshots: Show zfs snapshots in results 
+   -z: (z)fs: Show zfs datasets (snapshots only with [-s])
 
+For a list and description of PARAMETERS, run:
+   qb-help params
 ENDOFUSAGE
 }
