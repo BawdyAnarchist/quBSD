@@ -80,7 +80,6 @@ get_results() {
 	# Note: While there's some redundancy, it's a more clear/comprehensive solution
 	# Where possible, _$ZLIST_ is set as wildcard, with switch used inside case statement
 
-#	echo "${LIST}_${ZLIST}_${JAIL}_${PARAM}"
 	case "${LIST}_${ZLIST}_${JAIL}_${PARAM}" in
 
 		# List all jails (regardless of [-l] given or not)
@@ -106,10 +105,17 @@ get_results() {
 
 		# Show a particular jail
 		*_*_*_NONE)
+
+			# Get all results for JAIL in JMAP
 			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $JMAP)
+	
+			# Add in devfs if appropriate, and supplement missing values with #defaults
+			supplement_results	
+
 			[ "$ZLIST" = "t" ] \
-							&& _ZRESULT=$(zfs list -r $_snaps $_zparams "${JAILS_ZFS}/${JAIL}" ;\
-												zfs list -r $_snaps $_zparams "${ZUSR_ZFS}/${JAIL}")
+					&& _ZRESULT=$(zfs list -r $_snaps $_zparams "${JAILS_ZFS}/${JAIL}" ; \
+					chk_valid_zfs "${ZUSR_ZFS}/${JAIL}" \
+					&& zfs list -r $_snaps $_zparams "${ZUSR_ZFS}/${JAIL}")
 		;;
 
 		# Show a particular parameter
@@ -125,6 +131,37 @@ get_results() {
 												zfs list -r $_snaps $_zparams "${ZUSR_ZFS}/${JAIL}")
 		;;
 	esac
+}
+
+supplement_results() {
+
+	# Will return globals: CLASS and ALL_PARAMS (which will change for jails vs VMs)
+	get_parameter_lists
+
+	# If jail modify result with the devfs ruleset
+	if [ -z "${CLASS##*jail}" ] ; then
+		# Get the rule number from jail.conf
+		_rulenum=$(sed -En "/^${JAIL}(\{|[[:blank:]])/,/^}/p" $JCONF \
+				| sed -En "s/devfs_ruleset=\"//p" | grep -Eo "[[:digit:]]+")
+	
+		# Then get the full name of the rulenumber from devfs.rules 
+		_rulename=$(sed -En "s/.*devfsrules_(.*=${_rulenum}).*/\1/p" /etc/devfs.rules)
+
+		# Modify result
+		_RESULT=$(echo "$_RESULT" ; echo "$JAIL  DEVFS_RULE  ${_rulename}")
+	fi
+
+	# Parameters enumerated for the jail/VM
+	_current_params=$(echo "$_RESULT" | awk '{print $2}')
+
+	# Find the #defaults that will need to be added	
+	for _param in $ALL_PARAMS ; do
+		! echo "$_current_params" | grep -qs "$_param" && _RESULT="$(echo "$_RESULT" \
+										; grep -E "^#default[[:blank:]]+${_param}[[:blank:]]" $JMAP)"
+	done	
+
+	# Sort the result by the 2nd column
+	_RESULT=$(echo "$_RESULT" | awk '{$1=$1}1' | sort -k2)
 }
 
 print_results() {
