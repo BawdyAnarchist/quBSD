@@ -129,9 +129,6 @@ get_global_variables() {
    ZUSR_ZFS=$(sed -nE "s:#NONE[[:blank:]]+zusr_zfs[[:blank:]]+::p" $JMAP)
 	M_JAILS=$(zfs get -H mountpoint $JAILS_ZFS | awk '{print $3}')
 	M_ZUSR=$(zfs get -H mountpoint $ZUSR_ZFS | awk '{print $3}')
-
-	# Defaults for quBSD.sh functions
-	RTRN="return 1"
 }
 
 get_networking_variables() {
@@ -148,6 +145,26 @@ get_networking_variables() {
 		WGPORTS=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*.*://p" \
 				${M_ZUSR}/${JAIL}/${WG0CONF})
 	fi
+}
+
+get_parameter_lists() {
+	# Primarily returns global varibles: CLASS ; ALL_PARAMS ; but also a few others
+	
+	# Need the CLASS to determine which parameters are valid
+	get_jail_parameter -dqs CLASS "$JAIL"
+
+	# List out normal parameters which can be checked (vs BHYVE_CUSTM)
+	COMN_PARAMS="AUTOSTART AUTOSNAP CLASS GATEWAY IPV4 MTU NO_DESTROY"
+	JAIL_PARAMS="CPUSET MAXMEM ROOTJAIL SCHG SECLVL"
+	VM_PARAMS="BHYVEOPTS BHYVE_CUSTM MEMSIZE PPT ROOTVM TAPS TMUX VCPUS WIREMEM"
+
+	case $CLASS in
+		*VM) ALL_PARAMS="$COMN_PARAMS $VM_PARAMS" ;;
+		dispjail) ALL_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE" ;;
+		appjail|rootjail) ALL_PARAMS="$COMN_PARAMS $JAIL_PARAMS" ;;
+	esac
+
+	return 0
 }
 
 get_user_response() {
@@ -189,7 +206,7 @@ get_jail_parameter() {
 	 # $2: _jail  : <jail> to reference in JMAP
 
 	# Ensure all options variables are reset
-	_dp='' ; _ep='' ; _qp='' ; _sp='' ; _zp=''
+	local _dp='' ; local _ep='' ; local _qp='' ; local _sp='' ; local _zp=''
 
 	while getopts deqsz opts ; do
 		case $opts in
@@ -205,8 +222,8 @@ get_jail_parameter() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional and function variables 
-	_param="$1"  ; _low_param=$(echo "$_param" | tr '[:upper:]' '[:lower:]')
-	_jail="$2"   ; _value=''
+	local _param="$1"  ; local _low_param=$(echo "$_param" | tr '[:upper:]' '[:lower:]')
+	local _jail="$2"   ; local _value=''
 
 	# Either jail or param weren't provided
 	[ -z "$_jail" ] && get_msg $_qp "_0" "jail" && eval $_sp return 1 
@@ -256,9 +273,9 @@ get_info() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional variables
-	_info="$1"
-	_jail="$2"
-	_value=''
+	local _info="$1"
+	local _jail="$2"
+	local _value=''
 
 	case $_info in
 		_CLIENTS)
@@ -514,8 +531,8 @@ connect_client_to_gateway() {
 	shift $(( OPTIND - 1 ))
 
 	# Positional variables
-	_client="$1" ; _gateway="$2" ; _ipv4="$3"
-	_mtu="${MTU:=$(get_jail_parameter -es MTU '#default')}"
+	local _client="$1" ; local _gateway="$2" ; local _ipv4="$3"
+	local _mtu="${MTU:=$(get_jail_parameter -es MTU '#default')}"
 
 	# VM client uses pre-determined tap interfaces and DHCP on the gateway jail
 	if chk_isvm "$_client" ; then
@@ -873,7 +890,7 @@ chk_isvm() {
 	# Checks if the positional variable is the name of a VM, return 0 if true 1 of not
 	_jail="$1"
 
-	$(get_jail_parameter -qse CLASS $_jail | grep -qs "VM") && return 0 || return 1
+	$(get_jail_parameter -qsde CLASS $_jail | grep -qs "VM") && return 0 || return 1
 }
 
 chk_avail_jailname() {
