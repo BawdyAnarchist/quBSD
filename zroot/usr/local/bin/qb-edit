@@ -37,10 +37,8 @@ get_options() {
 	# Necessary for checks
 	OLDSETTING=$(sed -nE "s@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+@@p" $JMAP)
 
-	# List out normal parameters which can be checked (vs BHYVE_CUSTM)
-	COMN_PARAMS="AUTOSTART AUTOSNAP CLASS GATEWAY IPV4 MTU NO_DESTROY TEMPLATE"
-	JAIL_PARAMS="CPUSET MAXMEM ROOTJAIL SCHG SECLVL TEMPLATE"
-	VM_PARAMS="BHYVEOPTS MEMSIZE PPT ROOTVM TAPS TMUX VCPUS WIREMEM"
+	# This will return CLASS and ALL_PARAMS 
+	get_parameter_lists
 }
 
 checks() {
@@ -49,13 +47,13 @@ checks() {
 		# Make sure that at JAIL and PARAM exist
 		[ -n "$JAIL" ] && [ -n "$PARAM" ] || get_msg_edit "_1" "usage_1"
 
-		# Make sure the combo of JAIL and PARAM (and VALUE if available)
+		# If only JAIL & PARAM are specified, delete all lines. Otherwise delete specific line 
 		if [ -n "$VALUE" ] ; then
 			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $JMAP) \
-				|| get_msg_edit "_2_1" "exit_0"
+				|| get_msg_edit "_5" "exit_0"
 		else
 			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP) \
-				|| get_msg_edit "_2_1" "exit_0"
+				|| get_msg_edit "_5" "exit_0"
 		fi
 
 	else
@@ -64,15 +62,16 @@ checks() {
 
 		# New value is unchanged from old value
 		[ "$VALUE" = "$OLDSETTING" ] && get_msg_edit "_2" "exit_0"
+
+		# The JAIL and/or PARAM actually exist in JMAP
+		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $JMAP || get_msg_edit "_5" "exit_1"	
 	fi
 
 	# Check that PARAM selected is a valid parameter for jail or VM indicated
-	if chk_isvm "$JAIL" ; then
-		echo "BHYVE_CUSTM $VM_PARAMS $COMN_PARAMS" | grep -Eqs "$PARAM" \
-			|| get_msg_edit "_3" "usage_1"
+	if [ -z "${CLASS##*VM}" ] ; then 
+		echo "$ALL_PARAMS" | grep -Eqs "$PARAM" || get_msg_edit "_3" "usage_1"
 	else
-		echo "$JAIL_PARAMS $COMN_PARAMS" | grep -Eqs "$PARAM" \
-			|| get_msg_edit "_4" "usage_1"
+		echo "$ALL_PARAMS" | grep -Eqs "$PARAM" || get_msg_edit "_4" "usage_1"
 	fi
 
 	# BHYVE_CUSTM is special, but everything else can run through normal chk_valid functions
@@ -141,9 +140,7 @@ modify_jmap() {
 
 modify_autosnap() {
 
-	# Class is necessary to know which dataset to operate on (zroot or zusr)
-	get_jail_parameter CLASS $JAIL
-
+	# Class tells us which dataset to operate on (zroot or zusr)
 	case $CLASS in
 
 		# Rootjail only needs zroot operation
