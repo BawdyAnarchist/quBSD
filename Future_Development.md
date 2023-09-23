@@ -1,11 +1,8 @@
 
 ##### VIRTUAL MACHINE INTEGRATION
 
-qb-list
-	- should show default value where none exists for jail/VM	
-	- jail.conf devfs ruleset should integrate too
-
 figure out why your snapshots are being label with qubsd:autosnap
+devfs.rules needs looked at and cleaned up / merged with net-jail
 
 qb-i3-launch
 	- It should have a monitoring time for qb-autostart to finish 
