@@ -66,6 +66,7 @@ Usage: qb-list [-alsz]   {will show all jails/VMs}
        qb-list [-alsz] <jail> <parameter>
        qb-list <parameter> OR [-p <parameter>]
        qb-list [-alsz] <jail> OR [-j <jail>] 
+           NOTE- #default substituted for missing parameters
        qb-list [-alsz] [-j <jail>] [-p <parameter>]
 
    -a: (a)autosnap. Show qubsd:autosnap column in zfs output
