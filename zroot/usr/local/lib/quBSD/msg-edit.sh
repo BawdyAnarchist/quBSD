@@ -34,12 +34,6 @@ ALERT: The new value entered is the same as the old value.
        No changes were made.
 ENDOFMSG
 		;;
-		_2_1) cat << ENDOFMSG
-
-ALERT: There was no combination of: < $JAIL $PARAM > to delete.
-       No changes were made.
-ENDOFMSG
-		;;
 		_3) cat << ENDOFMSG
 
 ERROR: < $PARAM > isn't a valid parameter for a VM 
@@ -52,7 +46,8 @@ ENDOFMSG
 		;;	
 		_5) cat << ENDOFMSG
 
-ERROR: The line: < $JAIL $PARAM > doesn't exist. Nothing to delete.
+ERROR: Combination of < $JAIL $PARAM > was not found in jailmap.conf
+       No changes were made.
 ENDOFMSG
 		;;
 		_6) cat << ENDOFMSG
