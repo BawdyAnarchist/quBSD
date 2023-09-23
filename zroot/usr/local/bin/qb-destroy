@@ -19,7 +19,7 @@ get_options() {
 define_variables() {
 	# Important parameters for checks 
 	get_jail_parameter -q CLASS "$JAIL"
-	get_jail_parameter -qd NO_DESTROY "$JAIL"
+	get_jail_parameter -q NO_DESTROY "$JAIL"
 	OFFJAILS=$(zfs list -o name,origin | grep -E "$JAIL\@.*\$" \
 									| awk '{print $1}' | sed "s@.*/@@")
 
