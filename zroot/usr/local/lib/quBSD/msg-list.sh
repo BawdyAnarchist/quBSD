@@ -8,26 +8,24 @@ get_msg_list() {
 	case "$_message" in
 	_1) cat << ENDOFMSG
 
-ERROR: must specify a jail, parameter, or [-z]
+ERROR: Argument < $POS1 > was neither valid jail, nor jailmap parameter.
 ENDOFMSG
 	;;	
 	_2) cat << ENDOFMSG
 
-ERROR: Jail: < $JAIL > doesn't exist or is not configured properly
+ERROR: Unable to differentiate betweeen desired JAIL and PARAM.
+       Use options [-j <jail>] and/or [-p <PARAM>] to deliniate.
 ENDOFMSG
 	;;	
-	_2_1) cat << ENDOFMSG
-
-ERROR: Argument < $POS1 > was neither valid jail, nor jailmap parameter.
-ENDOFMSG
-	;;
 	_3) cat << ENDOFMSG
 
-ERROR: The parameter < $param > wasn't found in jailmap.conf
+ERROR: A zfs option was selected [-a|-s|-z], but no datasets exist for < $JAIL >
 ENDOFMSG
 	;;
 	_4) cat << ENDOFMSG
 
+ERROR: Jail: < $JAIL > doesn't exist or is not configured properly
+ERROR: The parameter < $param > wasn't found in jailmap.conf
 ERROR: Combination of < ${jail} > < ${param} > 
        were not found in jailmap.conf 
 ENDOFMSG
@@ -39,8 +37,6 @@ ENDOFMSG
 	;;
 	_6) cat << ENDOFMSG
 
-ERROR: Unable to differentiate betweeen desired JAIL and PARAM.
-       Use options [-j <jail>] and/or [-p <PARAM>] to deliniate.
 ENDOFMSG
 	;;
 	esac
@@ -56,17 +52,18 @@ ENDOFMSG
 
 usage() { cat << ENDOFUSAGE
 
-qb-list: List jails, VMs, and parameters from jailmap.conf; 
-         AND/OR list zfs datasets associated with jails/VMs.
+qb-list: List all parameters associated with jail or VM; 
+         AND/OR list zfs datasets associated with jails/VMs
 
-Robust script that'll respond to any valid combo of: <opts>
-<jail> <parameter>. [-j] and [-p] normally arent needed. 
+Robust script that'll respond to any valid combo of:
+       qb-list <opts> <jail> <parameter>
+       [-j][-p] typically not needed
 
 Usage: qb-list [-alsz]   {will show all jails/VMs}
+       qb-list [-alsz] <jail> OR [-j <jail>] 
+           {#default values substituted for missing params}
        qb-list [-alsz] <jail> <parameter>
        qb-list <parameter> OR [-p <parameter>]
-       qb-list [-alsz] <jail> OR [-j <jail>] 
-           NOTE- #default substituted for missing parameters
        qb-list [-alsz] [-j <jail>] [-p <parameter>]
 
    -a: (a)autosnap. Show qubsd:autosnap column in zfs output
@@ -76,6 +73,7 @@ Usage: qb-list [-alsz]   {will show all jails/VMs}
    -p: (p)arameter: All jailmap entries with <parameter>
    -s: (s)napshots: Show zfs snapshots in results 
    -z: (z)fs: Show zfs datasets (snapshots only with [-s])
+   -Z: (Z)fs: ONLY show zfs datasets, but not parameters
 
 For a list and description of PARAMETERS, run:
    qb-help params

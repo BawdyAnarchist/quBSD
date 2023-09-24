@@ -4,9 +4,8 @@
 . /usr/local/lib/quBSD/msg-edit.sh
 
 get_options() {
-	while getopts adfhiqr opts ; do
+	while getopts dfhqr opts ; do
 		case $opts in
-			a) ACTION="add" ;;
 			d) ACTION="delete" ;;
 			f) FORCE="true" ; _q='-q' ;;
 			h) get_msg_edit "none" "usage_0" ;;
@@ -34,11 +33,11 @@ get_options() {
 	PARAM=$(echo  "$PARAM" | tr '[:lower:]' '[:upper:]')
 	_param=$(echo "$PARAM" | tr '[:upper:]' '[:lower:]')
 
-	# Necessary for checks
-	OLDSETTING=$(sed -nE "s@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+@@p" $JMAP)
+	# Necessary for editing lines vs adding lines
+	OLDVALUE=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]].*" $JMAP)
 
-	# This will return CLASS and ALL_PARAMS 
-	get_parameter_lists
+	# This will return CLASS and FILT_PARAMS 
+	get_parameter_lists "$JAIL"
 }
 
 checks() {
@@ -47,39 +46,42 @@ checks() {
 		# Make sure that at JAIL and PARAM exist
 		[ -n "$JAIL" ] && [ -n "$PARAM" ] || get_msg_edit "_1" "usage_1"
 
-		# If only JAIL & PARAM are specified, delete all lines. Otherwise delete specific line 
-		if [ -n "$VALUE" ] ; then
-			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $JMAP) \
-				|| get_msg_edit "_5" "exit_0"
-		else
-			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP) \
-				|| get_msg_edit "_5" "exit_0"
-		fi
+		# Make sure at least one line exists to delete 
+		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $JMAP \
+				|| get_msg_edit "_4" "exit_1"
 
 	else
 		# Need all 3 parameters
 		[ -z "$JAIL" -o -z "$PARAM" -o -z "$VALUE" ] && get_msg_edit "_1" "usage_1"
 
-		# New value is unchanged from old value
-		[ "$VALUE" = "$OLDSETTING" ] && get_msg_edit "_2" "exit_0"
+		# Error if proposed entry already exists 
+		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}[[:blank:]]*\$" $JMAP \
+																					&& get_msg_edit "_2" "exit_0"
 
-		# The JAIL and/or PARAM actually exist in JMAP
-		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $JMAP || get_msg_edit "_5" "exit_1"	
+		# Multi-line parameters receive a new line 
+		if echo "$MULT_LN_PARAMS" | grep -Eqs "$PARAM" ; then
+			ACTION="add"
+
+		# All other PARAMs must be checked for validity, and determine if new line is needed	
+		elif echo "$FILT_PARAMS" | grep -Eqs "$PARAM" ; then
+			[ -z "$OLDVALUE" ] && ACTION="add"	
+
+		# Otherwise, PARAM was not found to be valid for the jail/VM 
+		else
+			get_msg_edit "_3" "exit_1"	
+		fi
+
+		# BHYVE_CUSTM is special, but everything else can test for chk_valid_param
+		[ ! "$PARAM" = "BHYVE_CUSTM" ] \
+				&& ! eval "chk_valid_${_param}" $_q \"$VALUE\" \"$JAIL\" \
+				&& [ -z "$FORCE" ] && exit 1
 	fi
-
-	# Check that PARAM selected is a valid parameter for jail or VM indicated
-	if [ -z "${CLASS##*VM}" ] ; then 
-		echo "$ALL_PARAMS" | grep -Eqs "$PARAM" || get_msg_edit "_3" "usage_1"
-	else
-		echo "$ALL_PARAMS" | grep -Eqs "$PARAM" || get_msg_edit "_4" "usage_1"
-	fi
-
-	# BHYVE_CUSTM is special, but everything else can run through normal chk_valid functions
-	[ ! "$PARAM" = "BHYVE_CUSTM" ] && [ ! "$ACTION" = "delete" ] \
-		&& ! eval "chk_valid_${_param}" $_q \"$VALUE\" \"$JAIL\" && [ -z "$FORCE" ] && exit 1
 
 	# Extra checks/interaction for GATEWAY and IPV4
 	case $PARAM in
+		CLASS) get_msg_edit "_5" "exit_1" "_f" ;;
+
+		ROOTJAIL) get_msg_edit "_6" "warn" ;;
 
 		GATEWAY)
 				get_jail_parameter -qs IPV4 "$JAIL"
@@ -95,30 +97,20 @@ checks() {
 				chk_isqubsd_ipv4 $_q "$VALUE" "$JAIL" || get_msg_edit "none" "exit_1" "_f"
 		;;
 	esac
-
-	# Check if the line is already present, or if it needs to be added
-	if ! grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+" $JMAP ; then
-		[ "$ACTION" = "delete" ] && get_msg_edit "_5" "exit_1"
-		ACTION="add"
-	fi
 }
 
 modify_jmap() {
 
 	case $ACTION in
 		delete)
-			if [ -n "$VALUE" ] ; then
-				sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $JMAP
-			else
-				sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+@ d" $JMAP
-			fi
+			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $JMAP
 		;;
 		add)
 			echo "$JAIL  $PARAM  $VALUE" >> $JMAP
 		;;
 		*)
 			# Modify JMAP and print new settings on success
-			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}@s@[^[:blank:]]+\$@${VALUE}@" $JMAP
+			sed -i '' -E "s@^(${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+).*@\1${VALUE}@" $JMAP
 		;;
 	esac
 
@@ -126,8 +118,8 @@ modify_jmap() {
 	[ "$_IPAUTO" ] \
 		&& sed -i '' -E "\@^${JAIL}[[:blank:]]+IPV4@s@[^[:blank:]]+\$@auto@" $JMAP
 
-	# Clean up the columns and sorting
-	_newJMAP=$(column -t $JMAP)
+	# Clean up the columns and sorting. Make sure there's no duplicates
+	_newJMAP=$(column -t $JMAP | uniq)
 	_newJMAP=$(echo "$_newJMAP" | sort -k1,1 -k2,2)
 	echo "$_newJMAP" > $JMAP
 

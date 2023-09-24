@@ -4,7 +4,7 @@
 . /usr/local/lib/quBSD/msg-list.sh
 
 get_options() {
-	while getopts ahj:lp:sz opts ; do
+	while getopts ahj:lp:szZ opts ; do
 		case $opts in
 			a) _zparams="qubsd:autosnap" ; ZLIST="t" ;;
 			h) get_msg_list "none" "usage_0" ;;
@@ -13,6 +13,7 @@ get_options() {
 			p) PARAM="${OPTARG}" ;;
 			s) _snaps="-t all" ; ZLIST="t" ;;
 			z) ZLIST="t" ;;
+			Z) ZLIST="t" ; ZONLY="t" ;;
 			*) exit 1 ;;
 		esac
 	done
@@ -35,7 +36,7 @@ get_options() {
 }
 
 check_and_adjust() {
-	# Script is intended to be robust against minor user errors. This function
+	# Script is intended to be robust for the user. This function
 	# merges any positional parameters with -j and -p options, when able.
 
 	case "${JAIL}_${POS1}_${PARAM}_${POS2}" in
@@ -49,14 +50,14 @@ check_and_adjust() {
 			# Check if it's a parameter
 			awk '{print $2}' $JMAP | grep -Eqsi "$POS1" && PARAM="$POS1"
 
-			# Check if it's a jail
-			chk_valid_jail -q "$POS1" && JAIL="$POS1"
+			# Check if it's an entry in JMAP
+			grep -Eqs "^${POS1}[[:blank:]]+" $JMAP && JAIL="$POS1"
 
 			# If both are zero, then POS1 was not valid for anything. Send error
-			[ -z "$JAIL" ] && [ -z "$PARAM" ] && get_msg_list "_2_1" "usage_1"
+			[ "$JAIL" = "none" ] && [ "$PARAM" = "none" ] && get_msg_list "_1" "usage_1"
 
 			# If jail=param, then it's ambiguous what the user wanted
-			[ "$PARAM" = "$JAIL" ] && get_msg_list "_6" "usage_1"
+			[ "$PARAM" = "$JAIL" ] && get_msg_list "_2" "usage_1"
 		;;
 
 		# Both POS1&2 should be assigned
@@ -68,11 +69,6 @@ check_and_adjust() {
 
 	# Convert lower-case entered PARAM to upper, again, in case POS2 replaced it
 	[ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
-
-	# Final checks on JAIL and PARAM
-	[ ! "$JAIL" = "none" ] && ! chk_valid_jail "$JAIL" && get_msg_list "_2" "exit_1"
-	[ ! "$PARAM" = "NONE" ] && ! awk '{print $2}' $JMAP | grep -Eqs "$PARAM" \
-																		&& get_msg_list "_3" "exit_1"
 }
 
 get_results() {
@@ -84,38 +80,27 @@ get_results() {
 
 		# List all jails (regardless of [-l] given or not)
 		*_f_none_NONE)
-			_RESULT=$(awk '{print $1}' $JMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
+				_RESULT=$(awk '{print $1}' $JMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
 		;;
 
 		# List all jails and then list their zfs's
 		t_t_none_NONE)
-			_RESULT=$(awk '{print $1}' $JMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
-			_ZRESULT=$(zfs list -r $_snaps $_zparams "$JAILS_ZFS" ;\
-							zfs list -r $_snaps $_zparams "$ZUSR_ZFS")
+				_RESULT=$(awk '{print $1}' $JMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
+				get_zresult
 		;;
 
 		# List all jails zfs's, but dont list the jails as a single named column like last case
 		f_t_none_NONE)
-			_ZRESULT=$(zfs list -r $_snaps $_zparams "$JAILS_ZFS" ;\
-							zfs list -r $_snaps $_zparams "$ZUSR_ZFS")
+				get_zresult
 		;;
-
-		# NOTE that $LIST is irrelevant from now on.
-		# Wildcard* for JAIL/PARAM works, caz the 'none' possibilities were already enumerated
 
 		# Show a particular jail
 		*_*_*_NONE)
-
-			# Get all results for JAIL in JMAP
 			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $JMAP)
+			[ "$ZLIST" = "t" ] && get_zresult
 	
 			# Add in devfs if appropriate, and supplement missing values with #defaults
 			supplement_results	
-
-			[ "$ZLIST" = "t" ] \
-					&& _ZRESULT=$(zfs list -r $_snaps $_zparams "${JAILS_ZFS}/${JAIL}" ; \
-					chk_valid_zfs "${ZUSR_ZFS}/${JAIL}" \
-					&& zfs list -r $_snaps $_zparams "${ZUSR_ZFS}/${JAIL}")
 		;;
 
 		# Show a particular parameter
@@ -126,16 +111,23 @@ get_results() {
 		# Show a jail/parameter combo
 		*_f_*_*)
 			_RESULT=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $JMAP)
-			[ "$ZLIST" = "t" ] \
-							&& _ZRESULT=$(zfs list -r $_snaps $_zparams "${JAILS_ZFS}/${JAIL}" ;\
-												zfs list -r $_snaps $_zparams "${ZUSR_ZFS}/${JAIL}")
+			[ "$ZLIST" = "t" ] && get_zresult
 		;;
 	esac
 }
 
+get_zresult() {
+	# Grammar - add '/' in front of jail for zfs query
+	[ "$JAIL" ] && _jail="/$JAIL" 
+	_ZRESULT=$(zfs list -r $_snaps $_zparams "${JAILS_ZFS}${_jail}" 2>/dev/null; \
+					zfs list -r $_snaps $_zparams "${ZUSR_ZFS}${_jail}" 2>/dev/null)
+
+	[ -z "$_ZRESULT" ] && _ZRESULT="NO ZFS DATASETS WERE FOUND"
+}
+
 supplement_results() {
 
-	# Will return globals: CLASS and ALL_PARAMS (which will change for jails vs VMs)
+	# Will return globals: CLASS and FILT_PARAMS (which will change for jails vs VMs)
 	get_parameter_lists
 
 	# If jail modify result with the devfs ruleset
@@ -145,17 +137,19 @@ supplement_results() {
 				| sed -En "s/devfs_ruleset=\"//p" | grep -Eo "[[:digit:]]+")
 	
 		# Then get the full name of the rulenumber from devfs.rules 
-		_rulename=$(sed -En "s/.*devfsrules_(.*=${_rulenum}).*/\1/p" /etc/devfs.rules)
+		if [ -n "$_rulenum" ] ; then
+			_rulename=$(sed -En "s/.*devfsrules_(.*=${_rulenum}).*/\1/p" /etc/devfs.rules)
 
-		# Modify result
-		_RESULT=$(echo "$_RESULT" ; echo "$JAIL  DEVFS_RULE  ${_rulename}")
+			# Modify result
+			_RESULT=$(echo "$_RESULT" ; echo "$JAIL  DEVFS_RULE  ${_rulename}")
+		fi
 	fi
 
 	# Parameters enumerated for the jail/VM
 	_current_params=$(echo "$_RESULT" | awk '{print $2}')
 
 	# Find the #defaults that will need to be added	
-	for _param in $ALL_PARAMS ; do
+	for _param in $FILT_PARAMS ; do
 		! echo "$_current_params" | grep -qs "$_param" && _RESULT="$(echo "$_RESULT" \
 										; grep -E "^#default[[:blank:]]+${_param}[[:blank:]]" $JMAP)"
 	done	
@@ -166,7 +160,7 @@ supplement_results() {
 
 print_results() {
 
-	if [ "$_RESULT" ] ; then
+	if [ "$_RESULT" ] && [ -z "$ZONLY" ] ; then
 		_RESULT=$(echo -e "CONTAINER   PARAMETER   VALUE\n${_RESULT}" | column -t)
 		echo -e "\n${_RESULT}\n"
 	fi
