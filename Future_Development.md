@@ -1,6 +1,10 @@
 
 ##### VIRTUAL MACHINE INTEGRATION
 
+Add more z-score crypto comparisons and put their colors in the top corner
+Housing market compared to lots of stuff. Overall look.
+
+
 figure out why your snapshots are being label with qubsd:autosnap
 devfs.rules needs looked at and cleaned up / merged with net-jail
 
