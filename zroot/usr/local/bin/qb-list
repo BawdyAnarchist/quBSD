@@ -117,8 +117,9 @@ get_results() {
 }
 
 get_zresult() {
-	# Grammar - add '/' in front of jail for zfs query
-	[ "$JAIL" ] && _jail="/$JAIL" 
+	# Switches between full zfs list of system, and just for jail (if set) 
+	[ "$JAIL" = "none" ] && _jail='' || _jail="/$JAIL" 
+
 	_ZRESULT=$(zfs list -r $_snaps $_zparams "${JAILS_ZFS}${_jail}" 2>/dev/null; \
 					zfs list -r $_snaps $_zparams "${ZUSR_ZFS}${_jail}" 2>/dev/null)
 
