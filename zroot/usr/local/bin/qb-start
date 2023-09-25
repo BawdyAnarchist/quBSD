@@ -12,15 +12,15 @@
 . /usr/local/lib/quBSD/msg-start.sh
 
 get_options() {
-	while getopts aAeE:f:ht: opts ; do
+	while getopts aAeE:hf:t: opts ; do
 		case $opts in
 			a) _SOURCE="auto" ;;
-			A) [ "$_SOURCE" ] && get_msg_start "_e1" "usage_1" || _SOURCE="all" ;;
+			A) [ "$_SOURCE" ]  && get_msg_start "_e1" "usage_1" || _SOURCE="all" ;;
 			e) _EXCLUDE="true" ;;
 			E) [ "$_EXCLUDE" ] && get_msg_start "_e2" "usage_1" || _EXFILE="$OPTARG" ;;
-			f) [ "$_SOURCE" ] && get_msg_start "_e1" "usage_1" || _SOURCE="$OPTARG" ;; 
+			f) [ "$_SOURCE" ]  && get_msg_start "_e1" "usage_1" || _SOURCE="$OPTARG" ;;
 			h) get_msg_start "none" "usage_0" ;;
-			t) _TIMEOUT="$OPTARG" ;; 
+			t) _TIMEOUT="$OPTARG" ;;
 			*) exit 1 ;;
 		esac
 	done
@@ -29,23 +29,26 @@ get_options() {
 
 	# This makes it so that _POSPARAMS has one parameter per line
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
-	_TIMEOUT="${_TIMEOUT:=60}"
+
+	# Temp file for IP tracking
+	_TMP_IP="${QTMP}/qb-start_temp_ip"
+
+	# _STARTS is used for calculating the TIMEOUT later on. Initialize to zero
+	_STARTS=0
 }
 
 checks() {
 
 	# Timeout must be an integer less than 300 and greater than 5
-	if echo "$_TIMEOUT" | ! grep -Eq '^[[:digit:]]+$' \
-			|| [ "$_TIMEOUT" -gt 300 ] || [ "$_TIMEOUT" -lt 5 ]
-	then 
-		get_msg_start "_e5" "usage_1"
+	if [ "$_TIMEOUT" ] && echo "$_TIMEOUT" | ! grep -Eq '^[[:digit:]]+$' ; then
+		if [ "$_TIMEOUT" -le 600 ] && [ "$_TIMEOUT" -ge 5 ]
+		then _TIMEOUT=$(( _TIMEOUT * 2 ))
+		else get_msg_start "_e5" "usage_1"
+		fi
 	fi
-	
-	# Temp file for IP tracking
-	_TMP_IP="${QTMP}/qb-start_temp_ip"
 
 	# Absolutely do not run if another instance if qb-start or qb-stop is already running
-	monitor_startstop "1" || get_msg_start "_e0" "exit_1"
+	monitor_startstop || get_msg_start "_e0" "exit_1"
 
 	# Function above removes the temp_ip tracker
 	mktemp "$_TMP_IP" > /dev/null 2>&1
@@ -62,7 +65,7 @@ reclone_stale_zroots() {
 
 		# Only reclone the dataset if it's not already on the _JLIST to be started
 		if ! echo "$_JLIST" | grep -Eq "$_jail" ; then
-			
+
 			# The reclone function needs the rootjail name, not the dataset
 			_rootzfs=$(zfs list -rHo origin ${JAILS_ZFS}/${_jail} | sed "s/@.*//g")
 
@@ -77,37 +80,46 @@ climb_hierarchy() {
 	[ "$_depth" -gt 50 ] && get_msg_start "_e3" "exit_1"
 	_depth=$(( _depth + 1 ))
 
-	_jail="$1"
-	_gateway=$(get_jail_parameter -deqs GATEWAY "$_jail")
+	_JAIL="$1"
+	_gateway=$(get_jail_parameter -deqs GATEWAY "$_JAIL")
 
-	if echo "$_CLIMBED" | grep -Eq "(^|[[:blank:]]+)${_jail}([[:blank:]]+|\$)" ; then 
+	if echo "$_CLIMBED" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" ; then
 		# _jail gateway path was already handled. Skip further checks.
 		return 0
 
-	# _jail is an endpoint. Either has no network, or is top of hierarchy. 
-	elif [ "$_gateway" = "none" ] || [ -z "$_gateway" ] ; then 
+	# _jail is an endpoint. Either has no network, or is top of hierarchy.
+	elif [ "$_gateway" = "none" ] || [ -z "$_gateway" ] ; then
 
-		# Assemble list of hierarcy tops. Will later begin starts from this list 
-		_HIERTOP=$(printf "%b" "${_jail}\n${_HIERTOP}" | uniq) 
+		# Assemble list of hierarcy tops. Will later begin starts from this list
+		_HIERTOP=$(printf "%b" "${_JAIL}\n${_HIERTOP}" | uniq)
 
-		# Include jail on _FULLIST 
-		echo "$_FULLIST" | grep -Eq "(^|[[:blank:]]+)${_jail}([[:blank:]]+|\$)" \
-				|| _FULLIST=$(printf "%b" "${_FULLIST}\n${_jail}")
+		# Include jail on _FULLIST
+		echo "$_FULLIST" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" \
+				|| _FULLIST=$(printf "%b" "${_FULLIST}\n${_JAIL}")
 
 		# Add _jail to the list of jails already climbed and checked.
-		_CLIMBED=$(printf "%b" "${_jail}\n${_CLIMBED}") 
+		_CLIMBED=$(printf "%b" "${_JAIL}\n${_CLIMBED}")
+
+		# If _JAIL needs to be started, increment _starts, for timeout calculation
+		chk_isrunning "$_JAIL" || _starts=$(( _starts + 1 ))
 
 	# Make sure _jail is included in FULLIST. (some gateways might not have been on JLIST).
 	else
-		echo "$_FULLIST" | grep -Eq "(^|[[:blank:]]+)${_jail}([[:blank:]]+|\$)" \
-				|| _FULLIST=$(printf "%b" "${_FULLIST}\n${_jail}")
+		echo "$_FULLIST" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" \
+				|| _FULLIST=$(printf "%b" "${_FULLIST}\n${_JAIL}")
 
 		# Add _jail to the list of jails already climbed and checked.
-		_CLIMBED=$(printf "%b" "${_jail}\n${_CLIMBED}") 
-	
-		# Will continue recursively until hierarchy top is reached	
+		_CLIMBED=$(printf "%b" "${_JAIL}\n${_CLIMBED}")
+
+		# If _JAIL needs to be started, increment _starts, for timeout calculation
+		chk_isrunning "$_JAIL" || _starts=$(( _starts + 1 ))
+
+		# Will continue recursively until hierarchy top is reached
 		climb_hierarchy "$_gateway"
-	fi	
+	fi
+
+	# Chose the larger of the two values. This is the number of serial starts for TIMEOUT calc
+	[ "$_starts" -gt "$_STARTS" ] && _STARTS="$_starts"
 }
 
 determine_ips() {
@@ -115,7 +127,7 @@ determine_ips() {
 	# Map IPs in serial, write to TMP
 	for _jail in $_FULLIST ; do
 
-		# IP calaculation unnecessary for hierchy tops or running jails 
+		# IP calaculation unnecessary for hierchy tops or running jails
 		! chk_isrunning "$_jail" \
 			&& ! echo "$_HIERTOP" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" \
 				&& printf "%b" "$_jail  $(discover_open_ipv4 $_jail)\n" >> $_TMP_IP
@@ -128,18 +140,18 @@ begin_waterfall() {
 
 	for _JAIL in $_JAILS; do
 
-		# Only continue the waterfall if jail started successfully 
+		# Only continue the waterfall if jail started successfully
 		start_jail "$_JAIL" || get_msg_start "_e4" "exit_1"
 
-		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion) 
+		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion)
 		_SUBGATEWAYS='' ; _ENDPOINTS=''
 
 		for _client in $(get_info -e _CLIENTS $_JAIL); do
 
 			# Check that _client is on the FULLIST (save time)
-			if echo "$_FULLIST" | grep -q "$_client" ; then 
+			if echo "$_FULLIST" | grep -q "$_client" ; then
 
-				# If the _client has no further clients, it returns 1, and is an ENDPOINT	
+				# If the _client has no further clients, it returns 1, and is an ENDPOINT
 				get_info _CLIENTS "$_client" \
 					&& _SUBGATEWAYS="$_SUBGATEWAYS $_client" \
 					|| _ENDPOINTS="$_ENDPOINTS $_client"
@@ -155,7 +167,7 @@ begin_waterfall() {
 		done
 
 		# Subgateways need their own waterfall
-		[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS" 
+		[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS"
 	done
 }
 
@@ -171,23 +183,27 @@ main() {
 	# Find gateway hierarchy top for each jail. Returns $_HIERTOP and $_FULLIST
 	for _jlist in $_JLIST ; do
 
-		# Function is recursive, so _depth tracks # of cycles to prevent infinite loop. 
-		_depth=1
+		# Function is recursive, so _depth tracks # of cycles to prevent infinite loop.
+		_depth=0 ; _starts=0
 		climb_hierarchy "$_jlist"
 	done
 
 	# If the _FULLIST is empty, there's nothing to do. Remove TMP and exit.
-	[ -z "$_FULLIST" ] && rm "$_TMP_IP" && get_msg_start "_m1" && exit 0 
+	[ -z "$_FULLIST" ] && rm "$_TMP_IP" && get_msg_start "_m1" && exit 0
 
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
 	determine_ips
 
-	# Start the hierarchy tops, then their clients, until all of FULLIST is started 
+	# Start the hierarchy tops, then their clients, until all of FULLIST is started
 	for _jail in $_HIERTOP; do
 
-		# Each hierarchy top is independent of each other, and can be started in parallel. 
+		# Each hierarchy top is independent of each other, and can be started in parallel.
 		begin_waterfall $_jail &
 	done
+
+	# User specified, OR, 7.5 secs for every hierarchy level. Monitoring loop sleeps 0.5 sec
+	: ${_TIMEOUT:=$(( _STARTS * 15 ))}
+	monitor_startstop "$_TIMEOUT" || get_msg "_e6" "exit_1"
 }
 
 
@@ -201,7 +217,3 @@ checks
 
 main
 
-# Monitor completion of qb-start 
-monitor_startstop "$_TIMEOUT" "$_TMP_IP" &
-
-exit 0

@@ -13,9 +13,7 @@ ERROR: An instance of qb-start or qb-stop is already running.
        Absolutely should never run these in in parallel, due 
        to the high probability of errors, hangs, and loops.
 
-$(pgrep -fl qb-start)
-$(pgrep -fl qb-stop)
-	
+$(pgrep -fl '/bin/sh /usr/local/bin/qb-st(art|op)')
 ENDOFMSG
 	;;	
 	_e1) cat << ENDOFMSG
@@ -47,9 +45,17 @@ ENDOFMSG
 	;;	
 	_e5) cat << ENDOFMSG
 
-ERROR: [-t <timeout>] must be integer from 5 to 300
+ERROR: [-t <timeout>] must be integer from 5 to 600. Caution, 
+       choose a timeout appropriate for number of starts,
+       longer if starting multiple gateways/clients in a row 
 ENDOFMSG
 	;;	
+	_e6) cat << ENDOFMSG
+
+ERROR: One or more jails appear to be hung and havent started.
+       Check /var/log/quBSD.sh for details.
+ENDOFMSG
+	;;
 	_m1) cat << ENDOFMSG
 Jail(s) were already running
 ENDOFMSG
@@ -68,12 +74,12 @@ ENDOFMSG
 usage() { cat << ENDOFUSAGE
 
 !IMPORTANT; qb-start MUST be used when starting multiple
-jails in parallel to avoid networking errors. User scripts
-should only start jails in serial, or call this script. 
+jails in parallel to avoid race conditions and errors.
 
-qb-start [-h] [-a|-A|-f <file>] [-e|-E <file>] [-F] <jail list>
+qb-start [-a|-A|-f <file>] [-e|-E <file>]
+         [-t <timeout>] <jail list>
 
-   If no [-a|-A|-f] is specified, the < jail list > (positional
+   If no [-a|-A|-f] is specified; < jail list > (positional
    parameters) at the end are assumed to be jail starts. 
 
    -a: (a)uto. Start all jails tagged with autostart in jmap
@@ -85,7 +91,8 @@ qb-start [-h] [-a|-A|-f <file>] [-e|-E <file>] [-F] <jail list>
        but exlude any jails listed in <file>. 
    -h: (h)elp. Outputs this help message.
    -f: (f)ile. Use a file with a list of jails to start.
-
+   -t: (t)imeout in secs, to wait for jail starts before error
+       *This is auto calculated, so normally dont change this. 
 ENDOFUSAGE
 }
 

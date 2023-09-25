@@ -25,14 +25,14 @@ get_options() {
 parse_config() {
 	# Assign default file if one wasn't optioned
 	FILE="${FILE:=${HOME}/.config/i3/i3launch.conf}"
-	
+
 	# Set variable, and trap to remove it on exit
 	CONF=$(mktemp  -t "quBSD/i3-launch.conf")
 	JAILS=$(mktemp -t "quBSD/i3-launch-jails")
 	trap "rm $CONF $JAILS > /dev/null 2>&1" INT TERM HUP QUIT EXIT
-	
+
 	# Copy the launch config to tmp ($CONF)
-	cp -a $FILE $CONF 
+	cp -a $FILE $CONF
 
 	# Remove comments and blank lines
 	sed -i '' -e "/^$/ d ; /^[[:blank:]]*#.*/ d" $CONF
@@ -49,21 +49,13 @@ qb_start_jails() {
 	xterm -fs 12 -e csh -c 'i3-msg floating enable , resize set height 1000 ; qb-stat' &
 	_pid_stat=$(echo $!)
 
-	# Remove any non-jail line, and save to tmp file
+	# Remove host and NO_WINDOW lines, and save to tmp file
 	grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}' | uniq > $JAILS
-
-	# Ensure that there's not already a startup operation in progress. (sends empty "" tmp $2).
-	! monitor_startstop "$_TIMEOUT" \
-			&& echo "ERROR: qb-i3-launch: Timeout on jail starts" | tee -a $QBLOG && exit 1
 
 	# Turn on any jails not started
 	qb-start -f $JAILS > /dev/null 2>&1
 
-	# Monitor jail starts until either they finish, or timeout. 
-	! monitor_startstop "$_TIMEOUT" "" \
-			&& echo "ERROR: qb-i3-launch: Timeout on jail starts" | tee -a $QBLOG && exit 1
-
-	# Remove the temporary monitoring popup 
+	# Remove the temporary monitoring popup
 	kill -15 $_pid_stat
 }
 
@@ -75,9 +67,9 @@ check_existing() {
 	[ -n "$FORCE" ] && return 1
 
 	# Window check doesn't apply to commands with no window to launch
-	[ "$_LOC" = "!NO_WINDOW" ] && return 1 
+	[ "$_LOC" = "!NO_WINDOW" ] && return 1
 
-	# Getting just the first part of the command makes it easier to match later on. 
+	# Getting just the first part of the command makes it easier to match later on.
 	_cmd=$(echo $_CMD | awk '{print $1}')
 
 	# Isolate the windows/programs for the workspace in question; then
@@ -87,21 +79,21 @@ check_existing() {
 }
 
 wait_for_window() {
-	_loop=1	
-	while : ; do 
+	_loop=1
+	while : ; do
 		# Wait a moment for window to launch
 		sleep .2
 
 		# Jailname of window is same as the command. Func converts `hostname` to 'host'
 		if [ "$(get_info -e _XJAIL)" = "$_LOC" ] ; then
-				
-			# The i3launch $_cmd might be slightly different than xprop or ps, so check both.  
+
+			# The i3launch $_cmd might be slightly different than xprop or ps, so check both.
 			ps $(get_info -e _XPID) | grep -Eiq "$_cmd" && sleep 1 && break
 			get_info -e _XNAME      | grep -Eiq "$_cmd" && sleep 1 && break
 		fi
 
-		# If it gets stuck waiting longer than about 6 seconds, just move on	
-		[ "$_loop" -gt 30 ] && break	
+		# If it gets stuck waiting longer than about 6 seconds, just move on
+		[ "$_loop" -gt 30 ] && break
 		_loop=$(( _loop + 1 ))
 	done
 }
@@ -110,46 +102,46 @@ execute_commands() {
 	# Switch workspace
 	i3-msg workspace $_WS
 
-	# Execute commands in their respective places 
-	case "$_LOC" in 
-		!NO_WINDOW) 
+	# Execute commands in their respective places
+	case "$_LOC" in
+		!NO_WINDOW)
 			eval "$_CMD"
 		;;
-		host) 
+		host)
 			# Execute the command provided
 			eval $_CMD
 
-			# A bit dirty, but it eliminates interference with the eval above 
-			[ "$?" = "0" ] && wait_for_window 
-		;;  
-		*) 
+			# A bit dirty, but it eliminates interference with the eval above
+			[ "$?" = "0" ] && wait_for_window
+		;;
+		*)
 			# Execute the command provided
 			eval "qb-cmd $_LOC $_CMD"
 
-			# A bit dirty, but it eliminates interference with the eval above 
-			[ "$?" = "0" ] && wait_for_window 
+			# A bit dirty, but it eliminates interference with the eval above
+			[ "$?" = "0" ] && wait_for_window
 		;;
-	esac	
+	esac
 }
 
 main() {
-	# Start jails first before launching 
+	# Start jails first before launching
 	qb_start_jails
 
 	_cycle=1
-	while : ; do 
+	while : ; do
 		# Define cycle variables
-		_WS=$(sed  -n "$_cycle p" $CONF | awk '{print $1}') 
-		_LOC=$(sed -n "$_cycle p" $CONF | awk '{print $2}') 
+		_WS=$(sed  -n "$_cycle p" $CONF | awk '{print $1}')
+		_LOC=$(sed -n "$_cycle p" $CONF | awk '{print $2}')
 		_CMD=$(sed -En "${_cycle}p" $CONF \
 				| sed -E "s/[^[:blank:]]+[[:blank:]]+[^[:blank:]]+[[:blank:]]+//")
 		# First word in _CMD is easier to find in the atrocious X window commands
 		_cmd=$(echo "$_CMD" | awk '{print $1}')
 
-		# If $_WS was blank, then there are no more lines in CONF 
+		# If $_WS was blank, then there are no more lines in CONF
 		[ -z "$_WS" ] && break
 
-		# This avoids an accidental re-launching of already existing jail/windows 
+		# This avoids an accidental re-launching of already existing jail/windows
 		check_existing || execute_commands > /dev/null 2>&1
 
 	_cycle=$(( _cycle + 1 ))
@@ -163,7 +155,7 @@ get_options "$@"
 
 parse_config
 
-main 
+main
 
 exit 0
 

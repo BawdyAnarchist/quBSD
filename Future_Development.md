@@ -1,15 +1,10 @@
-
-##### VIRTUAL MACHINE INTEGRATION
-
 Add more z-score crypto comparisons and put their colors in the top corner
 Housing market compared to lots of stuff. Overall look.
+##### VIRTUAL MACHINE INTEGRATION
 
-
-figure out why your snapshots are being label with qubsd:autosnap
-devfs.rules needs looked at and cleaned up / merged with net-jail
-
-qb-i3-launch
-	- It should have a monitoring time for qb-autostart to finish 
+qb-i3-launch, qb-start, qb-stop
+	- One more test on i3-launch rapidly on boot
+	- Still need to handle commenting for starts, monitoring returns 1 and 0 inside qb-start/stop
 
 VMs implementation 
 	zusr dataset, script internal, in /vmusr
@@ -156,6 +151,7 @@ quBSD.sh and msg-qubsd.sh
 		- (x)tra check on chk_valid_{param} for certain circumstances
 		-(r)esolve value (for stuff like ip auto)
 		- Could also beef up the log file, and make reference to it in error messages
+		- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
 
 qubsd_ipv4 - there's probably room for IP expansion for multiple strings of gateways .. maybe.
 
@@ -188,6 +184,8 @@ NOTE: The "net-firewall" switches solution is
 
 sed doesnt need /g for the substitutions. Just leave it be. g is only for multiple matches in same line (not document)
 	- go through and remove these g's. Unnecessary
+
+Make some kind of function: chk_isinteger "lower_bound" "upper_bound". You have a lot of integer checks.
 
 ### MINOR UPGRADES 
 
