@@ -9,9 +9,8 @@ get_msg_start() {
 
 	_e0) cat << ENDOFMSG
 
-ERROR: An instance of qb-start or qb-stop is already running.
-       Absolutely should never run these in in parallel, due 
-       to the high probability of errors, hangs, and loops.
+ERROR: Two instances of qb-stop or qb-start are already running.
+       Cannot queue another instance until one of these finishes. 
 
 $(pgrep -fl '/bin/sh /usr/local/bin/qb-st(art|op)')
 ENDOFMSG
@@ -54,10 +53,6 @@ ENDOFMSG
 
 ERROR: One or more jails appear to be hung and havent started.
        Check /var/log/quBSD.sh for details.
-ENDOFMSG
-	;;
-	_m1) cat << ENDOFMSG
-Jail(s) were already running
 ENDOFMSG
 	;;
 	esac

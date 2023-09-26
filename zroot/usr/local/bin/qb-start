@@ -188,9 +188,6 @@ main() {
 		climb_hierarchy "$_jlist"
 	done
 
-	# If the _FULLIST is empty, there's nothing to do. Remove TMP and exit.
-	[ -z "$_FULLIST" ] && rm "$_TMP_IP" && get_msg_start "_m1" && exit 0
-
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
 	determine_ips
 

@@ -9,9 +9,8 @@ get_msg_stop() {
 
 	_e0) cat << ENDOFMSG
 
-ERROR: An instance of qb-stop or qb-start is already running.
-       Absolutely should never run these in in parallel, due 
-       to the high probability of errors, hangs, and loops.
+ERROR: Two instances of qb-stop or qb-start are already running.
+       Cannot queue another instance until one of these finishes.
 
 $(pgrep -fl '/bin/sh /usr/local/bin/qb-st(art|op)')
 ENDOFMSG
@@ -51,11 +50,6 @@ ERROR: [-t <timeout>] must be integer from 5 to 600. Caution,
        longer if starting multiple gateways/clients in a row
 ENDOFMSG
 	;;	
-	_m1) cat << ENDOFMSG
-
-ALERT: Waiting for all jails to stop. Will timeout in 15 sec.
-ENDOFMSG
-	;;
 	esac
 
 	case $_pass_cmd in 
@@ -72,7 +66,7 @@ usage() { cat << ENDOFUSAGE
 !IMPORTANT; qb-stop MUST be used when stopping multiple
 jails in parallel to avoid race conditions and errors. 
 
-qb-stop [-a|-A|-f <file>] [-e|-E <file>]
+qb-stop [-a|-A|-f <file>] [-e|-E <file>] [-r]
         [-t <timeout>] < jail list >
 
    If no [-a|-A|-f] is specified, < jail list > (positional
@@ -81,10 +75,10 @@ qb-stop [-a|-A|-f <file>] [-e|-E <file>]
    -a: (a)uto. Stop all jails tagged with autostop in jmap
        This is the default behavior if no opts are specified.
    -A: (A)ll. Start ALL valid jails on the system. 
-   -e: (e)xclude. Starts jails as indicated by options, 
-       except those as positional parameters in < jail list >
-   -E: (E)xclude. Start jails as indicated by options,
-       but exlude any jails listed in <file>. 
+   -e: (e)xclude. Start [-a|-A] jails, but exclude jails 
+       passed via positional parameters <jail list> 
+   -E: (E)xclude. Start [-a|-A|< jail list >], but
+       exclude any jails listed in <file>
    -f: (f)ile. Use a file with a list of jails to stop.
    -h: (h)elp. Outputs this help message.
    -r: (r)estart. Restart all jails after stopping them. 
