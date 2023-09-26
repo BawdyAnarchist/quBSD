@@ -12,7 +12,7 @@ start_cmd="${name}_start"
 
 qb_autostart_start() {
 	# Start all jails tagged with autostart
-	/bin/sh /usr/local/bin/qb-start -a 
+	/bin/sh /usr/local/bin/qb-start -a > /dev/null 2>&1 &
 }
 
 load_rc_config $name
