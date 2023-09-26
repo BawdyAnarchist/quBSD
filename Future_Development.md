@@ -2,11 +2,13 @@ Add more z-score crypto comparisons and put their colors in the top corner
 Housing market compared to lots of stuff. Overall look.
 ##### VIRTUAL MACHINE INTEGRATION
 
-qb-i3-launch, qb-start, qb-stop
-	- One more test on i3-launch rapidly on boot
-	- Still need to handle commenting for starts, monitoring returns 1 and 0 inside qb-start/stop
+qb-start
+	- Re-integrate the reclone stale zroot datasets, and test
+	- Maybe put it into qb-cleanup?
+	- get_info _ONJAILS needs to be reworked to include VMs
 
 VMs implementation 
+	- Ubuntu released ZFS. Try to integrate
 	zusr dataset, script internal, in /vmusr
 		- hostname ; configure network ; symlink files ;
 		- User profiles (if any) stored here
