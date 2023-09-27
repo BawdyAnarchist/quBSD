@@ -2,11 +2,6 @@ Add more z-score crypto comparisons and put their colors in the top corner
 Housing market compared to lots of stuff. Overall look.
 ##### VIRTUAL MACHINE INTEGRATION
 
-qb-start
-	- Re-integrate the reclone stale zroot datasets, and test
-	- Maybe put it into qb-cleanup?
-	- get_info _ONJAILS needs to be reworked to include VMs
-
 VMs implementation 
 	- Ubuntu released ZFS. Try to integrate
 	zusr dataset, script internal, in /vmusr
@@ -15,14 +10,12 @@ VMs implementation
 
 Scripts that should integrate VMs
 	- qb-rename , qb-destroy, qb-stat, qb-create, qb-disp
-	- Beef up [-h] for at least: qb-start , stop, cmd, 
 
 New scripts
 	qb-pci
 		- summary of PCI devices relevant to user
 		- USB, NIC, maybe others
 		- Show what was is currently passthrough'd
-
 
 # CLEANUP STUFF
 
@@ -41,6 +34,9 @@ net-firewall
 	- pf.conf 
 		- Currently does not integrate all unique wireguard ports of clients (net-jails).
 		- needs careful review. Use chatGPT-4
+
+qb-autosnap
+	- It should look for all snaps older than their qubsd:destroy-date , and reclone them (stale zroots)
 
 
 ### UPGRADES
