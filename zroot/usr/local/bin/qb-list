@@ -53,11 +53,11 @@ check_and_adjust() {
 			# Check if it's an entry in JMAP
 			grep -Eqs "^${POS1}[[:blank:]]+" $JMAP && JAIL="$POS1"
 
-			# If both are zero, then POS1 was not valid for anything. Send error
-			[ "$JAIL" = "none" ] && [ "$PARAM" = "none" ] && get_msg_list "_1" "usage_1"
+			# If jail=param (and not 'none'), then it's ambiguous what the user wanted
+			[ ! "$JAIL" = "none" ] && [ "$PARAM" = "$JAIL" ] && get_msg_list "_2" "usage_1"
 
-			# If jail=param, then it's ambiguous what the user wanted
-			[ "$PARAM" = "$JAIL" ] && get_msg_list "_2" "usage_1"
+			# If both are 'none', then continue, assuming POS1 as JAIL (could be zfs present) 
+			[ "$JAIL" = "none" ] && [ "$PARAM" = "none" ] && JAIL="$POS1" 
 		;;
 
 		# Both POS1&2 should be assigned
@@ -167,6 +167,8 @@ print_results() {
 	fi
 
 	[ "$_ZRESULT" ] && echo -e "${_ZRESULT}\n" | column -t
+
+	[ -z "$_RESULT" ] && [ -z "$_ZRESULT" ] && get_msg_list "_6"
 }
 
 get_global_variables
