@@ -284,7 +284,8 @@ get_info() {
 		;;
 		_ONJAILS)
 			# Prints a list of all jails that are currently running
-			_value=$(jls | sed "1 d" | awk '{print $2}')
+			_value=$(jls | sed "1 d" | awk '{print $2}' ; \
+						pgrep -fl 'bhyve: ' | sed -E "s/.*[[:blank:]]([^[:blank:]]+)\$/\1/")
 		;;
 		_TAP)
 			# If <jail> has VM gateway, the tap interface is returned. Else return 1.
@@ -321,6 +322,9 @@ get_info() {
 	# If null, return failure immediately
 	[ -z "$_value" ] && return 1
 
+	# Sort values
+	_value=$(echo "$_value" | sort)
+	
 	# Echo option signalled
 	[ "$_ei" ] && echo "$_value" && return 0
 
