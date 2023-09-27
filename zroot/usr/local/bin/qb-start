@@ -54,26 +54,6 @@ checks() {
 	mktemp "$_TMP_IP" > /dev/null 2>&1
 }
 
-reclone_stale_zroots() {
-
-	# Pull the list of zroot datasets
-	_datasets=$(zfs list -rHo name,origin ${JAILS_ZFS} | grep -Ev "[[:blank:]]+\-" \
-					| awk '{print $1}' | sed -E "s#${JAILS_ZFS}/##g")
-
-	# Check all of them one by one
-	for _jail in $_datasets ; do
-
-		# Only reclone the dataset if it's not already on the _JLIST to be started
-		if ! echo "$_JLIST" | grep -Eq "$_jail" ; then
-
-			# The reclone function needs the rootjail name, not the dataset
-			_rootzfs=$(zfs list -rHo origin ${JAILS_ZFS}/${_jail} | sed "s/@.*//g")
-
-			reclone_zroot "${_jail}" "${_rootzfs##*/}"
-		fi
-	done
-}
-
 climb_hierarchy() {
 
 	# Prevent infinite loop. Unlikely to be 50 gateways; more likely circular reference.
@@ -175,10 +155,6 @@ main() {
 
 	# Returns $_JLIST, from options and positional arguments. Func shared with qb-start.
 	compile_jlist
-
-# Reclone stale zroot datasets occasionally. Assume that all jails off, is a larger reset
-#	[ -z "$(get_info -e _ONJAILS)" ] && reclone_stale_zroots
-# get_info _ONJAILS needs to include VMs
 
 	# Find gateway hierarchy top for each jail. Returns $_HIERTOP and $_FULLIST
 	for _jlist in $_JLIST ; do
