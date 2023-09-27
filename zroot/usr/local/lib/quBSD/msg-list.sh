@@ -37,6 +37,7 @@ ENDOFMSG
 	;;
 	_6) cat << ENDOFMSG
 
+NO RESULTS TO SHOW
 ENDOFMSG
 	;;
 	esac

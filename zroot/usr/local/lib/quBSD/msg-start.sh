@@ -84,8 +84,8 @@ qb-start [-a|-A|-f <file>] [-e|-E <file>]
        except those as positional parameters in < jail list >
    -E: (E)xclude. Start jails as indicated by options,
        but exlude any jails listed in <file>. 
-   -h: (h)elp. Outputs this help message.
    -f: (f)ile. Use a file with a list of jails to start.
+   -h: (h)elp. Outputs this help message.
    -t: (t)imeout in secs, to wait for jail starts before error
        *This is auto calculated, so normally dont change this. 
 ENDOFUSAGE

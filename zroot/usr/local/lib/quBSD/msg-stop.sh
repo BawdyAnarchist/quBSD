@@ -82,7 +82,7 @@ qb-stop [-a|-A|-f <file>] [-e|-E <file>] [-r]
    -f: (f)ile. Use a file with a list of jails to stop.
    -h: (h)elp. Outputs this help message.
    -r: (r)estart. Restart all jails after stopping them. 
-	-t: (t)timeout in secs, to wait for jail stops before error
+   -t: (t)timeout in secs, to wait for jail stops before error
        *This is auto calculated, so normally dont change this.
 
 ENDOFUSAGE
