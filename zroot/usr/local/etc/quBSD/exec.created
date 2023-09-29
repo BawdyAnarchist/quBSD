@@ -80,7 +80,7 @@ resource_control() {
 
 main() {
 
-	modify_dhcpd
+	[ -e "${M_ZUSR}/${JAIL}/rw/usr/local/etc/dhcpd.conf" ] && modify_dhcpd
 
 	connect_to_gateway
 
@@ -99,5 +99,4 @@ get_parameters "$@"
 get_networking_variables
 
 main
-
 
