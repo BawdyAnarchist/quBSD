@@ -7,11 +7,10 @@
 # Functions embed many sanity checks, but also call other functions to assist.
 # Messages are sourced from a separate script, as a function. They have the form:
 #   get_msg <$_q> <_msg_ident> <_pass_variable1> <_pass_variable2>
-#     <$_q> (q)uiet option. Normally getopts, but sometimes as positional param,
-#            when <value> of a positional var might have a leading '-' dash.
-#            -note- csh passes local vars to new functions called within functions.
-#                   thus to prevent inadvertently passing [-q], important funcitons
-#                   have a unique _q identifier.
+#     <$_q> (q)uiet option.
+#        -note- /bin/sh passes local vars to new functions called within functions.
+#               thus to prevent inadvertently passing [-q], important funcitons
+#               have a unique _q identifier.
 #     <_msg_ident> Is used to retreive a particular message from the msg function.
 #     <_pass_variable> 1 and 2 are for supplementing message specificity.
 
@@ -249,7 +248,7 @@ get_jail_parameter() {
 	if ! [ $_sp ] ; then
 
 		# Variable indirection for checks. Escape \" avoids word splitting
-		eval "chk_valid_${_low_param}" $_qp \"$_value\" \"$_jail\" || return 1
+		eval "chk_valid_${_low_param}" $_qp '--' \"$_value\" \"$_jail\" || return 1
 	fi
 
 	# Either echo <value> , or assign global variable (as specified by caller).
@@ -294,7 +293,7 @@ get_info() {
 		;;
 		_USED_IPS)
 			# Assemble list of ifconfig inet addresses for all running jails
-			for _onjail in $(get_info -e _ONJAILS) ; do
+			for _onjail in $(jls | sed "1 d" | awk '{print $2}') ; do
 				_intfs=$(jexec -l -U root "$_onjail" ifconfig -a inet | grep -Eo "inet [^[:blank:]]+")
 				_value=$(printf "%b" "$_value" "\n" "$_intfs")
 			done
@@ -324,7 +323,7 @@ get_info() {
 
 	# Sort values
 	_value=$(echo "$_value" | sort)
-	
+
 	# Echo option signalled
 	[ "$_ei" ] && echo "$_value" && return 0
 
@@ -392,14 +391,12 @@ start_jail() {
    # Options
 	while getopts nqt opts ; do
 		case $opts in
-			n) _norun="-n" ;;
-			q) _qs="-q" ;;
-			t) _tmux="-t" ;;
+			n) _norun="-n" ; shift ;;
+			q) _qs="-q"    ; shift ;;
+			t) _tmux="-t"  ; shift ;;
 			*) return 1 ;;
 		esac
 	done
-
-	shift $(( OPTIND - 1 ))
 
 	# Positional parameter / checks
 	local _jail="$1"
@@ -432,9 +429,14 @@ start_jail() {
 stop_jail() {
 	# If jail is running, remove it. Return 0 on success; return 1 if fail.
 
-	# Quiet option
-	getopts q _opts && _qj='-q'
-	shift $(( OPTIND - 1 ))
+	while getopts qt:w opts ; do
+		case $opts in
+			q) _qj="-q" 					; shift ;;
+			t) _timeout="-t $OPTARG" 	; shift ;;
+			w) _wait="true" 				; shift ;;
+			*) get_msg "_1" ; return 1 ;;
+		esac
+	done
 
 	# Positional parameter / check
 	local _jail="$1"
@@ -449,11 +451,14 @@ stop_jail() {
 			# Kill the process gracefully; or if not, then forcefully
 			pkill -15 -fx "bhyve: $_jail" || pkill -9 -fx "bhyve: $_jail"
 
-		elif ! jail -vr "$_jail"  >> $QBLOG ; then
+			# If optioned, wait for the VM to stop
+			[ "$_wait" ] && ! monitor_vm_stop $_qj $_timeout "$_jail" && return 1
+
+		elif ! jail -vr "$_jail"  >> $QBLOG 2>&1 ; then
 
 			# If normal removal failed, forcibly remove
 			get_msg "_jf4" "$_jail" | tee -a $QBLOG
-			if jail -vR "$_jail"  >> $QBLOG  ; then
+			if jail -vR "$_jail"  >> $QBLOG  2>&1 ; then
 
 				# Forcible removal likely missed mounts. Clean them up.
 				sh ${QBDIR}/exec.release "$_jail"
@@ -480,8 +485,8 @@ restart_jail() {
 	# $2="hold" will override this default, so that an off jail stays off.
 
 	# Quiet option
-	getopts q _opts && _qr='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _qr='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parameters / check
 	local _jail="$1"
@@ -527,14 +532,8 @@ connect_client_to_gateway() {
 	# When a jail/VM is started, this connects to its gateway
 	# GLOBAL VARIABLES must have been assigned already: $GATEWAY ; $IPV4 ; $MTU
 
-	while getopts e opts ; do
-		case $opts in
-			e) local _ec="true" ;;
-			*) get_msg "_1" ; return 1 ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	getopts e _opts && _ec='true' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional variables
 	local _client="$1" ; local _gateway="$2" ; local _ipv4="$3"
@@ -607,8 +606,8 @@ connect_gateway_to_clients() {
 	# When a jail/VM is started, this manages the connection to its downstream clients
 
 	# Quiet option
-	getopts q _opts && _qz='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _qz='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	_jail="$1"
 	[ -z "$_jail" ] && get_msg $_q "_0" "Jail/VM" && return 1
@@ -618,10 +617,12 @@ connect_gateway_to_clients() {
 		if chk_isrunning "$_client" ; then
 
 			# Get client IP
-			_cIP=$(get_jail_parameter -deq IPV4 "$_client")
+			_cIP=$(get_jail_parameter -e IPV4 "$_client")
+
 			[ "$_cIP" = "auto" ] && _cIP=$(assign_ipv4_auto -e "$_client")
 
 			# Bring up connection, and return the VIF used for the client
+
 			_cVIF=$(connect_client_to_gateway -e "$_client" "$_jail" "$_cIP")
 
 			# Need to modify the client pf.conf with the epair
@@ -652,8 +653,8 @@ reclone_zroot() {
 	# and destroys old snapshots when no longer needed.
 
 	# Quiet option
-	getopts q _opts && _qz='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _qz='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Variables definitions
 	_jail="$1"
@@ -790,8 +791,8 @@ reclone_zusr() {
 cleanup_oldsnaps() {
 
 	# Option for clearning up "zero bytes" (_zb) snapshots
-	getopts z _opts && _zb='true'
-	shift $(( OPTIND - 1 ))
+	getopts z _opts && _zb='true' && shift
+	[ "$1" = "--" ] && shift
 
 	# Removes old snapshots for the given jail. Routine cleanup, necessary due to autosnapping.
 	local _dataset="$1"
@@ -861,6 +862,42 @@ monitor_startstop() {
 	return 1
 }
 
+monitor_vm_stop() {
+	# Loops until VM stops, or timeout (20 seconds)
+
+	# Quiet option
+	getopts q _opts && local _qms='-q' && shift
+	[ "$1" = "--" ] && shift
+
+	local _jail="$1"
+	local _timeout="$2"
+	: ${_timeout:=20}
+	local _count=1
+
+	[ -z "$_jail" ] && return 1
+
+	# Get message about waiting
+	get_msg $_qms "_jo4" "$_jail" "$_timeout"
+
+	# Check for when VM shuts down.
+	while [ "$_count" -le "$_timeout" ] ; do
+		sleep 1
+
+		if ! pgrep -qf "bhyve: $_jail" ; then
+			# If we _count was being shown, put an extra line before returning
+			[ -z "$_qms" ] && echo ''
+			return 0
+		fi
+
+		_count=$(( _count + 1 ))
+		[ "$_qms" ] || printf "%b" " .. ${_count}"
+	done
+
+	# Fail for timeout
+	return 1
+}
+
+
 
 ########################################################################################
 ###################################  STATUS  CHECKS  ###################################
@@ -889,8 +926,8 @@ chk_isrunning() {
 
 chk_truefalse() {
 	# Quiet option
-	getopts q _opts && _qf='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _qf='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeters / check.
 	local _value="$1"
@@ -918,8 +955,8 @@ chk_avail_jailname() {
 	# Return 0 jailname available, return 1 for any failure
 
 	# Quiet option
-	getopts q _opts && _qa='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _qa='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeters and function specific variables.
 	local _jail="$1"
@@ -932,8 +969,8 @@ chk_avail_jailname() {
 			&& get_msg $_qa "_cj15" "$_jail" && return 1
 
 	# Jail must start with :alnum: and afterwards, have only _ or - as special chars
-	echo ! "$_jail" | grep -Eq '^[[:alnum:]][[:alnum:]_-]*$' \
-			&& get_msg $_qa "_cj15_2" "$_jail" && return 1
+	! echo "$_jail" | grep -E -- '^[[:alnum:]]([-_[:alnum:]])*[[:alnum:]]$' \
+			| grep -Eqv '(--|-_|_-|__)' && get_msg $_qa "_cj15_2" "$_jail" && return 1
 
    # Checks that proposed jailname doesn't exist or partially exist
 	if chk_valid_zfs "${JAILS_ZFS}/$_jail" || \
@@ -963,8 +1000,8 @@ chk_valid_jail() {
 	# Return 0 for passed all checks, return 1 for any failure
 
 	# Quiet option
-	getopts q _opts && _qv='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _qv='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeters and function specific variables.
 	local _value="$1"
@@ -1055,8 +1092,8 @@ chk_valid_autostart() {
 	# Standardization/consistency with get_jail_parameter() func.
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	chk_truefalse $_q "$1" "AUTOSTART"
 }
@@ -1065,8 +1102,8 @@ chk_valid_autosnap() {
 	# Mostly for standardization/completeness with get_jail_parameter() func.
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	chk_truefalse $_q "$1" "AUTOSNAP"
 }
@@ -1075,8 +1112,8 @@ chk_valid_bhyveopts() {
 	# Checks that only non arg based bhyve options were provided
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	_value="$1"
 
@@ -1095,8 +1132,8 @@ chk_valid_class() {
 	# Return 0 if proposed class is valid ; return 1 if invalid
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "CLASS" && return 1
@@ -1112,8 +1149,8 @@ chk_valid_cpuset() {
 	# Return 0 if proposed cpuset is valid ; return 1 if invalid
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeters / check.
 	local _value="$1"
@@ -1146,8 +1183,8 @@ chk_valid_gateway() {
 	# Return 0 if proposed gateway is valid ; return 1 if invalid
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeters.
 	local _gw="$1"
@@ -1166,9 +1203,6 @@ chk_valid_gateway() {
 
 		# Check that gateway is a valid jail.
  		chk_valid_jail $_q "$_gw" || return 1
-
-# UPGRADES: TYPE
-
 	fi
 }
 
@@ -1182,8 +1216,8 @@ chk_valid_ipv4() {
 	#   $_a0  $_a1  $_a2  $_a3  $_a4
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeter / check.
 	local _value="$1"
@@ -1236,8 +1270,8 @@ chk_isqubsd_ipv4() {
 	# Returns 0 for IPv4 within convention ; return 1 if not.
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeters. _
 	local _value="$1"
@@ -1300,8 +1334,8 @@ chk_valid_maxmem() {
 	# IMPROVEMENT IDEA - check that proposal isn't greater than system memory
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeter / check
 	local _value="$1"
@@ -1335,8 +1369,8 @@ chk_valid_memsize() {
 	# Return 0 if proposed memsize is valid ; return 1 if invalid
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# It's the exact same program/routine. Different jmap params to be technically specific.
 	chk_valid_maxmem $_q "$1" || return 1
@@ -1348,8 +1382,8 @@ chk_valid_mtu() {
 	# Return 0 if proposed mtu is valid ; return 1 if invalid
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeters / check.
 	local _value="$1"
@@ -1369,8 +1403,8 @@ chk_valid_no_destroy() {
 	# Mostly for standardization/completeness with get_jail_parameter() func.
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	chk_truefalse $_q "$1" "NO_DESTROY"
 }
@@ -1379,8 +1413,8 @@ chk_valid_ppt() {
 	# Mostly for standardization/completeness with get_jail_parameter() func.
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	_value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "PPT (passthru)" && return 1
@@ -1430,8 +1464,8 @@ chk_valid_rootjail() {
 	# Return 0 if proposed rootjail is valid ; return 1 if invalid
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeter / check
 	local _value="$1"
@@ -1456,8 +1490,8 @@ chk_valid_rootvm() {
 	# Return 0 if proposed rootVM is valid ; return 1 if invalid
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeter / check
 	local _value="$1"
@@ -1477,15 +1511,11 @@ chk_valid_rootvm() {
 chk_valid_seclvl() {
 	# Return 0 if proposed seclvl is valid ; return 1 if invalid
 
-	# NOTE: Rare case where [-q] is received as positional, not getopts.
-	# '-1' is a valid seclvl ; which getopts interprets as an option.
-	local _opt="$1"
+	# Quiet option
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
-	if [ "$_opt" = '-q' ] ; then
-		_value="$2" ; _q='-q'
-	else
-		_value="$_opt"
-	fi
+	local _value="$1"
 
 	[ -z "$_value" ] && get_msg $_q "_0" "SECLVL" && return 1
 
@@ -1493,7 +1523,7 @@ chk_valid_seclvl() {
 	[ "$_value" = "none" ] && return 0
 
 	# If SECLVL is not a number
-	echo "$_value" | ! grep -Eq '^(-1|-0|0|1|2|3)$' \
+	echo "$_value" | ! grep -Eq -- '^(-1|-0|0|1|2|3)$' \
 			&& get_msg $_q "_cj2" "$_value" "SECLVL" && return 1
 
 	return 0
@@ -1503,8 +1533,8 @@ chk_valid_taps() {
 	# Return 0 if vif is valid ; return 1 if invalid
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeters.
 	local _value="$1"
@@ -1521,8 +1551,8 @@ chk_valid_taps() {
 
 chk_valid_tmux() {
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	chk_truefalse $_q "$1" "TMUX"
 }
@@ -1531,8 +1561,8 @@ chk_valid_schg() {
 	# Return 0 if proposed schg is valid ; return 1 if invalid
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeter / check
 	local _value="$1"
@@ -1553,8 +1583,8 @@ chk_valid_template() {
 	# Exists mostly so that the get_jail_parameters() function works seamlessly
 
 	# Quiet option
-	getopts q _opts && _qt='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _qt='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeters.
 	local _value="$1"
@@ -1568,8 +1598,8 @@ chk_valid_vcpus() {
 	# Return 0 if proposed vcpus are valid; false if not.
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	# Positional parmeters / check.
 	local _value="$1"
@@ -1595,8 +1625,8 @@ chk_valid_vncres() {
 	# Make sure that the resolution is supported by bhyve
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	_value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "vnc viewer resolution" && return 1
@@ -1611,8 +1641,8 @@ chk_valid_wiremem() {
 	# Standardization/consistency with get_jail_parameter() func.
 
 	# Quiet option
-	getopts q _opts && _q='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && _q='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	chk_truefalse $_q "$1" "WIREMEM"
 }
@@ -1667,8 +1697,8 @@ discover_open_ipv4() {
 	# Echo open IP on success; Returns 1 if failure to find an available IP
 
 	# Positional params and func variables.
-	getopts q _opts && local _qi='-q'
-	shift $(( OPTIND - 1 ))
+	getopts q _opts && local _qi='-q' && shift
+	[ "$1" = "--" ] && shift
 
 	local _jail="$1"
 	local _ipv4
@@ -1714,8 +1744,8 @@ assign_ipv4_auto() {
 	# file is used for deconfliction during qb-start, and must be referenced by exec.created
 
 	# Positional params and func variables.
-	getopts e _opts && _echo="true"
-	shift $(( OPTIND - 1 ))
+	getopts e _opts && _echo="true" && shift
+	[ "$1" = "--" ] && shift
 
 	_jail="$1"
 	_ipv4=''
@@ -1745,13 +1775,12 @@ cleanup_vm() {
 	# Positional params and func variables.
 	while getopts nqx opts ; do
 		case $opts in
-			n) _norun="-n" ;;
-			q) _qcv="-q" ;;
-			x) _exit="true" ;;
+			n) _norun="-n"  ; shift ;;
+			q) _qcv="-q"    ; shift ;;
+			x) _exit="true" ; shift ;;
 		esac
 	done
-
-	shift $(( OPTIND - 1 ))
+	[ "$1" = "--" ] && shift
 
 	# Positional variables
 	_VM="$1"
@@ -1807,12 +1836,11 @@ prep_bhyve_options() {
    # Options
 	while getopts qt opts ; do
 		case $opts in
-			q) _qs="-q" ;;
-			t) _tmux="-t" ;;
+			q) _qs="-q"   ; shift ;;
+			t) _tmux="-t" ; shift ;;
 		esac
 	done
-
-	shift $(( OPTIND - 1 ))
+	[ "$1" = "--" ] && shift
 
 	# Assign _vm variable
 	_VM="$1"
@@ -1983,13 +2011,12 @@ exec_vm_coordinator() {
    # Options
 	while getopts nqt opts ; do
 		case $opts in
-			n) _norun="-n" ;;
-			q) _qs="-q" ;;
-			t) _tmux="-t" ;;
+			n) _norun="-n" ; shift ;;
+			q) _qs="-q"    ; shift ;;
+			t) _tmux="-t"  ; shift ;;
 		esac
 	done
-
-	shift $(( OPTIND - 1 ))
+	[ "$1" = "--" ] && shift
 
 	# Assign _vm variable
 	_VM="$1"
