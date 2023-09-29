@@ -8,63 +8,38 @@ get_msg_rename() {
 	case "$_message" in
 	_0) cat << ENDOFMSG
 
-Exiting. No changes were made.
+ERROR: < $JAIL > is invalid/incomplete. If you still wish to
+       rename whatever pieces might exist, use [-f] (force). 
 ENDOFMSG
 	;;	
 	_1) cat << ENDOFMSG
 
-#############################################
-###### UNUSED ERROR MESSAGE DESIGNATOR ######
-#############################################
+The following jails/VMs have a dependency on < $JAIL >
+They will be stopped/updated. To prevent this, use [-n]
 
 ENDOFMSG
+chk_isblank "$_CLIENTS"  || echo $_CLIENTS
+chk_isblank "$ROOT_FOR"  || echo $ROOT_FOR
+chk_isblank "$TEMPL_FOR" || echo $TEMPL_FOR
+echo -e "\nCONTINUE? (Y/n): \c"
 	;;	
 	_2) cat << ENDOFMSG
 
-#############################################
-###### UNUSED ERROR MESSAGE DESIGNATOR ######
-#############################################
-       
+EXITING. No changes were made.
 ENDOFMSG
 	;;	
 	_3) cat << ENDOFMSG
 
-ALERT: < $JAIL > is a rootjail for the following:
-$rootj_for
+ERROR: < $_jail > could not be stopped. Aborting qb-rename.
 ENDOFMSG
 	;;
 	_4) cat << ENDOFMSG
 
-ALERT: < $JAIL > is a template for the following: 
-$template_for
+Rename complete
 ENDOFMSG
 	;;
 	_5) cat << ENDOFMSG
-
-ALERT: < $JAIL > is a gateway for the following: 
-$gateway_for
-ENDOFMSG
-	;;
-	_6) cat << ENDOFMSG
-
-Would you like to automatically update the dependent jails 
-with the new jailname? This will restart any running jails
-ENDOFMSG
-echo -e "                                    Enter (y/n): \c"
-	;;
-	_7) cat << ENDOFMSG
-
-ERROR: < $_jail > could not be stopped. Aborting qb-rename.
-ENDOFMSG
-	;;
-	_8) cat << ENDOFMSG
-
-Final confirmation to change < $JAIL > to < $NEWNAME >
-ENDOFMSG
-echo -e "                                    Enter (y/n): \c"
-	;;
-	_9) cat << ENDOFMSG
-Rename complete. Might take a moment for restarts to finish. 
+Restarting jails/VMs that were stopped.
 ENDOFMSG
 	;;
 	esac
@@ -80,12 +55,13 @@ ENDOFMSG
 
 usage() { cat << ENDOFUSAGE
 
-qb-rename: Renames jail
-Usage: qb-rename [-a] <jail> <new_jailname>
-   -a: (a)utomatically update dependencies of client jails 
-       which depend on the <jail> being renamed, for things 
-       like: gateway, rootjail, and as a template.  
+qb-rename: Renames <jail> ; and automatically updates any
+jails which depend on it as a gateway, root, or template.
+
+Usage: qb-rename [-d][-f] <jail> <new_jailname>
+   -f: (f)orce rename, even if jail is invalid/incomplete 
    -h: (h)elp. Outputs this help message
+   -n: (n)o_update. Do not update dependent jails/VMs. 
 
 ENDOFUSAGE
 }
