@@ -14,7 +14,9 @@ ENDOFMSG
 
 	_2) cat << ENDOFMSG
 
-ERROR: [-t] Must be an integer greater than zero.
+ERROR: [-t <timeout>] must be integer from 5 to 600. Caution, 
+       choose a timeout appropriate for number of starts,
+       longer if starting multiple gateways/clients in a row
 ENDOFMSG
 	esac
 
@@ -44,13 +46,9 @@ Usage: qb-i3-launch [-h][-f <conf_file>][-s]
    
 If no options are given, default conf is fully run.
 
-NOTE: This script can be finicky, and windows can pop up
-in the wrong places sometimes. For example, if your browser 
-tries to restore multiple windows from its last session. 
-The script tries to account for that with a short delay
-after detecting the window; but it's not perfect. 
-
-If a window fails to launch within 6 sec, it's skipped. 
+NOTE: The results can sometimes be finicky, especially if
+a particular program takes longer than 6 sec to launch.
+After that built-in delay, i3-launch moves to next window. 
 
 ENDOFUSAGE
 }
