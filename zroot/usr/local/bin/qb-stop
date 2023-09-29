@@ -4,7 +4,7 @@
 . /usr/local/lib/quBSD/msg-stop.sh
 
 get_options() {
-	while getopts aAeE:hf:rt: opts ; do
+	while getopts aAeE:hf:rt:w opts ; do
 		case $opts in
 			a) _SOURCE="auto" ;;
 			A) [ "$_SOURCE" ]  && get_msg_stop "_e1" "usage_1" || _SOURCE="all" ;;
@@ -14,6 +14,7 @@ get_options() {
 			h) get_msg_stop "none" "usage_0" ;;
 			r) _RESTART="true" ;;
 			t) _TIMEOUT="$OPTARG" ;;
+			w) _WAIT="true" ;;
 			*) exit 1 ;;
 		esac
 	done
@@ -25,6 +26,9 @@ get_options() {
 
 	# _STARTS is used for calculating the TIMEOUT later on. Initialize to zero
 	_STARTS=0
+
+	# Assign the monitoring a background or not, based on [-w]
+	[ "$_WAIT" ] && _bkgnd='' || _bkgnd='&'
 }
 
 checks() {
@@ -95,12 +99,9 @@ begin_waterfall() {
 
 	for _JAIL in $_JAILS; do
 
-		# VMs can be stopped in background, as there's no epair race conditions.
-		chk_isvm $_JAIL && _bkgnd='&' || _bkgnd=''
-
-		# If JAIL is on JLIST shut it down, and wait for the shutdown.
+		# Serial stop for gateways. Exception: VMs can stop in background (no VIF race conds)
 		echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" \
-			&& eval stop_jail "$_JAIL" $_bkgnd
+			&& eval stop_jail "$_JAIL"
 
 		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion)
 		_SUBGATEWAYS='' ; _ENDPOINTS=''
@@ -130,6 +131,7 @@ begin_waterfall() {
 }
 
 monitor_stop() {
+	# Separate function is necessary, so that qb-start can be handed off
 	monitor_startstop "$_TIMEOUT" || get_msg "_e4" "exit_1"
 }
 
@@ -155,7 +157,7 @@ main() {
 
 	# User specified, OR, 7.5 secs for every hierarchy level. Monitoring loop sleeps 0.5 sec
 	: ${_TIMEOUT:=$(( _STARTS * 15 ))}
-	monitor_stop &
+	eval monitor_stop $_bkgnd
 
 	[ "$_RESTART" ] && exec qb-start "$_JLIST"
 }
