@@ -2,6 +2,9 @@ Add more z-score crypto comparisons and put their colors in the top corner
 Housing market compared to lots of stuff. Overall look.
 ##### VIRTUAL MACHINE INTEGRATION
 
+CHANGES
+	- removed 99: qb-stop (chk_isVM) - VMs alrady stop in bkgnd
+
 VMs implementation 
 	- Ubuntu released ZFS. Try to integrate
 	zusr dataset, script internal, in /vmusr
@@ -9,7 +12,7 @@ VMs implementation
 		- User profiles (if any) stored here
 
 Scripts that should integrate VMs
-	- qb-rename , qb-destroy, qb-stat, qb-create, qb-disp
+	- qb-destroy, qb-stat, qb-create, qb-disp
 
 New scripts
 	qb-pci
@@ -18,6 +21,8 @@ New scripts
 		- Show what was is currently passthrough'd
 
 # CLEANUP STUFF
+
+set your i3 quick keys for VMs
 
 USBVM 
 	- Auto-install various useful mounting stuff for common devices     
@@ -46,15 +51,15 @@ ZFS Encrypted Jails
 Tor and I2P Jails
 
 Xephyr
-	- An absolute must for pw managers and pw entry
-	- You might be able to make it a wrapper?
-	- Maybe integrate an "X" option for qb-cmd and qb-disp.
+	- Integrate the qb-xephyr command into qb-cmd -X, including VMs. Make sure works with -n as well.
+	- Integrate an "X" option for qb-disp as well.
 	- Wayland/sway might be a good bonus to run in a separate tty
 
 qb-disp
 	- Really should be called class=ephemeral
 	- Should clone zroot from template as well. 
 	- Make it so you can run a specific command directly at the command line.
+	- Also make it so that you dont need a terminal. That's annoying. Keep jail alive based on presence of X-window from jail 
 	- Needs significant rework, to allow for using an appjail as a rootjail
      and the reclone operation for that appjail's zroot.
 
@@ -184,6 +189,8 @@ sed doesnt need /g for the substitutions. Just leave it be. g is only for multip
 	- go through and remove these g's. Unnecessary
 
 Make some kind of function: chk_isinteger "lower_bound" "upper_bound". You have a lot of integer checks.
+
+in qubsd.sh - alot of positional stuff really should be options stuff
 
 ### MINOR UPGRADES 
 
