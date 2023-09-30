@@ -1,24 +1,25 @@
-Add more z-score crypto comparisons and put their colors in the top corner
-Housing market compared to lots of stuff. Overall look.
 ##### VIRTUAL MACHINE INTEGRATION
 
-CHANGES
-	- removed 99: qb-stop (chk_isVM) - VMs alrady stop in bkgnd
-
-VMs implementation 
-	- Ubuntu released ZFS. Try to integrate
-	zusr dataset, script internal, in /vmusr
-		- hostname ; configure network ; symlink files ;
-		- User profiles (if any) stored here
-
 Scripts that should integrate VMs
-	- qb-destroy, qb-stat, qb-create, qb-disp
+	- qb-create
+		- Need to change to -p PARAMTER=VALUE options construction 
+	- qb-disp
+	- qb-connect
+		- jail/VM connections, specifically SSH preparation for files copy
 
 New scripts
 	qb-pci
 		- summary of PCI devices relevant to user
 		- USB, NIC, maybe others
 		- Show what was is currently passthrough'd
+
+Ubuntu upgrades
+	zusr dataset integration
+		- try Ubuntu zfs install 
+		- User profiles
+
+bhyve -p <specific CPUs> should probably be integrated to CPUSET
+
 
 # CLEANUP STUFF
 
@@ -39,9 +40,6 @@ net-firewall
 	- pf.conf 
 		- Currently does not integrate all unique wireguard ports of clients (net-jails).
 		- needs careful review. Use chatGPT-4
-
-qb-autosnap
-	- It should look for all snaps older than their qubsd:destroy-date , and reclone them (stale zroots)
 
 
 ### UPGRADES
@@ -192,9 +190,23 @@ Make some kind of function: chk_isinteger "lower_bound" "upper_bound". You have 
 
 in qubsd.sh - alot of positional stuff really should be options stuff
 
+qb-hostnet _TIME variable should be called TIMEOUT, and it should have a better check
+
+qb-stat
+	- I like my hardcode setup, but columns sorting and even a generalized setup file might be better
+	- Also the ability to choose which columns are displayed
+
+qb-autosnap
+	- It should look for all snaps older than their qubsd:destroy-date , and reclone them (stale zroots)
+
 ### MINOR UPGRADES 
 
-qb-help: forget the docs, make the more in depth stuff part of qb-help. Like a man page
+If you really wanted to make everything robust, you could do the same robustness that qb-list has, with other commands
+
+qb-help:
+	- forget the docs, make the more in depth stuff part of qb-help. Like a man page
+	- Make it robust like qb-list
+	- Each PARAM has a verbose message
 
 monitor_startstop
 	- Could make this granular to each jail/VM
