@@ -27,7 +27,7 @@ parse_config() {
 	_TMP=$(mktemp   -t "quBSD/i3-genconf3")
 	NEWCONF=$(mktemp -t "quBSD/i3-genconf_newconf")
 	
-	trap "rm $GEN1 $GEN2 $_TMP $NEWCONF" INT TERM HUP QUIT EXIT
+	trap "rm $GEN1 $GEN2 $_TMP $NEWCONF ; exit 0" INT TERM HUP QUIT EXIT
 
 	cp $CONF $NEWCONF
 

@@ -45,7 +45,7 @@ main() {
 	zfs snapshot $NEWSNAP
 
 	#Trap to destroy snapshot after use.
-	trap 'zfs destroy -rRf $NEWSNAP' INT TERM HUP QUIT EXIT
+	trap 'zfs destroy -rRf $NEWSNAP ; exit 0' INT TERM HUP QUIT EXIT
 
 	# Create dispjail and disable the no_destroy protection 
 	qb-create -y -c dispjail -g none -i none -n false -t $JAIL $NEWJAIL 
@@ -69,6 +69,7 @@ destroy_dispjail() {
 	zfs destroy $NEWSNAP
 	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $JMAP
 	sed -i '' -E "\@${NEWJAIL}[[:blank:]]*\{@,\@^[[:blank:]]*\}[[:blank:]]*\$@d" $JCONF
+	exit 0
 }
 
 get_global_variables

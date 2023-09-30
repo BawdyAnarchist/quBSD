@@ -183,7 +183,7 @@ handle_if_off() {
 	# Modify seclvl to -1. Trap and restore original if exit before finish
 	# If we're only turning on the jail to LIST its connection, don't mod seclvl
 	if [ "$SEC_orig" -ge 0 ] && [ -z "$LIST" ] ; then
-		trap 'qb-edit -qf $JAIL SECLVL $SEC_orig' INT TERM HUP QUIT EXIT
+		trap 'qb-edit -qf $JAIL SECLVL $SEC_orig ; exit 0' INT TERM HUP QUIT EXIT
 		qb-edit -fq $JAIL SECLVL -1 
 	fi
 		

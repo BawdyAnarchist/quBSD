@@ -452,7 +452,7 @@ cleanup_trapped() {
 
 main() {
 
-	trap "cleanup_trapped" INT TERM HUP QUIT 
+	trap "cleanup_trapped" INT TERM HUP QUIT EXIT
 
 	[ "$GUIDED" ] && guided_mode
 
