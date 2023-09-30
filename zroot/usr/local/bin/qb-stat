@@ -109,7 +109,6 @@ print_alerts() {
 	printf "%b" "${GREEN}----------------------   ACTIVE WINDOW:  $_XJAIL ---------------------${COL_OFF}\n"
 
 	if [ "$cam" -o "$mic" -o "$hostnet" ] ; then
-		aaaa
 		echo -e "${RED}####################################################################" 
 		[ "$cam" ] \
 		&& echo -e "##             W E B C A M   D A E M O N   I S   O N  !!           ##"  
