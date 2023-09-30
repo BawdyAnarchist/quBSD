@@ -1,92 +1,26 @@
 #!/bin/sh
 
+. /usr/local/lib/quBSD/msg-help.sh
+
 get_options() {
-	while getopts h opts ; do
+	while getopts hvp: opts ; do
 		case $opts in 
-			h) help_msg ; exit 0 ;;
+			h) get_msg_help "help_msg" ; exit 0 ;;
+			p) PARAM="$OPTARG" ; shift ;;
 		esac
 	done
 
 	ACTION="$1"
 }
 
-help_msg() { cat << ENDOFMSG
-qb-help: Quick help for quBSD scripts
-
-Usage: qb-help list|show > Shows all scripts
-       qb-help params|parameters > Shows all quBSD.conf parameters
-       qb-help -h > shows this help message
-ENDOFMSG
-}
-
-list_scripts() { cat << ENDOFMSG
-qb-autosnap: Tool to automate the creation, management, and thinning
-             of ZFS snapshots. Works in combination with /etc/crontab.
-qb-cmd:      Runs a command inside of a jail - starts the jail if off
-qb-connect:  Creates/destroys epairs between jails. Options for
-             auto-configuration for immediate internet connectivity
-qb-create:   Automates creation of new jails. Options exist to clone
-             an existing jail, initialize/cofigure from scratch,
-             or a guided mode with descriptive help and input prompts
-qb-destroy:  Destroys jail and removes all lingering pieces
-qb-disp:     Launches a disposable jail on the basis of any jail.
-             Useful for opening questionable files in an isolated env. 
-qb-dpi:      Modify dpi to launch a program, then autoreverts to default.
-qb-edit:     Edit jailmap. Checks performed to ensure valid entry
-qb-flags:    Remove or re-apply schg flags from all jail files,
-qb-floatcmd: Launches a popup to accept/run a single command for a jail. 
-qb-hostnet:  Bring up internet connectivity for host.
-qb-i3-genconf: Generates/adds key i3 bindings, based on: i3gen.conf 
-qb-i3-launch:  Starts jails and launches programes based on: launch.conf
-qb-i3-windows: Lists all i3 workspaces, and the windows/programs in them.
-qb-ivpn:     Change ivpn servers for gateway jail
-qb-list:     List jailmap settings for a particular jail or parameter
-qb-pefs:     Creation pefs directory, mount, or decrypt pefs-kmod in jail
-qb-record:   Toggles webcam and virtual_oss off/on
-qb-rename:   Renames a jail. Option to update downstream dependencies
-qb-snap:     Create jail snapshot. Necessary for rootjails and dispjails
-qb-start:    Start jails in parallel. from list, file, or jmap autostarts
-qb-stat:     Continuously running status script for quBSD and jail status
-qb-stop:     Remove/restart specified jails. Options for -all and -except
-ENDOFMSG
-}
-
-print_parameters() { cat << ENDOFMSG
-
-PARAMETERS SAVED AT /usr/local/etc/quBSD/jailmap.conf
-
-AUTOSNAP:    Snapshot jail with qb-autosnap /etc/crontab
-AUTOSTART:   Automatically start with rc script during host boot.  
-CLASS:       Cannot be modified. Use qb-create instead.
-CPUSET:      CPUs a jail may use. Comma separated integers, or a
-             range.  For example: 0,1,2,3 is the same as 0-3
-             \`none' places no restrictions on jail's CPU access
-GATEWAY:     Gateway for <jail> to receive network connectivity
-IPV4:        IPv4 address for the jail.
-MAXMEM:      RAM maximum allocation:  <integer><G|M|K> 
-             For example: 4G or 3500M, or \'none' for no limit
-MTU:         MTU for connections made when jail comes up. 
-NO_DESTROY:  Prevents accidental destruction of <jail>
-             Change to \`false' in order to use qb-destroy
-ROOTJAIL:    Which rootjail system to clone for <jail> . If <jail>
-             is a rootjail; then this entry is self referential,
-             but important for script funcitonality.
-SCHG:        Directories to receive schg flags: all|sys|none
-             \`sys' are files like: /boot /bin /lib , and others
-             \`all includes /usr and /home as well
-SECLVL:      kern.securelevel to protect <jail>: -1|0|1|2|3
-             \`1' or higher is required for schg to take effect
-TEMPLATE:    Only applicable for dispjail. Designates jail to
-             clone (including /home) for dispjail
-
-ENDOFMSG
-}
-
 main() {
 	case $ACTION in 
-		list|show) list_scripts ;;		
-		param|params|PARAM|PARAMS|parameter|parameters|PARAMETER|PARAMETERS) print_parameters ;;
-		'') help_msg ;;
+		list|show|scripts|commands) get_msg_help "list_scripts" ;;		
+
+		param|params|PARAM|PARAMS|parameter|parameters|PARAMETER|PARAMETERS) 
+				[ "$VERBOSE" ] && get_msg_help "verb_params" || get_msg_help "params" ;;
+
+		'') get_msg_help "help_msg" ;;
 	esac
 }
 
