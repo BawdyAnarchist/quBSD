@@ -41,7 +41,7 @@ checks() {
 	[ "$NO_DESTROY" = "true" ] && get_msg_destroy "_2" "usage_1"	
 
 	# Extra reminder that they're destorying a rootjail
-	[ "$CLASS" = "rootjail" ] && get_msg_destroy "_4" 
+	[ -z "${CLASS##root*}" ] && get_msg_destroy "_4" 
 
 	# Print the datasets and amount of data to be destroyed
 	get_msg_destroy "_5" 
@@ -56,17 +56,20 @@ checks() {
 }
 
 main() {
-	# Add current jail to the list of jails to be destroyed. 
-	OFFJAILS="$OFFJAILS $JAIL"
 
 	# Turn off all jails before applying changes 
-	for _jail in $OFFJAILS ; do
-		stop_jail "$_jail" 
+	for _jail in $JAIL $OFFJAILS ; do
+		stop_jail -w "$_jail" 
 	done
 	
 	# Destroy datasets
-	[ "$zrootDestroy" ] && zfs destroy -rRf ${JAILS_ZFS}/${JAIL} > /dev/null 2>&1
-	[ "$zusrDestroy" ]  && zfs destroy -rRf ${ZUSR_ZFS}/${JAIL}  > /dev/null 2>&1
+	[ "$zrootDestroy" ] \
+		&& chk_valid_zfs "${JAILS_ZFS}/${JAIL}" \
+		&& zfs destroy -rRf ${JAILS_ZFS}/${JAIL}
+
+	[ "$zusrDestroy" ] \
+		&& chk_valid_zfs "${ZUSR_ZFS}/${JAIL}" \
+		&& zfs destroy -rRf ${ZUSR_ZFS}/${JAIL}
 	
 	# Modify Files
 	sed -i '' -E "/^${JAIL}[[:blank:]]/d" $JMAP

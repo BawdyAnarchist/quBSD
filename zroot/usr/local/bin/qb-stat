@@ -12,21 +12,14 @@ get_options() {
 	done
 
 	shift $(( OPTIND - 1 ))
-}
 
-trap_on_exit() {
-	rm $TMP1 > /dev/null 2>&1
-	rm $TMP2 > /dev/null 2>&1
-	exit 0
-}
-
-define_script_files() {
-	# Trap to remove TMP files when exiting
-	trap "trap_on_exit" INT TERM HUP QUIT EXIT
-
+	# Temp files for building the status report
 	TMP1=$(mktemp -t "quBSD/qb-stat1")
 	TMP2=$(mktemp -t "quBSD/qb-stat2")
 	COL="${COL:=6,6}"
+
+	# Trap to remove TMP files when exiting
+	trap 'rm $TMP1 $TMP2 > /dev/null 2>&1 ; exit 0' INT TERM HUP QUIT EXIT
 }
 
 define_colors() {
@@ -43,19 +36,9 @@ define_colors() {
      HILIT='\033[7;39m'     # Highlighted top line
 }
 
-assemble_header() {
-	[ -e "$TMP1" ] && rm $TMP1
-	[ -e "$TMP2" ] && rm $TMP2
-	mktemp $TMP1 > /dev/null
-	mktemp $TMP2 > /dev/null
-
-	printf "%b" "${HILIT}CONTAINER\tPID\tGATEWAY\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" >> $TMP1
-}
-
-define_variables() {
+get_stat_variables() {
 	#Jails data
-	jails=$(grep -E "[^[:blank:]]+[[:blank:]]+CLASS[[:blank:]]+" $JMAP | awk '{print $1}') 
-	zfs_list=$(zfs list -ro name,used)
+	JAILS=$(sed -En "s/^([^[:blank:]]+)[[:blank:]]+CLASS.*/\1/p" $JMAP)
 
 	# Jailname of the active window is assigned to: $_XJAIL 
 	get_info _XJAIL
@@ -68,102 +51,90 @@ define_variables() {
 	interfaces=$(ifconfig -l | sed "s/lo0//g")
 	[ -z "$interfaces" ] && hostnet=""
 
-	for _i in $interfaces ; do
-		$(ifconfig $_i inet | grep -Eqs "^[[:blank:]]*inet") && hostnet="true" || hostnet=""
+	for _intf in $interfaces ; do
+		$(ifconfig $_intf inet | grep -Eqs "^[[:blank:]]*inet") && hostnet="true" || hostnet=""
 	done
 }
 
 get_jails_loop() {
-	for _j in $jails ; do
-		class=$(get_jail_parameter -eqs CLASS "$_j")
-#scheduled for deletion
-#class="${class%jail}"
-		gateway=$(get_jail_parameter -eqs GATEWAY "$_j")
-		gateway="${gateway:--}"
-		rootjail=$(get_jail_parameter -eqs ROOTJAIL "$_j")
-		rootjail="${rootjail:--}"
-		disk="-"
-		jid="-"
-		cpu="-"
-		ram="-"
-		
-		if chk_isrunning "$_j" ; then
+	# Get key variables
+	class=$(get_jail_parameter -eqs CLASS "$_jail")
+	gateway=$(get_jail_parameter -eqs GATEWAY "$_jail")
+	rootjail=$(sed -En "s/^${_jail}[[:blank:]]+ROOT.*[[:blank:]]+//p" $JMAP)
+	rootjail="${rootjail:=-}"
 
-			if chk_isvm "$_j" ; then
-				jid=$(pgrep -f "bhyve: $_j")
-				cpu=unk
-				ram=unk
-				#cpu=$(ps au -J $_j | awk '{sum+=$3;} END {print sum;}')
-				#ram=$(ps au -J $_j | awk '{sum+=$4;} END {print sum;}')
+	if chk_isrunning "$_jail" ; then
 
-			else
-				jid=$(jls -j $_j -n jid | sed "s/jid=//") 
-				cpu=$(ps au -J $_j | awk '{sum+=$3;} END {print sum;}')
-				ram=$(ps au -J $_j | awk '{sum+=$4;} END {print sum;}')
-			fi
-		fi	
-
-		if [ "$class" = "rootjail" -o -z "${_j##0*template}" ] ; then 
-			disk=$(echo "$zfs_list" | sed -nE "s#^${JAILS_ZFS}/${_j}[[:blank:]]+##p")
-			sub=4
-
-		elif [ "$class" = "rootVM" ] ; then 
-			# Future functionality - bhyvectl or ping test for on/connected
-			disk=$(echo "$zfs_list" | sed -nE "s#^${JAILS_ZFS}/${_j}[[:blank:]]+##p")
-			sub=5
-		else 
-			disk=$(echo "$zfs_list" | sed -nE "s#^${ZUSR_ZFS}/${_j}[[:blank:]]+##p")
-			
-			case $_j in
-				net*)  sub="3" ;;
-				serv*) sub="2" ;;
-				host*) sub="6" ;;
-				*)		 sub="1" ;;
-			esac
+		if chk_isvm "$_jail" ; then
+			jid=$(pgrep -f "bhyve: $_jail")
+			cpu=$(ps -p $jid -o %cpu | awk '{sum+=$1;} END {print sum;}')
+			ram=$(ps -p $jid -o %mem | awk '{sum+=$1;} END {print sum;}')
+		else
+			jid=$(jls -j $_jail -n jid | sed "s/jid=//") 
+			cpu=$(ps axJ $_jail -o %cpu | awk '{sum+=$1;} END {print sum;}')
+			ram=$(ps axJ $_jail -o %mem | awk '{sum+=$1;} END {print sum;}')
 		fi
+	else
+		jid='-' ;  cpu='-' ;  ram='-'
+	fi	
 
-		gateway="${gateway:--}"
-		rootjail="${rootjail:--}"
-		disk="${disk:--}"
-		jid="${jid:--}"
-		cpu="${cpu:--}"
+	# Get ZFS disk size 
+	[ -z "${class##root*}" ] && _zfs="${JAILS_ZFS}" || _zfs="${ZUSR_ZFS}"
+	chk_valid_zfs "${_zfs}/${_jail}" && disk=$(zfs list -Ho used "${_zfs}/${_jail}")
 
-		case $sub in
-			1) TEMPCOL=${NORMAL} ;;
-			2) TEMPCOL=${BLUE} ;;
-			3) TEMPCOL=${YELLOW} ;;
-			4) TEMPCOL=${GRAY} ;;
-			5) TEMPCOL=${GRAY} ;;
-			6) TEMPCOL=${GRAY} ;;
-		esac
+	# This is for ordering purposes
+	case "${_jail}_${class}" in
+		serv*)   sub="2" ;;
+		net*)    sub="3" ;;
+		0*app*)  sub="4" ;;
+		0*root*) sub="5" ;;
+		host*)   sub="6" ;;
+		*)		   sub="1" ;;
+	esac
 
-		printf "%b" "${TEMPCOL}$_j\t" "$jid\t" "$gateway\t" "$class\t" "$rootjail\t" "$sub\t" "$disk\t" "$ram\t" "${cpu}${COL_OFF}\n" >> $TMP1
-	done
+	case $sub in
+		1) TEMPCOL=${NORMAL} ;;
+		2) TEMPCOL=${BLUE} ;;
+		3) TEMPCOL=${YELLOW} ;;
+		4) TEMPCOL=${GRAY} ;;
+		5) TEMPCOL=${GRAY} ;;
+		6) TEMPCOL=${GRAY} ;;
+	esac
+
+	# Print the line for jail in TMP1
+	printf "%b" "${TEMPCOL}$_jail\t" "$jid\t" "$gateway\t" "$class\t" "$rootjail\t" "$sub\t" "$disk\t" "$ram\t" "${cpu}${COL_OFF}\n" >> $TMP1
 }
 
 print_alerts() {
-	printf "%b" "${GREEN}-------------------   ACTIVE WINDOW:  $_XJAIL ------------------${COL_OFF}\n"
+	printf "%b" "${GREEN}----------------------   ACTIVE WINDOW:  $_XJAIL ---------------------${COL_OFF}\n"
 
 	if [ "$cam" -o "$mic" -o "$hostnet" ] ; then
-		echo -e "${RED}##############################################################" 
+		aaaa
+		echo -e "${RED}####################################################################" 
 		[ "$cam" ] \
-		&& echo -e "##          W E B C A M   D A E M O N   I S   O N  !!        ##"  
+		&& echo -e "##             W E B C A M   D A E M O N   I S   O N  !!           ##"  
 		[ "$mic" ] \
-		&& echo -e "##      M I C R O P H O N E   D A E M O N  I S  O N  !!      ##"
+		&& echo -e "##         M I C R O P H O N E   D A E M O N  I S  O N  !!         ##"
 		[ "$hostnet" ] \
-		&& echo -e "##${BRED}     H O S T  I S  N E T W O R K  C O N N E C T E D !!    ${COL_OFF}${RED}##" 
-		echo -e "##############################################################${COL_OFF}"
+		&& echo -e "##${BRED}        H O S T  I S  N E T W O R K  C O N N E C T E D !!       ${COL_OFF}${RED}##" 
+		echo -e "####################################################################${COL_OFF}"
 	fi
-
 }
 
 main() {
 	while : ; do 
-		assemble_header
-		define_variables
+		# Reset the TMP files
+		printf "%b" \
+			"${HILIT}CONTAINER\tPID\tGATEWAY\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" > $TMP1
+		echo '' > $TMP2
 
-		# Redirect is important to prevent micro flashes of a sed error for ZUSR
-		get_jails_loop > /dev/null 2>&1
+		# Get the general status variables
+		get_stat_variables
+
+		# Assemble the full stats of all jails. Redirect to prevent errors from flashing
+		for _jail in $JAILS ; do
+			get_jails_loop > /dev/null 2>&1
+		done
 
 		# Sort -b ignores leadings spaces, -f ignores case ; grep remove #defaults from JMAP
 		(head -n 1 $TMP1 && tail -n +2 $TMP1 | sort -fbk $COL | cut -f 1,2,3,4,5,7,8,9 \
@@ -182,11 +153,7 @@ get_global_variables
 
 get_options "$@"
 
-define_script_files
-
 define_colors
-
-define_variables
 
 main
 
