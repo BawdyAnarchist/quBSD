@@ -64,9 +64,9 @@ main() {
 
 destroy_dispjail() {
 	stop_jail "$NEWJAIL" 
-	zfs destroy -rRf ${JAILS_ZFS}/$NEWJAIL
-	zfs destroy -rRf ${ZUSR_ZFS}/$NEWJAIL
-	zfs destroy $NEWSNAP
+	zfs destroy -rRf ${JAILS_ZFS}/$NEWJAIL > /dev/null 2>&1
+	zfs destroy -rRf ${ZUSR_ZFS}/$NEWJAIL > /dev/null 2>&1
+	zfs destroy $NEWSNAP > /dev/null 2>&1
 	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $JMAP
 	sed -i '' -E "\@${NEWJAIL}[[:blank:]]*\{@,\@^[[:blank:]]*\}[[:blank:]]*\$@d" $JCONF
 	exit 0
