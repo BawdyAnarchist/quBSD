@@ -1372,6 +1372,9 @@ chk_valid_memsize() {
 	getopts q _opts && _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
+	# None is not permitted for memsize
+	[ "$_value" = "none" ] && get_msg "_cj21_1" && return 1
+
 	# It's the exact same program/routine. Different jmap params to be technically specific.
 	chk_valid_maxmem $_q "$1" || return 1
 
@@ -1927,7 +1930,6 @@ prep_bhyve_options() {
 
 		_TAB="-s 30,xhci,tablet"
 		_slot=$(( _slot + 1 ))
-
 	fi
 
 	# Launch a serial port if variable was passed
@@ -1938,7 +1940,7 @@ prep_bhyve_options() {
 	[ "$(( _slot + _taps ))" -gt 28 ] && get_msg "_cj28" "$_VM" && return 1
 
 	# Invoke the trap function for VM cleanup, in case of any errors after modifying host/trackers
-	trap "cleanup_vm -n $_VM" INT TERM HUP EXIT
+	trap "cleanup_vm -n $_VM ; exit 0" INT TERM HUP QUIT EXIT
 
 	# Assign all taps to slots _VTNET. VM can have taps, even without gateway
 	while [ "$_taps" -gt 0 ] ; do
@@ -1963,7 +1965,7 @@ prep_bhyve_options() {
 			$_VTNET $_PPT $_FBUF $_TAB $_LPC $_BOOT $_BHYVE_CUST $_STDIO $_VM $_TMUX2)
 
 	# unset the trap
-	trap ":" INT TERM HUP EXIT
+	trap "exit 0" INT TERM HUP QUIT EXIT
 
 	return 0
 }
@@ -1982,7 +1984,7 @@ launch_vm() {
 		get_global_variables
 
 		# Create trap for post VM exit
-		trap "cleanup_vm -x $_VM $_rootvm" INT TERM HUP EXIT
+		trap "cleanup_vm -x $_VM $_rootvm ; exit 0" INT TERM HUP QUIT EXIT
 
 		# Launch the VM to background
 		eval $_BHYVE_CMD
