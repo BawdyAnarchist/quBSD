@@ -452,7 +452,8 @@ cleanup_trapped() {
 
 main() {
 
-	trap "cleanup_trapped" INT TERM HUP QUIT EXIT
+	# Dont include EXIT, because cleanup_trapped will be invoked upon successful creation/exit 
+	trap "cleanup_trapped" INT TERM HUP QUIT
 
 	[ "$GUIDED" ] && guided_mode
 
@@ -466,7 +467,8 @@ main() {
 
 	change_configs
 
-	_exit='0' && cleanup_finished
+	_exit='0' 
+	cleanup_finished
 }
 
 get_global_variables
