@@ -200,6 +200,11 @@ ERROR: RAM allocation < $_value > should be less than the
        host's available RAM < $_passvar bytes >
 ENDOFMSG
 	;;
+	_cj21_1) cat << ENDOFMSG
+
+ERROR: \`none' is not permitted for VM memsize
+ENDOFMSG
+	;;
 	_cj22) cat << ENDOFMSG
 
 ERROR: PCI device < $_value > doesn't exist on the host machine.

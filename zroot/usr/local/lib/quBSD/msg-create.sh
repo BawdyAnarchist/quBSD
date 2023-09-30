@@ -520,9 +520,12 @@ Usage: qb-create [-e|-h|-G] [-a <true|false>] [-c <class>] [-C <cpuset>]
    -Z: (Z)rootopt: Creates a new rootjail with an independent on-disk
        dataset, from snapshot of:  ${JAILS_ZFS}/<template> 
 
-JAIL PARAMETERS - Stored at /usr/local/etc/quBSD/jailmap.conf
-   -a: (a)autostart: Autostart jail on boot. <true|false>.
-   -A: (A)autosnap: Include <newjail> in autosnap cronjob. 
+FOR PARAMETER DETAILS, RUN: 
+   qb-help params
+	
+JAIL PARAMETERS
+   -a: (a)utostart: Autostart jail on boot. <true|false>.
+   -A: (A)utosnap: Include <newjail> in autosnap cronjob. 
    -c: (c)lass:  < appjail | rootjail | dispjail >.
    -C: (C)puset: Limit <newjail> to specified CPUs.
    -g: (g)ateway: <newjail> receives network from <gateway> jail.

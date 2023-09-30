@@ -24,7 +24,7 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_4) cat << ENDOFMSG
-WARNING! $JAIL is a rootjail
+WARNING! < $JAIL > is a $CLASS 
 ENDOFMSG
 	;;
 	_5) cat << ENDOFMSG
