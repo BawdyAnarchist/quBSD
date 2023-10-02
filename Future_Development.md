@@ -2,10 +2,10 @@
 
 Scripts that should integrate VMs
 	- qb-create
-		- Need to change to -p PARAMTER=VALUE options construction 
 	- qb-disp
 	- qb-connect
 		- jail/VM connections, specifically SSH preparation for files copy
+	- qb-edit - add BHYVE_CUSTM to qb-help PARAMS
 
 New scripts
 	qb-pci
@@ -149,6 +149,7 @@ quBSD.sh and msg-qubsd.sh
 		- Passing through the -q [quiet] -s [skipchecks] and even a new [-f force] 
 			This enables easier to implement features (like with ephemeral jails that use appjail clones as rootjails
 		- Master -V (verbose) command could be included on all top level scripts, with -q as default 
+		- Getting the #default shouldnt be the default behavior. -d should say "get default if nothing is there"
 		- (x)tra check on chk_valid_{param} for certain circumstances
 		-(r)esolve value (for stuff like ip auto)
 		- Could also beef up the log file, and make reference to it in error messages
@@ -198,6 +199,11 @@ qb-stat
 
 qb-autosnap
 	- It should look for all snaps older than their qubsd:destroy-date , and reclone them (stale zroots)
+
+${JAILS_ZFS} should probably be ROOT_Z and maybe also then ZUSR_Z.  Also M_ROOT instead of M_JAILS
+
+The reality is that all PARAMETERS should always be capitalized to refer to the generic PARAM,
+and lowercase when refering to a specific value for PARAMETER. This requires alot of grammar changes.
 
 ### MINOR UPGRADES 
 
