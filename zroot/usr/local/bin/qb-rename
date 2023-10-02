@@ -27,13 +27,12 @@ checks_and_variables() {
 	chk_avail_jailname "$NEWNAME" || get_msg_rename "none" "usage_1"
 
 	# Variables change if it's a VM or not
-	chk_isvm "$JAIL" && ROOTYPE="ROOTVM" || ROOTYPE="ROOTJAIL"
-	_ROOT=$(get_jail_parameter -esqd $ROOTYPE $JAIL)
+	get_jail_parameter -sqd ROOTENV $JAIL
 
 	# Finds jails dependent on the jail to be renamed
 	get_info _CLIENTS $JAIL
 
-	ROOT_FOR=$(sed -En "/${ROOTYPE}[[:blank:]]+${JAIL}\$/s/^([^[:blank:]]+).*/\1/p" $JMAP)
+	ROOT_FOR=$(sed -En "/ROOTENV[[:blank:]]+${JAIL}\$/s/^([^[:blank:]]+).*/\1/p" $JMAP)
 	TEMPL_FOR=$(sed -En "/TEMPLATE[[:blank:]]+${JAIL}\$/s/^([^[:blank:]]).*/\1/p" $JMAP)
 
 	# Figure out which jails should be restarted
@@ -53,7 +52,7 @@ rename_common() {
 
 	# Modify jailmap. Roojails should update their own rootjail to self
 	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}  /g" $JMAP
-	[ "${JAIL}" = "${_ROOT}" ] && qb-edit -fq ${NEWNAME} ${ROOTYPE} ${NEWNAME}
+	[ "$JAIL" = "$ROOTENV" ] && qb-edit -fq ${NEWNAME} ${ROOTENV} ${NEWNAME}
 
 	# Rename associated zfs datasets
 	chk_valid_zfs ${ZUSR_ZFS}/${JAIL} \
@@ -89,7 +88,7 @@ rename_jail() {
 update_dependencies() {
 
 	for _jail in $ROOT_FOR ; do
-		[ "$_jail" = "$JAIL" ] || qb-edit -fq $_jail $ROOTYPE $NEWNAME
+		[ "$_jail" = "$JAIL" ] || qb-edit -fq $_jail $ROOTENV $NEWNAME
 	done
 
 	for _jail in $TEMPJ_FOR ; do
@@ -109,9 +108,9 @@ main() {
 	rename_common
 
 	# Rename things specific to jails
-	[ "$ROOTYPE" = "ROOTJAIL" ] && rename_jail
+	! chk_isvm "$JAIL" && rename_jail
 
-	# Update _CLIENTS , ROOT , and TEMPLATE dependencies
+	# Update _CLIENTS , ROOTENV , and TEMPLATE dependencies
 	[ -z "$NOUPDATE" ] && update_dependencies
 
 	# Inform rename is complete

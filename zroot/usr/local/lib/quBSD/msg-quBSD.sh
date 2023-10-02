@@ -73,8 +73,8 @@ ENDOFMSG
 	;;
 	_cj7_1) cat << ENDOFMSG
 
-ERROR: < $_value > is a rootjail or rootVM. For security
-       reasons, it should never be used as a gateway.
+ERROR: < $_value > is a ROOTENV. For security reasons,
+       it should never be used as a gateway.
 
 ENDOFMSG
 	;;
@@ -323,12 +323,12 @@ ENDOFMSG
 	_jo0) cat << ENDOFMSG
 
 ERROR: < $_value > is not a clone (has no zfs origin).
-       Likely is a rootjail or rootVM
+       Likely is a ROOTENV. 
 ENDOFMSG
 	;;
 	_jo1) cat << ENDOFMSG
 
-ERROR: < $_value > needs a rootjail clone; however, there are
+ERROR: < $_value > needs a ROOTENV clone; however, there are
        no existing clones, and the rootjail at: < $_passvar >
        is either being updated, or installing pkgs. New clone
        shouldn't be taken until these operations are complete.

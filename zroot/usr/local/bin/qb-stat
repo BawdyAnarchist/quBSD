@@ -60,8 +60,8 @@ get_jails_loop() {
 	# Get key variables
 	class=$(get_jail_parameter -eqs CLASS "$_jail")
 	gateway=$(get_jail_parameter -eqs GATEWAY "$_jail")
-	rootjail=$(sed -En "s/^${_jail}[[:blank:]]+ROOT.*[[:blank:]]+//p" $JMAP)
-	rootjail="${rootjail:=-}"
+	rootenv=$(sed -En "s/^${_jail}[[:blank:]]+ROOTENV.*[[:blank:]]+//p" $JMAP)
+	rootenv="${rootenv:=-}"
 
 	if chk_isrunning "$_jail" ; then
 
@@ -102,7 +102,7 @@ get_jails_loop() {
 	esac
 
 	# Print the line for jail in TMP1
-	printf "%b" "${TEMPCOL}$_jail\t" "$jid\t" "$gateway\t" "$class\t" "$rootjail\t" "$sub\t" "$disk\t" "$ram\t" "${cpu}${COL_OFF}\n" >> $TMP1
+	printf "%b" "${TEMPCOL}$_jail\t" "$jid\t" "$gateway\t" "$class\t" "$rootenv\t" "$sub\t" "$disk\t" "$ram\t" "${cpu}${COL_OFF}\n" >> $TMP1
 }
 
 print_alerts() {

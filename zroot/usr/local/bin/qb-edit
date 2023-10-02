@@ -36,7 +36,7 @@ get_options() {
 	# Necessary for editing lines vs adding lines
 	OLDVALUE=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]].*" $JMAP)
 
-	# This will return CLASS and FILT_PARAMS
+	# This will return global variables: CLASS and FILT_PARAMS
 	get_parameter_lists "$JAIL"
 }
 
@@ -84,7 +84,7 @@ checks() {
 	case $PARAM in
 		CLASS) get_msg_edit "_5" "exit_1" "_f" ;;
 
-		ROOTJAIL) get_msg_edit "_6" "warn" ;;
+		ROOTENV) get_msg_edit "_6" "warn" ;;
 
 		GATEWAY)
 				get_jail_parameter -qs IPV4 "$JAIL"
@@ -106,7 +106,8 @@ modify_jmap() {
 
 	case $ACTION in
 		delete)
-			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $JMAP
+			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $JMAP)
+			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $JMAP	
 		;;
 		add)
 			echo "$JAIL  $PARAM  $VALUE" >> $JMAP
@@ -170,7 +171,7 @@ handle_restarts() {
 	# Logic could be written to change running jails, but simpler just to restart.
 	case $PARAM in
 
-		CPUSET|MAXMEM|MTU|ROOTJAIL|SCHG|SECLVL|TEMPLATE)
+		CPUSET|MAXMEM|MTU|ROOTENV|SCHG|SECLVL|TEMPLATE)
 			chk_isrunning $JAIL && _restart1="$JAIL"
 		;;
 		IPV4|GATEWAY)

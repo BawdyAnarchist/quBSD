@@ -10,7 +10,7 @@ get_msg_create() {
 
 	_e1) cat << ENDOFMSG
 
-ERROR: [-z] can only be <dupl|clone|sys|none|empty>
+ERROR: [-z] can only be <dupl|none|empty>
 ENDOFMSG
 	;;
 	_e2) 
@@ -26,15 +26,15 @@ ENDOFMSG
 	;;
 	_e4) cat << ENDOFMSG
 
-ERROR: [-Z] not valid when creating <appjail|dispjail>. Their
-       root filesystem is always cloned at start/stop, from a 
-       limited set of on-disk rootjails, as a security measure.
+ERROR: [-Z] not valid when creating <appjail/VM|dispjail>. Their
+       ROOTENV filesystem is always cloned at start/stop, from a 
+       limited set of on-disk ROOTENVs, as a security measure.
 
        It would imply a clone of a clone, making <newjail>
        ephemeral, destroyed at <template> stop or start.
 
-       Either create a new on-disk rootjail to serve appjails: 
-          qb-create [-c rootjail] [-Z] [-t ${TEMPLATE}] $NEWJAIL
+       Either create a new on-disk ROOTENV to serve appjails: 
+          qb-create [-c rootjail/VM] [-Z] [-t ${TEMPLATE}] $NEWJAIL
 	    OR	
        Create an ephemeral jail with qb-disp. 
           qb-disp $TEMPLATE 
@@ -50,7 +50,7 @@ ERROR: Cannot [-z clone] for < $TEMPLATE >. It's a dispjail,
        so its zusr dataset is already a clone; meaning the
        new appjail would be dependent on the dispjail.
       
-       All other [-z] <dupl|sys|none|empty> are valid, as an 
+       All other [-z] <dupl|none|empty> are valid, as an 
        independent zusr dataset is created.
 ENDOFMSG
 	;;
@@ -63,10 +63,10 @@ ENDOFMSG
 	;;
 	_e8) cat << ENDOFMSG
 
-ERROR: User specified [-c rootjail] which will create a new 
-       ondisk rootjail from [-t ${TEMPLATE}] which isn't a
-       rootjail. It's an edge usecase operation that creates 
-       a full, ondisk duplicate from a snapshot of the clone:
+ERROR: User specified [-c rootjail/VM] which will create a new
+       ondisk ROOTENV from [-t ${TEMPLATE}] which isn't a
+       ROOTENV. It's an edge usecase operation that creates a
+       full, ondisk duplicate from a snapshot of the clone:
        ${JAILS_ZFS}/${TEMPLATE}
 
        Please run command again with [-Z] option, to confirm.
@@ -74,15 +74,15 @@ ENDOFMSG
 	;;
 	_e9) cat << ENDOFMSG
 
-ERROR: The root dataset for < $NEWJAIL > is invalid:
+ERROR: The ROOTENV dataset for < $NEWJAIL > is invalid:
        $R_ZPARENT 
 ENDOFMSG
 	;;
 	_e10) cat << ENDOFMSG
 
 ERROR: Conflicting opts. Creating dispjail with [-t $TEMPLATE]
-       which is a rootjail. However, user also specified
-       [-r $ROOTJAIL], which is in conflict with the template.
+       which is a ROOTENV. However, user also specified
+       [-r $ROOTENV], which is in conflict with the template.
 ENDOFMSG
 	;;
 
@@ -149,7 +149,7 @@ ENDOFMSG
 
 [-c <class>]
 
-quBSD offers 3 classes of jails:  rootjail | appjail | dispjail
+quBSD classes:  rootjail | appjail | dispjail | appVM | rootVM
 
    rootjail - Contains a full FreeBSD installation and pkgs.
               These are pristine root environments which serve
@@ -171,13 +171,22 @@ quBSD offers 3 classes of jails:  rootjail | appjail | dispjail
               Use for insecure activities like random surfing
               and untrusted files. quBSD pre-installs the jail: 
               disp1, which is based on template: 0gui-template.
+  
+   appVM    - Like an appjail, an appVM is launch from a zfs
+              clone of a designated rootVM. Persistent storage
+              is accomplished via corresponding zusr dataset.
+
+   rootVM   - Like rootjail, a rootVM is a full VM installation,
+              which serves ROOTENV zfs clones to dependent VMs.
+              No workstation activity or program execution should
+              take place here, except updates and pkg installs.
 
 ENDOFMSG
 	;;
 
 	_m2) cat << ENDOFMSG
 
-[-r <rootjail>]
+[-r <rootenv>]
 
 quBSD comes with the following rootjails pre-installed:
    
@@ -216,13 +225,13 @@ ENDOFMSG
 
 [-t <template>]
 
-At the command line, a new rootjail requires a template,
-to prevent accidental creation of an ondisk rootjail. Here
-we'll assume you want to use < $ROOTJAIL > as the template.
+At the command line, a new ROOTENV requires a template,
+to prevent accidental creation of an ondisk ROOTENV. Here
+we'll assume you want to use < $ROOTENV > as the template.
 
-Here are the jailmap.conf settings for:  $ROOTJAIL
+Here are the jailmap.conf settings for:  $ROOTENV
 ENDOFMSG
-		qb-list -j $ROOTJAIL
+		qb-list -j $ROOTENV
 
 cat << ENDOFMSG
 WOULD YOU LIKE TO:
@@ -243,22 +252,22 @@ A TEMPLATE ACCOMPLISHES TWO DISTINCT FUNCITONS
 
 IF NO TEMPLATE IS SPECIFIED  
 1. "#default" Jail Parameters in jailmap.conf are used. 
-2. The zusr template associated with the rootjail is duplicated.
+2. The zusr template associated with the ROOTENV, is duplicated.
    (These have baseline files associated with their purpose).
    0base-template, 0net-template, 0gui-template, 0serv-template
-   If no ROOTJAIL-template is found, an empty zusr is created.
+   If no ROOTENV-template is found, an empty zusr is created.
 
 Command line parameters override template parameters, and zero
 or more CL params can be used in combination with the template.
 
 Use qb-edit to change #default. Current #default parameters:
 ENDOFMSG
-		qb-list -j '#default' | grep -Ev "[[:blank:]]+ROOTJAIL[[:blank:]]+" \
+		qb-list -j '#default' | grep -Ev "[[:blank:]]+ROOTENV[[:blank:]]+" \
 								  	 | grep -Ev "[[:blank:]]+CLASS[[:blank:]]+" \
 								  	 | grep -Ev "[[:blank:]]+TEMPLATE[[:blank:]]+"
 cat << ENDOFMSG
 WOULD YOU LIKE TO:
-   1. Use ${ROOTJAIL}-template for zusr dataset operations,
+   1. Use ${ROOTENV}-template for zusr dataset operations,
       and the above #default parameter values
    2. Use this template for zusr dataset operations, but
       see info and input prompts to change each parameter 
@@ -271,12 +280,12 @@ ENDOFMSG
 
 [-t <template>]
 
-Dispjails require a template. You selected ROOTJAIL=${ROOTJAIL},
-so it'd make sense to choose a template with the same rootjail.
+Dispjails require a template. You selected ROOT=${ROOTENV},
+so it'd make sense to choose a template with the same ROOTENV.
 If not, it will still launch, but might not have the expected
 functionality/packages to match zusr files of the template.
 
-Any valid jail can be used as a template. If a rootjail is used,
+Any valid jail can be used as a template. If a ROOTENV is used,
 then no zusr dataset will be created. If an existing dispjail is
 used as the template for a new dispjail, the new jail will use 
 the same template as the existing dispjail. 
@@ -288,7 +297,7 @@ ENDOFMSG
 
 Here's the settings from $TEMPLATE to be used for the new jail:
 ENDOFMSG
-		qb-list -j $TEMPLATE | grep -Ev "[[:blank:]]+ROOTJAIL[[:blank:]]+" \
+		qb-list -j $TEMPLATE | grep -Ev "[[:blank:]]+ROOTENV[[:blank:]]+" \
 									| grep -Ev "[[:blank:]]+CLASS[[:blank:]]+"
 cat << ENDOFMSG
 WOULD YOU LIKE TO:
@@ -456,7 +465,7 @@ Appjail from #default:  qb-create <newjail>
 From Template:          qb-create -t <template> <newjail>
 Standard GUI jail:      qb-create -t 0gui-template <newjail>
 Dispjail:               qb-create -c dispjail -t <template> <newjail>
-Rootjail:               qb-create -t <existing_rootjail> <newjail>
+Rootjail:               qb-create -t <existing_rootenv> <newjail>
 
 If no opts or <template> are specified, jailmap \'#default' are used. 
   #default can be viewed with:   qb-list -j #default
@@ -494,49 +503,39 @@ ENDOFMSG
 
 usage() { cat << ENDOFUSAGE
 
-Usage: qb-create [-e|-h|-G] [-a <true|false>] [-c <class>] [-C <cpuset>]
-                 [-g <gateway>] [-i <IPv4>] [-m <maxmem>] [-M <MTU>]
-                 [-n <true|false>] [-r <rootjail>] [-s <all|sys|none>]
-                 [-S <-1|0|1|2|3>] [-t <template>] 
-                 [-z <dupl|none|empty>] [-Z] <newjail>
+qb-create: Creates new jails and VMs. Can duplicate from template, or
+           create new jail/VM by specificing individual parameters.
 
+Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>] 
+                 [-t <template>] [-z <dupl|none|empty>]
+                 [-p <PARAMETER>=<value>] <newjail>
+
+   -c: (c)lass: <appjail|rootjail|dispjail|appVM|rootVM> is a critical
+       parameter for new jail/VM. Can also be defined using [-p].
    -e: (e)examples. Print examples of how to use qb-create
    -h: (h)elp: Shows this message
    -G: (G)uided: Informative messages guide user via input prompts to
         create <newjail>. All other command line options are ignored.
+   -p: (p)arameter. Multiple [-p] can be used in the same command to 
+       specify values for valid parameters listed in:  qb-help params
+   -r: (r)oot jail/VM: <newjail> depends on zfs clone of <rootenv> for
+       ROOTENV operating system & packages. Cloned at every start/stop.
    -t: (t)emplate:
        1. JAIL PARAMETERS are copied from <template>, except those
           specified at the command line. If no <template> and no
           command line args, #default is used from jailmap.conf
        2. The zusr dataset of the <template> will be duplicated. 
           Use [-z] to specify zusr dataset handling. 
-       -note- [-c dispjail] and [-c rootjail] requires [-t <template>]
+       -note- [-c dispjail] and [-c <rootjail/VM>] requires [-t <template>]
    -y: (y)es: Assume "Y" for warnings/confirmations before proceeding. 
    -z: (z)usropt: How to handle <newjail> zusr dataset. Only applies
        to appjails. <dupl> is the default behavior.
        <dupl>  Duplicate template zusr dataset. Consumes disk space.
        <none>  Copy directory paths from <template> but with no files. 
        <empty> Create an empty zusr dataset.
-   -Z: (Z)rootopt: Creates a new rootjail with an independent on-disk
+   -Z: (Z)rootopt: Creates a new ROOTENV with an independent on-disk
        dataset, from snapshot of:  ${JAILS_ZFS}/<template> 
 
-FOR PARAMETER DETAILS, RUN: 
-   qb-help params
-	
-JAIL PARAMETERS
-   -a: (a)utostart: Autostart jail on boot. <true|false>.
-   -A: (A)utosnap: Include <newjail> in autosnap cronjob. 
-   -c: (c)lass:  < appjail | rootjail | dispjail >.
-   -C: (C)puset: Limit <newjail> to specified CPUs.
-   -g: (g)ateway: <newjail> receives network from <gateway> jail.
-   -i: (i)pv4: Override IP auto-assignment. Use CIDR notation.
-   -m: (m)axmem:  <integer><G|M|K>  
-   -M: (M)TU: Can be tuned for individual jails. 
-   -n: (n)o_destroy: Protection against accidenal destruction. 
-   -r: (r)ootjail: <newjail> depends on clone of <rootjail> for
-        root operating system & packages. Cloned at every start/stop.
-   -s: (s)ecurelevel:  kern.securelevel <-1|0|1|2|3> for <newjail>.
-   -S: (S)chg: chflags schg is applied to groups of files.
-       < all | sys | none > (quBSD convention, see docs for more).
+FOR [-p] PARAMETERS LIST AND DETAILS, RUN:  qb-help params
 ENDOFUSAGE
 }

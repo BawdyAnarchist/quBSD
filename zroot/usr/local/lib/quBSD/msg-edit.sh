@@ -53,7 +53,7 @@ ENDOFMSG
 		;;
 		_6) cat << ENDOFMSG
 
-WARNING: ROOTJAIL is typically not changed, but it can be if desired.
+WARNING: ROOTENV is typically not changed, but it can be if desired.
 ENDOFMSG
 		;;
 		_7) cat << ENDOFMSG
@@ -69,7 +69,7 @@ echo -e "Should qb-edit to restart these jails? (y/n):  \c"
 			qb-list -j $JAIL -p $PARAM
 		;;
 		_8_1) cat << ENDOFMSG
-Deleted the following line:
+Deleted the following line(s):
 $_delline
 ENDOFMSG
 		;;

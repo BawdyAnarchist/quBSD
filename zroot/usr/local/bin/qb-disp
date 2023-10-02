@@ -48,7 +48,7 @@ main() {
 	trap 'zfs destroy -rRf $NEWSNAP ; exit 0' INT TERM HUP QUIT EXIT
 
 	# Create dispjail and disable the no_destroy protection 
-	qb-create -y -c dispjail -g none -i none -n false -t $JAIL $NEWJAIL 
+	qb-create -c dispjail -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false -t $JAIL $NEWJAIL 
 
 	#Trap to ensure DISP doesn't remain after use
 	trap	'destroy_dispjail' INT TERM HUP QUIT EXIT
