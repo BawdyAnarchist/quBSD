@@ -1,5 +1,5 @@
 ##### VIRTUAL MACHINE INTEGRATION
-
+qb-cmd needs to better figure out -tmux and vncviewer
 Scripts that should integrate VMs
 	- qb-create
 	- qb-disp

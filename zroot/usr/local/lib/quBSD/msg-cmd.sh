@@ -14,6 +14,9 @@ ENDOFMSG
 	;;	
 	_2) cat << ENDOFMSG
 
+ERROR: VM started successfully, but there's tmux or valid
+       vncviewer configuration for < $JAIL >. Recommend
+       checking VM parameters with:  qb-list $JAIL
 ENDOFMSG
 	;;	
 	esac
