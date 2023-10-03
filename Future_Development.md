@@ -5,7 +5,6 @@ Scripts that should integrate VMs
 	- qb-disp
 	- qb-connect
 		- jail/VM connections, specifically SSH preparation for files copy
-	- qb-edit - add BHYVE_CUSTM to qb-help PARAMS
 
 New scripts
 	qb-pci
@@ -196,6 +195,7 @@ qb-hostnet _TIME variable should be called TIMEOUT, and it should have a better 
 qb-stat
 	- I like my hardcode setup, but columns sorting and even a generalized setup file might be better
 	- Also the ability to choose which columns are displayed
+	- You should use background colors for the RAM and CPU usage. Maybe disk as well
 
 qb-autosnap
 	- It should look for all snaps older than their qubsd:destroy-date , and reclone them (stale zroots)
