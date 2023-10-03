@@ -5,33 +5,33 @@
 get_parameters() {
 	JAIL="$1"
 
-	# Get jail parameters.   
-	get_jail_parameter -d CLASS "$JAIL" ||  exit 1
-	get_jail_parameter -d ROOTJAIL "$JAIL" ||  exit 1
+	# Get jail parameters.
+	get_jail_parameter -d CLASS   "$JAIL" ||  exit 1
+	get_jail_parameter -d ROOTENV "$JAIL" ||  exit 1
 
 	# Find any remaining mounts for the jail
 	JMOUNT=$(mount | egrep -o "${M_JAILS}/${JAIL}/[^[:blank:]]+")
 }
 
 main() {
-	# Just in case there were any mounts missed 
-	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f 
+	# Just in case there were any mounts missed
+	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
 
-	case $CLASS in 
-		appjail) 
+	case $CLASS in
+		appjail)
          # Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTJAIL"
+			reclone_zroot "$JAIL" "$ROOTENV"
 		;;
-		dispjail) 
+		dispjail)
          # Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTJAIL"
+			reclone_zroot "$JAIL" "$ROOTENV"
 
 			# Dispjails also reclone the zusr portion from template (if it exists)
 			get_jail_parameter TEMPLATE "$JAIL" || exit 1
 			chk_valid_zfs "${ZUSR_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE"
 		;;
 	esac
-	
+
 	# Flags come down after stopping.
 	[ -e ${M_ZUSR}/${JAIL} ] && chflags -R noschg ${M_ZUSR}/${JAIL}
 }

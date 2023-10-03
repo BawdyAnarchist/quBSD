@@ -5,46 +5,46 @@
 get_parameters() {
 	JAIL="$1"
 
-	# Get parameters. Class was already verified, so skip checks. 
+	# Get parameters. Class was already verified, so skip checks.
 	get_jail_parameter -dqs CLASS  "$JAIL" ||  exit 1
 	get_jail_parameter IPV4    "$JAIL"     ||  exit 1
 	get_jail_parameter GATEWAY "$JAIL"     ||  exit 1
 	get_jail_parameter MAXMEM  "$JAIL"     ||  exit 1
 	get_jail_parameter CPUSET  "$JAIL"     ||  exit 1
 
-	# Check/warn if outside of quBSD IPv4 convention, but don't fail 
+	# Check/warn if outside of quBSD IPv4 convention, but don't fail
 	chk_isqubsd_ipv4 "$IPV4" "$JAIL"
 
-	# MTU only with valid IP. Quiet messages (MTU is not critical) 
-	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter -q MTU "$JAIL" 
+	# MTU only with valid IP. Quiet messages (MTU is not critical)
+	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter MTU "$JAIL"
 }
 
 modify_dhcpd() {
 
-	# If wireguard is enabled, DNS should come from wg0.conf. Otherwise, use /etc/resolv.conf	
+	# If wireguard is enabled, DNS should come from wg0.conf. Otherwise, use /etc/resolv.conf
 	if grep -Eq 'wireguard_enable="YES"' "${M_ZUSR}/${JAIL}/rw/etc/rc.conf" ; then
 		_DNS=$(sed -En "s/^DNS.*=[[:blank:]]*([0-9]+.*[0-9]+)[[:blank:]]*\$/\1;/p" \
 											"${M_ZUSR}/${JAIL}/rw/usr/local/etc/wireguard/wg0.conf")
-	else	
-		# Get the DNS entries from resolv.conf, and use those for the dhcpd server 
+	else
+		# Get the DNS entries from resolv.conf, and use those for the dhcpd server
 		_DNS=$(sed -En "s/^nameserver (.*[0-9]+)[[:blank:]]*\$/\1,/p" \
 														"${M_ZUSR}/${JAIL}/rw/etc/resolv.conf")
 		_DNS=$(echo $_DNS | sed -E "s/,\$/;/")
 	fi
-	
+
 	# Modify dhcpd with new DNS
 	[ -n "$_DNS" ] && sed -i '' -E "s/(option domain-name-servers ).*/\1${_DNS}/g" \
 														"${M_ZUSR}/${JAIL}/rw/usr/local/etc/dhcpd.conf"
-	# Set MTU in the config file 
+	# Set MTU in the config file
 	[ -n "$MTU" ] && sed -i '' -E "s/(option interface-mtu ).*/\1${MTU};/g" \
 														"${M_ZUSR}/${JAIL}/rw/usr/local/etc/dhcpd.conf"
 }
 
 connect_to_gateway() {
 	# If auto, then assign the global variable IPV4 to have a real IP addr
-	[ "$IPV4" = "auto" ] && assign_ipv4_auto "$JAIL" 
+	[ "$IPV4" = "auto" ] && assign_ipv4_auto "$JAIL"
 
-	# Connect jail, to it's gateway, and assign VIF used for gateway 
+	# Connect jail, to it's gateway, and assign VIF used for gateway
 	chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -e "$JAIL" "$GATEWAY" "$IPV4")
 }
 
@@ -54,25 +54,25 @@ modify_pf() {
 	if [ -e "$JPF" ] ; then
 
 		# Make sure flags are down
-		chflags -R noschg "${M_ZUSR}/${JAIL}/rw/etc" 
+		chflags -R noschg "${M_ZUSR}/${JAIL}/rw/etc"
 
-		# $VIF was assigned during the connect_client_to_gateway func. Modify pf.conf 
+		# $VIF was assigned during the connect_client_to_gateway func. Modify pf.conf
 		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${_VIF}\"@" $JPF
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${IPV4}\"@" $JPF
 
 		# net-jail internal wireguard parameters
 		[ -n "$ENDPOINT" ] \
-			&& sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"${ENDPOINT}\"@" $JPF 
+			&& sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"${ENDPOINT}\"@" $JPF
 
 		[ -n "$WGPORTS" ] \
-			&& sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"${WGPORTS}\"@" $JPF  
+			&& sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"${WGPORTS}\"@" $JPF
 	fi
 }
 
 resource_control() {
-	# Remove any existing rules for the jail 	
+	# Remove any existing rules for the jail
 	rctl -r jail:${JAIL}:: > /dev/null 2>&1
-	
+
 	# Establish max memory allocaiton and jail CPUs
 	[ "$MAXMEM" = "none" ] || rctl -a jail:${JAIL}:memoryuse:deny=${MAXMEM}
 	[ "$CPUSET" = "none" ] || cpuset -j $JAIL -cl $CPUSET
@@ -84,7 +84,7 @@ main() {
 
 	connect_to_gateway
 
-	modify_pf			
+	modify_pf
 
 	connect_gateway_to_clients "$JAIL"
 

@@ -107,7 +107,7 @@ modify_jmap() {
 	case $ACTION in
 		delete)
 			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $JMAP)
-			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $JMAP	
+			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $JMAP
 		;;
 		add)
 			echo "$JAIL  $PARAM  $VALUE" >> $JMAP
@@ -175,7 +175,7 @@ handle_restarts() {
 			chk_isrunning $JAIL && _restart1="$JAIL"
 		;;
 		IPV4|GATEWAY)
-			_gateway=$(get_jail_parameter -deqs GATEWAY $JAIL)
+			_gateway=$(get_jail_parameter -eqs GATEWAY $JAIL)
 
 			# If jail is running it needs restarted
 			if chk_isrunning $JAIL ; then

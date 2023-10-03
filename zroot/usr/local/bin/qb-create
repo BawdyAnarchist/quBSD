@@ -4,24 +4,20 @@
 . /usr/local/lib/quBSD/msg-create.sh
 
 get_options() {
-	while getopts a:A:c:C:eg:Ghi:m:M:n:r:s:S:t:yz:Z o ; do
-		case $o in
-			a) AUTOSTART="$OPTARG" ;;
-			A) AUTOSNAP="$OPTARG" ;;
-			c) CLASS="$OPTARG"; chk_valid_class "$CLASS" || get_msg_create "none" "exit_1" ;;
-			C) CPUSET="$OPTARG" ;;
+	# CLASS, ROOT, and TEMPLATE are important enough to merit their own options
+	
+	while getopts c:eGhp:r:t:yz:Z _opts ; do
+		case $_opts in
+			c) CLASS="$OPTARG" ;;
 			e) get_msg_create "_examples" "exit_0" ;; 
-			g) GATEWAY="$OPTARG" ;;
 			G) GUIDED="true" ;;
 			h) get_msg_create "none" "usage_0" ;; 
-			i) IPV4="$OPTARG" ;; 
-			m) MAXMEM="$OPTARG" ;;
-			M) MTU="$OPTARG" ;;
-			n) NO_DESTROY="$OPTARG" ;;
-			r) ROOTJAIL="$OPTARG"; chk_valid_rootjail "$ROOTJAIL" || get_msg_create "none" "exit_1" ;;
-			s) SECLVL="$OPTARG" ;;
-			S) SCHG="$OPTARG" ;;
-			t) TEMPLATE="$OPTARG"; chk_valid_jail "$TEMPLATE" || get_msg_create "none" "exit_1" ;;
+			p) # Enables multiple -o options 
+				_param=$(echo $OPTARG | sed -En 's/(.*)=.*/\1/p' | tr '[:lower:]' '[:upper:]')
+				_value=$(echo $OPTARG | sed -En 's/.*=(.*)/\1/p')
+				eval "$_param=$_value" ;;
+			r) ROOT="$OPTARG" ;;
+			t) TEMPLATE="$OPTARG" ;;
 			y) _ASSM_Y="true" ;;
 			z) U_ZOPT="$OPTARG" ;
 		         echo "$U_ZOPT" | grep -Eq "^(dupl|none|empty)\$" \
@@ -35,28 +31,37 @@ get_options() {
 
 	# Proposed newjail name is avail, and no conflict with existing or partially existing jails
 	NEWJAIL="$1"
-	chk_avail_jailname "$NEWJAIL" || exit 1 
+}
 
+checks() {
+	# Checks for the command line parameters provided	
+	chk_avail_jailname "$NEWJAIL"  || exit 1
+	[ "$CLASS" ] && chk_valid_class "$CLASS" || get_msg_create "none" "exit_1"
+	[ "$ROOT" ] && chk_valid_rootjail "$ROOTJAIL" || get_msg_create "none" "exit_1"
+	[ "$TEMPLATE" ] && chk_valid_jail "$TEMPLATE" || get_msg_create "none" "exit_1"
+echo 1
 	# Need to track the resuls of assignements. Use a temp file
 	_TMP_WARN="${QTMP}/qb_create_warn"  ;  _TMP_PARAMS="${QTMP}/qb_create_params"
-
 	[ -e "$_TMP_WARN" ] && rm "$_TMP_WARN" 
 	[ -e "$_TMP_PARAMS" ] && rm "$_TMP_PARAMS"
-
 	mktemp "$_TMP_WARN" > /dev/null
 	mktemp "$_TMP_PARAMS" > /dev/null
 }
 
 assign_jail_parameters() {
 
-	# Jail defining parameters that must be specified and valid 
-	PARAMS="AUTOSNAP AUTOSTART CLASS CPUSET GATEWAY IPV4 MAXMEM MTU NO_DESTROY ROOTJAIL SCHG SECLVL"
+	# First thing needed is CLASS, to determine which set of parameters to check against 
+	[ -z "$CLASS" ] && [ "$TEMPLATE" ] && CLASS=$(get_jail_parameter CLASS $TEMPLATE)
+	[ -z "$CLASS" ] && CLASS=$(get_jail_parameter CLASS '#default')
 
-	# Assign jail parameters based on 1) command line ; 2) template ; 3) #defaults in jmap
+	# Jail defining parameters that must be specified and valid 
+	get_parameter_lists
+
+	# Parameters will be assigned based on 1) command line, 2) template, 3) #defaults in jmap
 	[ "$TEMPLATE" ] && PULLFROM="$TEMPLATE" || PULLFROM='#default'
 
-	# Cycle through parameters, define anything without a value, and record results to _TMP files. 
-	for _P in $PARAMS ; do
+	# Cycle through parameters, define anything without a value, and record results to _TMP files
+	for _P in $FILT_PARAMS ; do
 
 		# Convert UPPER to lower because the functions and variable indirection use lower case 
 		local _param=$(echo $_P | tr '[:upper:]' '[:lower:]')	
@@ -474,6 +479,8 @@ main() {
 get_global_variables
 
 get_options "$@"
+
+checks
 
 main 
 
