@@ -24,6 +24,7 @@
 ###################  VARIABLE ASSIGNMENTS and VALUE RETRIEVAL  #####################
 # get_global_variables  - File names/locations ; ZFS datasets
 # get_networking_variables - pf.conf ; wireguard ; endpoints
+# get_parameter_lists - Valid parameters are tracked here, and divided into groups
 # get_user_response   - Simple yes/no y/n checker
 # get_jail_parameter  - All JMAP entries, along with sanity checks
 # get_info            - Info beyond that just for jails or jail parameters
@@ -35,7 +36,6 @@
 	# _XNAME           - Name of the process for the current active X window
 	# _XPID            - PID for the currently active X window
 # compile_jlist       - Used for qb-start/stop, to get list of jails to act on
-# parse_options       - Parses options with more functionality than getopts
 
 ############################  JAIL HANDLING / ACTIONS  #############################
 # start_jail          - Performs checks before starting, creates log
@@ -149,20 +149,27 @@ get_networking_variables() {
 get_parameter_lists() {
 	# Primarily returns global varibles: CLASS ; ALL_PARAMS ; but also a few others
 
-	# Need the CLASS to determine which parameters are valid
-	[ -z "$CLASS" ] && get_jail_parameter -dqs CLASS "$JAIL"
+	# [-n] suppresses separation of parameters into groups by CLASS (we dont always have CLASS yet)
+	getopts n _opts && local _nc="true" && shift
 
 	# List out normal parameters which can be checked (vs BHYVE_CUSTM)
 	COMN_PARAMS="AUTOSTART AUTOSNAP CLASS GATEWAY IPV4 MTU NO_DESTROY ROOTENV"
 	JAIL_PARAMS="CPUSET MAXMEM SCHG SECLVL"
-	VM_PARAMS="BHYVEOPTS MEMSIZE PPT TAPS TMUX VCPUS VNCRES WIREMEM"
+	VM_PARAMS="BHYVEOPTS MEMSIZE TAPS TMUX VCPUS VNCRES WIREMEM"
 	MULT_LN_PARAMS="BHYVE_CUSTM PPT"
+	ALL_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE $VM_PARAMS $MULT_LN_PARAMS"
 
-	case $CLASS in
-		*VM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS" ;;
-		dispjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE" ;;
-		appjail|rootjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS" ;;
-	esac
+	# Unless suppressed with [-n], group by CLASS
+	if [ -z "$_nc" ] ; then
+		[ -z "$CLASS" ] && get_jail_parameter -dqs CLASS "$JAIL"
+
+		case $CLASS in
+			appVM|rootVM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS" ;;
+			dispVM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS TEMPLATE" ;;
+			dispjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE" ;;
+			appjail|rootjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS" ;;
+		esac
+	fi
 
 	return 0
 }
@@ -285,11 +292,6 @@ get_info() {
 			# Prints a list of all jails that are currently running
 			_value=$(jls | sed "1 d" | awk '{print $2}' ; \
 						pgrep -fl 'bhyve: ' | sed -E "s/.*[[:blank:]]([^[:blank:]]+)\$/\1/")
-		;;
-		_TAP)
-			# If <jail> has VM gateway, the tap interface is returned. Else return 1.
-			_gateway=$(get_jail_parameter -deqs GATEWAY $_jail)
-			_value=$(get_jail_parameter -deqs VIF $_gateway)
 		;;
 		_USED_IPS)
 			# Assemble list of ifconfig inet addresses for all running jails
@@ -1190,7 +1192,6 @@ chk_valid_gateway() {
 
 	# Positional parmeters.
 	local _gw="$1"
-	local _jail="$2"
 
 	# 'none' is always a valid gateway
 	[ "$_gw" = "none" ] && return 0
@@ -1200,12 +1201,12 @@ chk_valid_gateway() {
 
 	# Class of gateway should never be a ROOTENV
 	if [ "$_class_gw" = "rootjail" ] || [ "$_class_gw" = "rootVM" ] ; then
-		get_msg $_q "_cj7_1" "$_gw" "$_jail" && return 1
+		get_msg $_q "_cj7_1" "$_gw" && return 1
 	else
 		# Check that gateway is a valid jail.
  		chk_valid_jail $_q "$_gw" || return 1
 	fi
-	
+
 	return 0
 }
 
@@ -1375,6 +1376,8 @@ chk_valid_memsize() {
 	getopts q _opts && _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
+	local _value="$1"
+
 	# None is not permitted for memsize
 	[ "$_value" = "none" ] && get_msg "_cj21_1" && return 1
 
@@ -1393,7 +1396,6 @@ chk_valid_mtu() {
 
 	# Positional parmeters / check.
 	local _value="$1"
-	local _jail="$2"
 
 	# If MTU is not a number
 	echo "$_value" | ! grep -Eq '^[0-9]*$' && get_msg $_q "_cj18_1" "$_value" "MTU" && return 1
@@ -1478,17 +1480,17 @@ chk_valid_rootenv() {
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "CLASS" && return 1
 
-	# Must be designated as the appropriate corresponding ROOTENV in jmap 
-	_rootenv=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
+	# Must be designated as the appropriate corresponding CLASS in jmap
+	_class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
 	if chk_isvm "$_value" ; then
-		[ ! "$_rootenv" = "rootVM" ] && get_msg $_q "_cj16" "$_value" "rootVM" && return 1
+		[ ! "$_class" = "rootVM" ] && get_msg $_q "_cj16" "$_value" "rootVM" && return 1
 	else
-		[ ! "$_rootenv" = "rootjail" ] && get_msg $_q "_cj16" "$_value" "rootjail" && return 1
-	fi
+		[ ! "$_class" = "rootjail" ] && get_msg $_q "_cj16" "$_value" "rootjail" && return 1
 
-	# Must have an entry in JCONF
-	! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
-			&& get_msg $_q "_cj3" && return 1
+		# Must have an entry in JCONF
+		! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
+				&& get_msg $_q "_cj3" && return 1
+	fi
 
 	# Rootjails require a dataset at zroot/quBSD/jails
 	! chk_valid_zfs ${JAILS_ZFS}/${_value} \
@@ -1832,20 +1834,20 @@ prep_bhyve_options() {
 	_VM="$1"
 
 	# Get simple jmap variables
-	_gateway=$(get_jail_parameter -edz GATEWAY "$_VM")    || return 1
+	_gateway=$(get_jail_parameter -ez GATEWAY "$_VM")     || return 1
 	_ipv4=$(get_jail_parameter -ez IPV4 "$_VM")           || return 1
 	_memsize=$(get_jail_parameter -e MEMSIZE "$_VM")      || return 1
 	_wiremem=$(get_jail_parameter -e WIREMEM "$_VM")      || return 1
 	_bhyveopts=$(get_jail_parameter -e BHYVEOPTS "$_VM")  || return 1
-	_rootenv=$(get_jail_parameter -ed ROOTENV "$_VM")       || return 1
+	_rootenv=$(get_jail_parameter -ed ROOTENV "$_VM")     || return 1
 	_taps=$(get_jail_parameter -e TAPS "$_VM")            || return 1
 	_vcpus=$(get_jail_parameter -e VCPUS "$_VM")          || return 1
-	_vncres=$(get_jail_parameter -edz VNCRES "$_VM")      || return 1
-	[ -z "$_tmux" ] && _tmux=$(get_jail_parameter -edz TMUX "$_VM") || return 1
-
+	_vncres=$(get_jail_parameter -ez VNCRES "$_VM")       || return 1
 	# _ppt_launch is a dirty hack to flag extra checks for passthru devices
 	_ppt_launch="true"
-	_ppt=$(get_jail_parameter -edz PPT "$_VM")            || return 1
+	_ppt=$(get_jail_parameter -ez PPT "$_VM")             || return 1
+	# tmux can be passed by qb-cmd -t , or by PARAMETERS
+	[ -z "$_tmux" ] && ! _tmux=$(get_jail_parameter -ez TMUX "$_VM") && return 1
 
 	# For VMs that are clients, their tap still needs an IPV4 inside the gateway
 	[ "$_ipv4" = "auto" ] && _ipv4=$(assign_ipv4_auto -e "$_VM")
@@ -2013,7 +2015,7 @@ exec_vm_coordinator() {
 	cleanup_vm $_norun $_qs "$_VM"
 
 	# Pulls variables for the VM, and assembles them into bhyve line options
-	prep_bhyve_options $_qs $_tmux "$_VM"
+	! prep_bhyve_options $_qs $_tmux "$_VM" && [ -z "$_norun" ] && get_msg "_cj33"
 
 	# If norun, echo the bhyve start command, cleanup the taps/files, and return 0
 	if [ -n "$_norun" ] ; then
