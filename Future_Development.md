@@ -1,7 +1,13 @@
 ##### VIRTUAL MACHINE INTEGRATION
-qb-cmd needs to better figure out -tmux and vncviewer
+0ubuntu - install vlc (or something). Add common connection commands
+qb-edit should probably make sure youre not mixing up CLASS with a wrong ROOTENV (jails vs VMs)
+qb-stop probably needs a -f force option for misbehaving VMs
+   - Maybe you should integrate that into timeout as a popup or something
+reclone_zroot
+	- VMs are causing +%s dated snapshots to linger
+
 Scripts that should integrate VMs
-	- qb-create
+	- qb-create - still needs tested and fuzzed a bit
 	- qb-disp
 	- qb-connect
 		- jail/VM connections, specifically SSH preparation for files copy
@@ -121,6 +127,8 @@ qubsd_installer
 	- quBSD.conf removed. Everything now in jailmap.conf
 
 ### BEST PRACTICES / FIXES / CLEANUP
+
+You really need to run Wayland and/or figure out Xauth, xpra, and isolation of gui
 
 Convert all JMAP to QCONF , and rename jailmap.conf quBSD.conf
 
