@@ -118,10 +118,11 @@ usage() { cat << ENDOFUSAGE
 qb-edit:  Modify jail parameters in jailmap.conf
 
 Usage: qb-edit <jail> <PARAMETER> <value>
-       qb-edit [-h] | [-d][-f][-q][-r] <jail> <PARAM> <value>
-       qb-edit -d <jail> <param>  {removes all lines that match}
+       qb-edit [-h] | [-f][-q][-r] <jail> <PARAM> <value>
+       qb-edit [-d][-q] <jail> <param> {<value>}  {optional}
 
-   -d: (d)elete line. Only need <jail> <PARAM> to do so
+   -d: (d)elete line. If <value> is not specified, then all
+       lines matching: <jail> <param> will be deleted.
    -f: (f)orce. Ignore errors and modify. Error msgs suppressed
    -h: (h)elp. Outputs this help message
    -q: (q)uiet output, do not print anything to stdout
