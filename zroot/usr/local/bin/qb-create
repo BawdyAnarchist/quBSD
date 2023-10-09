@@ -1,270 +1,341 @@
 #!/bin/sh
+# Remember to finalize [ ! _param = BHYVE_CUSTM ]
 
 . /usr/local/lib/quBSD/quBSD.sh
 . /usr/local/lib/quBSD/msg-create.sh
 
 get_options() {
-	# CLASS, ROOT, and TEMPLATE are important enough to merit their own options
-	
+
+	# Initialize _PARAMS with the bare minimum necessary to create jail or VM
+	_PARAMS="CLASS ROOTENV"
+
+	# CLASS, ROOTENV, and TEMPLATE are important enough to merit their own options
 	while getopts c:eGhp:r:t:yz:Z _opts ; do
 		case $_opts in
 			c) CLASS="$OPTARG" ;;
-			e) get_msg_create "_examples" "exit_0" ;; 
+			e) get_msg_create "_examples" "exit_0" ;;
 			G) GUIDED="true" ;;
-			h) get_msg_create "none" "usage_0" ;; 
-			p) # Enables multiple -o options 
-				_param=$(echo $OPTARG | sed -En 's/(.*)=.*/\1/p' | tr '[:lower:]' '[:upper:]')
-				_value=$(echo $OPTARG | sed -En 's/.*=(.*)/\1/p')
-				eval "$_param=$_value" ;;
-			r) ROOT="$OPTARG" ;;
+			h) get_msg_create "none" "usage_0" ;;
+			p) evaluate_p_option "$OPTARG" ;;
+			r) ROOTENV="$OPTARG" ;;
 			t) TEMPLATE="$OPTARG" ;;
 			y) _ASSM_Y="true" ;;
-			z) U_ZOPT="$OPTARG" ;
-		         echo "$U_ZOPT" | grep -Eq "^(dupl|none|empty)\$" \
-					|| get_msg_create "_e1" "exit_1" ;;
+			z) U_ZOPT="$OPTARG" ;;
 			Z) R_ZOPT="true" ;;
 			*) exit 1 ;;
 		esac
 	done
-	
+
 	shift $(( OPTIND - 1 ))
 
 	# Proposed newjail name is avail, and no conflict with existing or partially existing jails
 	NEWJAIL="$1"
-}
 
-checks() {
-	# Checks for the command line parameters provided	
-	chk_avail_jailname "$NEWJAIL"  || exit 1
-	[ "$CLASS" ] && chk_valid_class "$CLASS" || get_msg_create "none" "exit_1"
-	[ "$ROOT" ] && chk_valid_rootjail "$ROOTJAIL" || get_msg_create "none" "exit_1"
-	[ "$TEMPLATE" ] && chk_valid_jail "$TEMPLATE" || get_msg_create "none" "exit_1"
-echo 1
 	# Need to track the resuls of assignements. Use a temp file
 	_TMP_WARN="${QTMP}/qb_create_warn"  ;  _TMP_PARAMS="${QTMP}/qb_create_params"
-	[ -e "$_TMP_WARN" ] && rm "$_TMP_WARN" 
+	[ -e "$_TMP_WARN" ]   && rm "$_TMP_WARN"
 	[ -e "$_TMP_PARAMS" ] && rm "$_TMP_PARAMS"
-	mktemp "$_TMP_WARN" > /dev/null
+	mktemp "$_TMP_WARN"   > /dev/null
 	mktemp "$_TMP_PARAMS" > /dev/null
+
+	# Dont include EXIT, because cleanup_trapped will be invoked upon successful creation/exit
+	trap "cleanup_trapped" INT TERM HUP QUIT EXIT
 }
 
-assign_jail_parameters() {
+evaluate_p_option() {
+	_optarg="$1"
 
-	# First thing needed is CLASS, to determine which set of parameters to check against 
-	[ -z "$CLASS" ] && [ "$TEMPLATE" ] && CLASS=$(get_jail_parameter CLASS $TEMPLATE)
-	[ -z "$CLASS" ] && CLASS=$(get_jail_parameter CLASS '#default')
+	# Enables multiple -p options
+	_param=$(echo $_optarg | sed -En 's/(.*)=.*/\1/p' | tr '[:lower:]' '[:upper:]')
+	_value=$(echo $_optarg | sed -En 's/.*=(.*)/\1/p')
 
-	# Jail defining parameters that must be specified and valid 
+	# Main purpose is to check for invalid variable characters. Also prelim check for valid PARAM
+	! echo "$ALL_PARAMS" | grep -Eqs -- "$_param" && get_msg_create "_e0" "usage_1"
+
+	# BHYVE_CUSTM does not get checked for validity
+	[ ! "$_param" = "BHYVE_CUSTM" ] && _PARAMS="$_PARAMS $_param"
+
+	# Some PARAMS are multi line. Will be sorted later. Very sensitive escapes and evals.
+   if chk_isblank "$(eval echo \${$_param})" ; then
+		eval $_param=\"\${_value}\"
+	else
+		# Only assign value if it's a multi line PARAM. Else there's potential for duplicate params
+		echo $MULT_LN_PARAMS | grep -qs "$_param" \
+			&& eval $_param="\$(echo \${$_param} ; echo "$_value")"
+	fi
+}
+
+checks_and_parameters() {
+	# Only PARAMs specified on CL, or are different from #default, will get lines in qconf
+
+	# TEMPLATE must have a not-null value for get_jail_parameter to function appropriately
+	[ -z "$TEMPLATE" ] && TEMPLATE="none"
+	# CL options take precedence, followed by -t <template>, followed by #default in quBSD.conf
+	[ -z "$CLASS" ] && ! get_jail_parameter CLASS "$TEMPLATE" \
+			&& get_msg_create "_e1" "exit_1" "CLASS"
+	[ -z "$ROOTENV" ] && ! get_jail_parameter ROOTENV "$TEMPLATE" \
+			&& get_msg_create "_e1" "exit_1" "ROOTENV"
+	[ -z "${CLASS##disp*}" ] && [ -z "$TEMPLATE" ] && ! get_jail_parameter TEMPLATE "$TEMPLATE" \
+			&& get_msg_create "_e1" "exit_1" "TEMPLATE"
+
+	# TEMPLATE is an important switch for how PARAMs are derived.
+	if [ ! "$TEMPLATE" = "none" ] ; then
+		_PARAMS="$_PARAMS TEMPLATE"
+		temp_cl=$(sed -nE "s/^${TEMPLATE}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
+		temp_params=$(/usr/local/bin/qb-list -j $TEMPLATE | grep -E "^$TEMPLATE " | awk '{print $2}')
+
+		# Add template params unique from #default, to the PARAM list (unless already specified).
+		for t_par in $temp_params ; do
+			! echo "$_PARAMS" | grep -Eqs "$t_par" && _PARAMS="$_PARAMS $t_par" \
+																&& get_jail_parameter -d "$t_par" "$TEMPLATE"
+		done
+	fi
+
+	# Need CLASS of ROOTENV to check for jail/VM congruency among them
+	root_cl=$(sed -nE "s/^${ROOTENV}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
+
+	# Vital parameters are all jails
+	if [ -z "${CLASS##*jail}" ] ; then
+		[ -n "${root_cl##*jail}" ] && get_msg_create "_e2" "exit_1"
+		[ ! "$TEMPATE" = "none" ] && [ -n "${temp_cl##*jail}" ] && get_msg_create "_e2" "exit_1"
+
+	# Vital parameters are all VMs
+	elif [ -z "${CLASS##*VM}" ] ; then
+		[ -n "${root_cl##*VM}" ] && get_msg_create "_e2" "exit_1"
+		[ ! "$TEMPATE" = "none" ] && [ -n "${temp_cl##*VM}" ] && get_msg_create "_e2" "exit_1"
+	fi
+
+	# Due to filling in blanks with defaults, and [-p], some PARAMs might be duplicated on the list.
+	_PARAMS=$(echo "$_PARAMS"  | tr ' ' '\n' | sort -u | uniq | tr '\n' ' ' | sed '/^$/ d')
+
+	# Get the parameter_lists again, this time with CLASS separation
 	get_parameter_lists
 
-	# Parameters will be assigned based on 1) command line, 2) template, 3) #defaults in jmap
-	[ "$TEMPLATE" ] && PULLFROM="$TEMPLATE" || PULLFROM='#default'
+	# Check all _PARAMS passed via command line
+	for _PAR in $FILT_PARAMS ; do
 
-	# Cycle through parameters, define anything without a value, and record results to _TMP files
-	for _P in $FILT_PARAMS ; do
+		# Convert to lower case for chk_valid functions
+		_par=$(echo $_PAR | tr '[:upper:]' '[:lower:]')
 
-		# Convert UPPER to lower because the functions and variable indirection use lower case 
-		local _param=$(echo $_P | tr '[:upper:]' '[:lower:]')	
+		# Check that _PAR is on the list of permissible PARAMETERS (depending on CLASS)
+		if echo "$_PARAMS" | grep -Eqs "$_PAR" ; then
+			eval "chk_valid_${_par}" \"\${$_PAR}\" || get_msg_create "_e4" "usage_1" "$_PAR"
 
-		# Parameter was not assigned at the command line 
-		if [ -z $(eval echo "\${$_P}") ] ; then
-			
-			if ! get_jail_parameter "$_P" "$PULLFROM" >> "$_TMP_WARN" ; then
-				# Bad return on any parameter is acceptable, except CLASS and ROOTJAIL 
-				[ "$_P" = "CLASS" ]    && get_msg_create "_e2" "exit_1" 
-				[ "$_P" = "ROOTJAIL" ] && get_msg_create "_e2" "exit_1" 
-			fi
+			# IPv4 validity was checked, but conformance with quBSD conventions was not.
+			[ "$_PAR" = "IPV4" ] && chk_isqubsd_ipv4 "$IPV4" "$NEWJAIL"  >> "$_TMP_WARN"
+		fi
 
+		# Separate PARAMS by whether they're unique (add a jmap line), or the #default is being used.
+		_def=$(/usr/local/bin/qb-list -j \#default -p "$_PAR" | tail -1 | awk '{print $3}')
+
+		if [ "$_def" = "$(eval echo \${$_PAR})" ] || [ -z "$(eval echo \${$_PAR})" ] ; then
+			echo "#default  ${_PAR}  $_def"  >> "$_TMP_PARAMS"
 		else
-			# Parameter assigned at cl, needs checked. Critical params already checked, so just _WARN
-			eval "chk_valid_${_param}" \"\${$_P}\"  >>  "$_TMP_WARN"
-		fi 
-
-		# IPv4 validity was checked, but conformance with quBSD conventions was not. 
-		[ "$_P" = "IPV4" ] && chk_isqubsd_ipv4 "$IPV4" "$NEWJAIL"  >>  "$_TMP_WARN" 
-
-		# Record the final param value to _TMP_PARAMS
-		eval echo "$NEWJAIL  $_P  \${$_P}" >> "$_TMP_PARAMS"
+			eval echo "$NEWJAIL  $_PAR  \${$_PAR}"  >> "$_TMP_PARAMS"
+		fi
 	done
+
+	# If jail, make sure [-z] is among allowable values
+	[ -z "${CLASS##*jail}" ] && [ "$U_ZOPT" ] \
+		&& ! echo "$U_ZOPT" | grep -Eq "^(dupl|clone|none|empty)\$" && get_msg_create "_e5" "usage_1"
+
+	# If VM, must either be [-z dupl] or a valid volsize
+	[ -z "${CLASS##*VM}" ] && [ "$U_ZOPT" ] && ! echo "$U_ZOPT" | grep -Eq "^dupl\$" \
+		&& check_valid_volsize
+}
+
+check_valid_volsize() {
+   # Check that the volsize was given in proper format
+	! echo "$U_ZOPT" | grep -Eqs '(^[0-9]+(\.[0-9]*)?|^\.[0-9]+)(T|t|G|g|M|m|K|k)$' \
+																					&& get_msg_create "_e5_1" "exit_1"
+	# Convert to raw bytes for comparison
+	_vol=$(echo $U_ZOPT| sed -nE "s/.\$//p")
+	_avail=$(zfs list -pHo available zusr)
+
+	case $U_ZOPT in
+		*T|*t) _vol=$(echo "scale=0 ; $_vol * 1000000000000" | bc | grep -Eo "^[[:digit:]]+") ;;
+		*G|*g) _vol=$(echo "scale=0 ; $_vol * 1000000000" | bc | grep -Eo "^[[:digit:]]+") ;;
+		*M|*m) _vol=$(echo "scale=0 ; $_vol * 1000000" | bc | grep -Eo "^[[:digit:]]+") ;;
+		*K|*k) _vol=$(echo "scale=0 ; $_vol * 1000" | bc | grep -Eo "^[[:digit:]]+") ;;
+	esac
+
+	# Check the values
+	[ "$_vol" -lt 80000000 ] && get_msg_create "_e5_2" "exit_1"
+	[ "$_vol" -gt "$_avail" ] && get_msg_create "_e5_3" "exit_1"
 }
 
 assign_datasets() {
 	# To prevent ambiguity/conflicts, all combos of [-c <class>], and class of the <template> are
-	# considered. Case statement provides clarity, and opportunity to handle special cases. 
+	# considered. Case statement provides clarity, and opportunity to handle special cases.
+	# Also, checks have removed jail/VM conflicts, so no need to consider any jail/VM combos
 
-	CLASS_TEMP=$(get_jail_parameter -eq CLASS "$TEMPLATE")
+	case "${CLASS}_${temp_cl}" in
+		# NOTE- some vital PARAMs were set to the #default, and dont need to appear here
 
-	case "${CLASS}_${CLASS_TEMP}" in 
-
-		dispjail_|rootjail_|ephemeral_)
-			# Dispjails and rootjails require [-t <template>].
-			get_msg_create "_e3" "exit_1"
+		# rootjails require [-t <template>]
+		rootjail_)
+			get_msg_create "_e6" "exit_1"
 		;;
 
       # Assume what the user wants, based on jmap #default.
-		appjail_|appjail_rootjail)
-			# [-Z] is only for creating rootjails, not appjails from rootjails 
-	     	[ "$R_ZOPT" ] && get_msg_create "_e4" "exit_1" 
-			TEMPLATE="${ROOTJAIL}-template"
-			R_ZPARENT="${JAILS_ZFS}/${ROOTJAIL}"
+		app*_|app*_root*)
+			# [-Z] is only for creating rootjails, not appjails from rootjails
+	     	[ "$R_ZOPT" ] && get_msg_create "_e7" "exit_1"
+			TEMPLATE="${ROOTENV}-template"
+			R_ZPARENT="${JAILS_ZFS}/${ROOTENV}"
 			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
 
-			# If $ROOTJAIL-template doesn't exist, just create an empty zusr. Warn.
+			# If $ROOTENV-template doesn't exist, just create an empty zusr. Warn.
 			! chk_valid_zfs "$U_ZPARENT" && U_ZOPT="empty" && get_msg_create "_w6" >> $_TMP_WARN
 		;;
 
-		appjail_appjail|appjail_dispjail)
+		app*_app*|app*_disp*)
 			# [-Z] is only for creating rootjails
-	     	[ "$R_ZOPT" ] && get_msg_create "_e4" "exit_1" 
-			R_ZPARENT="${JAILS_ZFS}/${ROOTJAIL}"
-			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"  
+	     	[ "$R_ZOPT" ] && get_msg_create "_e7" "exit_1"
+			R_ZPARENT="${JAILS_ZFS}/${ROOTENV}"
+			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
 
-			# dispjail template might not have zusr (if disp of rootjail). Check U_ZPARENT exists 
-			chk_valid_zfs "$U_ZPARENT" || get_msg_create "_e7" "exit_1"
+			# dispjail template might not have zusr (if disp of rootjail). Check U_ZPARENT exists
+			chk_valid_zfs "$U_ZPARENT" || get_msg_create "_e8" "exit_1"
 		;;
-		
-		dispjail_appjail)
+
+		disp*_app*)
 			# [-Z] is only for creating rootjails
-	     	[ "$R_ZOPT" ] && get_msg_create "_e4" "exit_1" 
-			R_ZPARENT="${JAILS_ZFS}/${ROOTJAIL}"
-			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"  
+	     	[ "$R_ZOPT" ] && get_msg_create "_e7" "exit_1"
+			R_ZPARENT="${JAILS_ZFS}/${ROOTENV}"
+			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
 
-			# Dispjails always clone from another jail 
-			U_ZOPT="clone"	
-
-			# Is a dispjail. Needs to have the appjail as a <template> in jailmap 
-			echo "$NEWJAIL  TEMPLATE  $TEMPLATE" >> "$_TMP_PARAMS"
+			# Dispjails always clone from another jail
+			U_ZOPT="clone"
 		;;
 
 		# New rootjail from any other rootjail.
-		rootjail_rootjail)
+		root*_root*)
 			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
 			U_ZOPT="skip"
 		;;
 
-		#Can create a dispjail of a rootjail too. 
-		dispjail_rootjail)
+		# Can create a dispjail from a rootjail too.
+		disp*_root*)
 			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
 			U_ZOPT="skip"
 
 			# If the user entered conflicting options, error and exit
-			[ "$TEMPLATE" ] && ! [ "$TEMPLATE" = "$ROOTJAIL" ] && get_msg_create "_e10" "exit_1"
-
-			# Add <template> to jailmap parameters if dispjail
-			echo "$NEWJAIL  TEMPLATE  $ROOTJAIL" >> "$_TMP_PARAMS"
+			[ ! "$TEMPLATE" = "none" ] && [ ! "$TEMPLATE" = "$ROOTENV" ] \
+																					&& get_msg_create "_e9" "exit_1"
 		;;
 
 		# New rootjail, but checks for [-Z]. Ensures user intends new rootjail from app/disp jail.
-		rootjail_appjail|rootjail_dispjail)
-			[ "$R_ZOPT" ] || get_msg_create "_e8" "exit_1"
-			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}" 
+		root*_app*|root*_disp*)
+			[ "$R_ZOPT" ] || get_msg_create "_e10" "exit_1"
+			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
 			U_ZOPT="skip"
 		;;
 
 		# Provide a way to simply copy an existing dispjail. This is NOT creating a disp of a disp
-		dispjail_dispjail)
-			R_ZPARENT="${JAILS_ZFS}/${ROOTJAIL}"
+		disp*_disp*)
+			R_ZPARENT="${JAILS_ZFS}/${ROOTENV}"
 
-			# Pass the template of the <template> to the copycat new dispjail parameters
+			# We need to replace the previous TEMPLATE assignment, as it references a dispjail
 			TEMP_TEMP=$(get_jail_parameter -eq TEMPLATE $TEMPLATE)
-			echo "$NEWJAIL  TEMPLATE  $TEMP_TEMP" >> "$_TMP_PARAMS"
+			sed -i '' -E "s/^(${NEWJAIL}[[:blank:]]+TEMPLATE ).*/\1 ${TEMP_TEMP}/" $_TMP_PARAMS
 
 			# Either assign the valid zusr dataset to clone dispjail, or set it to skip later on.
 			if chk_valid_zfs "${ZUSR_ZFS}/${TEMP_TEMP}" ; then
-				U_ZPARENT="${ZUSR_ZFS}/${TEMP_TEMP}" 
+				U_ZPARENT="${ZUSR_ZFS}/${TEMP_TEMP}"
 				TEMPLATE="$TEMP_TEMP"
-				U_ZOPT="clone" 
-			else 
+				U_ZOPT="clone"
+			else
 				U_ZOPT="skip"
 			fi
 		;;
-	
-		# Ephemeral will clone both zroot and zusr, and make a special jail and launch sequence	
+
+		# Ephemeral will clone both zroot and zusr, and make a special jail and launch sequence
 		ephemeral_*)
 			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
 			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
 		;;
 	esac
 
-	# If U_ZOPT wasn't specified, assign the default value: <dupl> 
+	# If U_ZOPT wasn't specified, assign the default value: <dupl>
 	[ "$U_ZPARENT" ] && [ -z "$U_ZOPT" ] && U_ZOPT="dupl"
 
-	# Root dataset was derived from <template>. Check that it exists. 
-	chk_valid_zfs "$R_ZPARENT" || get_msg_create "_e9" "exit_1"
+	# Root dataset was derived from <template>. Check that it exists.
+	chk_valid_zfs "$R_ZPARENT" || get_msg_create "_e11" "exit_1"
 
 	# Temporary snapshots to be used for jail duplication.
-	if [ "${CLASS}" = rootjail ] ; then 
+	if [ -z "${CLASS##root*}" ] ; then
 		R_SNAP="${R_ZPARENT}@$(date +%s)"
 		zfs snapshot "$R_SNAP" > /dev/null 2>&1
 
-		# The new rootjail should reference itself as the rootjail, and not the template	
-		sed -i '' -E "s/ROOTJAIL[[:blank:]]+${ROOTJAIL}/ROOTJAIL ${NEWJAIL}/g"  $_TMP_PARAMS
+		# The new rootjail should reference itself as the rootjail, and not the template
+		sed -i '' -E "s/ROOTENV[[:blank:]]+${ROOTENV}/ROOTENV ${NEWJAIL}/g"  $_TMP_PARAMS
 
-	elif [ "$CLASS" = "appjail" ] && [ "$U_ZOPT" = "dupl" ] ; then
+	elif [ -z "${CLASS##app*}" ] && [ "$U_ZOPT" = "dupl" ] ; then
 		U_SNAP="${U_ZPARENT}@$(date +%s)"
 		zfs snapshot "$U_SNAP" > /dev/null 2>&1
 	fi
 }
 
 confirm_creation() {
-
-	# Show the final result of jail parameters
-	clear && get_msg_create "_w1" "_cont" 
+	clear
 
 	# Show the disksize that will be occupied by creating the new jail
-	if [ "$CLASS" = "rootjail" ] ; then
-		get_msg_create "_w2" "_cont"
+	if [ -z "${CLASS##root*}" ] ; then
+		get_msg_create "_w1" "_cont"
 
-	elif [ "${CLASS}_${U_ZOPT}" = "appjail_dupl" ] ; then
-		get_msg_create "_w3" "_cont"  
+	elif [ "${CLASS##app*}_${U_ZOPT}" = "_dupl" ] ; then
+		get_msg_create "_w2" "_cont"
 	fi
 
-	# Warnings for jail parameters. 
-	if [ -s "$_TMP_WARN" ] ; then 
-		get_msg_create "_w4" "_cont" 
+	# Show the final result of jail parameters
+	get_msg_create "_w3" "_cont"
+
+	# Warnings for jail parameters.
+	if [ -s "$_TMP_WARN" ] ; then
+		get_msg_create "_w4" "_cont"
 
 		# Regularizes a single blank line at the end (instead of none, or multiple blank lines).
 		printf '%s\n' "$(cat $_TMP_WARN)" | sed '/./,$!d' ; echo ""
 	fi
 
 	# Get final confirmation, unless [-y] was specified
-	if ! [ "$_ASSM_Y" ] ; then 
-		get_msg_create "_w5" "_cont" 
+	if ! [ "$_ASSM_Y" ] ; then
+		get_msg_create "_w5" "_cont"
 		get_user_response || exit 0
 	fi
 }
 
-change_datasets() {        
+change_datasets() {
+	# The AUTOSNAP value is needed for the new datasets
+	AUTOSNAP=$(sed -En "s/.* AUTOSNAP[[:blank:]]+//p" $_TMP_PARAMS)
+
 	# ZROOT changes: Only new rootjails are duplicated. Everything else is cloned from a rootjail.
-	if [ "$CLASS" = "rootjail" ] ; then
+	if [ -z "${CLASS##root*}" ] ; then
 		echo ''
 		zfs send -P "$R_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${JAILS_ZFS}/${NEWJAIL}"
-		
 	else
-		reclone_zroot "$NEWJAIL" "$ROOTJAIL"	
+		reclone_zroot "$NEWJAIL" "$ROOTENV"
 	fi
 
-	# U_ZOPT should've been define already. Handle zusr dataset 
+	# U_ZOPT should've been define already. Handle zusr dataset
 	case "$U_ZOPT" in
-		skip) 
-			# Is rootjail or disp of roojail. 
-			return 0
+		skip) return 0
 		;;
 
-		dupl)
+		dupl) # Full duplication of zfs data to new dataset
 			echo ''
 			zfs send -vP "$U_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
+			[ -z "${CLASS##*VM}" ] && echo success && return 0
 		;;
 
-		clone)
-
-			# Renaming of datasets and files is handled internally to the function
-			reclone_zusr "$NEWJAIL" "$TEMPLATE" 
+		clone) # Renaming of datasets and files is handled internally to the function
+			reclone_zusr "$NEWJAIL" "$TEMPLATE"
 			return 0
 		;;
 
 		none)
-			# Create the empty dataset 
+			# Create the empty dataset
 			zfs create -o qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
 
 			# Create the directory mapping of the template
@@ -274,52 +345,53 @@ change_datasets() {
 			done
 		;;
 
-		empty)
-			# Create the empty dataset with autosnap option
+		empty) # Create the empty dataset with autosnap option
 			zfs create -o qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
 		;;
-	esac		
+
+		*) # Anything else is going to be a VM block device. Checks were already done.
+			zfs create -V${_volsize} -o volmode=dev -o qubsd:autosnap="$AUTOSNAP" \
+					"${ZUSR_ZFS}/${NEWJAIL}" && return 0 || exit 1
+	esac
 
 	# Jail types that don't need the edits below, have already exited the function.
-	# Make sure flags are down for rw/etc directory 
+	# Make sure flags are down for rw/etc directory
 	chflags -R noschg ${M_ZUSR}/${NEWJAIL}/rw/etc > /dev/null 2>&1
 
-   # Fix fstab 
+   # Fix fstab
 	if [ -e "${M_ZUSR}/${NEWJAIL}/rw/etc/fstab" ] ; then
 
 		# Replace template with newjail name
 		sed -i '' -E "s/${TEMPLATE}/${NEWJAIL}/g" ${M_ZUSR}/${NEWJAIL}/rw/etc/fstab
 	else
 
-		# fstab is required for jail to start, even if everything else is empty 
+		# fstab is required for jail to start, even if everything else is empty
 		mkdir -p ${M_ZUSR}/${NEWJAIL}/rw/etc/
 		head -1 /etc/fstab > ${M_ZUSR}/${NEWJAIL}/rw/etc/fstab
 	fi
 
-	# If a special pw user file was copied over, it needs to be modified. 
-	if pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usershow 1001 >> /dev/null 2>&1 ; then 
-		[ -e ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL} ] || mkdir -p ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}
+	# If a special pw user file was copied over, it needs to be modified.
+	if pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usershow 1001 >> /dev/null 2>&1 ; then
+		[ -e ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL} ] \
+													|| mkdir -p ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}
 		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usermod 1001 -l $NEWJAIL
 		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ groupmod 1001 -l $NEWJAIL
 		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usermod 1001 -d /usr/home/${NEWJAIL}  >> /dev/null 2>&1
 	fi
-	
+
 	# home directory must be renamed (if it exists)
 	mv ${M_ZUSR}/${NEWJAIL}/usr/home/${TEMPLATE} ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL} > /dev/null 2>&1
 }
 
-change_configs() {
+change_jconf() {
 
-	# Add the parameters to jailmap 
-	column -t < "$_TMP_PARAMS"  >> $JMAP
-
-	# Make a tmp file for /etc/jail.conf edits 
+	# Make a tmp file for /etc/jail.conf edits
 	_TMP_JCONF="${QTMP}/qb_create_jconf"
 	mktemp $_TMP_JCONF > /dev/null
 
 	# Modify /etc/jail.conf
-	sed -nE "/^${TEMPLATE}[[:blank:]]*\{/,/\}/p" $JCONF >> $_TMP_JCONF 
-	sed -i '' -E "s/${TEMPLATE}/${NEWJAIL}/" $_TMP_JCONF 
+	sed -nE "/^${TEMPLATE}[[:blank:]]*\{/,/\}/p" $JCONF >> $_TMP_JCONF
+	sed -i '' -E "s/${TEMPLATE}/${NEWJAIL}/" $_TMP_JCONF
 
 	if [ "$CLASS" = "rootjail" ] ; then
 		sed -i '' -e "/# Rootjails/r $_TMP_JCONF" $JCONF
@@ -340,53 +412,53 @@ guided_mode() {
 	# OPENING MESSAGE
 		clear && get_msg_create "_m0" && read _dummyvar
 
-	# CLASS 
+	# CLASS
 		clear && get_msg_create "_m1"
 		get_msg_create "_resp1" "_cont" "CLASS"
 
-	# ROOTJAIL
-		clear && get_msg_create "_m2" 
-	
-		# Messages diverge based on CLASS
-		[ "$CLASS" = "rootjail" ] && get_msg_create "_m3" || get_msg_create "_m4" 
+	# ROOTENV
+		clear && get_msg_create "_m2"
 
-		get_msg_create "_resp1" "_cont" "ROOTJAIL"
+		# Messages diverge based on CLASS
+		[ "$CLASS" = "rootjail" ] && get_msg_create "_m3" || get_msg_create "_m4"
+
+		get_msg_create "_resp1" "_cont" "ROOTENV"
 
 	# TEMPLATE
 		clear
 
-		# Messages diverge based on CLASS 
-		case $CLASS in 
+		# Messages diverge based on CLASS
+		case $CLASS in
 			rootjail) get_msg_create "_m5" ; get_msg_create "_resp2" ;;
 			appjail)  get_msg_create "_m6" ; get_msg_create "_resp2" ;;
 			dispjail) get_msg_create "_m7" ;;
 		esac
 
-		# Complex decision tree unavoidable, due to the potential branches. 
-		case ${CLASS}_${_RESPONSE} in 
+		# Complex decision tree unavoidable, due to the potential branches.
+		case ${CLASS}_${_RESPONSE} in
 
 			# Assign the rootjail TEMPLATE as rootjail, since that's what'd normally happen
-			rootjail_1) [ "$CLASS" = "rootjail" ] && TEMPLATE="$ROOTJAIL" && return 0 ;;
-			rootjail_2) [ "$CLASS" = "rootjail" ] && TEMPLATE="$ROOTJAIL" ;;
-			rootjail_3) get_msg_create "_resp2" ;; 
-			
-			# Will either use template and return to main program, or stay and get parameters 
+			rootjail_1) [ "$CLASS" = "rootjail" ] && TEMPLATE="$ROOTENV" && return 0 ;;
+			rootjail_2) [ "$CLASS" = "rootjail" ] && TEMPATE="$ROOTENV" ;;
+			rootjail_3) get_msg_create "_resp2" ;;
+
+			# Will either use template and return to main program, or stay and get parameters
 			appjail_1)  return 0 ;;
 			appjail_2)  : ;;
 
 			# These cases need to get user entered template, show parameters, and confirm again
-			appjail_3|dispjail*)  
+			appjail_3|dispjail*)
 					get_msg_create "_resp1" "_cont" "TEMPLATE"
 
 					# Give user opportunity to keep checking different template parameters
-					while : ; do 
-						clear && get_msg_create "_m9"	&& get_msg_create "_resp2" 
+					while : ; do
+						clear && get_msg_create "_m9"	&& get_msg_create "_resp2"
 
 						! [ "$_RESPONSE" = "3" ] && break
 						get_msg_create "_resp1" "_cont" "TEMPLATE"
 					done
-				
-					# A response of 1, means to use the template for rest of params.	
+
+					# A response of 1, means to use the template for rest of params.
 					[ "$_RESPONSE" = "1" ] && return 0
 			;;
 		esac
@@ -399,9 +471,9 @@ guided_mode() {
 	# AUTOSNAP
 		get_msg_create "_m12" && get_msg_create "_resp1" "_cont" "AUTOSNAP"
 
-	# CPUSET	
+	# CPUSET
 		get_msg_create "_m13" && get_msg_create "_resp1" "_cont" "CPUSET"
-	
+
 	# GATEWAY
 		clear && get_msg_create "_m14" && get_msg_create "_resp1" "_cont" "GATEWAY"
 
@@ -425,10 +497,10 @@ guided_mode() {
 }
 
 cleanup_finished() {
-	# Once complete, only certain temporary item need removed.  
-		
+	# Once complete, only certain temporary item need removed.
+
 	# Remove the TMP files if they exist (ignore if they dont)
-	rm $_TMP_WARN $_TMP_PARAMS $_TMP_JCONF > /dev/null 2>&1 
+	rm $_TMP_WARN $_TMP_PARAMS $_TMP_JCONF > /dev/null 2>&1
 
 	# Remove the snapshots if they exist (ignore if they dont)
 	[ "$R_SNAP" ] && zfs destroy $R_SNAP > /dev/null 2>&1
@@ -436,12 +508,14 @@ cleanup_finished() {
 
 	# Helps to standardize having a newline if program is ctrl-c stopped
 	echo ''
-	
+
+	# Unset the trap (or else EXIT will cause all changes to be reverted), and EXIT
+	trap '' INT TERM HUP QUIT EXIT
 	eval exit "$_exit"
 }
 
 cleanup_trapped() {
-	# Can't be leaving partially transferred datasets and pieces of newjail laying around 
+	# Can't be leaving partially transferred datasets and pieces of newjail laying around
 	zfs destroy -rRf "${JAILS_ZFS}/${NEWJAIL}" > /dev/null 2>&1
 	zfs destroy -rRf "${ZUSR_ZFS}/${NEWJAIL}" > /dev/null 2>&1
 
@@ -450,39 +524,35 @@ cleanup_trapped() {
 
 	# Items above should only be removed if the operation was incomplete
 	# Items below should be removed regardless of complete/incomplete
-	cleanup_finished
-	
-	_exit='1'
+	_exit='1' ; cleanup_finished
 }
 
 main() {
-
-	# Dont include EXIT, because cleanup_trapped will be invoked upon successful creation/exit 
-	trap "cleanup_trapped" INT TERM HUP QUIT
-
 	[ "$GUIDED" ] && guided_mode
-
-	assign_jail_parameters
 
 	assign_datasets
 
-	confirm_creation	
+	confirm_creation
+
+	# Add the parameters to jailmap
+	grep -E "^$NEWJAIL" "$_TMP_PARAMS" | column -t >> $JMAP
 
 	change_datasets
 
-	change_configs
+	[ "${CLASS##*jail}" ] && change_jconf
 
-	_exit='0' 
-	cleanup_finished
+	_exit='0' ; cleanup_finished
 }
 
 get_global_variables
 
+get_parameter_lists -n
+
 get_options "$@"
 
-checks
+checks_and_parameters
 
-main 
+main
 
 
 
