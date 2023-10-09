@@ -270,6 +270,12 @@ ENDOFMSG
 quBSD msg: VM < $_value > has ended
 ENDOFMSG
 	;;
+	_cj33) cat << ENDOFMSG
+
+ERROR: Tried to launch < $_value > but there were
+       errors while assembling VM parameters.
+ENDOFMSG
+	;;
 	_jf1) cat << ENDOFMSG
 
 $0 is starting < $_value >
@@ -323,7 +329,7 @@ ENDOFMSG
 	_jo0) cat << ENDOFMSG
 
 ERROR: < $_value > is not a clone (has no zfs origin).
-       Likely is a ROOTENV. 
+       Likely is a ROOTENV.
 ENDOFMSG
 	;;
 	_jo1) cat << ENDOFMSG
