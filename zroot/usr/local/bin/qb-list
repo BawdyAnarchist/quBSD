@@ -56,8 +56,8 @@ check_and_adjust() {
 			# If jail=param (and not 'none'), then it's ambiguous what the user wanted
 			[ ! "$JAIL" = "none" ] && [ "$PARAM" = "$JAIL" ] && get_msg_list "_2" "usage_1"
 
-			# If both are 'none', then continue, assuming POS1 as JAIL (could be zfs present) 
-			[ "$JAIL" = "none" ] && [ "$PARAM" = "none" ] && JAIL="$POS1" 
+			# If both are 'none', then continue, assuming POS1 as JAIL (could be zfs present)
+			[ "$JAIL" = "none" ] && [ "$PARAM" = "none" ] && JAIL="$POS1"
 		;;
 
 		# Both POS1&2 should be assigned
@@ -98,9 +98,9 @@ get_results() {
 		*_*_*_NONE)
 			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $JMAP)
 			[ "$ZLIST" = "t" ] && get_zresult
-	
+
 			# Add in devfs if appropriate, and supplement missing values with #defaults
-			supplement_results	
+			supplement_results
 		;;
 
 		# Show a particular parameter
@@ -117,8 +117,8 @@ get_results() {
 }
 
 get_zresult() {
-	# Switches between full zfs list of system, and just for jail (if set) 
-	[ "$JAIL" = "none" ] && _jail='' || _jail="/$JAIL" 
+	# Switches between full zfs list of system, and just for jail (if set)
+	[ "$JAIL" = "none" ] && _jail='' || _jail="/$JAIL"
 
 	_ZRESULT=$(zfs list -r $_snaps $_zparams "${JAILS_ZFS}${_jail}" 2>/dev/null; \
 					zfs list -r $_snaps $_zparams "${ZUSR_ZFS}${_jail}" 2>/dev/null)
@@ -136,8 +136,8 @@ supplement_results() {
 		# Get the rule number from jail.conf
 		_rulenum=$(sed -En "/^${JAIL}(\{|[[:blank:]])/,/^}/p" $JCONF \
 				| sed -En "s/devfs_ruleset=\"//p" | grep -Eo "[[:digit:]]+")
-	
-		# Then get the full name of the rulenumber from devfs.rules 
+
+		# Then get the full name of the rulenumber from devfs.rules
 		if [ -n "$_rulenum" ] ; then
 			_rulename=$(sed -En "s/.*devfsrules_(.*=${_rulenum}).*/\1/p" /etc/devfs.rules)
 
@@ -149,11 +149,11 @@ supplement_results() {
 	# Parameters enumerated for the jail/VM
 	_current_params=$(echo "$_RESULT" | awk '{print $2}')
 
-	# Find the #defaults that will need to be added	
+	# Find the #defaults that will need to be added
 	for _param in $FILT_PARAMS ; do
 		! echo "$_current_params" | grep -qs "$_param" && _RESULT="$(echo "$_RESULT" \
 										; grep -E "^#default[[:blank:]]+${_param}[[:blank:]]" $JMAP)"
-	done	
+	done
 
 	# Sort the result by the 2nd column
 	_RESULT=$(echo "$_RESULT" | awk '{$1=$1}1' | sort -k2)
@@ -163,7 +163,10 @@ print_results() {
 
 	if [ "$_RESULT" ] && [ -z "$ZONLY" ] ; then
 		_RESULT=$(echo -e "CONTAINER   PARAMETER   VALUE\n${_RESULT}" | column -t)
-		echo -e "\n${_RESULT}\n"
+		echo ''
+		echo "$_RESULT" | grep "CONTAINER"
+		echo "$_RESULT" | grep -Ev "^(#default|CONTAINER)"
+		echo "$_RESULT" | grep "#default"
 	fi
 
 	[ "$_ZRESULT" ] && echo -e "${_ZRESULT}\n" | column -t
