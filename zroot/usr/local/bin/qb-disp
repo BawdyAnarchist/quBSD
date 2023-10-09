@@ -24,18 +24,18 @@ get_options() {
 }
 
 newjail_name() {
-	# Valid jail or exit 
+	# Valid jail or exit
 	chk_valid_jail "$JAIL" || get_msg_disp "none" "usage_1"
-	
+
 	# Make name visually easy to identify
 	NEWJAIL="DISP-${JAIL}"
 	_cycle=''
 
-	# If DISP-jail exists (even partially), increment the ending number and try again 
+	# If DISP-jail exists (even partially), increment the ending number and try again
 	while ! chk_avail_jailname "$NEWJAIL" ; do
-		_cycle=$(( _cycle + 1 ))	
+		_cycle=$(( _cycle + 1 ))
 		NEWJAIL="DISP-${JAIL}_${_cycle}"
-	done	
+	done
 
 	echo "$NEWJAIL"
 }
@@ -47,23 +47,23 @@ main() {
 	#Trap to destroy snapshot after use.
 	trap 'zfs destroy -rRf $NEWSNAP ; exit 0' INT TERM HUP QUIT EXIT
 
-	# Create dispjail and disable the no_destroy protection 
-	qb-create -c dispjail -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false -t $JAIL $NEWJAIL 
+	# Create dispjail and disable the no_destroy protection
+	qb-create -c dispjail -t $JAIL -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false $NEWJAIL
 
 	#Trap to ensure DISP doesn't remain after use
 	trap	'destroy_dispjail' INT TERM HUP QUIT EXIT
 
-	if [ -n "$_i3wm" ] ; then 
+	if [ -n "$_i3wm" ] ; then
 		# i3-specific command. Launch a floating terminal for the dispjail
 		xterm -e csh -c "i3-msg -q floating enable, move position center; qb-cmd $NEWJAIL"
 	else
-		# Can be called without i3 as well. 
-		csh -c "qb-cmd $NEWJAIL"	
+		# Can be called without i3 as well.
+		csh -c "qb-cmd $NEWJAIL"
 	fi
 }
 
 destroy_dispjail() {
-	stop_jail "$NEWJAIL" 
+	stop_jail "$NEWJAIL"
 	zfs destroy -rRf ${JAILS_ZFS}/$NEWJAIL > /dev/null 2>&1
 	zfs destroy -rRf ${ZUSR_ZFS}/$NEWJAIL > /dev/null 2>&1
 	zfs destroy $NEWSNAP > /dev/null 2>&1
