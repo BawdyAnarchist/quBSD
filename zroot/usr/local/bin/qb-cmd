@@ -71,7 +71,7 @@ connect_vm_session() {
 		_novnc="true"
 	fi
 
-	if [ "$TMUX" = "true" ] ; then
+	if [ ! "$TMUX" = "false" ] ; then
 		tmux attach -t $JAIL || _nomux="true"
 	fi
 
