@@ -1,14 +1,21 @@
 ##### VIRTUAL MACHINE INTEGRATION
+
 0ubuntu - install vlc (or something). Add common connection commands
+
 qb-edit should probably make sure youre not mixing up CLASS with a wrong ROOTENV (jails vs VMs)
+
 qb-stop probably needs a -f force option for misbehaving VMs
    - Maybe you should integrate that into timeout as a popup or something
+
+qb-stat - host should have a total off all system resource usage
+
+qb-cmd - If no vncview tmp file is found, increment a new one and add the tmp file and open vnc
+
 reclone_zroot
 	- VMs are causing +%s dated snapshots to linger
+the VM startup script should be a .dot-qb-script (hidden).
 
 Scripts that should integrate VMs
-	- qb-create - still needs tested and fuzzed a bit
-	- qb-disp
 	- qb-connect
 		- jail/VM connections, specifically SSH preparation for files copy
 
