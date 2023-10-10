@@ -17,15 +17,23 @@ get_options() {
 }
 
 define_variables() {
-	# Important parameters for checks 
-	get_jail_parameter -q CLASS "$JAIL"
+
+	# No jail provided
+	[ -z "$JAIL" ] && get_msg_destroy "_3" "usage_1"
+
+	# Important parameters for checks
+	get_jail_parameter -qd CLASS "$JAIL"
 	get_jail_parameter -q NO_DESTROY "$JAIL"
+
+	# Assume the jail either doesnt exist, or is partial. Dont require changing NO_DESTROY
+	[ -z "$CLASS" ] && NO_DESTROY="false"
+
 	OFFJAILS=$(zfs list -o name,origin | grep -E "$JAIL\@.*\$" \
 									| awk '{print $1}' | sed "s@.*/@@")
 
-	# Get sizes of datasets to be destroyed, and simulation messages from zfs 
-	if chk_valid_zfs ${ZUSR_ZFS}/${JAIL} ; then 
-		zusrSize=$(zfs list -o used ${ZUSR_ZFS}/${JAIL} | tail -1) 
+	# Get sizes of datasets to be destroyed, and simulation messages from zfs
+	if chk_valid_zfs ${ZUSR_ZFS}/${JAIL} ; then
+		zusrSize=$(zfs list -o used ${ZUSR_ZFS}/${JAIL} | tail -1)
 		zusrDestroy=$(zfs destroy -nvrRf ${ZUSR_ZFS}/${JAIL} | grep -v "${JAIL}\@")
 	fi
 
@@ -38,30 +46,37 @@ define_variables() {
 checks() {
 
 	# no_destroy protection flag still active
-	[ "$NO_DESTROY" = "true" ] && get_msg_destroy "_2" "usage_1"	
+	[ "$NO_DESTROY" = "true" ] && get_msg_destroy "_2" "usage_1"
 
 	# Extra reminder that they're destorying a rootjail
-	[ -z "${CLASS##root*}" ] && get_msg_destroy "_4" 
+	[ -z "${CLASS##root*}" ] && [ -n "$CLASS" ] && get_msg_destroy "_4"
 
-	# Print the datasets and amount of data to be destroyed
-	get_msg_destroy "_5" 
-	[ -n "$zrootDestroy" ] && get_msg_destroy "_6" 
-	[ -n "$zusrDestroy" ] && get_msg_destroy "_7"
+	# Message on datasets depends on if there's any dataset to destroy
+	if [ -z "${zrootDestroy}${zusrDestroy}" ] ; then
+		get_msg_destroy "_5_1"
 
-	# Solicit user response. 
-	get_msg_destroy "_8"
+	else
+		# Print the datasets and amount of data to be destroyed
+		get_msg_destroy "_5"
+		[ -n "$zrootDestroy" ] && get_msg_destroy "_6"
+		[ -n "$zusrDestroy" ] && get_msg_destroy "_7"
+
+		# Solicit user response
+		get_msg_destroy "_8"
+		severe="severe"
+	fi
 
 	# "severe" requires a full `yes' to be typed
-	get_user_response "severe" || get_msg_destroy "_1" "exit_0"
+	get_user_response $severe || get_msg_destroy "_1" "exit_0"
 }
 
 main() {
 
-	# Turn off all jails before applying changes 
+	# Turn off all jails before applying changes
 	for _jail in $JAIL $OFFJAILS ; do
-		stop_jail -w "$_jail" 
+		stop_jail -w "$_jail"
 	done
-	
+
 	# Destroy datasets
 	[ "$zrootDestroy" ] \
 		&& chk_valid_zfs "${JAILS_ZFS}/${JAIL}" \
@@ -70,7 +85,7 @@ main() {
 	[ "$zusrDestroy" ] \
 		&& chk_valid_zfs "${ZUSR_ZFS}/${JAIL}" \
 		&& zfs destroy -rRf ${ZUSR_ZFS}/${JAIL}
-	
+
 	# Modify Files
 	sed -i '' -E "/^${JAIL}[[:blank:]]/d" $JMAP
 	sed -i '' -E "/^${JAIL}(\{|[[:blank:]])/,/^}/d" $JCONF
