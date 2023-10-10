@@ -24,7 +24,7 @@ ERROR: Cant mix jail/VM between vital PARAMETERS and/or options:
        [-c] CLASS < $CLASS > was assigned to < $NEWJAIL >
        [-R] ROOTENV < $ROOTENV > has CLASS < $root_cl >
 ENDOFMSG
-[ ! "$TEMPLATE" - "none" ] \
+[ ! "$TEMPLATE" = "none" ] \
 	&& echo "       [-t] TEMPLATE < $TEMPLATE > has CLASS < $temp_cl >"
 	;;
 	_e3) cat <<ENDOFMSG
@@ -114,20 +114,28 @@ ERROR: The ROOTENV dataset for < $NEWJAIL > is invalid:
        $R_ZPARENT
 ENDOFMSG
 	;;
-	_w1) cat << ENDOFMSG
+	_w0) cat << ENDOFMSG
 
 FINAL CONFIRMATION FOR < $NEWJAIL >
-
-New disk space consumed:  $(zfs list -Ho used "${R_ZPARENT}")
-Duplicated from dataset:  ${R_ZPARENT}
 ENDOFMSG
 	;;
-	_w2) cat << ENDOFMSG
-
-FINAL CONFIRMATION OF < $NEWJAIL >
-
+	_w1) cat << ENDOFMSG
+New rootjail will consume: $(zfs list -Ho used "${R_ORIGIN}")
+Duplicated from dataset:   ${R_ZPARENT}
+ENDOFMSG
+	;;
+	_w1_1) cat << ENDOFMSG
 New disk space consumed:  $(zfs list -Ho used "${U_ZPARENT}")
 Duplicated from dataset:  ${U_ZPARENT}
+ENDOFMSG
+	;;
+	_w1_2) cat << ENDOFMSG
+New disk space consumed:  $VOLSIZE
+New block storage device: ${ZUSR_ZFS}/${NEWJAIL}
+ENDOFMSG
+	;;
+	_w1_3) cat << ENDOFMSG
+Creating $CLASS from:  ${ZUSR_ZFS}/${NEWJAIL}
 ENDOFMSG
 	;;
 	_w3) cat << ENDOFMSG
@@ -141,9 +149,6 @@ $(cat "$_TMP_PARAMS" | column -t | sort | grep -E "^#default")
 ENDOFMSG
 	;;
 	_w4) cat << ENDOFMSG
-Some jail parameters above have warnings. New jail can be
-created, but it might not function properly. Errors below:
-
 ENDOFMSG
 ;;
 
@@ -152,10 +157,17 @@ echo -e "     PROCEED? (Y/n): \c"
 ;;
 
 	_w6) cat << ENDOFMSG
-ALERT: No valid template was specified for appjail.
-       Creating an empty zusr for the jail.
+ALERT: No valid template was specified or found for appjail.
+       Creating an empty $ZUSR_ZFS dataset for < $NEWJAIL >
 ENDOFMSG
 	;;
+	_w7) cat << ENDOFMSG
+ALERT: No valid template was specified or found for appVM.
+       Creating empty 80M $ZUSR_ZFS block device for < $NEWJAIL >
+       VM will not have custom script executed at start.
+ENDOFMSG
+	;;
+
 
 	_m0) cat << ENDOFMSG
 
@@ -536,6 +548,9 @@ usage() { cat << ENDOFUSAGE
 qb-create: Creates new jails/VMs. Can duplicate from <template>, or
            create new jail/VM by specificing individual parameters.
 
+           If insuffient options <newjail/VM> are specified, script
+           will attempt to substitute #defaults from quBSD.conf.
+
 Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>]
                  [-t <template>] [-z <dupl|none|empty|volsize>]
                  [-p <PARAMETER>=<value>] <newjail/VM>
@@ -544,30 +559,30 @@ Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>]
        parameter for new jail/VM. Can also be defined using [-p].
    -e: (e)examples. Print examples of how to use qb-create
    -h: (h)elp: Shows this message
-   -G: (G)uided: Informative messages guide user via input prompts to
-        create <newjail/VM>. All other command line options are ignored.
+   -G: (G)uided: Informative messages guide user via input prompts.
+        All other command line options are ignored. For <jail> only.
    -p: (p)arameter. Multiple [-p] can be used in the same command to
        specify values for valid parameters listed in:  qb-help params
-   -r: (r)eference <jail/VM> can be specified, and fills two functions:
-       1. PARAMETERS are copied from <reference>, except those specified
-          at the command line. If neither <reference> nor command line
-          args are given, #default is used from jailmap.conf
-       2. The zusr dataset of the <reference> will be copied in one
+   -t: (t)template <jail/VM> can be specified, and fills two functions:
+       1. PARAMETERS are copied from <template>, except those specified
+          at the command line. If neither <template> nor command line
+          args are given, #default are substituted from quBSD.conf
+       2. The zusr dataset of the <template> will be copied in one
           form or another. Use [-z] to specify zusr dataset handling.
-          Note! [-c <rootjail/VM>] requires [-r <reference>]
-   -R: (R)ootenv. Designates that <newjail/VM> will have <rootenv>
-       as its rootjail/VM. Cloned at every start/stop.
+          Note! [-c <rootjail|rootVM>] requires [-t <template>]
+   -r: (r)ootenv. Designates the <rootenv> for <newjail/VM>
+   -v: (v)olsize for new appVM block device on ${ZUSR_ZFS}. Use same
+       convention as MEMSIZE. Only relevant with [-z empty]
    -y: (y)es: Assume "Y" for warnings/confirmations before proceeding.
    -z: (z)usropt: How to handle <newjail/VM> zusr dataset. Only applies
-       to appjail/VM, not disp. <dupl> <template> is default behavior.
-       <dupl>  Jail/VM. Duplicate dataset or blk device. Consumes disk.
-       <none>  Jail only. Copy <template> empty directories, no files.
-       <empty> Jail only. Create empty zusr dataset.
-       <volsize> VM only. Create new block device of size <X>.
-               Use same convention as MEMSIZE for for <X>.
+       to appjail/VM, not disp. Default behavior is <dupl>.
+       <dupl>  Jail/VM. Duplicate dataset/block device. Consumes disk.
+       <dirs>  Jail only. Copy <template> empty directories, no files.
+       <empty> Jail/VM. Create empty dataset/block device on $ZUSR_ZFS
+               NOTE! VM wont have startup script as a result.
    -Z: (Z)rootopt: Creates a new ROOTENV with an independent on-disk
        dataset, from snapshot of:  ${JAILS_ZFS}/<template>
 
-FOR [-p] PARAMETERS LIST AND DETAILS, RUN:  qb-help params
+FOR [-p <PARAMETERS>] LIST AND DETAILS, RUN:  qb-help params
 ENDOFUSAGE
 }

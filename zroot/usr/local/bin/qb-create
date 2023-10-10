@@ -10,7 +10,7 @@ get_options() {
 	_PARAMS="CLASS ROOTENV"
 
 	# CLASS, ROOTENV, and TEMPLATE are important enough to merit their own options
-	while getopts c:eGhp:r:t:yz:Z _opts ; do
+	while getopts c:eGhp:r:t:v:yz:Z _opts ; do
 		case $_opts in
 			c) CLASS="$OPTARG" ;;
 			e) get_msg_create "_examples" "exit_0" ;;
@@ -19,6 +19,7 @@ get_options() {
 			p) evaluate_p_option "$OPTARG" ;;
 			r) ROOTENV="$OPTARG" ;;
 			t) TEMPLATE="$OPTARG" ;;
+			v) VOLSIZE="$OPTARG" && check_valid_volsize ;;
 			y) _ASSM_Y="true" ;;
 			z) U_ZOPT="$OPTARG" ;;
 			Z) R_ZOPT="true" ;;
@@ -75,8 +76,11 @@ checks_and_parameters() {
 			&& get_msg_create "_e1" "exit_1" "CLASS"
 	[ -z "$ROOTENV" ] && ! get_jail_parameter ROOTENV "$TEMPLATE" \
 			&& get_msg_create "_e1" "exit_1" "ROOTENV"
-	[ -z "${CLASS##disp*}" ] && [ -z "$TEMPLATE" ] && ! get_jail_parameter TEMPLATE "$TEMPLATE" \
+	[ -z "${CLASS##disp*}" ] && [ "$TEMPLATE" = "none" ] && ! get_jail_parameter TEMPLATE "$TEMPLATE" \
 			&& get_msg_create "_e1" "exit_1" "TEMPLATE"
+
+	# Need CLASS of ROOTENV to check for jail/VM congruency among them
+	root_cl=$(sed -nE "s/^${ROOTENV}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
 
 	# TEMPLATE is an important switch for how PARAMs are derived.
 	if [ ! "$TEMPLATE" = "none" ] ; then
@@ -91,18 +95,15 @@ checks_and_parameters() {
 		done
 	fi
 
-	# Need CLASS of ROOTENV to check for jail/VM congruency among them
-	root_cl=$(sed -nE "s/^${ROOTENV}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
+	# Vital parameters must either be all jails
+	if ! chk_isvm -c "$CLASS" ; then
+		chk_isvm -c "$root_cl" && get_msg_create "_e2" "exit_1"
+		[ ! "$TEMPATE" = "none" ] && chk_isvm -c "${temp_cl}" && get_msg_create "_e2" "exit_1"
 
-	# Vital parameters are all jails
-	if [ -z "${CLASS##*jail}" ] ; then
-		[ -n "${root_cl##*jail}" ] && get_msg_create "_e2" "exit_1"
-		[ ! "$TEMPATE" = "none" ] && [ -n "${temp_cl##*jail}" ] && get_msg_create "_e2" "exit_1"
-
-	# Vital parameters are all VMs
-	elif [ -z "${CLASS##*VM}" ] ; then
-		[ -n "${root_cl##*VM}" ] && get_msg_create "_e2" "exit_1"
-		[ ! "$TEMPATE" = "none" ] && [ -n "${temp_cl##*VM}" ] && get_msg_create "_e2" "exit_1"
+	# Or vital parameters must be all VMs
+	elif chk_isvm -c "$CLASS" ; then
+		! chk_isvm -c "${root_cl}" && get_msg_create "_e2" "exit_1"
+		[ ! "$TEMPATE" = "none" ] && ! chk_isvm -c "${temp_cl}" && get_msg_create "_e2" "exit_1"
 	fi
 
 	# Due to filling in blanks with defaults, and [-p], some PARAMs might be duplicated on the list.
@@ -113,46 +114,49 @@ checks_and_parameters() {
 
 	# Check all _PARAMS passed via command line
 	for _PAR in $FILT_PARAMS ; do
-
 		# Convert to lower case for chk_valid functions
 		_par=$(echo $_PAR | tr '[:upper:]' '[:lower:]')
 
-		# Check that _PAR is on the list of permissible PARAMETERS (depending on CLASS)
+		# Only check validity of PARAMS that were input by user [-p] or via the <template>
 		if echo "$_PARAMS" | grep -Eqs "$_PAR" ; then
-			eval "chk_valid_${_par}" \"\${$_PAR}\" || get_msg_create "_e4" "usage_1" "$_PAR"
+			eval "chk_valid_${_par}" '--' \"\${$_PAR}\" || get_msg_create "_e4" "usage_1" "$_PAR"
 
 			# IPv4 validity was checked, but conformance with quBSD conventions was not.
 			[ "$_PAR" = "IPV4" ] && chk_isqubsd_ipv4 "$IPV4" "$NEWJAIL"  >> "$_TMP_WARN"
 		fi
 
-		# Separate PARAMS by whether they're unique (add a jmap line), or the #default is being used.
+		# Get the #default value for the PARAM, for comparison in the next switch
 		_def=$(/usr/local/bin/qb-list -j \#default -p "$_PAR" | tail -1 | awk '{print $3}')
 
-		if [ "$_def" = "$(eval echo \${$_PAR})" ] || [ -z "$(eval echo \${$_PAR})" ] ; then
+		# Vital PARAMs should be line specified in qmap, even if the same as #default
+		if [ "$_PAR" = "CLASS" ] || [ "$_PAR" = "ROOTENV" ] || [ "$_PAR" = "TEMPLATE" ] ; then
+			eval echo "$NEWJAIL  $_PAR  \${$_PAR}"  >> "$_TMP_PARAMS"
+
+		# PARAMS specified by user, that are the same as #default, dont make a unique qmap line
+		elif [ "$_def" = "$(eval echo \${$_PAR})" ] || [ -z "$(eval echo \${$_PAR})" ] ; then
 			echo "#default  ${_PAR}  $_def"  >> "$_TMP_PARAMS"
+
 		else
 			eval echo "$NEWJAIL  $_PAR  \${$_PAR}"  >> "$_TMP_PARAMS"
 		fi
 	done
 
-	# If jail, make sure [-z] is among allowable values
-	[ -z "${CLASS##*jail}" ] && [ "$U_ZOPT" ] \
-		&& ! echo "$U_ZOPT" | grep -Eq "^(dupl|clone|none|empty)\$" && get_msg_create "_e5" "usage_1"
-
-	# If VM, must either be [-z dupl] or a valid volsize
-	[ -z "${CLASS##*VM}" ] && [ "$U_ZOPT" ] && ! echo "$U_ZOPT" | grep -Eq "^dupl\$" \
-		&& check_valid_volsize
+	# Make sure U_ZOPT [-z] value specified is appropriate for jail/VM
+	[ "$U_ZOPT" ] && chk_isvm -c "$CLASS" \
+		&& ! echo "$U_ZOPT" | grep -Eq "^(dupl|empty)\$" && get_msg_create "_e5" "usage_1"
+	[ "$U_ZOPT" ] && ! chk_isvm -c "$CLASS" \
+		&& chk_isvm "$CLASS" && ! echo "$U_ZOPT" | grep -Eq "^(dupl|dirs|empty)\$"
 }
 
 check_valid_volsize() {
    # Check that the volsize was given in proper format
-	! echo "$U_ZOPT" | grep -Eqs '(^[0-9]+(\.[0-9]*)?|^\.[0-9]+)(T|t|G|g|M|m|K|k)$' \
+	! echo "$VOLSIZE" | grep -Eqs '(^[0-9]+(\.[0-9]*)?|^\.[0-9]+)(T|t|G|g|M|m|K|k)$' \
 																					&& get_msg_create "_e5_1" "exit_1"
 	# Convert to raw bytes for comparison
-	_vol=$(echo $U_ZOPT| sed -nE "s/.\$//p")
+	_vol=$(echo $VOLSIZE | sed -nE "s/.\$//p")
 	_avail=$(zfs list -pHo available zusr)
 
-	case $U_ZOPT in
+	case $VOLSIZE in
 		*T|*t) _vol=$(echo "scale=0 ; $_vol * 1000000000000" | bc | grep -Eo "^[[:digit:]]+") ;;
 		*G|*g) _vol=$(echo "scale=0 ; $_vol * 1000000000" | bc | grep -Eo "^[[:digit:]]+") ;;
 		*M|*m) _vol=$(echo "scale=0 ; $_vol * 1000000" | bc | grep -Eo "^[[:digit:]]+") ;;
@@ -185,8 +189,13 @@ assign_datasets() {
 			R_ZPARENT="${JAILS_ZFS}/${ROOTENV}"
 			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
 
-			# If $ROOTENV-template doesn't exist, just create an empty zusr. Warn.
-			! chk_valid_zfs "$U_ZPARENT" && U_ZOPT="empty" && get_msg_create "_w6" >> $_TMP_WARN
+			# If jail, empty zfs dataset. If VM, new 80M block device (smallest that zfs allows)
+			if ! chk_valid_zfs "$U_ZPARENT" ; then
+				U_ZOPT="empty"
+				echo should be good
+				chk_isvm -c "$CLASS" && VOLSIZE="80M" && get_msg_create "_w7" >> $_TMP_WARN \
+																	|| get_msg_create "_w6" >> $_TMP_WARN
+			fi
 		;;
 
 		app*_app*|app*_disp*)
@@ -212,6 +221,7 @@ assign_datasets() {
 		# New rootjail from any other rootjail.
 		root*_root*)
 			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
+			R_ORIGIN="${JAILS_ZFS}/${TEMPLATE}"
 			U_ZOPT="skip"
 		;;
 
@@ -229,6 +239,7 @@ assign_datasets() {
 		root*_app*|root*_disp*)
 			[ "$R_ZOPT" ] || get_msg_create "_e10" "exit_1"
 			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
+			R_ORIGIN=$(zfs list -Ho origin "${JAILS_ZFS}/${TEMPLATE}" | sed -E "s/\@.*//")
 			U_ZOPT="skip"
 		;;
 
@@ -279,22 +290,21 @@ assign_datasets() {
 
 confirm_creation() {
 	clear
+	get_msg_create "_w0" "_cont"
 
 	# Show the disksize that will be occupied by creating the new jail
-	if [ -z "${CLASS##root*}" ] ; then
-		get_msg_create "_w1" "_cont"
-
-	elif [ "${CLASS##app*}_${U_ZOPT}" = "_dupl" ] ; then
-		get_msg_create "_w2" "_cont"
-	fi
+	case "${CLASS}_${U_ZOPT}" in
+		root*) get_msg_create "_w1" "_cont" ;;
+		app*_dupl) get_msg_create "_w1_1" "_cont" ;;
+		appVM_empty) get_msg_create "_w1_2" "_cont" ;;
+		disp*) get_msg_create "_w1_3" "_cont" ;;
+	esac
 
 	# Show the final result of jail parameters
 	get_msg_create "_w3" "_cont"
 
 	# Warnings for jail parameters.
 	if [ -s "$_TMP_WARN" ] ; then
-		get_msg_create "_w4" "_cont"
-
 		# Regularizes a single blank line at the end (instead of none, or multiple blank lines).
 		printf '%s\n' "$(cat $_TMP_WARN)" | sed '/./,$!d' ; echo ""
 	fi
@@ -313,7 +323,7 @@ change_datasets() {
 	# ZROOT changes: Only new rootjails are duplicated. Everything else is cloned from a rootjail.
 	if [ -z "${CLASS##root*}" ] ; then
 		echo ''
-		zfs send -P "$R_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${JAILS_ZFS}/${NEWJAIL}"
+		zfs send -vP "$R_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${JAILS_ZFS}/${NEWJAIL}"
 	else
 		reclone_zroot "$NEWJAIL" "$ROOTENV"
 	fi
@@ -326,7 +336,7 @@ change_datasets() {
 		dupl) # Full duplication of zfs data to new dataset
 			echo ''
 			zfs send -vP "$U_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
-			[ -z "${CLASS##*VM}" ] && echo success && return 0
+			chk_isvm -c "$CLASS" && echo success && return 0
 		;;
 
 		clone) # Renaming of datasets and files is handled internally to the function
@@ -334,7 +344,7 @@ change_datasets() {
 			return 0
 		;;
 
-		none)
+		dirs)
 			# Create the empty dataset
 			zfs create -o qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
 
@@ -345,13 +355,15 @@ change_datasets() {
 			done
 		;;
 
-		empty) # Create the empty dataset with autosnap option
-			zfs create -o qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
-		;;
+		empty) # Create the empty dataset/volume
+			if chk_isvm -c "$CLASS" ; then
+				zfs create -V ${VOLSIZE} -o volmode=dev -o qubsd:autosnap="$AUTOSNAP" \
+																			"${ZUSR_ZFS}/${NEWJAIL}" && return 0
+			else
+				zfs create -o qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
+			fi
 
-		*) # Anything else is going to be a VM block device. Checks were already done.
-			zfs create -V${_volsize} -o volmode=dev -o qubsd:autosnap="$AUTOSNAP" \
-					"${ZUSR_ZFS}/${NEWJAIL}" && return 0 || exit 1
+		;;
 	esac
 
 	# Jail types that don't need the edits below, have already exited the function.
@@ -380,7 +392,8 @@ change_datasets() {
 	fi
 
 	# home directory must be renamed (if it exists)
-	mv ${M_ZUSR}/${NEWJAIL}/usr/home/${TEMPLATE} ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL} > /dev/null 2>&1
+	mv ${M_ZUSR}/${NEWJAIL}/usr/home/${TEMPLATE} \
+													${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL} > /dev/null 2>&1
 }
 
 change_jconf() {
@@ -388,6 +401,17 @@ change_jconf() {
 	# Make a tmp file for /etc/jail.conf edits
 	_TMP_JCONF="${QTMP}/qb_create_jconf"
 	mktemp $_TMP_JCONF > /dev/null
+
+	# This is a bit ineligant, but [-Z] with an appjail, TEMPLATE needs converted to the ROOTENV;
+	# and the fstab probably tries to link zusr/rw/etc/fstab instead of /qubsd/<jail>/etc/fstab
+	if [ "$CLASS" = "rootjail" ] ; then
+		TEMPLATE="$ROOTENV"
+		chflags -R noschg ${M_JAILS}/${NEWJAIL}/etc
+
+		# You can't just copy over linked file. Must remove it
+		rm -f ${M_JAILS}/${NEWJAIL}/etc/fstab
+		cp -a "${M_JAILS}/0base/etc/fstab" "${M_JAILS}/${NEWJAIL}/etc"
+	fi
 
 	# Modify /etc/jail.conf
 	sed -nE "/^${TEMPLATE}[[:blank:]]*\{/,/\}/p" $JCONF >> $_TMP_JCONF
@@ -539,7 +563,7 @@ main() {
 
 	change_datasets
 
-	[ "${CLASS##*jail}" ] && change_jconf
+	[ -z "${CLASS##*jail}" ] && change_jconf
 
 	_exit='0' ; cleanup_finished
 }
