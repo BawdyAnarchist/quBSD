@@ -341,10 +341,10 @@ compile_jlist() {
 	case "${_SOURCE}" in
 		'')
 			# If both SOURCE and POSPARAMS are empty, there is no JLIST.
-			[ -z "$_POSPARAMS" ] && get_msg_start "_je1" "usage_1" || _JLIST="$_POSPARAMS"
+			[ -z "$_POSPARAMS" ] && get_msg "_je1" "usage_1" || _JLIST="$_POSPARAMS"
 
 			# If there was no SOURCE, then [-e] makes the positional params ambiguous
-			[ "$_EXCLUDE" ] && get_msg_start "_je2" "usage_1"
+			[ "$_EXCLUDE" ] && get_msg "_je2" "usage_1"
 		;;
 
 		auto)
@@ -360,18 +360,18 @@ compile_jlist() {
 		?*)
 			# Only possibility remaining is [-f]. Check it exists, and assign JLIST
 			[ -e "$_SOURCE" ] && _JLIST=$(tr -s '[:space:]' '\n' < "$_SOURCE" | uniq) \
-					|| get_msg_start "_je3" "usage_1"
+					|| get_msg "_je3" "usage_1"
 		;;
 	esac
 
 	# If [-e], then the exclude list is just the JLIST, but error if null.
-	[ "$_EXCLUDE" ] && _EXLIST="$_POSPARAMS" && [ -z "$_EXLIST" ] && get_msg_start "_je4" "usage_1"
+	[ "$_EXCLUDE" ] && _EXLIST="$_POSPARAMS" && [ -z "$_EXLIST" ] && get_msg "_je4" "usage_1"
 
 	# If [-E], make sure the file exists, and if so, make it the exclude list
 	if [ "$_EXFILE" ] ; then
 
 		[ -e "$_EXFILE" ] && _EXLIST=$(tr -s '[:space:]' '\n' < "$_EXFILE")	\
-			|| get_msg_start "_je5" "usage_1"
+			|| get_msg "_je5" "usage_1"
 	fi
 
 	# Remove any jail on EXLIST, from the JLIST
@@ -947,10 +947,16 @@ chk_truefalse() {
 }
 
 chk_isvm() {
-	# Checks if the positional variable is the name of a VM, return 0 if true 1 of not
-	_jail="$1"
+	# Quiet option
+	getopts c _opts && local _class='true' && shift
 
-	$(get_jail_parameter -qsde CLASS $_jail | grep -qs "VM") && return 0 || return 1
+	# Checks if the positional variable is the name of a VM, return 0 if true 1 of not
+	_value="$1"
+
+	# If -c was passed, then use the $1 as a class, not as a jailname
+	[ "$_class" ] && [ -z "${_value##*VM}" ] && return 0
+
+	$(get_jail_parameter -qsde CLASS $_value | grep -qs "VM") && return 0 || return 1
 }
 
 chk_avail_jailname() {
@@ -1016,7 +1022,7 @@ chk_valid_jail() {
 
 	# Must have class in JMAP. Used later to find the correct zfs dataset
 	_class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
-	chk_valid_class $_qv $_class || return 1
+	chk_valid_class $_qv "$_class" || return 1
 
 	case $_class in
 		"")
