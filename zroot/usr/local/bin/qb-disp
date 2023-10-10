@@ -36,8 +36,6 @@ newjail_name() {
 		_cycle=$(( _cycle + 1 ))
 		NEWJAIL="DISP-${JAIL}_${_cycle}"
 	done
-
-	echo "$NEWJAIL"
 }
 
 main() {
@@ -48,7 +46,8 @@ main() {
 	trap 'zfs destroy -rRf $NEWSNAP ; exit 0' INT TERM HUP QUIT EXIT
 
 	# Create dispjail and disable the no_destroy protection
-	qb-create -c dispjail -t $JAIL -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false $NEWJAIL
+	qb-create -y -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false -p AUTOSNAP=false \
+														-c dispjail -t $JAIL $NEWJAIL > /dev/null 2>&1
 
 	#Trap to ensure DISP doesn't remain after use
 	trap	'destroy_dispjail' INT TERM HUP QUIT EXIT
