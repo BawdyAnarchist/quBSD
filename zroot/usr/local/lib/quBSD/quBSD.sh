@@ -1950,9 +1950,6 @@ prep_bhyve_options() {
 	# First tap created is used for networking
 	_vif=$(head -1 "${QTMP}/qb-taps_${_VM}" 2> /dev/null)
 
-	# Wait till last moment to create tracker file for the vncview port
-	[ "$_vncport" ] && echo "${_vncport}" > "${QTMP}/qb-vnc_${_VM}"
-
 	# Define the full bhyve command
 	_BHYVE_CMD=$(echo $_TMUX1 bhyve $_CPU $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT $_BLK_ZUSR \
 			$_VTNET $_PPT $_FBUF $_TAB $_LPC $_BOOT $_BHYVE_CUST $_STDIO $_VM $_TMUX2)
@@ -1980,7 +1977,7 @@ launch_vm() {
 		trap "cleanup_vm -x $_VM $_rootenv ; exit 0" INT TERM HUP QUIT EXIT
 
 		# Launch the VM to background
-		eval $_BHYVE_CMD
+		eval "$_BHYVE_CMD" | tee -a $QBLOG
 
 		sleep 2
 

@@ -11,10 +11,8 @@ get_options() {
 			h) get_msg_cmd "none" "usage_0" ;;
 			n) _NEWWIND="xterm -e" ;;
         	r) _USER="root" ;;
-        	t) TMUX="-t" ;; 
 			u) _USER="${OPTARG}" ;;
 			v) _REDIRECT='' ;;
-        	V) VNCRES="true" ;; 
 			*) exit 1 ;;
 		esac
 	done
@@ -27,53 +25,55 @@ get_options() {
 
 parse_jail_vars() {
 
-	# Passing commands through another terminal is tricky. 
+	# Passing commands through another terminal is tricky.
 	if [ -z "$_CMD" ] ; then
 
 		# No command is provided. Default to /bin/csh. Quotation not required
 		_CMD="${_CMD:=/bin/csh}"
 
-		# Redirect not desired, because we're using host xterm to access JAIL 
+		# Redirect not desired, because we're using host xterm to access JAIL
 		_REDIRECT=''
 
 	else
-		# Quotations are required to pass multiple arguments to jail, through jexec 
+		# Quotations are required to pass multiple arguments to jail, through jexec
 		_CMD="'${_CMD}'"
-		
-		# {parameter-word} regards `null' as the "set" value. Default behavior of qb-cmd is to, 
-		# suppress output. So if [-v] option was set `null' ; we want to leave it that way. 
-		# NOTE: {paremeter-word} is not documented in man sh , but it works. 
+
+		# {parameter-word} regards `null' as the "set" value. Default behavior of qb-cmd is to,
+		# suppress output. So if [-v] option was set `null' ; we want to leave it that way.
+		# NOTE: {paremeter-word} is not documented in man sh , but it works.
 		_REDIRECT="${_REDIRECT- > /dev/null 2>&1 &}"
 	fi
 
-	# If X is running, get the jailname of the active window 
+	# If X is running, get the jailname of the active window
 	if pgrep -q Xorg ; then
-		# Jailname of the active window is assigned to: $_XJAIL 
+		# Jailname of the active window is assigned to: $_XJAIL
 		get_info _XJAIL
 	fi
-	
-	# Unless already specified, JAIL and USER should be set to the active window 
+
+	# Unless already specified, JAIL and USER should be set to the active window
 	JAIL="${JAIL:=$_XJAIL}"
 	_USER="${_USER:=$JAIL}"
 }
 
 connect_vm_session() {
 
-	if [ -z "$TMUX" ] && [ -z "$VNCRES" ] ; then
-		get_jail_parameter TMUX $JAIL
-		get_jail_parameter VNCRES $JAIL
-	fi
+	# Pull the qconf parameters for VM attachment
+	get_jail_parameter TMUX $JAIL
+	get_jail_parameter VNCRES $JAIL
 
+	# Handle the vnc viewer port
 	if [ ! "$VNCRES" = "none" ] ; then
-		_vncport=$(cat ${QTMP}/qb-vnc_${_jail} 2> /dev/null) || _novnc="true"
-		[ "$_vncport" ] && vncviewer 0.0.0.0:$_vncport > /dev/null 2>&1 &
+		_vmpid=$(pgrep -f "bhyve: $JAIL")
+		_vncport=$(sockstat -P tcp \
+							| sed -nE "s/.*bhyve[[:blank:]]+${_vmpid}.*\*:([[:digit:]]+).*/\1/p")
+		# Launch vnc viewer
+		[ -z "$_vncport" ] && _novnc="true"	|| vncviewer 0.0.0.0:$_vncport > /dev/null 2>&1 &
 	else
 		_novnc="true"
 	fi
 
-	if [ ! "$TMUX" = "false" ] ; then
-		tmux attach -t $JAIL || _nomux="true"
-	fi
+	# Launch TMUX if available
+	[ "$TMUX" = "true" ] && tmux attach -t $JAIL || _nomux="true"
 
 	# Error message for nothing to connect to
 	[ "$_nomux" ] && [ "$_novnc" ] && get_msg_cmd "_2" "exit_1"
@@ -87,17 +87,17 @@ main() {
 		exit 0
 	fi
 
-	# Start the jail or exit with failure messages. 
-	start_jail $TMUX "$JAIL" || get_msg_cmd "_1" "exit_1"
+	# Start the jail or exit with failure messages.
+	! chk_isrunning $JAIL && ! qb-start "$JAIL" && get_msg_cmd "_1" "exit_1"
 
-	# Either connect to the VM, or run the JAIL command 
+	# Either connect to the VM, or run the JAIL command
 	if chk_isvm "$JAIL" ; then
-		
-		connect_vm_session	
+		connect_vm_session
 	else
 		eval $_NEWWIND "jexec -l -U $_USER $JAIL csh -c $_CMD $_REDIRECT"
 	fi
 }
+
 
 get_global_variables
 
