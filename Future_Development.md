@@ -1,23 +1,11 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-0ubuntu - install vlc (or something). Add common connection commands
-
-qb-edit should probably make sure youre not mixing up CLASS with a wrong ROOTENV (jails vs VMs)
-
-qb-stop probably needs a -f force option for misbehaving VMs
-   - Maybe you should integrate that into timeout as a popup or something
-
-qb-stat - host should have a total off all system resource usage
-
-qb-cmd - If no vncview tmp file is found, increment a new one and add the tmp file and open vnc
-
 reclone_zroot
 	- VMs are causing +%s dated snapshots to linger
 the VM startup script should be a .dot-qb-script (hidden).
 
-Scripts that should integrate VMs
-	- qb-connect
-		- jail/VM connections, specifically SSH preparation for files copy
+- qb-connect
+	- VM integration: jail/VM connections, specifically SSH preparation for files copy
 
 New scripts
 	qb-pci
@@ -29,11 +17,16 @@ Ubuntu upgrades
 	zusr dataset integration
 		- try Ubuntu zfs install 
 		- User profiles
+	0ubuntu - install vlc (or something). Add common connection commands
 
-bhyve -p <specific CPUs> should probably be integrated to CPUSET
+bhyve -p <specific CPUs> should probably be integrated
 
+need to expand volume for Ubuntu
 
 # CLEANUP STUFF
+
+qb-create
+	- Still havent tested multiline parameters (like PPT) or BHYVE_CUSTM
 
 set your i3 quick keys for VMs
 
@@ -135,6 +128,8 @@ qubsd_installer
 
 ### BEST PRACTICES / FIXES / CLEANUP
 
+Try to use more redirects, tee's, and also try the 'wait' command for scripts that appear to hang (but are actually finished).
+
 You really need to run Wayland and/or figure out Xauth, xpra, and isolation of gui
 
 Convert all JMAP to QCONF , and rename jailmap.conf quBSD.conf
@@ -219,6 +214,12 @@ ${JAILS_ZFS} should probably be ROOT_Z and maybe also then ZUSR_Z.  Also M_ROOT 
 
 The reality is that all PARAMETERS should always be capitalized to refer to the generic PARAM,
 and lowercase when refering to a specific value for PARAMETER. This requires alot of grammar changes.
+
+qb-edit and qb-create
+	- Probably should offload the jail/VM non-mixing check for root, class, and template, into qubsd.sh 
+
+qb-stop
+	- the monitoring is still not right. It exits early, coz pgrep returns nothing after 2 cycles for no gd reason 
 
 ### MINOR UPGRADES 
 
