@@ -25,14 +25,14 @@ get_options() {
 define_colors() {
 	# NOTE: printf counts ANSI color escapes with \tabs in alignment
 	# As a result, any color used for jails/VMs must have same length escapes
-	COL_OFF='\033[0m'	       # Turn off color	
-	 NORMAL='\033[0;39m'     # Default terminal settings 
-     GREEN='\033[1;7;32m'   # Green, inverted, for active window alert 
+	COL_OFF='\033[0m'	       # Turn off color
+	 NORMAL='\033[0;39m'     # Default terminal settings
+     GREEN='\033[1;7;32m'   # Green, inverted, for active window alert
        RED='\033[1;31m'     # Bold Red
       BRED='\033[1;5;31m'   # Blinking bold red, for hostnet connection alert
-      BLUE='\033[0;34m'     # Blue - server jails 
-      GRAY='\033[0;90m'     # Gray - system, templates, host, VMs, misc jails 
-    YELLOW='\033[0;33m'     # Yellow - net jails 
+      BLUE='\033[0;34m'     # Blue - server jails
+      GRAY='\033[0;90m'     # Gray - system, templates, host, VMs, misc jails
+    YELLOW='\033[0;33m'     # Yellow - net jails
      HILIT='\033[7;39m'     # Highlighted top line
 }
 
@@ -40,7 +40,7 @@ get_stat_variables() {
 	#Jails data
 	JAILS=$(sed -En "s/^([^[:blank:]]+)[[:blank:]]+CLASS.*/\1/p" $JMAP)
 
-	# Jailname of the active window is assigned to: $_XJAIL 
+	# Jailname of the active window is assigned to: $_XJAIL
 	get_info _XJAIL
 
 	# Input devices status
@@ -64,21 +64,24 @@ get_jails_loop() {
 	rootenv="${rootenv:=-}"
 
 	if chk_isrunning "$_jail" ; then
-
 		if chk_isvm "$_jail" ; then
 			jid=$(pgrep -f "bhyve: $_jail")
 			cpu=$(ps -p $jid -o %cpu | awk '{sum+=$1;} END {print sum;}')
 			ram=$(ps -p $jid -o %mem | awk '{sum+=$1;} END {print sum;}')
 		else
-			jid=$(jls -j $_jail -n jid | sed "s/jid=//") 
+			jid=$(jls -j $_jail -n jid | sed "s/jid=//")
 			cpu=$(ps axJ $_jail -o %cpu | awk '{sum+=$1;} END {print sum;}')
 			ram=$(ps axJ $_jail -o %mem | awk '{sum+=$1;} END {print sum;}')
 		fi
+	elif [ "$class" = "host" ] ; then
+		jid='-'
+		cpu=$(ps -axo %cpu -o comm | grep -v idle | awk '{sum+=$1;} END {print sum;}')
+		ram=$(ps -axo %mem -o comm | grep -v idle | awk '{sum+=$1;} END {print sum;}')
 	else
 		jid='-' ;  cpu='-' ;  ram='-'
-	fi	
+	fi
 
-	# Get ZFS disk size 
+	# Get ZFS disk size
 	[ -z "${class##root*}" ] && _zfs="${JAILS_ZFS}" || _zfs="${ZUSR_ZFS}"
 	chk_valid_zfs "${_zfs}/${_jail}" && disk=$(zfs list -Ho used "${_zfs}/${_jail}")
 
@@ -109,19 +112,19 @@ print_alerts() {
 	printf "%b" "${GREEN}----------------------   ACTIVE WINDOW:  $_XJAIL ---------------------${COL_OFF}\n"
 
 	if [ "$cam" -o "$mic" -o "$hostnet" ] ; then
-		echo -e "${RED}####################################################################" 
+		echo -e "${RED}####################################################################"
 		[ "$cam" ] \
-		&& echo -e "##             W E B C A M   D A E M O N   I S   O N  !!           ##"  
+		&& echo -e "##             W E B C A M   D A E M O N   I S   O N  !!           ##"
 		[ "$mic" ] \
 		&& echo -e "##         M I C R O P H O N E   D A E M O N  I S  O N  !!         ##"
 		[ "$hostnet" ] \
-		&& echo -e "##${BRED}        H O S T  I S  N E T W O R K  C O N N E C T E D !!       ${COL_OFF}${RED}##" 
+		&& echo -e "##${BRED}        H O S T  I S  N E T W O R K  C O N N E C T E D !!       ${COL_OFF}${RED}##"
 		echo -e "####################################################################${COL_OFF}"
 	fi
 }
 
 main() {
-	while : ; do 
+	while : ; do
 		# Reset the TMP files
 		printf "%b" \
 			"${HILIT}CONTAINER\tPID\tGATEWAY\tCLASS\tROOT\tDISK\t%RAM\t%CPU${COL_OFF}\n" > $TMP1
@@ -141,7 +144,7 @@ main() {
 
 		# Clear at the last moment; re-print the new file in nice columns; plus any alerts
 		clear
-		column -t $TMP2 
+		column -t $TMP2
 		print_alerts
 
 		sleep 1
