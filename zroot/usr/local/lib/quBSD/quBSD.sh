@@ -432,8 +432,9 @@ start_jail() {
 stop_jail() {
 	# If jail is running, remove it. Return 0 on success; return 1 if fail.
 
-	while getopts qt:w opts ; do
+	while getopts fqt:w opts ; do
 		case $opts in
+			f) _force="true" ;;
 			q) _qj="-q" ;;
 			t) _timeout="-t $OPTARG" ;;
 			w) _wait="true" ;;
@@ -453,7 +454,11 @@ stop_jail() {
 
 		if chk_isvm "$_jail" ; then
 			# Kill the process gracefully; or if not, then forcefully
-			pkill -15 -fx "bhyve: $_jail" || pkill -9 -fx "bhyve: $_jail"
+			if [ -z "$_force" ] ; then
+				bhyvectl --vm="$_jail" --force-poweroff
+			else
+				bhyvectl --vm="$_jail" --destroy
+			fi
 
 			# If optioned, wait for the VM to stop
 			[ "$_wait" ] && ! monitor_vm_stop $_qj $_timeout "$_jail" && return 1
@@ -856,13 +861,19 @@ monitor_startstop() {
 		esac
 	done
 
-	# If timeout defaulted to 1, and didnt return 0 yet, assume another process needs the files
-	# Otherwise, assume that there was a start/stop failure, and cleanup files
+	# If timeout=1, assume this was just a ping check for qb-start/stop, and that 
+	# another process needs the files. Otherwise, assume it was a timeout failure. 
 	if [ ! "$_timeout" = "1" ] ; then
 		[ -e "$_TMP_IP" ] && rm "$_TMP_IP"
 		[ -e "$_timeoutfile" ] && rm "$_timeoutfile"
-	fi
 
+		# Popup window to ask for forcible shutdown 
+		_PROMPT=$(printf "%b" "\"i3-msg -q floating enable, move position center ; " \
+		"echo -e \'WARNING: VM < $JAIL > failed to shut down. Kill it? (Y/n): \\\c\' ; " \
+		"read _option ; if echo \\\\\$_option | grep -Eqs \'^(Y|y|yes|YES)$\' ; " \
+		"then _ASSM_Y=true sh /usr/local/bin/qb-stop -F $JAIL ; fi\"")
+		eval xterm -e sh -c $_PROMPT
+	fi
 	return 1
 }
 
@@ -1096,7 +1107,7 @@ chk_valid_jail() {
 }
 
 
-###############################  JAIL  PARAMETER CHECKS  ###############################
+##############################  JAIL/VM  PARAMETER CHECKS  ##############################
 
 chk_valid_autostart() {
 	# Standardization/consistency with get_jail_parameter() func.
@@ -1150,7 +1161,7 @@ chk_valid_class() {
 	# Valid inputs are: appjail | rootjail | dispjail | appVM | rootVM
 	case $_value in
 		'') get_msg $_q "_0" "CLASS" && return 1 ;;
-		appjail|dispjail|ephemeral|rootjail|rootVM|appVM|VM) return 0 ;;
+		appjail|dispjail|ephemeral|rootjail|rootVM|appVM) return 0 ;;
 		*) get_msg $_q "_cj2" "$_value" "CLASS" && return 1 ;;
 	esac
 }
@@ -1983,9 +1994,6 @@ launch_vm() {
 
 		# Monitor the VM, perform cleanup after done
 		while pgrep -fq "bhyve: $_VM" ; do sleep 1 ; done
-
-		# Positively exiting the script prevents hanging at terminal
-		exit 0
 ENDOFCMD
 
 	# Make the file executabel
