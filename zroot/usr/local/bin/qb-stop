@@ -4,13 +4,14 @@
 . /usr/local/lib/quBSD/msg-stop.sh
 
 get_options() {
-	while getopts aAeE:hf:rt:w opts ; do
+	while getopts aAeE:hf:Frt:w opts ; do
 		case $opts in
 			a) _SOURCE="auto" ;;
 			A) [ "$_SOURCE" ]  && get_msg_stop "_e1" "usage_1" || _SOURCE="all" ;;
 			e) _EXCLUDE="true" ;;
 			E) [ "$_EXCLUDE" ] && get_msg_stop "_e2" "usage_1" || _EXFILE="${OPTARG}" ;;
 			f) [ "$_SOURCE" ]  && get_msg_stop "_e1" "usage_1" || _SOURCE="$OPTARG" ;;
+			F) FORCE="true" ;;
 			h) get_msg_stop "none" "usage_0" ;;
 			r) _RESTART="true" ;;
 			t) _TIMEOUT="$OPTARG" ;;
@@ -37,7 +38,7 @@ checks() {
 	if [ "$_TIMEOUT" ] && echo "$_TIMEOUT" | ! grep -Eq '^[[:digit:]]+$' ; then
 		if [ "$_TIMEOUT" -le 600 ] && [ "$_TIMEOUT" -ge 5 ]
 		then _TIMEOUT=$(( _TIMEOUT * 2 ))
-		else get_msg_start "_e5" "usage_1"
+		else get_msg_stop "_e5" "usage_1"
 		fi
 	fi
 
@@ -135,10 +136,31 @@ monitor_stop() {
 	monitor_startstop "$_TIMEOUT" || get_msg "_e4" "exit_1"
 }
 
+force_stop_jlist() {
+
+	# _ASSM_Y is only passed via env variable in monitor_startstop. Should not be user option
+	if [ -z "$_ASSM_Y" ] ; then
+		get_msg_stop "_m1" "_cont"
+		get_user_response || exit 0
+	fi
+
+	for _jail in $_JLIST ; do
+		stop_jail -f "$_jail"
+	done
+
+	exit 0
+}
+
 main() {
 
 	# Returns $_JLIST, from options and positional arguments. Func shared with qb-start.
 	compile_jlist
+
+	# If [-F] was passed, force stop each container serially, one at at time
+	[ "$FORCE" ] && force_stop_jlist
+
+	# Check saved for later. Might already be in the middle of qb-stop, when -F needs to kill 
+	checks
 
 	# Find gateway hierarchy top for each jail. Returns $_HIERTOP
 	for _jlist in $_JLIST ; do
@@ -157,7 +179,7 @@ main() {
 
 	# User specified, OR, 7.5 secs for every hierarchy level. Monitoring loop sleeps 0.5 sec
 	: ${_TIMEOUT:=$(( _STARTS * 15 ))}
-	eval monitor_stop $_bkgnd
+	eval monitor_stop "$_TIMEOUT" $_bkgnd
 
 	[ "$_RESTART" ] && exec qb-start "$_JLIST"
 }
@@ -166,8 +188,5 @@ get_global_variables
 
 get_options "$@"
 
-checks
-
 main
 
-exit 0
