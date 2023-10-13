@@ -139,9 +139,11 @@ get_networking_variables() {
 	# Get wireguard related variables
    if [ -e "${M_ZUSR}/${JAIL}/${WG0CONF}" ] ; then
 
-		ENDPOINT=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*//p" \
-				${M_ZUSR}/${JAIL}/${WG0CONF} | sed -n "s/:[[:digit:]]*.*//p")
-		WGPORTS=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*.*://p" \
+		WG_ENDPT=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*([^[:blank:]]+):.*/\1/p" \
+				${M_ZUSR}/${JAIL}/${WG0CONF})
+		WG_PORTS=$(sed -nE "s/^Endpoint[[:blank:]]*=.*:(.*)[[:blank:]]*/\1/p" \
+				${M_ZUSR}/${JAIL}/${WG0CONF})
+		WG_MTU=$(sed -nE "s/^MTU[[:blank:]]*=[[:blank:]]*([[:digit:]]+)/\1/p" \
 				${M_ZUSR}/${JAIL}/${WG0CONF})
 	fi
 }
@@ -872,7 +874,7 @@ monitor_startstop() {
 		"echo -e \'WARNING: VM < $JAIL > failed to shut down. Kill it? (Y/n): \\\c\' ; " \
 		"read _option ; if echo \\\\\$_option | grep -Eqs \'^(Y|y|yes|YES)$\' ; " \
 		"then _ASSM_Y=true sh /usr/local/bin/qb-stop -F $JAIL ; fi\"")
-		eval xterm -e sh -c $_PROMPT
+#eval xterm -e sh -c $_PROMPT
 	fi
 	return 1
 }
