@@ -48,7 +48,7 @@ connect_to_gateway() {
 	chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -e "$JAIL" "$GATEWAY" "$IPV4")
 }
 
-modify_pf() {
+modify_files() {
 
 	# Numerous variables need to be modified for pf.conf
 	if [ -e "$JPF" ] ; then
@@ -61,12 +61,16 @@ modify_pf() {
 		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${IPV4}\"@" $JPF
 
 		# net-jail internal wireguard parameters
-		[ -n "$ENDPOINT" ] \
-			&& sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"${ENDPOINT}\"@" $JPF
+		[ -n "$WG_ENDPT" ] \
+			&& sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"${WG_ENDP}\"@" $JPF
 
-		[ -n "$WGPORTS" ] \
-			&& sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"${WGPORTS}\"@" $JPF
+		[ -n "$WG_PORTS" ] \
+			&& sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"${WG_PORTS}\"@" $JPF
 	fi
+
+	# Make sure the MTU matches qconf
+	[ "$MTU" ] && [ -e "${M_ZUSR}/${JAIL}/${WG0CONF}" ] \
+						&& sed -i '' -E "s/^MTU.*/MTU = ${MTU}/" ${M_ZUSR}/${JAIL}/${WG0CONF}
 }
 
 resource_control() {
@@ -84,7 +88,7 @@ main() {
 
 	connect_to_gateway
 
-	modify_pf
+	modify_files
 
 	connect_gateway_to_clients "$JAIL"
 
