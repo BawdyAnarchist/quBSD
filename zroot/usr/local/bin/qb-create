@@ -181,31 +181,22 @@ assign_datasets() {
 			get_msg_create "_e6" "exit_1"
 		;;
 
-      # Assume what the user wants, based on jmap #default.
-		app*_|app*_root*)
+		app*_|app*_root*|app*_app*|app*_disp*)
 			# [-Z] is only for creating rootjails, not appjails from rootjails
 	     	[ "$R_ZOPT" ] && get_msg_create "_e7" "exit_1"
-			TEMPLATE="${ROOTENV}-template"
+			
+			# If no template for zusr, try to find one.
+			( [ -z "$temp_cl" ] || [ -z "${temp_cl##root*}" ] ) && TEMPLATE="${ROOTENV}-template"
+
 			R_ZPARENT="${JAILS_ZFS}/${ROOTENV}"
 			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
 
-			# If jail, empty zfs dataset. If VM, new 80M block device (smallest that zfs allows)
+			# Handle missing zusr dataset. For VMs, minimum block device size that zfs allows, is 80M 
 			if ! chk_valid_zfs "$U_ZPARENT" ; then
 				U_ZOPT="empty"
-				echo should be good
 				chk_isvm -c "$CLASS" && VOLSIZE="80M" && get_msg_create "_w7" >> $_TMP_WARN \
 																	|| get_msg_create "_w6" >> $_TMP_WARN
 			fi
-		;;
-
-		app*_app*|app*_disp*)
-			# [-Z] is only for creating rootjails
-	     	[ "$R_ZOPT" ] && get_msg_create "_e7" "exit_1"
-			R_ZPARENT="${JAILS_ZFS}/${ROOTENV}"
-			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
-
-			# dispjail template might not have zusr (if disp of rootjail). Check U_ZPARENT exists
-			chk_valid_zfs "$U_ZPARENT" || get_msg_create "_e8" "exit_1"
 		;;
 
 		disp*_app*)

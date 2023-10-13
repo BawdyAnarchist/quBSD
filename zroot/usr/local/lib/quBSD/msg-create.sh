@@ -84,10 +84,6 @@ ERROR: [-Z] not valid when creating <appjail/VM|dispjail>. Their
 ENDOFMSG
 	;;
 	_e8) cat << ENDOFMSG
-
-ERROR: Attempted to create a new appjail from template.
-       However, < $TEMPLATE >, is a dispjail with no zusr
-       dataset for the new appjail to copy from.
 ENDOFMSG
 	;;
 	_e9) cat << ENDOFMSG
