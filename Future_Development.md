@@ -1,5 +1,7 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
+bhyve -p <specific CPUs> should probably be integrated
+
 reclone_zroot
 	- VMs are causing +%s dated snapshots to linger
 the VM startup script should be a .dot-qb-script (hidden).
@@ -18,8 +20,6 @@ Ubuntu upgrades
 		- try Ubuntu zfs install 
 		- User profiles
 	0ubuntu - install vlc (or something). Add common connection commands
-
-bhyve -p <specific CPUs> should probably be integrated
 
 need to expand volume for Ubuntu
 
