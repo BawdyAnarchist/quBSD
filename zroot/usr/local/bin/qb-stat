@@ -87,8 +87,8 @@ get_jails_loop() {
 
 	# This is for ordering purposes
 	case "${_jail}_${class}" in
-		serv*)   sub="2" ;;
-		net*)    sub="3" ;;
+		serv-*)   sub="2" ;;
+		net-*)    sub="3" ;;
 		0*app*)  sub="4" ;;
 		0*root*) sub="5" ;;
 		host*)   sub="6" ;;
