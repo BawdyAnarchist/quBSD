@@ -60,10 +60,11 @@ To see detailed description of each PARAMETER, run: qb-help <PARAMETER>
 AUTOSNAP:    Snapshot <jail/VM> with qb-autosnap, via /etc/crontab
 AUTOSTART:   Automatically start <jail/VM> during host boot
 BHYVEOPTS:   Options to pass to bhyve (non-argument options only).
-BHYVE_CUSTM: Add any custom bhyve option and argument, which will be
-             included in the bhyve command at VM launch 
+BHYVE_CUSTM: Add any custom bhyve [-option <argument>], and it will
+             be included in the bhyve command at VM launch
 CLASS:       rootjail|rootVM|appjail|appVM|dispjail 
-CPUSET:      Limit <jail> to specific CPU cores. \`none' means unrestricted
+CPUISO:      Isolate <jail/VM> on the CPUSET indicated threads. 
+CPUSET:      Limit <jail/VM> to specific CPU threads. There are 2x as many \`none' is unrestricted
              Comma separated, or range:  0,1,2,3 is the same as 0-3
 GATEWAY:     Gateway through which <jail/VM> connects to external network
 IPV4:        IPv4 address for <jail/VM>. Normally should be set to 'auto' 

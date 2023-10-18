@@ -11,7 +11,7 @@
 get_options(){
 	while getopts hiru:x opts ; do
 		case $opts in
-			h) get_msg_floatcmd "none" "usage_0" ;;
+			h) usage ;;
 			i) _i3wm="true" ;;
 			r) _USER="root" ; ROOT="-r" ;;
 			u) _USER="$OPTARG" ;;

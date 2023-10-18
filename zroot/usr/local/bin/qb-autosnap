@@ -93,7 +93,6 @@ sync_from_jmap() {
 						 && zfs set qubsd:autosnap="$_value" "${JAILS_ZFS}/${_jail}"
 			;;
 		esac
-
 	done
 }
 

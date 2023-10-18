@@ -76,7 +76,7 @@ checks() {
 
 		# BHYVE_CUSTM is special, but everything else can test for chk_valid_param
 		[ ! "$PARAM" = "BHYVE_CUSTM" ] \
-				&& ! eval "chk_valid_${_param}" $_q \"$VALUE\" \"$JAIL\" \
+				&& ! eval "chk_valid_${_param}" $_q '--' \"$VALUE\" \"$JAIL\" \
 				&& [ -z "$FORCE" ] && exit 1
 	fi
 

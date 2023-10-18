@@ -11,5 +11,7 @@ Usage: qb-float-cmd [-h ] [-r] [-x] <jail>
    -x: DO NOT USE!! special option internal to script. 
 
 ENDOFUSAGE
+
+exit 0
 }
 
