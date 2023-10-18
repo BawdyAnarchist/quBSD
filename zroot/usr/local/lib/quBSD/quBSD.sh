@@ -155,8 +155,8 @@ get_parameter_lists() {
 	getopts n _opts && local _nc="true" && shift
 
 	# List out normal parameters which can be checked (vs BHYVE_CUSTM)
-	COMN_PARAMS="AUTOSTART AUTOSNAP CLASS GATEWAY IPV4 MTU NO_DESTROY ROOTENV"
-	JAIL_PARAMS="CPUSET MAXMEM SCHG SECLVL"
+	COMN_PARAMS="AUTOSTART AUTOSNAP CLASS CPUSET GATEWAY IPV4 MTU NO_DESTROY ROOTENV"
+	JAIL_PARAMS="MAXMEM SCHG SECLVL"
 	VM_PARAMS="BHYVEOPTS MEMSIZE TAPS TMUX VCPUS VNCRES WIREMEM"
 	MULT_LN_PARAMS="BHYVE_CUSTM PPT"
 	ALL_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE $VM_PARAMS $MULT_LN_PARAMS"
@@ -208,6 +208,7 @@ get_jail_parameter() {
 		 ## quiet any error messages to prevent unpredictable behavior.
 	 # -qp: quiet any error/alert messages. Otherwise error messages are shown.
 	 # -sp: Skip checks, and return 0 regardless of any failures
+	 # -xp: Some parameters need extra functions/checks in certain cases. [-x] flags this
 	 # -zp: don't error on zero/null values, just return
 
 	# Positional variables:
@@ -215,14 +216,15 @@ get_jail_parameter() {
 	 # $2: _jail  : <jail> to reference in JMAP
 
 	# Ensure all options variables are reset
-	local _dp='' ; local _ep='' ; local _qp='' ; local _sp='' ; local _zp=''
+	local _dp='' ; local _ep='' ; local _qp='' ; local _sp='' ; local _xp='' ; local _zp=''
 
-	while getopts deqsz opts ; do
+	while getopts deqsxz opts ; do
 		case $opts in
 			d) _dp="-d" ;;
 			e) _ep="-e" ;;
 			q) _qp="-q" ;;
 			s) _sp="true" ;;
+			x) _xp="-x" ;;
 			z) _zp="true" ;;
 			*) get_msg "_1" ; return 1 ;;
 		esac
@@ -255,9 +257,8 @@ get_jail_parameter() {
 
 	# If -s was provided, checks are skipped by this eval
 	if ! [ $_sp ] ; then
-
 		# Variable indirection for checks. Escape \" avoids word splitting
-		eval "chk_valid_${_low_param}" $_qp '--' \"$_value\" \"$_jail\" || return 1
+		eval "chk_valid_${_low_param}" $_qp $_xp '--' \"$_value\" \"$_jail\" || return 1
 	fi
 
 	# Either echo <value> , or assign global variable (as specified by caller).
@@ -385,7 +386,7 @@ compile_jlist() {
 
 
 ########################################################################################
-##############################  JAIL HANDLING / ACTIONS  ###############################
+############################  JAIL/VM  HANDLING / ACTIONS  #############################
 ########################################################################################
 
 start_jail() {
@@ -397,7 +398,6 @@ start_jail() {
 		case $opts in
 			n) _norun="-n" ;;
 			q) _qs="-q"    ;;
-			t) _tmux="-t"  ;;
 			*) return 1 ;;
 		esac
 	done
@@ -421,7 +421,7 @@ start_jail() {
 			get_msg "_jf1" "$_jail" | tee -a $QBLOG
 
 			if chk_isvm "$_jail" ; then
-				exec_vm_coordinator $_norun $_tmux $_qs "$_jail"
+				exec_vm_coordinator $_norun $_qs "$_jail"
 			else
 				jail -vc "$_jail"  >> $QBLOG 2>&1  ||  get_msg $_qs "_jf2" "$_jail"
 			fi
@@ -695,8 +695,6 @@ reclone_zroot() {
 	if pgrep -qf "/usr/sbin/freebsd-update -b ${M_JAILS}/${_rootenv}" \
 		|| pgrep -qj "$_rootenv" -qf '/usr/sbin/freebsd-update' > /dev/null 2>&1 \
 		|| pgrep -qj "$_rootenv" 'pkg' > /dev/null 2>&1
-#I'm not sure if taking a snapshot of a running rootVM is maybe a bad idea
-#||pgrep -qf "bhyve: $_jail" > /dev/null 2>&1
 	then
 		local _busy="true"
 	fi
@@ -738,9 +736,6 @@ reclone_zroot() {
 		pw -V ${M_JAILS}/${_jail}/etc/ \
 				useradd -n $_jail -u 1001 -d /usr/home/${_jail} -s /bin/csh 2>&1
 	fi
-
-	# Remove old snapshots past their ttl and no longer being used.
-#cleanup_oldsnaps "$_rootzfs" &
 
 	return 0
 }
@@ -794,8 +789,6 @@ reclone_zusr() {
 	# Rename directories and mounts with dispjail name
 	mv ${M_ZUSR}/${_jail}/usr/home/${_template} ${M_ZUSR}/${_jail}/usr/home/${_jail} > /dev/null 2>&1
 
-	# Remove old snapshots past their ttl and no longer being used.
-	cleanup_oldsnaps "$_templzfs" &
 	return 0
 }
 
@@ -809,9 +802,22 @@ cleanup_oldsnaps() {
 	local _dataset="$1"
 	local _date=$(date +%s)
 
+	# Assemble list of cloned datasets with a separate origin.
+#	local _clonelist=$(zfs list -Hro name,origin | grep -Ev -- '-\$' \
+#												| grep -E "^(${JAILS_ZFS}|${ZUSR_ZFS})[^[:blank:]]+")
+
+#	for _clone in $_clonelist ; do
+#		if ! chk_isrunning "${_clone##*/}" ; then
+#echo zfs destroy -rRf $_clone
+#			local _root="${_clone%/*}/$(get_jail_parameter -e ROOTENV ${_clone##*/})"
+#			local _rootsnap=$(zfs list -t snapshot $_root | tail -1)
+#echo	zfs clone -o qubsd:autosnap='false' "$_rootsnap"  $_clone
+#		fi
+#	done
+
 	# Assemple list of datasets in zroot, tagged ttl. Note that empty $1 , pulls all datasets
-	local _snaplist=$(zfs list -Hr -t snapshot -o name,qubsd:destroy-date $_dataset \
-		| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
+	local _snaplist=$(zfs list -Hrt snapshot -o name,qubsd:destroy-date $_dataset \
+										| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
 
 	for _snap in $_snaplist ; do
 
@@ -863,13 +869,13 @@ monitor_startstop() {
 		esac
 	done
 
-	# If timeout=1, assume this was just a ping check for qb-start/stop, and that 
-	# another process needs the files. Otherwise, assume it was a timeout failure. 
+	# If timeout=1, assume this was just a ping check for qb-start/stop, and that
+	# another process needs the files. Otherwise, assume it was a timeout failure.
 	if [ ! "$_timeout" = "1" ] ; then
 		[ -e "$_TMP_IP" ] && rm "$_TMP_IP"
 		[ -e "$_timeoutfile" ] && rm "$_timeoutfile"
 
-		# Popup window to ask for forcible shutdown 
+		# Popup window to ask for forcible shutdown
 		_PROMPT=$(printf "%b" "\"i3-msg -q floating enable, move position center ; " \
 		"echo -e \'WARNING: VM < $JAIL > failed to shut down. Kill it? (Y/n): \\\c\' ; " \
 		"read _option ; if echo \\\\\$_option | grep -Eqs \'^(Y|y|yes|YES)$\' ; " \
@@ -1171,8 +1177,15 @@ chk_valid_class() {
 chk_valid_cpuset() {
 	# Return 0 if proposed cpuset is valid ; return 1 if invalid
 
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	local _q ; local _xtra
+	while getopts ex opts ; do
+		case $opts in
+			q) _q="-q" ;;
+			*) get_msg "_1" ; return 1 ;;
+		esac
+	done
+
+	shift $(( OPTIND - 1 ))
 	[ "$1" = "--" ] && shift
 
 	# Positional parmeters / check.
@@ -1427,8 +1440,6 @@ chk_valid_mtu() {
 }
 
 chk_valid_no_destroy() {
-	# Mostly for standardization/completeness with get_jail_parameter() func.
-
 	# Quiet option
 	getopts q _opts && _q='-q' && shift
 	[ "$1" = "--" ] && shift
@@ -1437,10 +1448,17 @@ chk_valid_no_destroy() {
 }
 
 chk_valid_ppt() {
-	# Mostly for standardization/completeness with get_jail_parameter() func.
 
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	local _q ; local _xtra
+	while getopts ex opts ; do
+		case $opts in
+			q) _q="-q" ;;
+			x) _xtra="true" ;;
+			*) get_msg "_1" ; return 1 ;;
+		esac
+	done
+
+	shift $(( OPTIND - 1 ))
 	[ "$1" = "--" ] && shift
 
 	_value="$1"
@@ -1464,7 +1482,7 @@ chk_valid_ppt() {
 		[ -z "$_pciline" ] && get_msg $_q "_cj22" "$_val" "PPT" && return 1
 
 		# Extra set of checks for the PCI device, if it's about to be attached to a VM
-		if [ "$_ppt_launch" = "true" ] ; then
+		if [ "$_xtra" ] ; then
 
 			# If the pci device is detached, try to attach it.
 			[ -z "${_pciline##none*}" ] && ! $(devctl attach "$_pcidev") && _attached="true" \
@@ -1843,7 +1861,6 @@ prep_bhyve_options() {
 	while getopts qt opts ; do
 		case $opts in
 			q) _qs="-q" ;;
-			t) _tmux="-t" ;;
 		esac
 	done
 	shift $(( OPTIND - 1 ))
@@ -1853,6 +1870,7 @@ prep_bhyve_options() {
 	_VM="$1"
 
 	# Get simple jmap variables
+	_cpuset=$(get_jail_parameter -e CPUSET "$_VM")        || return 1
 	_gateway=$(get_jail_parameter -ez GATEWAY "$_VM")     || return 1
 	_ipv4=$(get_jail_parameter -ez IPV4 "$_VM")           || return 1
 	_memsize=$(get_jail_parameter -e MEMSIZE "$_VM")      || return 1
@@ -1862,11 +1880,8 @@ prep_bhyve_options() {
 	_taps=$(get_jail_parameter -e TAPS "$_VM")            || return 1
 	_vcpus=$(get_jail_parameter -e VCPUS "$_VM")          || return 1
 	_vncres=$(get_jail_parameter -ez VNCRES "$_VM")       || return 1
-	# _ppt_launch is a dirty hack to flag extra checks for passthru devices
-	_ppt_launch="true"
-	_ppt=$(get_jail_parameter -ez PPT "$_VM")             || return 1
-	# tmux can be passed by qb-cmd -t , or by PARAMETERS
-	[ -z "$_tmux" ] && ! _tmux=$(get_jail_parameter -ez TMUX "$_VM") && return 1
+	_ppt=$(get_jail_parameter -exz PPT "$_VM")            || return 1
+	_tmux=$(get_jail_parameter -ez TMUX "$_VM") 				|| return 1
 
 	# For VMs that are clients, their tap still needs an IPV4 inside the gateway
 	[ "$_ipv4" = "auto" ] && _ipv4=$(assign_ipv4_auto -e "$_VM")
@@ -1878,8 +1893,37 @@ prep_bhyve_options() {
 	_BHYVE_CUST=$(sed -En "s/${_VM}[[:blank:]]+BHYVE_CUST[[:blank:]]+//p" $JMAP \
 						| sed -En "s/[[:blank:]]+/ /p")
 
-	# Assign CPU, memory, and wire variable
-	_CPU="-c $_vcpus"
+	# Handle CPU pinning, or if none, then just assign the number of vcpus
+	_vcpu_count=0 ; IFS=','
+	for _range in $_cpuset; do
+		case "$_range" in
+			none) # CPUSET was none, so there is no pinning. Assign the variable and break
+				_CPU="-c $_vcpus"
+				break
+			;;
+			*-*) # It's a range; extract the start and end
+				_start=$(echo "$_range" | cut -d'-' -f1)
+				_end=$(echo "$_range" | cut -d'-' -f2)
+
+				# Loop over the range to append to the _cpupin string
+				while [ "$_start" -le "$_end" ]; do
+					_CPUPIN="$_CPUPIN -p $_vcpu_count:$_start"
+					_vcpu_count=$(( _vcpu_count + 1 ))
+					_start=$(( _start + 1 ))
+				done
+			;;
+			*) # It's a single number; directly append to the _CPUPIN string
+				_CPUPIN="$_CPUPIN -p $_vcpu_count:$_range"
+				_vcpu_count=$(( _vcpu_count + 1 ))
+			;;
+		esac
+	done
+
+	# Output the final _cpupin string
+	[ -z "$_CPU" ] && _CPU="-c $_vcpu_count"
+	unset IFS
+
+	# RAM and memory handlingk
 	_RAM="-m $_memsize"
 	[ "$_wiremem" = "true" ] && _WIRE='-S' || _WIRE=''
 
@@ -1964,8 +2008,8 @@ prep_bhyve_options() {
 	_vif=$(head -1 "${QTMP}/qb-taps_${_VM}" 2> /dev/null)
 
 	# Define the full bhyve command
-	_BHYVE_CMD=$(echo $_TMUX1 bhyve $_CPU $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT $_BLK_ZUSR \
-			$_VTNET $_PPT $_FBUF $_TAB $_LPC $_BOOT $_BHYVE_CUST $_STDIO $_VM $_TMUX2)
+	_BHYVE_CMD=$(echo $_TMUX1 bhyve $_CPU $_CPUPIN $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT \
+			$_BLK_ZUSR $_VTNET $_PPT $_FBUF $_TAB $_LPC $_BOOT $_BHYVE_CUST $_STDIO $_VM $_TMUX2)
 
 	# unset the trap
 	trap ":" INT TERM HUP QUIT EXIT
