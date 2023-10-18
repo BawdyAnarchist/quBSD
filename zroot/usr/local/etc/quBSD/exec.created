@@ -62,7 +62,7 @@ modify_files() {
 
 		# net-jail internal wireguard parameters
 		[ -n "$WG_ENDPT" ] \
-			&& sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"${WG_ENDP}\"@" $JPF
+			&& sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"${WG_ENDPT}\"@" $JPF
 
 		[ -n "$WG_PORTS" ] \
 			&& sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"${WG_PORTS}\"@" $JPF
