@@ -25,11 +25,11 @@ need to expand volume for Ubuntu
 
 qb-create
 	- Still havent tested multiline parameters (like PPT) or BHYVE_CUSTM
+	- I think there were still problems with some of the creates. Like ones with solely a template
 
 set your i3 quick keys for VMs
 
 USBVM 
-	- Auto-install various useful mounting stuff for common devices     
 	- Create a proper unprivileged user with devd.conf and automounts     
 	- Auto remove password from unprivleged usbvm user     
 	- When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
