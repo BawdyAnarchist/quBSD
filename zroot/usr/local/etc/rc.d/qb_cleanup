@@ -1,14 +1,14 @@
 #!/bin/sh
 
 # PROVIDE: qb_cleanup
-# REQUIRE: jail  
-# KEYWORD: shutdown 
+# REQUIRE: jail
+# KEYWORD: shutdown
 
 . /etc/rc.subr
 . /usr/local/lib/quBSD/quBSD.sh
 
 name="qb_cleanup"
-desc="Cleans up lingering pieces of quBSD at boot/poweroff" 
+desc="Cleans up lingering pieces of quBSD at boot/poweroff"
 rcvar="${name}_enable"
 start_cmd="${name}_start"
 
@@ -17,19 +17,28 @@ qb_cleanup_start() {
 	# Source the global variables
 	get_global_variables
 
+	cleanup_files
+
+	cleanup_disps
+}
+
+cleanup_files() {
 	# Remove and replace the quBSD /tmp directory
 	rm /tmp/quBSD > /dev/null 2>&1
 	mkdir /tmp/quBSD > /dev/null 2>&1
 
 	# Remove the quBSD log
 	rm /var/log/quBSD.log > /dev/null 2>&1
+}
 
-	# Unmount datasets which may still be mounted
+cleanup_disps() {
+
+	# Unmount DISP datasets which may still be mounted
 	for _mount in $(mount | awk '/DISP/ {print $3}') ; do
 		umount -f $_mount
 	done
 
-	# Remove lingering DISP datasets in qubsd's zroot 
+	# Remove lingering DISP datasets in qubsd's zroot
 	for _disp in $(zfs list -Hro name "$JAILS_ZFS" | grep "DISP") ; do
 		zfs destroy -rRf $_disp > /dev/null 2>&1
 	done
