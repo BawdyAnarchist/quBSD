@@ -2,7 +2,6 @@
 
 reclone_zroot
 	- VMs are causing +%s dated snapshots to linger
-the VM startup script should be a .dot-qb-script (hidden).
 
 - qb-connect
 	- VM integration: jail/VM connections, specifically SSH preparation for files copy

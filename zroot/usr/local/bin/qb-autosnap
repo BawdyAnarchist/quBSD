@@ -6,65 +6,65 @@
 get_options() {
 	local OPTIND
 	while getopts ':dhl:st:' opts ; do
-		case $opts in 
+		case $opts in
 			d) 	DESTROY=true ;;
 			h) 	get_msg_autosnap "none" "usage_0" ;;
 			l) 	LIST=${OPTARG} ;;
-			s) 	SNAPSHOT=true ;;	
+			s) 	SNAPSHOT=true ;;
 			t) 	TTL="${OPTARG}" ;;
 			\:) 	LIST="all" ;;
-			\?)   get_msg_autosnap "_2" "usage_1"	
+			\?)   get_msg_autosnap "_2" "usage_1"
 		esac
 	done
 
 	shift $(( OPTIND - 1 ))
 
-	# Separate integer from the units, for later use 
+	# Separate integer from the units, for later use
 	_INT="${TTL%?}"
 	_UNITS="${TTL##*[0-9]}"
 	DATE_UNIX=$(date +%s)
 }
 
 checks() {
-	# Ensuring that _INT is an integer 
+	# Ensuring that _INT is an integer
 	if [ -n "$TTL" ] && ! echo "$_INT" | grep -Eq '^[0-9]+$' ; then
 		get_msg_autosnap "_1" "usage_1"
 
-	# Ensuring that _UNITS is in a proper time unit 
+	# Ensuring that _UNITS is in a proper time unit
 	elif [ -n "$TTL" ] && ! echo "$_UNITS" | grep -Eq "m|H|D|W|Y" ; then
 		get_msg_autosnap "_1" "usage_1"
 
-	fi	
+	fi
 }
 
 calculate_variables() {
 	# SNAPNAME format is unique for each timeframe, for clear visual separation
-	# Calculates the destroy-date in unix time, to be stored with snapshot 
+	# Calculates the destroy-date in unix time, to be stored with snapshot
 
-	if [ -n "$TTL" ] ; then  
+	if [ -n "$TTL" ] ; then
 		case $_UNITS in
 			m)	SNAPNAME=$(date +%b%d_%H%M)
-				_ttl_unix=$(( _INT * 60 )) 
+				_ttl_unix=$(( _INT * 60 ))
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
 			H)	SNAPNAME=$(date +%b%d_%H_H)
-				_ttl_unix=$(( _INT * 3600 )) 
+				_ttl_unix=$(( _INT * 3600 ))
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
 			D)	SNAPNAME=$(date +%b%d_%H_D)
-				_ttl_unix=$(( _INT * 3600 * 24 )) 
+				_ttl_unix=$(( _INT * 3600 * 24 ))
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
 			W)	SNAPNAME=$(date +%b%d_%H_W)
-				_ttl_unix=$(( _INT * 3600 * 24 * 7 )) 
+				_ttl_unix=$(( _INT * 3600 * 24 * 7 ))
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
 			M)	SNAPNAME=$(date +%b%d_M)
-				_ttl_unix=$(( _INT * 3600 * 24 * 31 )) 
+				_ttl_unix=$(( _INT * 3600 * 24 * 31 ))
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 
 			Y)	SNAPNAME=$(date +%Y%b%d_Annual)
-				_ttl_unix=$(( _INT * 3600 * 24 * 365 )) 
+				_ttl_unix=$(( _INT * 3600 * 24 * 365 ))
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 		esac
 	else
@@ -76,15 +76,15 @@ calculate_variables() {
 sync_from_jmap() {
 
 	# Get list of all jails with an AUTOSNAP setting in JMAP
-	_jlist=$(qb-list -p AUTOSNAP | grep -E "(true|false)" | awk '{print $1}') 
+	_jlist=$(qb-list -p AUTOSNAP | grep -E "(true|false)" | awk '{print $1}')
 
-	# Check/set each entry one by one	
+	# Check/set each entry one by one
 	for _jail in $_jlist ; do
 
-		# Pull the value of the autosnap option in JMAP 
+		# Pull the value of the autosnap option in JMAP
 		_value=$(sed -En "s/^${_jail}[[:blank:]]+AUTOSNAP[[:blank:]]+//gp" $JMAP)
 
-		# zroot vs zusr dataset depending on CLASS 
+		# zroot vs zusr dataset depending on CLASS
 		case "$(get_jail_parameter -eqs CLASS "$_jail")" in
 			appjail)  chk_valid_zfs "${ZUSR_ZFS}/${_jail}" \
 						 && zfs set qubsd:autosnap="$_value" "${ZUSR_ZFS}/${_jail}"
@@ -99,7 +99,7 @@ sync_from_jmap() {
 list_datasets() {
 
 	if [ "$LIST" != "snapshot" ] ; then
-		# Get list of datasets tagged for autosnap 
+		# Get list of datasets tagged for autosnap
 		ZLIST=$(zfs list -rH -o name,qubsd:autosnap,qubsd:backup-location \
 													| grep -E "[[:blank:]]+true[[:blank:]]")
 		# Print with formatted header
@@ -107,50 +107,50 @@ list_datasets() {
 				  		"$ZLIST" "\n" | column -t
 		echo ""
 	fi
-	
+
 	if [ "$LIST" != "dataset" ] ; then
 		# Get list of snapshots created by autosnap
 		SNAPLIST=$(zfs list -H -t snapshot -o \
 						name,qubsd:time-to-live,qubsd:destroy-date,qubsd:autocreated \
-												| grep -E "yes$" | awk '{print $1, $2, $3}') 
+												| grep -E "yes$" | awk '{print $1, $2, $3}')
 		# Print with formatted header
 		printf "%b" "\nSNAPSHOT_NAME QUBSD:TIME-TO-LIVE QUBSD:DESTROY-DATE\n" \
 				  		"$SNAPLIST" "\n" | column -t
 		echo ""
 	fi
-	exit 0	
-}		
+	exit 0
+}
 
 new_snapshots() {
 
-	# Datasets tagged with qubsd:autosnap. 
+	# Datasets tagged with qubsd:autosnap.
 	ZLIST=$(zfs list -rH -o name,qubsd:autosnap \
 								| grep -E "[[:blank:]]+true\$" | awk '{print $1}')
-	
+
 	for _dataset in $ZLIST ; do
 
 		# Calculate unix-time destroy-dates based on user input time-to-live.
 		calculate_variables
 
-		# Snapshot datasets from the auto list 
+		# Snapshot datasets from the auto list
 		zfs snapshot "${_dataset}@${SNAPNAME}"
 		zfs set qubsd:autocreated=yes "${_dataset}@${SNAPNAME}"
 		zfs set qubsd:autosnap="-" "${_dataset}@${SNAPNAME}"
-		
+
 		# Set the time-to-live and destroy-date for new snapshots
-		if [ -n "$TTL" ] ; then 
-			zfs set qubsd:time-to-live="$TTL" "${_dataset}@${SNAPNAME}" 
-			zfs set qubsd:destroy-date="$_ddate_unix" "${_dataset}@${SNAPNAME}" 
+		if [ -n "$TTL" ] ; then
+			zfs set qubsd:time-to-live="$TTL" "${_dataset}@${SNAPNAME}"
+			zfs set qubsd:destroy-date="$_ddate_unix" "${_dataset}@${SNAPNAME}"
 		else
-			zfs set qubsd:time-to-live="-" "${_dataset}@${SNAPNAME}" 
-			zfs set qubsd:destroy-date="-" "${_dataset}@${SNAPNAME}" 
+			zfs set qubsd:time-to-live="-" "${_dataset}@${SNAPNAME}"
+			zfs set qubsd:destroy-date="-" "${_dataset}@${SNAPNAME}"
 		fi
 	done
 }
 
 main() {
 	# Sync from JMAP just in case.
-	sync_from_jmap	
+	sync_from_jmap
 
 	# List first
 	[ -n "$LIST" ] && list_datasets
@@ -160,7 +160,7 @@ main() {
 
 	# Cleanup first, then create; ensures most recent snapshot (even if 0B) is present.
 	# This helps user identify that snaps are working correctly, with recent snap for dataset.
-	[ -n "$SNAPSHOT" ] && new_snapshots 
+	[ -n "$SNAPSHOT" ] && new_snapshots
 }
 
 

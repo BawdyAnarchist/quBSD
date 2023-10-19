@@ -803,17 +803,17 @@ cleanup_oldsnaps() {
 	local _date=$(date +%s)
 
 	# Assemble list of cloned datasets with a separate origin.
-#	local _clonelist=$(zfs list -Hro name,origin | grep -Ev -- '-\$' \
-#												| grep -E "^(${JAILS_ZFS}|${ZUSR_ZFS})[^[:blank:]]+")
+	local _clonelist=$(zfs list -Hro name,origin | grep -Ev -- '-$' \
+											| grep -E "^(${JAILS_ZFS}|${ZUSR_ZFS})" | awk '{print $1}')
 
-#	for _clone in $_clonelist ; do
-#		if ! chk_isrunning "${_clone##*/}" ; then
-#echo zfs destroy -rRf $_clone
-#			local _root="${_clone%/*}/$(get_jail_parameter -e ROOTENV ${_clone##*/})"
-#			local _rootsnap=$(zfs list -t snapshot $_root | tail -1)
-#echo	zfs clone -o qubsd:autosnap='false' "$_rootsnap"  $_clone
-#		fi
-#	done
+	for _clone in $_clonelist ; do
+		if ! chk_isrunning "${_clone##*/}" ; then
+			zfs destroy $_clone
+			local _root="${_clone%/*}/$(get_jail_parameter -e ROOTENV ${_clone##*/})"
+			local _rootsnap=$(zfs list -Ht snapshot -o name $_root | tail -1)
+			zfs clone -o qubsd:autosnap='false' "$_rootsnap"  $_clone
+		fi
+	done
 
 	# Assemple list of datasets in zroot, tagged ttl. Note that empty $1 , pulls all datasets
 	local _snaplist=$(zfs list -Hrt snapshot -o name,qubsd:destroy-date $_dataset \
