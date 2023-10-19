@@ -19,18 +19,18 @@ get_options() {
 
 get_parameters() {
 	# Did not specify an action
-	[ -z "$_CMD" ] && get_msg_hostnet "_2" "usage_1" 
+	[ -z "$_CMD" ] && get_msg_hostnet "_2" "usage_1"
 
 	# [-t time] was invalid
 	[ "$_TIME" -ge 0 ] || get_msg_hostnet "_6" "usage_1"
 
-	# Must get host network parameters. 
+	# Must get host network parameters.
 	get_jail_parameter GATEWAY "host" || exit 1
-	get_jail_parameter IPV4 "host" || exit 1 
+	get_jail_parameter IPV4 "host" || exit 1
 }
 
 connection_down() {
-	# Find all epairs and destroy them. 
+	# Find all epairs and destroy them.
 	ifconfig -l | grep -o "epair[[:digit:]]*[a,b]" | xargs -I@ ifconfig @ destroy
 
 	# Make sure all other interfaces have no IP addr, and are down (except loopback).
@@ -38,17 +38,17 @@ connection_down() {
 		ifconfig $_intf -alias > /dev/null 2>&1
 		ifconfig $_intf down
 	done
-	
+
 	# Set pf.conf, which is simply: "block all"
-	pfctl -f /etc/pf.conf	
+	pfctl -f /etc/pf.conf
 }
 
 revert_connection() {
 	# User opted out of the <timeout> feature
-	[ "$_TIME" -eq 0 ] && get_msg_hostnet "_7" "exit_0" 
-	
+	[ "$_TIME" -eq 0 ] && get_msg_hostnet "_7" "exit_0"
+
 	# Wait the prescribed time
-	sleep $_TIME	
+	sleep $_TIME
 
 	# Check that there aren't still `pkg` or `freebsd-update` commands being run
 	while $(pgrep -qf '/usr/sbin/freebsd-update') || $(pgrep -q 'pkg') ; do
@@ -61,23 +61,23 @@ revert_connection() {
 }
 
 main() {
-	# Regardless of [-u] or [-d], first remove all interfaces, 
+	# Regardless of [-u] or [-d], first remove all interfaces,
 	# to ensure that host network is in a known good state.
 	connection_down
-		
-	# Bring up host network connection 
-	if [ "$_CMD" = "up" ] ; then 
 
-		# start_jail command handles most error messages 
+	# Bring up host network connection
+	if [ "$_CMD" = "up" ] ; then
+
+		# start_jail command handles most error messages
 		start_jail "$GATEWAY" ||  get_msg_hostnet "_3" "usage_1"
 
 		connect_client_to_gateway "host" "$GATEWAY" "$IPV4"
-		
-		# Change pf to file that passes internet from host to outside. 
+
+		# Change pf to file that passes internet from host to outside.
 		pfctl -f /etc/pf_pass.conf
 
 		# Restart ntpd. One problem with host being offline is that it loses time sync
-		service ntpd restart > /dev/null 
+		service ntpd restart > /dev/null 2>&1
 
 		revert_connection &
 		exit 0
