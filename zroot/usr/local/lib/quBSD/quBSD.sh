@@ -418,7 +418,7 @@ start_jail() {
 		if chk_valid_jail $_qs "$_jail" ; then
 
 			# If checks were good, start jail, make a log of it
-			get_msg "_jf1" "$_jail" | tee -a $QBLOG
+			get_msg $_qs "_jf1" "$_jail" | tee -a $QBLOG
 
 			if chk_isvm "$_jail" ; then
 				exec_vm_coordinator $_norun $_qs "$_jail"
@@ -1890,7 +1890,7 @@ prep_bhyve_options() {
 	_BHOPTS="-${_bhyveopts}"
 
 	# Get wildcard bhyve option added by user
-	_BHYVE_CUST=$(sed -En "s/${_VM}[[:blank:]]+BHYVE_CUST[[:blank:]]+//p" $JMAP \
+	_bhyve_custm=$(sed -En "s/${_VM}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+//p" $JMAP \
 						| sed -En "s/[[:blank:]]+/ /p")
 
 	# Handle CPU pinning, or if none, then just assign the number of vcpus
@@ -1923,36 +1923,55 @@ prep_bhyve_options() {
 	[ -z "$_CPU" ] && _CPU="-c $_vcpu_count"
 	unset IFS
 
-	# RAM and memory handlingk
+	# RAM and memory handling
 	_RAM="-m $_memsize"
 	[ "$_wiremem" = "true" ] && _WIRE='-S' || _WIRE=''
 
 	# Assign hostbridge based on CPU
 	grep -Eqs "^CPU.*AMD" /var/run/dmesg.boot \
-		&& _HOSTBRG="-s 0:0,amd_hostbridge" \
-		|| _HOSTBRG="-s 0:0,hostbridge"
+		&& _HOSTBRG="-s 0,amd_hostbridge" \
+		|| _HOSTBRG="-s 0,hostbridge"
 
 	# assign lpc, then start slot count for bhyve command construction
-	_LPC="-s 31:0,lpc"
+	_LPC="-s 31,lpc"
 	_slot=1
 
 	# Assign zroot blk device
-	_BLK_ROOT="-s ${_slot}:0,virtio-blk,/dev/zvol/${JAILS_ZFS}/${_VM}"
-	_slot=$(( _slot + 1 ))
+	_BLK_ROOT="-s ${_slot},virtio-blk,/dev/zvol/${JAILS_ZFS}/${_VM}"
+	_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
 
 	# Assign zusr blk device. Must be a volume; or should be blank
 	chk_valid_zfs "${ZUSR_ZFS}/${_VM}" \
 		&& zfs list -Ho type "${ZUSR_ZFS}/${_VM}" | grep -qs "volume" \
-		&& _BLK_ZUSR="-s ${_slot}:0,virtio-blk,/dev/zvol/${ZUSR_ZFS}/${_VM}" \
-		&& _slot=$(( _slot + 1 ))	\
-		|| _BLK_ZUSR='' \
+		&& _BLK_ZUSR="-s ${_slot},virtio-blk,/dev/zvol/${ZUSR_ZFS}/${_VM}" \
+		&& _slot=$(( _slot + 1 )) || _BLK_ZUSR=''
+
+	[ "$_slot" -eq 29 ] && _slot=32 
+
+	# Handling BHYVE_CUST options
+	[ "$_bhyve_custm" ] && while IFS= read -r _line ; do
+
+		# User can specify for quBSD to fill in the slot for -s.
+		if [ -z "${_line##-s \#*}" ] ; then 
+			# If a slot was included with a '#', it means to autofill the slot
+			_line=$(echo "$_line" | sed -E "s/-s #/-s ${_slot}/")
+			_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
+		fi
+
+		# Make _BHYVE_CUSTM a single line variable for later inclusion with bhyve command
+		_BHYVE_CUSTM=$(printf "%b" "${_BHYVE_CUSTM} ${_line}")
+
+	# Personal note: herefile is required; else, `echo $var | while` subshell will lose _BHYVE_CUSTM
+	done << EOF
+$_bhyve_custm
+EOF
 
 	# Assign passthrough variables
 	if [ ! "$_ppt" = "none" ] ; then
 		for _pci in $_ppt ; do
-			_PPT=$(printf "%b" "${_PPT} -s ${_slot}:0,passthru,\"${_pci}\"")
+			_PPT=$(printf "%b" "${_PPT} -s ${_slot},passthru,\"${_pci}\"")
 			_WIRE="-S"
-			_slot=$(( _slot + 1 ))
+			_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
 		done
 	fi
 
@@ -1976,18 +1995,12 @@ prep_bhyve_options() {
 		done
 
 		_FBUF="-s 29,fbuf,tcp=0.0.0.0:${_vncport},w=${_w},h=${_h}"
-		_slot=$(( _slot + 1 ))
-
 		_TAB="-s 30,xhci,tablet"
-		_slot=$(( _slot + 1 ))
 	fi
 
 	# Launch a serial port if variable was passed
-	[ "$_tmux" ] && _STDIO="-l com1,stdio" && _TMUX1="tmux new-session -d -s $_VM \"" \
+	[ "$_tmux" = "true" ] && _STDIO="-l com1,stdio" && _TMUX1="tmux new-session -d -s $_VM \"" \
 		&& _TMUX2='"'
-
-	# Tap virtio lines still need to be created. Slots 29-31 are reserved fbuf, tablet, lpc
-	[ "$(( _slot + _taps ))" -gt 28 ] && get_msg "_cj28" "$_VM" && return 1
 
 	# Invoke the trap function for VM cleanup, in case of any errors after modifying host/trackers
 	trap "cleanup_vm -n $_VM ; exit 0" INT TERM HUP QUIT
@@ -1997,7 +2010,8 @@ prep_bhyve_options() {
 
 		# Use ifconfig to keep track of available taps.
 		_tap=$(ifconfig tap create)
-		_VTNET=$(printf "%b" "${_VTNET} -s ${_slot}:0,virtio-net,${_tap}")
+		_VTNET=$(printf "%b" "${_VTNET} -s ${_slot},virtio-net,${_tap}")
+		_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
 		_taps=$(( _taps - 1 ))
 
 		# Tracker file for which taps are related to which VM
@@ -2009,7 +2023,7 @@ prep_bhyve_options() {
 
 	# Define the full bhyve command
 	_BHYVE_CMD=$(echo $_TMUX1 bhyve $_CPU $_CPUPIN $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT \
-			$_BLK_ZUSR $_VTNET $_PPT $_FBUF $_TAB $_LPC $_BOOT $_BHYVE_CUST $_STDIO $_VM $_TMUX2)
+			$_BLK_ZUSR $_BHYVE_CUSTM $_PPT $_VTNET $_FBUF $_TAB $_LPC $_BOOT $_STDIO $_VM $_TMUX2)
 
 	# unset the trap
 	trap ":" INT TERM HUP QUIT EXIT
@@ -2032,9 +2046,14 @@ launch_vm() {
 
 		# Create trap for post VM exit
 		trap "cleanup_vm -x $_VM $_rootenv ; exit 0" INT TERM HUP QUIT EXIT
+	
+		# Log the exact bhyve command being run
+		date >> $QBLOG	
+		echo "Starting VM: $_VM ; with the following command:" >> $QBLOG
+		echo "$_BHYVE_CMD" >> $QBLOG
 
 		# Launch the VM to background
-		eval "$_BHYVE_CMD" | tee -a $QBLOG
+		eval "$_BHYVE_CMD" 
 
 		sleep 2
 
