@@ -163,6 +163,10 @@ print_results() {
 
 	if [ "$_RESULT" ] && [ -z "$ZONLY" ] ; then
 		_RESULT=$(echo -e "CONTAINER   PARAMETER   VALUE\n${_RESULT}" | column -t)
+		# Eliminate the extra space that can happen for BHYVE_CUSTM after the column -t
+		_RESULT=$(echo "$_RESULT" | sed -E \
+		's/^([^[:blank:]]+[[:blank:]]+[^[:blank:]]+[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /')
+
 		echo ''
 		echo "$_RESULT" | grep "CONTAINER"
 		echo "$_RESULT" | grep -Ev "^(#default|CONTAINER)"
