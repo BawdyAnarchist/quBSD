@@ -6,13 +6,14 @@
 . /usr/local/lib/quBSD/msg-cmd.sh
 
 get_options() {
-	while getopts hnrtu:vV opts ; do
+	while getopts hnNrtu:vV opts ; do
 		case $opts in
 			h) get_msg_cmd "none" "usage_0" ;;
 			n) _NEWWIND="xterm -e" ;;
+			N) _NORUN="true" ;;
         	r) _USER="root" ;;
 			u) _USER="${OPTARG}" ;;
-			v) _REDIRECT='' ;;
+			v) _REDIRECT='' ; _VERBOSE="true" ;;
 			*) exit 1 ;;
 		esac
 	done
@@ -87,13 +88,26 @@ main() {
 		exit 0
 	fi
 
-	# Start the jail or exit with failure messages.
-	! chk_isrunning $JAIL && ! qb-start "$JAIL" && get_msg_cmd "_1" "exit_1"
-
-	# Either connect to the VM, or run the JAIL command
+	# Switch whether VM or jail
 	if chk_isvm "$JAIL" ; then
+
+		if ! chk_isrunning $JAIL && [ "$_NORUN" ] ; then
+			# -N option, do not start VM, just print bhyve command
+			start_jail -nq $JAIL
+			exit 0
+
+		elif ! chk_isrunning $JAIL ; then
+			# Verbose prints the bhyve command
+			[ "$_VERBOSE" ] && start_jail -nq $JAIL
+
+			# Start the VM, if successful, connect the session
+			! qb-start "$JAIL" && get_msg_cmd "_1" "exit_1"
+		fi
+
 		connect_vm_session
 	else
+		# Start the gateways then the jail, then execute command
+		! chk_isrunning $JAIL && ! qb-start "$JAIL" && get_msg_cmd "_1" "exit_1"
 		eval $_NEWWIND "jexec -l -U $_USER $JAIL csh -c $_CMD $_REDIRECT"
 	fi
 }
