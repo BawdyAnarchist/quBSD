@@ -129,7 +129,7 @@ begin_waterfall() {
 		for _client in $(get_info -e _CLIENTS $_JAIL); do
 
 			# Check that _client is on the FULLIST (save time)
-			if echo "$_FULLIST" | grep -q "$_client" ; then
+			if echo "$_FULLIST" | grep -Eq "(^|[[:blank:]]+)${_client}([[:blank:]]+|\$)" ; then
 
 				# If the _client has no further clients, it returns 1, and is an ENDPOINT
 				get_info _CLIENTS "$_client" \
