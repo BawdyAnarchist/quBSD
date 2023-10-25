@@ -65,7 +65,7 @@ get_jails_loop() {
 
 	if chk_isrunning "$_jail" ; then
 		if chk_isvm "$_jail" ; then
-			jid=$(pgrep -f "bhyve: $_jail")
+			jid=$(pgrep -xf "bhyve: $_jail")
 			cpu=$(ps -p $jid -o %cpu | awk '{sum+=$1;} END {print sum;}')
 			ram=$(ps -p $jid -o %mem | awk '{sum+=$1;} END {print sum;}')
 		else
