@@ -906,7 +906,7 @@ monitor_vm_stop() {
 	while [ "$_count" -le "$_timeout" ] ; do
 		sleep 1
 
-		if ! pgrep -qf "bhyve: $_jail" ; then
+		if ! pgrep -xqf "bhyve: $_jail" ; then
 			# If we _count was being shown, put an extra line before returning
 			[ -z "$_qms" ] && echo ''
 			return 0
@@ -941,7 +941,7 @@ chk_isrunning() {
 	[ -z "$_jail" ] && return 1
 
 	if $(get_jail_parameter -deqs CLASS "$_jail" | grep -qs "VM") ; then
-		pgrep -qf "bhyve: $_jail" > /dev/null 2>&1  && return 0 ||  return 1
+		pgrep -xqf "bhyve: $_jail" > /dev/null 2>&1  && return 0 ||  return 1
 	else
 		jls -j "$1" > /dev/null 2>&1  && return 0  ||  return 1
 	fi
@@ -1686,31 +1686,22 @@ define_ipv4_convention() {
 
 	local _jail="$1"
 
-	# Global variable indirection is used with `_cycle', in discover_open_ipv4()
-	_cycle=1
+	# _ip assignments are static, except for $_ip1
+	_ip0=10 ; _ip2=1 ; _ip3=2 ; _subnet=30
 
-	# Combo of function caller and $JAIL determine which IP form to use
+	# Combo of function caller and JAIL/VM determine which IP form to use
 	case "$0" in
-		*qb-connect)
-				# Temporary, adhoc connections have the form: 10.99.x.2/30
-				_ip0=10 ; _ip1=99 ; _ip2="_cycle" ; _ip3=2 ; _subnet=30 ;;
-
+		*qb-connect) # Temporary, adhoc connections have the form: 10.99.x.2/30
+			_ip1=99 ;;
 		*) case $_jail in
-				net-firewall)
-					# firewall IP is not internally assigned, but router dependent.
+				net-firewall) # firewall IP is not internally assigned, but router dependent.
 					_cycle=256 ; return 1 ;;
-
-				net-*)
-					# net jails IP address convention is: 10.255.x.2/30
-					_ip0=10 ; _ip1=255 ; _ip2="_cycle" ; _ip3=2 ; _subnet=30 ;;
-
-				serv-*)
-					# Server jails IP address convention is: 10.128.x.2/30
-					_ip0=10 ; _ip1=128 ; _ip2="_cycle" ; _ip3=2 ; _subnet=30 ;;
-
-				*)
-					# All other jails should receive convention: 10.1.x.2/30
-					_ip0=10 ; _ip1=1 ; _ip2="_cycle" ; _ip3=2 ; _subnet=30 ;;
+				net-*) # net jails IP address convention is: 10.255.x.2/30
+					_ip1=255 ;;
+				serv-*) # Server jails IP address convention is: 10.128.x.2/30
+					_ip1=128 ;;
+				*) # All other jails should receive convention: 10.1.x.2/30
+					_ip1=1 ;;
 			esac
 	esac
 }
@@ -1724,7 +1715,7 @@ discover_open_ipv4() {
 	[ "$1" = "--" ] && shift
 
 	local _jail="$1"
-	local _ipv4
+	local _ip_test
 	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
 
 	# net-firewall connects to external network. Assign DHCP, and skip checks.
@@ -1737,27 +1728,27 @@ discover_open_ipv4() {
 	get_info _USED_IPS
 
 	# Increment _cycle to find an open IP.
-	while [ $_cycle -le 255 ] ; do
+	while [ $_ip2 -le 255 ] ; do
 
 		# $_ip2 uses variable indirection, which subsitutes "cycle"
-		eval "_ipv4=${_ip0}.${_ip1}.\${$_ip2}.${_ip3}"
+		_ip_test="${_ip0}.${_ip1}.${_ip2}"
 
 		# Compare against JMAP, and the IPs already in use, including the temp file.
-		if grep -Fq "$_ipv4" $JMAP || echo "$_USED_IPS" | grep -Fq "$_ipv4" \
-				|| grep -Fqs "$_ipv4" "$_TMP_IP" ; then
+		if grep -Fq "$_ip_test" $JMAP || echo "$_USED_IPS" | grep -Fq "$_ip_test" \
+				|| grep -Fqs "$_ip_test" "$_TMP_IP" ; then
 
 			# Increment for next cycle
-			_cycle=$(( _cycle + 1 ))
+			_ip2=$(( _ip2 + 1 ))
 
 			# Failure to find IP in the quBSD conventional range
-			if [ $_cycle -gt 255 ] ; then
-				eval "_pass_var=${_ip0}.${_ip1}.x.${_ip3}"
+			if [ $_ip2 -gt 255 ] ; then
+				_pass_var="${_ip0}.${_ip1}.x.${_ip3}"
 				get_msg $_qi "_jf7" "$_jail"
 				return 1
 			fi
 		else
 			# Echo the value of the discovered IP and return 0
-			echo "${_ipv4}/${_subnet}" && return 0
+			echo "${_ip_test}.${_ip3}/${_subnet}" && return 0
 		fi
 	done
 }
@@ -1770,8 +1761,8 @@ assign_ipv4_auto() {
 	getopts e _opts && _echo="true" && shift
 	[ "$1" = "--" ] && shift
 
-	_jail="$1"
-	_ipv4=''
+	local _jail="$1"
+	local _ipv4=''
 	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
 
 	# Try to pull pre-set IPV4 from the temp file if it exists.
@@ -2058,7 +2049,7 @@ launch_vm() {
 		sleep 2
 
 		# Monitor the VM, perform cleanup after done
-		while pgrep -fq "bhyve: $_VM" ; do sleep 1 ; done
+		while pgrep -xfq "bhyve: $_VM" ; do sleep 1 ; done
 ENDOFCMD
 
 	# Make the file executabel
@@ -2107,7 +2098,7 @@ exec_vm_coordinator() {
 	_count=1
 	while : ; do
 		sleep .5
-		pgrep -fq "bhyve: $_VM" && break
+		pgrep -xfq "bhyve: $_VM" && break
 
 		[ "$_count" -ge 6 ] && get_msg get_msg "_cj31" "$_VM" && return 1
 		_count=$(( _count + 1 ))
