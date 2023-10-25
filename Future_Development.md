@@ -1,7 +1,8 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-reclone_zroot
-	- VMs are causing +%s dated snapshots to linger
+- qb-create
+	- Still havent tested multiline parameters (like PPT) or BHYVE_CUSTM
+	- I think there were still problems with some of the creates. Like ones with solely a template
 
 - qb-connect
 	- VM integration: jail/VM connections, specifically SSH preparation for files copy
@@ -18,16 +19,6 @@ Ubuntu upgrades
 		- User profiles
 	0ubuntu - install vlc (or something). Add common connection commands
 
-need to expand volume for Ubuntu
-
-# CLEANUP STUFF
-
-qb-create
-	- Still havent tested multiline parameters (like PPT) or BHYVE_CUSTM
-	- I think there were still problems with some of the creates. Like ones with solely a template
-
-set your i3 quick keys for VMs
-
 USBVM 
 	- Create a proper unprivileged user with devd.conf and automounts     
 	- Auto remove password from unprivleged usbvm user     
@@ -37,6 +28,10 @@ USBVM
 NICVM 
   - Make a Linux VM so that it can use all the wireless protocols.
      - Someone made a post about this in FreeBSD
+
+VM customization
+	- Create the VMs for all your uses
+	- Create the i3 quick keys and i3gen.conf
 
 net-firewall
 	- pf.conf 
