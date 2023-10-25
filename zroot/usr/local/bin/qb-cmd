@@ -90,7 +90,6 @@ main() {
 
 	# Switch whether VM or jail
 	if chk_isvm "$JAIL" ; then
-
 		if ! chk_isrunning $JAIL && [ "$_NORUN" ] ; then
 			# -N option, do not start VM, just print bhyve command
 			start_jail -nq $JAIL

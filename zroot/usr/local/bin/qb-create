@@ -88,7 +88,7 @@ checks_master() {
 			
 	checks_zopts
 
-	# One more check for new install rootVM, to ensure there's no way to connect to it
+	# One more check for new install rootVM, to ensure there's a way to connect to it
 	[ "$INSTALL" ] && [ "$VNCRES" = "none" ] && [ "$TMUX" = "false" ] \
 															&& get_msg_create "_w4" >> $_TMP_WARN
 }
@@ -106,6 +106,9 @@ checks_install() {
 	[ -e "$INSTALL" ] || get_msg_create "_e8_3" "exit_1"
 
 	chk_valid_zfs "${JAILS_ZFS}/${NEWJAIL}" && get_msg_create "_e8_4" "exit_1"
+
+	# Add qmap line to launch VM with ahci-cd ISO  
+	echo "$NEWJAIL  BHYVE_CUSTM  -s #,ahci-cd,${INSTALL}" >> $_TMP_PARAMS
 }
 
 
@@ -580,17 +583,8 @@ guided_mode() {
 }
 
 launch_install() {
-
-	# Add qmap line to launch VM with ahci-cd ISO  
-	qb-edit -q $NEWJAIL BHYVE_CUSTM "-s #,ahci-cd,${INSTALL}" 
-
 	# Launch the vm to a detached process
 	exec qb-cmd $NEWJAIL
-
-	# Give VM a moment for the VM to launch, then delete the special qmap line, and exit
-	sleep 3
-	qb-edit -dq $NEWJAIL BHYVE_CUSTM "-s #,ahci-cd,${INSTALL}"
-	exit 0
 }
 
 cleanup_finished() {
@@ -633,8 +627,9 @@ main() {
 
 	confirm_creation
 
-	# Add the parameters to jailmap
+	# Add the parameters to jailmap. BHYVE_CUSTM has extra spaces. Remove at least the first one
 	grep -E "^$NEWJAIL" "$_TMP_PARAMS" | column -t >> $JMAP
+	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $JMAP 
 
 	change_datasets
 
@@ -642,7 +637,11 @@ main() {
 
 	_exit='0' ; cleanup_finished
 
-	launch_install
+	launch_install &
+
+	# Give VM a moment for the VM to launch, then delete the special qmap line, and exit
+	sleep 3
+	sed -i '' -E "\@^${NEWJAIL}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+-s #,ahci-cd,${INSTALL}@d" $JMAP
 }
 
 get_global_variables

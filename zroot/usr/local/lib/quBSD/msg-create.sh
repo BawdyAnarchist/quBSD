@@ -176,7 +176,8 @@ ENDOFMSG
 	_w3) cat << ENDOFMSG
 
 UNIQUE PARAMETERS TO BE ADDED:
-$(cat "$_TMP_PARAMS" | column -t | sort | grep -E "^$NEWJAIL")
+$(cat "$_TMP_PARAMS" | column -t | sort | grep -E "^$NEWJAIL" \
+	| grep -Ev "BHYVE_CUSTM[[:blank:]]+-s[[:blank:]]+#,ahci-cd,${INSTALL}")
 
 PARAMETERS EQUAL TO DEFAULTS:
 $(cat "$_TMP_PARAMS" | column -t | sort | grep -E "^#default")
