@@ -8,7 +8,12 @@ get_msg_create() {
 
 	case "$_message" in
 
-	_e0) cat <<ENDOFMSG
+	_e0_0) cat << ENDOFMSG
+
+ERROR: Did not specify a <newjail/VM>
+ENDOFMSG
+	;;
+	_e0) cat << ENDOFMSG
 
 ERROR: < $_param > is not a valid quBSD PARAMETER.
 ENDOFMSG
@@ -18,7 +23,7 @@ ENDOFMSG
 ERROR: There was a problem when trying to assign < $_passvar >
 ENDOFMSG
 	;;
-	_e2) cat <<ENDOFMSG
+	_e2) cat << ENDOFMSG
 
 ERROR: Cant mix jail/VM between vital PARAMETERS and/or options:
        [-c] CLASS < $CLASS > was assigned to < $NEWJAIL >
@@ -27,16 +32,16 @@ ENDOFMSG
 [ ! "$TEMPLATE" = "none" ] \
 	&& echo "       [-t] TEMPLATE < $TEMPLATE > has CLASS < $temp_cl >"
 	;;
-	_e3) cat <<ENDOFMSG
+	_e3) cat << ENDOFMSG
 
 ERROR: < $_param > is not a valid quBSD PARAMETER for the CLASS
        to be created. Valid params for < $CLASS > are:
 $FILT_PARAMS
 ENDOFMSG
 	;;
-	_e4) cat <<ENDOFMSG
+	_e4) cat << ENDOFMSG
 
-ERROR: < \${$_PAR} > was an invalid value for < $_PAR >
+ERROR: < $_VAL > was an invalid value for < $_PAR >
 ENDOFMSG
 	;;
 	_e5) cat << ENDOFMSG
@@ -83,9 +88,38 @@ ERROR: [-Z] not valid when creating <appjail/VM|dispjail>. Their
           qb-disp $TEMPLATE
 ENDOFMSG
 	;;
+
+## [-i] INSTALLATION MESSAGES
 	_e8) cat << ENDOFMSG
+
+ERROR: The only CLASS allowable with [-i] is < rootVM >
 ENDOFMSG
 	;;
+	_e8_1) cat << ENDOFMSG
+
+ERROR: [-i] implies < $NEWJAIL > will be the ROOTENV. Thus [-r]
+       is redundant, but at least it should equal < $NEWJAIL >
+ENDOFMSG
+	;;
+	_e8_2) cat << ENDOFMSG
+
+ERROR: [-i] requires [-v <volsize>] for the new rootVM volume. 
+ENDOFMSG
+	;;
+	_e8_3) cat << ENDOFMSG
+
+ERROR: [-i < $INSTALL >] Must specify the ISO to be installed,
+       but there is currently no file at that path. 
+ENDOFMSG
+	;;
+	_e8_4) cat << ENDOFMSG
+
+ERROR: [-i] zfs already exists at < ${JAILS_ZFS}/${NEWJAIL} >. For safety
+       reasons, qb-create will not overwrite existing volumes.
+       To use this location run qb-destroy, to eliminate
+       possible conflicts with what might be another jail/VM.
+ENDOFMSG
+	;; 
 	_e9) cat << ENDOFMSG
 
 ERROR: Conflicting opts. Creating dispjail with [-t $TEMPLATE]
@@ -116,7 +150,7 @@ FINAL CONFIRMATION FOR < $NEWJAIL >
 ENDOFMSG
 	;;
 	_w1) cat << ENDOFMSG
-New rootjail will consume: $(zfs list -Ho used "${R_ORIGIN}")
+New ROOTENV will consume: $(zfs list -Ho used "${R_ORIGIN}")
 Duplicated from dataset:   ${R_ZPARENT}
 ENDOFMSG
 	;;
@@ -134,6 +168,11 @@ ENDOFMSG
 Creating $CLASS from:  ${ZUSR_ZFS}/${NEWJAIL}
 ENDOFMSG
 	;;
+	_w1_4) cat << ENDOFMSG
+New rootVM will consume: $VOLSIZE
+Installed to new dataset: ${R_ZPARENT}
+ENDOFMSG
+	;;
 	_w3) cat << ENDOFMSG
 
 UNIQUE PARAMETERS TO BE ADDED:
@@ -145,13 +184,13 @@ $(cat "$_TMP_PARAMS" | column -t | sort | grep -E "^#default")
 ENDOFMSG
 	;;
 	_w4) cat << ENDOFMSG
+WARNING: User has specified neither vncviewer nor tmux for this
+         install. VM will launch, but there will be no interface.
 ENDOFMSG
 ;;
-
 	_w5)
 echo -e "     PROCEED? (Y/n): \c"
 ;;
-
 	_w6) cat << ENDOFMSG
 ALERT: No valid template was specified or found for appjail.
        Creating an empty $ZUSR_ZFS dataset for < $NEWJAIL >
@@ -163,7 +202,6 @@ ALERT: No valid template was specified or found for appVM.
        VM will not have custom script executed at start.
 ENDOFMSG
 	;;
-
 
 	_m0) cat << ENDOFMSG
 
@@ -548,15 +586,18 @@ qb-create: Creates new jails/VMs. Can duplicate from <template>, or
            will attempt to substitute #defaults from quBSD.conf.
 
 Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>]
-                 [-t <template>] [-z <dupl|none|empty|volsize>]
+                 [-t <template>] [-v <volsize>] [-z <dupl|none|empty]
                  [-p <PARAMETER>=<value>] <newjail/VM>
+       qb-create -i <ISO_filepath> -v <volsize> <newVM>
 
    -c: (c)lass: <appjail|rootjail|dispjail|appVM|rootVM> is a critical
        parameter for new jail/VM. Can also be defined using [-p].
    -e: (e)examples. Print examples of how to use qb-create
-   -h: (h)elp: Shows this message
    -G: (G)uided: Informative messages guide user via input prompts.
         All other command line options are ignored. For <jail> only.
+   -h: (h)elp: Shows this message
+   -i: (i)nstall a new rootVM based on the ISO provided. Recommend to
+       store ISOs at: /usr/local/share/ISOs
    -p: (p)arameter. Multiple [-p] can be used in the same command to
        specify values for valid parameters listed in:  qb-help params
    -t: (t)template <jail/VM> can be specified, and fills two functions:
@@ -567,8 +608,8 @@ Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>]
           form or another. Use [-z] to specify zusr dataset handling.
           Note! [-c <rootjail|rootVM>] requires [-t <template>]
    -r: (r)ootenv. Designates the <rootenv> for <newjail/VM>
-   -v: (v)olsize for new appVM block device on ${ZUSR_ZFS}. Use same
-       convention as MEMSIZE. Only relevant with [-z empty]
+   -v: (v)olsize for: rootVM at ${JAILS_ZFS}; or appVM at ${ZUSR_ZFS}
+       Use same convention as MEMSIZE.
    -y: (y)es: Assume "Y" for warnings/confirmations before proceeding.
    -z: (z)usropt: How to handle <newjail/VM> zusr dataset. Only applies
        to appjail/VM, not disp. Default behavior is <dupl>.
