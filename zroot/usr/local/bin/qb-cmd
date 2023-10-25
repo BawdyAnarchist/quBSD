@@ -64,7 +64,7 @@ connect_vm_session() {
 
 	# Handle the vnc viewer port
 	if [ ! "$VNCRES" = "none" ] ; then
-		_vmpid=$(pgrep -f "bhyve: $JAIL")
+		_vmpid=$(pgrep -xf "bhyve: $JAIL")
 		_vncport=$(sockstat -P tcp \
 							| sed -nE "s/.*bhyve[[:blank:]]+${_vmpid}.*\*:([[:digit:]]+).*/\1/p")
 		# Launch vnc viewer
