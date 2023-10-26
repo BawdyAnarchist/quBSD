@@ -145,12 +145,12 @@ checks_jailVM_congruency() {
 	# Vital parameters must either be all jails
 	if ! chk_isvm -c "$CLASS" ; then
 		chk_isvm -c "$root_cl" && get_msg_create "_e2" "exit_1"
-		[ ! "$TEMPATE" = "none" ] && chk_isvm -c "${temp_cl}" && get_msg_create "_e2" "exit_1"
+		[ ! "$TEMPLATE" = "none" ] && chk_isvm -c "${temp_cl}" && get_msg_create "_e2" "exit_1"
 
 	# Or vital parameters must be all VMs
 	elif chk_isvm -c "$CLASS" ; then
 		! chk_isvm -c "${root_cl}" && get_msg_create "_e2" "exit_1"
-		[ ! "$TEMPATE" = "none" ] && ! chk_isvm -c "${temp_cl}" && get_msg_create "_e2" "exit_1"
+		[ ! "$TEMPLATE" = "none" ] && ! chk_isvm -c "${temp_cl}" && get_msg_create "_e2" "exit_1"
 	fi
 }
 
@@ -170,10 +170,13 @@ checks_parameters() {
 		# Only check validity of PARAMS that were input by user [-p] or via the <template>
 		if echo "$_PARAMS" | grep -Eqs "$_PAR" ; then
 			_VAL=$(eval echo \"\${$_PAR}\")
-	
+
 			# For INSTALL CLASS and ROOTENV dont exist yet for testing. Skip checks.	
 			if ! ([ "$INSTALL" ] && ( [ "$_PAR" = "CLASS" ] || [ "$_PAR" = "ROOTENV" ] )) ; then
-				eval "chk_valid_${_par}" '--' "$_VAL" || get_msg_create "_e4" "usage_1" "$_PAR"
+				# for-loop takes care of cases of multiple values for _PAR
+				for _val in $_VAL ; do
+					eval "chk_valid_${_par}" '--' "$_val" || get_msg_create "_e4" "usage_1" "$_PAR"
+				done
 			fi
 			# IPv4 validity was checked, but conformance with quBSD conventions was not.
 			[ "$_PAR" = "IPV4" ] && chk_isqubsd_ipv4 "$IPV4" "$NEWJAIL"  >> "$_TMP_WARN"
@@ -186,12 +189,13 @@ checks_parameters() {
 		if [ "$_PAR" = "CLASS" ] || [ "$_PAR" = "ROOTENV" ] || [ "$_PAR" = "TEMPLATE" ] ; then
 			eval echo "$NEWJAIL  $_PAR  $_VAL"  >> "$_TMP_PARAMS"
 
-
 		# PARAMS specified by user, that are the same as #default, dont make a unique qmap line
 		elif [ "$_def" = "$_VAL" ] || [ -z "$_VAL" ] ; then
 			echo "#default  ${_PAR}  $_def"  >> "$_TMP_PARAMS"
 		else
-			eval echo "$NEWJAIL  $_PAR  \${$_PAR}"  >> "$_TMP_PARAMS"
+			for _val in $_VAL ; do
+				eval echo "$NEWJAIL  $_PAR  $_val"  >> "$_TMP_PARAMS"
+			done
 		fi
 
 		# Unset _VAL so that previous values dont affect next cycle
@@ -525,7 +529,7 @@ guided_mode() {
 
 			# Assign the rootjail TEMPLATE as rootjail, since that's what'd normally happen
 			rootjail_1) [ "$CLASS" = "rootjail" ] && TEMPLATE="$ROOTENV" && return 0 ;;
-			rootjail_2) [ "$CLASS" = "rootjail" ] && TEMPATE="$ROOTENV" ;;
+			rootjail_2) [ "$CLASS" = "rootjail" ] && TEMPLATE="$ROOTENV" ;;
 			rootjail_3) get_msg_create "_resp2" ;;
 
 			# Will either use template and return to main program, or stay and get parameters
