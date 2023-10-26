@@ -2028,7 +2028,8 @@ launch_vm() {
 	# but VMs launched by qb-start would otherwise persist in the process list with the VM.
 
 	# Send the commands to a temp file
-	cat << ENDOFCMD > "${QTMP}/qb-bhyve_${_VM}"
+	cat <<-ENDOFCMD > "${QTMP}/qb-bhyve_${_VM}"
+		#!/bin/sh
 
 		# New script wont know about caller functions. Need to source them again
 		. /usr/local/lib/quBSD/quBSD.sh
