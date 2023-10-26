@@ -39,7 +39,7 @@ get_options() {
 	mktemp "$_TMP_WARN"   > /dev/null
 	mktemp "$_TMP_PARAMS" > /dev/null
 
-	# Revert all changes in the case of an error 
+	# Revert all changes in the case of an error
 	trap "cleanup_trapped" INT TERM HUP QUIT EXIT
 }
 
@@ -51,7 +51,7 @@ evaluate_p_option() {
 	_value=$(echo $_optarg | sed -En 's/.*=(.*)/\1/p')
 
 	# Main purpose is to check for invalid variable characters. Also prelim check for valid PARAM
-	! echo "$ALL_PARAMS" | grep -Eqs -- "$_param" && get_msg_create "_e0" "usage_1"
+	! echo "$ALL_PARAMS" | grep -Eqs -- "$_param" && get_msg_create "_e0" "exit_1"
 
 	# BHYVE_CUSTM does not get checked for validity
 	[ ! "$_param" = "BHYVE_CUSTM" ] && _PARAMS="$_PARAMS $_param"
@@ -72,19 +72,19 @@ checks_master() {
 	# in large part, due to overlap of many qmap parameters for both jails and VMs, but also due
 	# to attempting to optimistically "fill in the blanks" for users that dont specify all params.
 
-	# Check that proposed name is available and valid 
-	chk_avail_jailname "$NEWJAIL" || exit 1 
-	
-	# TEMPLATE must have a not-null value for get_jail_parameter to function without an error 
+	# Check that proposed name is available and valid
+	chk_avail_jailname "$NEWJAIL" || exit 1
+
+	# TEMPLATE must have a not-null value for get_jail_parameter to function without an error
 	[ -z "$TEMPLATE" ] && TEMPLATE="none"
 
 	# Switch between install VM, vs normal operations
 	[ "$INSTALL" ] && checks_install	|| optimistic_vitals_assignments
 
 	checks_jailVM_congruency
-	
+
 	checks_parameters
-			
+
 	checks_zopts
 
 	# One more check for new install rootVM, to ensure there's a way to connect to it
@@ -93,9 +93,9 @@ checks_master() {
 }
 
 checks_install() {
-	# Installing a new rootVM comes with different vitals assignments 
+	# Installing a new rootVM comes with different vitals assignments
 
-	# Safety checks, in case the user specified conflicting vital parameters for the new VM 
+	# Safety checks, in case the user specified conflicting vital parameters for the new VM
 	: ${CLASS:=rootVM} && [ "$CLASS" = "rootVM" ] || get_msg_create "_e8" "exit_1"
 	: ${ROOTENV:=$NEWJAIL} && [ "$ROOTENV" = "$NEWJAIL" ] || get_msg_create "_e8_1" "exit_1"
 	root_cl="rootVM"
@@ -106,13 +106,13 @@ checks_install() {
 
 	chk_valid_zfs "${JAILS_ZFS}/${NEWJAIL}" && get_msg_create "_e8_4" "exit_1"
 
-	# Add qmap line to launch VM with ahci-cd ISO  
+	# Add qmap line to launch VM with ahci-cd ISO
 	echo "$NEWJAIL  BHYVE_CUSTM  -s #,ahci-cd,${INSTALL}" >> $_TMP_PARAMS
 }
 
 
 optimistic_vitals_assignments() {
-	# Parameter assignments based on precedence. Fill-in-the-blanks. jail/VM congruency checks. 
+	# Parameter assignments based on precedence. Fill-in-the-blanks. jail/VM congruency checks.
 
 	# CL options take precedence, followed by -t <template>, followed by #default in quBSD.conf
 	[ -z "$CLASS" ] && ! get_jail_parameter CLASS "$TEMPLATE" \
@@ -122,7 +122,7 @@ optimistic_vitals_assignments() {
 	[ -z "${CLASS##disp*}" ] && [ "$TEMPLATE" = "none" ] && ! get_jail_parameter TEMPLATE "$TEMPLATE" \
 			&& get_msg_create "_e1" "exit_1" "TEMPLATE"
 
-	# Need CLASS of ROOTENV to check for jail/VM congruency among vital parameters 
+	# Need CLASS of ROOTENV to check for jail/VM congruency among vital parameters
 	root_cl=$(sed -nE "s/^${ROOTENV}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
 }
 
@@ -165,16 +165,16 @@ checks_parameters() {
 	for _PAR in $FILT_PARAMS ; do
 		# Convert to lower case for chk_valid functions
 		_par=$(echo $_PAR | tr '[:upper:]' '[:lower:]')
+		_VAL=$(eval echo \"\${$_PAR}\")
 
 		# Only check validity of PARAMS that were input by user [-p] or via the <template>
 		if echo "$_PARAMS" | grep -Eqs "$_PAR" ; then
-			_VAL=$(eval echo \"\${$_PAR}\")
 
-			# For INSTALL CLASS and ROOTENV dont exist yet for testing. Skip checks.	
+			# For INSTALL CLASS and ROOTENV dont exist yet for testing. Skip checks.
 			if ! ([ "$INSTALL" ] && ( [ "$_PAR" = "CLASS" ] || [ "$_PAR" = "ROOTENV" ] )) ; then
 				# for-loop takes care of cases of multiple values for _PAR
 				for _val in $_VAL ; do
-					eval "chk_valid_${_par}" '--' "$_val" || get_msg_create "_e4" "usage_1" "$_PAR"
+					eval "chk_valid_${_par}" '--' "$_val" || get_msg_create "_e4" "exit_1" "$_PAR"
 				done
 			fi
 			# IPv4 validity was checked, but conformance with quBSD conventions was not.
@@ -182,11 +182,14 @@ checks_parameters() {
 		fi
 
 		# Get the #default value for the PARAM, for comparison in the next switch
-		_def=$(/usr/local/bin/qb-list -j \#default -p "$_PAR" | tail -1 | awk '{print $3}')
+		_def=$(sed -En "s/^#default[[:blank:]]+${_PAR}[[:blank:]]+//p" $JMAP)
 
 		# Vital PARAMs should be line specified in qmap, even if the same as #default
 		if [ "$_PAR" = "CLASS" ] || [ "$_PAR" = "ROOTENV" ] || [ "$_PAR" = "TEMPLATE" ] ; then
 			eval echo "$NEWJAIL  $_PAR  $_VAL"  >> "$_TMP_PARAMS"
+
+		# Both are null, do nothing
+		elif [ -z "$_def" ] && [ -z "$_VAL" ] ; then :
 
 		# PARAMS specified by user, that are the same as #default, dont make a unique qmap line
 		elif [ "$_def" = "$_VAL" ] || [ -z "$_VAL" ] ; then
@@ -198,18 +201,25 @@ checks_parameters() {
 		fi
 
 		# Unset _VAL so that previous values dont affect next cycle
-		unset _VAL		
+		unset _VAL
 	done
 }
 
 checks_zopts() {
 	# Make sure U_ZOPT [-z] value specified is appropriate for jail/VM
 
-	[ "$U_ZOPT" ] && chk_isvm -c "$CLASS" \
-		&& ! echo "$U_ZOPT" | grep -Eq "^(dupl|empty)\$" && get_msg_create "_e5" "usage_1"
+	# [-z] for VMs must either duplicate, or have [-v]
+	if [ "$U_ZOPT" ] && chk_isvm -c "$CLASS" ; then
+		case $U_ZOPT in
+			dupl) : ;;
+			empty) [ -z "$VOLSIZE" ] && get_msg_create "_e5_4" "exit_1" ;;
+			*) get_msg_create "_e5" "exit_1" ;;
+		esac
+	fi
 
+	# Check [-z] value for jail
 	[ "$U_ZOPT" ] && ! chk_isvm -c "$CLASS" \
-		&& chk_isvm "$CLASS" && ! echo "$U_ZOPT" | grep -Eq "^(dupl|dirs|empty)\$"
+			&& ! echo "$U_ZOPT" | grep -Eq "^(dupl|dirs|empty)\$" && get_msg_create "_e5" "exit_1"
 }
 
 check_valid_volsize() {
@@ -247,18 +257,22 @@ assign_datasets() {
 		app*_|app*_root*|app*_app*|app*_disp*)
 			# [-Z] is only for creating rootjails, not appjails from rootjails
 	     	[ "$R_ZOPT" ] && get_msg_create "_e7" "exit_1"
-			
+
 			# If no template for zusr, try to find one.
 			( [ -z "$temp_cl" ] || [ -z "${temp_cl##root*}" ] ) && TEMPLATE="${ROOTENV}-template"
 
 			R_ZPARENT="${JAILS_ZFS}/${ROOTENV}"
 			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
 
-			# Handle missing zusr dataset. For VMs, minimum block device size that zfs allows, is 80M 
+			# Handle missing zusr dataset. For VMs, minimum block device size that zfs allows, is 80M
 			if ! chk_valid_zfs "$U_ZPARENT" ; then
 				U_ZOPT="empty"
-				chk_isvm -c "$CLASS" && VOLSIZE="80M" && get_msg_create "_w7" >> $_TMP_WARN \
-																	|| get_msg_create "_w6" >> $_TMP_WARN
+				if chk_isvm -c "$CLASS" ; then
+					[ -z "$VOLSIZE" ] && VOLSIZE="80M"
+					get_msg_create "_w7" >> $_TMP_WARN
+				else
+					get_msg_create "_w6" >> $_TMP_WARN
+				fi
 			fi
 		;;
 
@@ -273,7 +287,7 @@ assign_datasets() {
 
 		rootVM_)  # New rootVM from install
 			R_ZPARENT="${JAILS_ZFS}/${NEWJAIL}"
-			U_ZOPT="skip"				
+			U_ZOPT="skip"
 
 			# The checks/assignments after this, arent applicable to new VM installation
 			return 0
@@ -381,7 +395,7 @@ change_datasets() {
 	# The AUTOSNAP value is needed for the new datasets
 	AUTOSNAP=$(sed -En "s/.* AUTOSNAP[[:blank:]]+//p" $_TMP_PARAMS)
 
-	# ZROOT changes: Only a new ROOTENV is duplicated. Everything else is cloned. 
+	# ZROOT changes: Only a new ROOTENV is duplicated. Everything else is cloned.
 	if [ -z "${CLASS##rootVM}" ] ; then
 		# Create the empty dataset
 		zfs create -V ${VOLSIZE} -o volmode=dev -o qubsd:autosnap="$AUTOSNAP" \
@@ -606,7 +620,7 @@ cleanup_finished() {
 	# Unset the trap (or else EXIT will cause all changes to be reverted)
 	trap '' INT TERM HUP QUIT EXIT
 
-	# INSTALL has further actions. But if _exit was set to 1, it was trapped. Either way, exit. 
+	# INSTALL has further actions. But if _exit was set to 1, it was trapped. Either way, exit.
 	( [ "$_exit" = "1" ] || [ -z "$INSTALL" ] ) && eval exit "$_exit"
 }
 
@@ -632,7 +646,7 @@ main() {
 
 	# Add the parameters to jailmap. BHYVE_CUSTM has extra spaces. Remove at least the first one
 	grep -E "^$NEWJAIL" "$_TMP_PARAMS" | column -t >> $JMAP
-	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $JMAP 
+	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $JMAP
 
 	change_datasets
 

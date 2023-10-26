@@ -37,7 +37,8 @@ ENDOFMSG
 	;;
 	_e5) cat << ENDOFMSG
 
-ERROR: [-z] can only have values of: <dupl|none|empty>
+ERROR: For jail, [-z] must be one of: <dupl|dirs|empty>
+       For VM, [-z] must be one of: <dupl|empty>
 ENDOFMSG
 	;;
 	_e5_1) cat << ENDOFMSG
@@ -55,6 +56,12 @@ ENDOFMSG
 
 ERROR: Specified size < $U_ZOPT > for new zfs block device,
        is greater than available < $ZUSR_ZFS > space: < $(zfs list -Ho available $ZUSR_ZFS) >
+ENDOFMSG
+	;;
+	_e5_4) cat << ENDOFMSG
+
+ERROR: [-z empty] for a new VM ${ZUSR_ZFS} block device,
+       must specify [-v <volsize>].
 ENDOFMSG
 	;;
 	_e6) cat << ENDOFMSG
@@ -94,13 +101,13 @@ ENDOFMSG
 	;;
 	_e8_2) cat << ENDOFMSG
 
-ERROR: [-i] requires [-v <volsize>] for the new rootVM volume. 
+ERROR: [-i] requires [-v <volsize>] for the new rootVM volume.
 ENDOFMSG
 	;;
 	_e8_3) cat << ENDOFMSG
 
 ERROR: [-i < $INSTALL >] Must specify the ISO to be installed,
-       but there is currently no file at that path. 
+       but there is currently no file at that path.
 ENDOFMSG
 	;;
 	_e8_4) cat << ENDOFMSG
@@ -110,7 +117,7 @@ ERROR: [-i] zfs already exists at < ${JAILS_ZFS}/${NEWJAIL} >. For safety
        To use this location run qb-destroy, to eliminate
        possible conflicts with what might be another jail/VM.
 ENDOFMSG
-	;; 
+	;;
 	_e9) cat << ENDOFMSG
 
 ERROR: Conflicting opts. Creating dispjail with [-t $TEMPLATE]
@@ -141,7 +148,7 @@ FINAL CONFIRMATION FOR < $NEWJAIL >
 ENDOFMSG
 	;;
 	_w1) cat << ENDOFMSG
-New ROOTENV will consume: $(zfs list -Ho used "${R_ORIGIN}")
+New ROOTENV will consume:  $(zfs list -Ho used "${R_ORIGIN}")
 Duplicated from dataset:   ${R_ZPARENT}
 ENDOFMSG
 	;;
@@ -184,14 +191,15 @@ ENDOFMSG
 echo -e "     PROCEED? (Y/n): \c"
 ;;
 	_w6) cat << ENDOFMSG
-ALERT: No valid template was specified or found for appjail.
+ALERT: No template was specified or found for the new appjail.
        Creating an empty $ZUSR_ZFS dataset for < $NEWJAIL >
 ENDOFMSG
 	;;
 	_w7) cat << ENDOFMSG
-ALERT: No valid template was specified or found for appVM.
-       Creating empty 80M $ZUSR_ZFS block device for < $NEWJAIL >
-       VM will not have custom script executed at start.
+ALERT: No valid template was specified or found for the new VM.
+       Creating empty and unformatted $VOLSIZE $ZUSR_ZFS block device
+       for < $NEWJAIL >, which will be attached to VM at boot;
+       but the VM will not have custom script to execute at start.
 ENDOFMSG
 	;;
 
@@ -610,7 +618,7 @@ Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>]
        <dupl>  Jail/VM. Duplicate dataset/block device. Consumes disk.
        <dirs>  Jail only. Copy <template> empty directories, no files.
        <empty> Jail/VM. Create empty dataset/block device on $ZUSR_ZFS
-               NOTE! VM wont have startup script as a result.
+               If VM, must specify [-v], and it will be unformatted.
    -Z: (Z)rootopt: Creates a new ROOTENV with an independent on-disk
        dataset, from snapshot of:  ${JAILS_ZFS}/<template>
 
