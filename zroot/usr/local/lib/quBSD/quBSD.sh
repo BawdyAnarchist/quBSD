@@ -1937,13 +1937,13 @@ prep_bhyve_options() {
 		&& _BLK_ZUSR="-s ${_slot},virtio-blk,/dev/zvol/${ZUSR_ZFS}/${_VM}" \
 		&& _slot=$(( _slot + 1 )) || _BLK_ZUSR=''
 
-	[ "$_slot" -eq 29 ] && _slot=32 
+	[ "$_slot" -eq 29 ] && _slot=32
 
 	# Handling BHYVE_CUST options
 	[ "$_bhyve_custm" ] && while IFS= read -r _line ; do
 
 		# User can specify for quBSD to fill in the slot for -s.
-		if [ -z "${_line##-s \#*}" ] ; then 
+		if [ -z "${_line##-s \#*}" ] ; then
 			# If a slot was included with a '#', it means to autofill the slot
 			_line=$(echo "$_line" | sed -E "s/-s #/-s ${_slot}/")
 			_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
@@ -2037,14 +2037,14 @@ launch_vm() {
 
 		# Create trap for post VM exit
 		trap "cleanup_vm -x $_VM $_rootenv ; exit 0" INT TERM HUP QUIT EXIT
-	
+
 		# Log the exact bhyve command being run
-		date >> $QBLOG	
+		date >> $QBLOG
 		echo "Starting VM: $_VM ; with the following command:" >> $QBLOG
 		echo "$_BHYVE_CMD" >> $QBLOG
 
 		# Launch the VM to background
-		eval "$_BHYVE_CMD" 
+		eval "$_BHYVE_CMD"
 
 		sleep 2
 
