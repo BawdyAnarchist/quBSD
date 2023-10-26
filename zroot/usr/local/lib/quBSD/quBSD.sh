@@ -808,10 +808,10 @@ cleanup_oldsnaps() {
 
 	for _clone in $_clonelist ; do
 		if ! chk_isrunning "${_clone##*/}" ; then
+			_origin=$(zfs list -Ho origin $_clone)
+			_newsnap=$(zfs list -t snapshot -o name ${_origin%%@*} | tail -1)
 			zfs destroy $_clone
-			local _root="${_clone%/*}/$(get_jail_parameter -e ROOTENV ${_clone##*/})"
-			local _rootsnap=$(zfs list -Ht snapshot -o name $_root | tail -1)
-			zfs clone -o qubsd:autosnap='false' "$_rootsnap"  $_clone
+			zfs clone -o qubsd:autosnap='false' "$_newsnap"  $_clone
 		fi
 	done
 

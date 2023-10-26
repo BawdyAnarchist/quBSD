@@ -155,12 +155,11 @@ main() {
 	# List first
 	[ -n "$LIST" ] && list_datasets
 
+	# Make new snapshots first so that oldsnaps have the latest snapshot to reference
+	[ -n "$SNAPSHOT" ] && new_snapshots
+
 	# Destroy snaps with a TTL, or null `zfs-diff` to parent. [-z] to destroy zero-byte snaps.
 	[ -n "$DESTROY" ] && cleanup_oldsnaps -z
-
-	# Cleanup first, then create; ensures most recent snapshot (even if 0B) is present.
-	# This helps user identify that snaps are working correctly, with recent snap for dataset.
-	[ -n "$SNAPSHOT" ] && new_snapshots
 }
 
 
