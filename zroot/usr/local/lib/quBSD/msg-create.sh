@@ -8,11 +8,6 @@ get_msg_create() {
 
 	case "$_message" in
 
-	_e0_0) cat << ENDOFMSG
-
-ERROR: Did not specify a <newjail/VM>
-ENDOFMSG
-	;;
 	_e0) cat << ENDOFMSG
 
 ERROR: < $_param > is not a valid quBSD PARAMETER.
@@ -33,10 +28,6 @@ ENDOFMSG
 	&& echo "       [-t] TEMPLATE < $TEMPLATE > has CLASS < $temp_cl >"
 	;;
 	_e3) cat << ENDOFMSG
-
-ERROR: < $_param > is not a valid quBSD PARAMETER for the CLASS
-       to be created. Valid params for < $CLASS > are:
-$FILT_PARAMS
 ENDOFMSG
 	;;
 	_e4) cat << ENDOFMSG
