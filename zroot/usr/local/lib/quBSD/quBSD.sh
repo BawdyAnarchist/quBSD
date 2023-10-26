@@ -166,8 +166,8 @@ get_parameter_lists() {
 		[ -z "$CLASS" ] && get_jail_parameter -dqs CLASS "$JAIL"
 
 		case $CLASS in
-			appVM|rootVM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS" ;;
-			dispVM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS TEMPLATE" ;;
+			appVM|rootVM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS $MULT_LN_PARAMS" ;;
+			dispVM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS $MULT_LN_PARAMS TEMPLATE" ;;
 			dispjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE" ;;
 			appjail|rootjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS" ;;
 		esac
