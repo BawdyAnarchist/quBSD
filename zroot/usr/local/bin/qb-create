@@ -30,7 +30,6 @@ get_options() {
 
 	shift $(( OPTIND - 1 ))
 
-	# Proposed newjail name is avail, and no conflict with existing or partially existing jails
 	NEWJAIL="$1"
 
 	# Need to track the resuls of assignements. Use a temp file
@@ -40,7 +39,7 @@ get_options() {
 	mktemp "$_TMP_WARN"   > /dev/null
 	mktemp "$_TMP_PARAMS" > /dev/null
 
-	# Dont include EXIT, because cleanup_trapped will be invoked upon successful creation/exit
+	# Revert all changes in the case of an error 
 	trap "cleanup_trapped" INT TERM HUP QUIT EXIT
 }
 
@@ -73,8 +72,8 @@ checks_master() {
 	# in large part, due to overlap of many qmap parameters for both jails and VMs, but also due
 	# to attempting to optimistically "fill in the blanks" for users that dont specify all params.
 
-	# Must assign a name
-	[ -z "$NEWJAIL" ] && get_msg_create "_e0_0" "exit_1"
+	# Check that proposed name is available and valid 
+	chk_avail_jailname "$NEWJAIL" || exit 1 
 	
 	# TEMPLATE must have a not-null value for get_jail_parameter to function without an error 
 	[ -z "$TEMPLATE" ] && TEMPLATE="none"
