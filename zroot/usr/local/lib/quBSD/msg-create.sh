@@ -529,11 +529,13 @@ ENDOFMSG
 	_examples) cat << ENDOFMSG
 
 QUICK and EASY USAGE
-Appjail from #default:  qb-create <newjail>
-From Template:          qb-create -t <template> <newjail>
-Standard GUI jail:      qb-create -t 0gui-template <newjail>
-Dispjail:               qb-create -c dispjail -t <template> <newjail>
-Rootjail:               qb-create -t <existing_rootenv> <newjail>
+From qmap #defaut:  qb-create <newjail/VM>
+From Template:      qb-create -t <template> <newjail/VM>
+Specific PARAMS:    qb-create -t <template> -p GATEWAY=<gateway> -p CPUSET=<size> <newjail/VM>
+Basic GUI jail:     qb-create -t 0gui-template <newjail>
+Dispjail:           qb-create -c dispjail -t <template> <newjail>
+Duplicate ROOTENV:  qb-create -t <existing_rootenv> <newjail/VM>
+Install rootVM:     qb-create -i /usr/local/share/ISOs/<ISOfile> -v <size> <newVM>
 
 If no opts or <template> are specified, jailmap \'#default' are used.
   #default can be viewed with:   qb-list -j #default
