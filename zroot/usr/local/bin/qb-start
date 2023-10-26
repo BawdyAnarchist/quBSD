@@ -121,7 +121,7 @@ begin_waterfall() {
 	for _JAIL in $_JAILS; do
 
 		# Only continue the waterfall if jail started successfully
-		start_jail "$_JAIL" || get_msg_start "_e4" "exit_1"
+		start_jail "$_JAIL" > /dev/null 2>&1 || get_msg_start "_e4" "exit_1"
 
 		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion)
 		_SUBGATEWAYS='' ; _ENDPOINTS=''
@@ -143,7 +143,7 @@ begin_waterfall() {
 
 			# Maintain a small stagger between parallel starts. Helps prevent conflicts
 			sleep .2
-			start_jail $_end &
+			start_jail $_end > /dev/null 2>&1 &
 		done
 
 		# Subgateways need their own waterfall
