@@ -51,7 +51,7 @@ qb-hostnet: Connect host to outside internet.
 Usage: hostnet [-h][-d|-u][-t <time_in_seconds>]
    -h: (h)elp. Outputs this help message
    -d: (d)own. Remove connectivity; set pf to block all 
-   -u: (u)p. Brings up connectivity as specified in JMAP
+   -u: (u)p. Brings up connectivity as specified in QMAP
 
    -t: (t)ime before connection is automatically removed.
        Default is 300 secs (5 min). Two exceptions where

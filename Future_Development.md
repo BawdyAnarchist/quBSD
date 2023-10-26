@@ -1,6 +1,9 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-Convert all JMAP to QCONF , and rename jailmap.conf quBSD.conf
+qb-edit
+	-I thought I'd put devfs_rules in there, but I think FILT_PARAMS is removing it as a possibility
+
+still getting problem with disp jails and ... I dont know. It happens after autosnap tho I think
 
 - qb-connect
 	- VM integration: jail/VM connections, specifically SSH preparation for files copy

@@ -123,7 +123,7 @@ optimistic_vitals_assignments() {
 			&& get_msg_create "_e1" "exit_1" "TEMPLATE"
 
 	# Need CLASS of ROOTENV to check for jail/VM congruency among vital parameters
-	root_cl=$(sed -nE "s/^${ROOTENV}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
+	root_cl=$(sed -nE "s/^${ROOTENV}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 }
 
 checks_jailVM_congruency() {
@@ -131,7 +131,7 @@ checks_jailVM_congruency() {
 	# TEMPLATE is an important switch for how PARAMs are derived.
 	if [ ! "$TEMPLATE" = "none" ] ; then
 		_PARAMS="$_PARAMS TEMPLATE"
-		temp_cl=$(sed -nE "s/^${TEMPLATE}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
+		temp_cl=$(sed -nE "s/^${TEMPLATE}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 		temp_params=$(/usr/local/bin/qb-list -j $TEMPLATE | grep -E "^$TEMPLATE " | awk '{print $2}')
 
 		# Add template params unique from #default, to the PARAM list (unless already specified).
@@ -182,7 +182,7 @@ checks_parameters() {
 		fi
 
 		# Get the #default value for the PARAM, for comparison in the next switch
-		_def=$(sed -En "s/^#default[[:blank:]]+${_PAR}[[:blank:]]+//p" $JMAP)
+		_def=$(sed -En "s/^#default[[:blank:]]+${_PAR}[[:blank:]]+//p" $QMAP)
 
 		# Vital PARAMs should be line specified in qmap, even if the same as #default
 		if [ "$_PAR" = "CLASS" ] || [ "$_PAR" = "ROOTENV" ] || [ "$_PAR" = "TEMPLATE" ] ; then
@@ -629,7 +629,7 @@ cleanup_trapped() {
 	zfs destroy -rRf "${JAILS_ZFS}/${NEWJAIL}" > /dev/null 2>&1
 	zfs destroy -rRf "${ZUSR_ZFS}/${NEWJAIL}" > /dev/null 2>&1
 
-   sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $JMAP > /dev/null 2>&1
+   sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QMAP > /dev/null 2>&1
 	sed -i '' -E "/^${NEWJAIL}(\{|[[:blank:]])/,/^}/d" $JCONF > /dev/null 2>&1
 
 	# Items above should only be removed if the operation was incomplete
@@ -645,8 +645,8 @@ main() {
 	confirm_creation
 
 	# Add the parameters to jailmap. BHYVE_CUSTM has extra spaces. Remove at least the first one
-	grep -E "^$NEWJAIL" "$_TMP_PARAMS" | column -t >> $JMAP
-	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $JMAP
+	grep -E "^$NEWJAIL" "$_TMP_PARAMS" | column -t >> $QMAP
+	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $QMAP
 
 	change_datasets
 
@@ -658,7 +658,7 @@ main() {
 
 	# Give VM a moment for the VM to launch, then delete the special qmap line, and exit
 	sleep 3
-	sed -i '' -E "\@^${NEWJAIL}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+-s #,ahci-cd,${INSTALL}@d" $JMAP
+	sed -i '' -E "\@^${NEWJAIL}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+-s #,ahci-cd,${INSTALL}@d" $QMAP
 }
 
 get_global_variables

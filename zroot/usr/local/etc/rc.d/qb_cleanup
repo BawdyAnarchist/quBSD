@@ -48,8 +48,8 @@ cleanup_disps() {
 		zfs destroy -rRf $_disp > /dev/null 2>&1
 	done
 
-	# Remove anything that starts with ^DISP in jmap and jail.conf
-   sed -i '' -E "/^DISP/d" $JMAP
+	# Remove anything that starts with ^DISP in qmap and jail.conf
+   sed -i '' -E "/^DISP/d" $QMAP
 	sed -i '' -E "/^DISP.*(\{|[[:blank:]])/,/^}/d" $JCONF
 }
 

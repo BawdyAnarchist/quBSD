@@ -168,7 +168,7 @@ ENDOFMSG
 	_cj17_1) cat << ENDOFMSG
 
 WARNING: < $_value > was not found in jailmap.conf, and
-         < $_passvar > was blank in jmap. Manually edit
+         < $_passvar > was blank in qmap. Manually edit
          $_passvar in /usr/local/etc/quBSD/jailmap.conf
 ENDOFMSG
 	;;

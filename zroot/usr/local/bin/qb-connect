@@ -72,7 +72,7 @@ check_security() {
 		_secG=$(jexec -l -U root $GATEWAY sysctl kern.securelevel | grep -Eo '[^[:blank:]]+$')
 
 	else
-		# If not running, rely on rc.conf and JMAP
+		# If not running, rely on rc.conf and QMAP
 		_pfG=$(grep -E "pf_enable=.*YES" ${M_ZUSR}/${GATEWAY}/rw/etc/rc.conf)
 		_secG=$(get_jail_parameter -eqs SECLVL "$GATEWAY")
 	fi

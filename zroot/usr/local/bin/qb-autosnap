@@ -73,16 +73,16 @@ calculate_variables() {
 	fi
 }
 
-sync_from_jmap() {
+sync_from_qmap() {
 
-	# Get list of all jails with an AUTOSNAP setting in JMAP
+	# Get list of all jails with an AUTOSNAP setting in QMAP
 	_jlist=$(qb-list -p AUTOSNAP | grep -E "(true|false)" | awk '{print $1}')
 
 	# Check/set each entry one by one
 	for _jail in $_jlist ; do
 
-		# Pull the value of the autosnap option in JMAP
-		_value=$(sed -En "s/^${_jail}[[:blank:]]+AUTOSNAP[[:blank:]]+//gp" $JMAP)
+		# Pull the value of the autosnap option in QMAP
+		_value=$(sed -En "s/^${_jail}[[:blank:]]+AUTOSNAP[[:blank:]]+//gp" $QMAP)
 
 		# zroot vs zusr dataset depending on CLASS
 		case "$(get_jail_parameter -eqs CLASS "$_jail")" in
@@ -149,8 +149,8 @@ new_snapshots() {
 }
 
 main() {
-	# Sync from JMAP just in case.
-	sync_from_jmap
+	# Sync from QMAP just in case.
+	sync_from_qmap
 
 	# List first
 	[ -n "$LIST" ] && list_datasets

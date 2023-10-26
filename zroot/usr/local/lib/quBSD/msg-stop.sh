@@ -83,7 +83,7 @@ qb-stop [-F] <jail_list>
    If no [-a|-A|-f] is specified, < jail list > (positional
    parameters) at the end are assumed to be jail stops.
 
-   -a: (a)uto. Stop all jails tagged with autostop in jmap
+   -a: (a)uto. Stop all jails tagged with autostop in qmap
        This is the default behavior if no opts are specified.
    -A: (A)ll. Start ALL valid jails on the system.
    -e: (e)xclude. Start [-a|-A] jails, but exclude jails

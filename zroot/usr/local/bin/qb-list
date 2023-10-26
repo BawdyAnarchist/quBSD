@@ -48,10 +48,10 @@ check_and_adjust() {
 		none_*_none_none)
 
 			# Check if it's a parameter
-			awk '{print $2}' $JMAP | grep -Eqsi "$POS1" && PARAM="$POS1"
+			awk '{print $2}' $QMAP | grep -Eqsi "$POS1" && PARAM="$POS1"
 
-			# Check if it's an entry in JMAP
-			grep -Eqs "^${POS1}[[:blank:]]+" $JMAP && JAIL="$POS1"
+			# Check if it's an entry in QMAP
+			grep -Eqs "^${POS1}[[:blank:]]+" $QMAP && JAIL="$POS1"
 
 			# If jail=param (and not 'none'), then it's ambiguous what the user wanted
 			[ ! "$JAIL" = "none" ] && [ "$PARAM" = "$JAIL" ] && get_msg_list "_2" "usage_1"
@@ -80,12 +80,12 @@ get_results() {
 
 		# List all jails (regardless of [-l] given or not)
 		*_f_none_NONE)
-				_RESULT=$(awk '{print $1}' $JMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
+				_RESULT=$(awk '{print $1}' $QMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
 		;;
 
 		# List all jails and then list their zfs's
 		t_t_none_NONE)
-				_RESULT=$(awk '{print $1}' $JMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
+				_RESULT=$(awk '{print $1}' $QMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
 				get_zresult
 		;;
 
@@ -96,7 +96,7 @@ get_results() {
 
 		# Show a particular jail
 		*_*_*_NONE)
-			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $JMAP)
+			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $QMAP)
 			[ "$ZLIST" = "t" ] && get_zresult
 
 			# Add in devfs if appropriate, and supplement missing values with #defaults
@@ -105,12 +105,12 @@ get_results() {
 
 		# Show a particular parameter
 		*_*_none_*)
-			_RESULT=$(grep -E "^[^[:blank:]]+[[:blank:]]+${PARAM}[[:blank:]]" $JMAP)
+			_RESULT=$(grep -E "^[^[:blank:]]+[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
 		;;
 
 		# Show a jail/parameter combo
 		*_f_*_*)
-			_RESULT=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $JMAP)
+			_RESULT=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
 			[ "$ZLIST" = "t" ] && get_zresult
 		;;
 	esac
@@ -152,7 +152,7 @@ supplement_results() {
 	# Find the #defaults that will need to be added
 	for _param in $FILT_PARAMS ; do
 		! echo "$_current_params" | grep -qs "$_param" && _RESULT="$(echo "$_RESULT" \
-										; grep -E "^#default[[:blank:]]+${_param}[[:blank:]]" $JMAP)"
+										; grep -E "^#default[[:blank:]]+${_param}[[:blank:]]" $QMAP)"
 	done
 
 	# Sort the result by the 2nd column

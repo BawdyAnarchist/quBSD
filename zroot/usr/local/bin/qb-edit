@@ -34,7 +34,7 @@ get_options() {
 	_param=$(echo "$PARAM" | tr '[:upper:]' '[:lower:]')
 
 	# Necessary for editing lines vs adding lines
-	OLDVALUE=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]].*" $JMAP)
+	OLDVALUE=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]].*" $QMAP)
 
 	# This will return global variables: CLASS and FILT_PARAMS
 	get_parameter_lists "$JAIL"
@@ -47,7 +47,7 @@ checks() {
 		[ -n "$JAIL" ] && [ -n "$PARAM" ] || get_msg_edit "_1" "usage_1"
 
 		# Make sure at least one line exists to delete
-		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $JMAP \
+		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QMAP \
 				|| get_msg_edit "_4" "exit_1"
 
 	else
@@ -55,7 +55,7 @@ checks() {
 		[ -z "$JAIL" -o -z "$PARAM" -o -z "$VALUE" ] && get_msg_edit "_1" "usage_1"
 
 		# Error if proposed entry already exists
-		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}[[:blank:]]*\$" $JMAP \
+		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}[[:blank:]]*\$" $QMAP \
 																			&& get_msg_edit "_2" "exit_0"
 
 		# Multi-line parameters receive a new line
@@ -102,33 +102,33 @@ checks() {
 	esac
 }
 
-modify_jmap() {
+modify_qmap() {
 
 	case $ACTION in
 		delete)
-			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $JMAP)
-			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $JMAP
+			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QMAP)
+			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $QMAP
 		;;
 		add)
-			echo "$JAIL  $PARAM  $VALUE" >> $JMAP
+			echo "$JAIL  $PARAM  $VALUE" >> $QMAP
 		;;
 		*)
-			# Modify JMAP and print new settings on success
-			sed -i '' -E "s@^(${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+).*@\1${VALUE}@" $JMAP
+			# Modify QMAP and print new settings on success
+			sed -i '' -E "s@^(${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+).*@\1${VALUE}@" $QMAP
 		;;
 	esac
 
-	# Set IPV4 to auto in JMAP, if the user approved it
+	# Set IPV4 to auto in QMAP, if the user approved it
 	[ "$_IPAUTO" ] \
-		&& sed -i '' -E "\@^${JAIL}[[:blank:]]+IPV4@s@[^[:blank:]]+\$@auto@" $JMAP
+		&& sed -i '' -E "\@^${JAIL}[[:blank:]]+IPV4@s@[^[:blank:]]+\$@auto@" $QMAP
 
 	# Clean up the columns and sorting. Make sure there's no duplicates
-	_newJMAP=$(column -t $JMAP | uniq)
-	_newJMAP=$(echo "$_newJMAP" | sort -k1,1 -k2,2)
-	echo "$_newJMAP" > $JMAP
+	_newQMAP=$(column -t $QMAP | uniq)
+	_newQMAP=$(echo "$_newQMAP" | sort -k1,1 -k2,2)
+	echo "$_newQMAP" > $QMAP
 
 	# BHYVE_CUSTM has extra spaces. At least remove the first space
-	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $JMAP
+	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $QMAP
 
 	# Print the new value
 	[ "$ACTION" = "delete" ] && get_msg_edit "_8_1" || get_msg_edit "_8"
@@ -206,7 +206,7 @@ handle_restarts() {
 main() {
 
 	# jailmap.conf edits
-	modify_jmap
+	modify_qmap
 
 	# Autosnap requires zfs changes
 	[ "$PARAM" = "AUTOSNAP" ] && modify_autosnap

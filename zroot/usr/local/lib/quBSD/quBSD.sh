@@ -26,7 +26,7 @@
 # get_networking_variables - pf.conf ; wireguard ; endpoints
 # get_parameter_lists - Valid parameters are tracked here, and divided into groups
 # get_user_response   - Simple yes/no y/n checker
-# get_jail_parameter  - All JMAP entries, along with sanity checks
+# get_jail_parameter  - All QMAP entries, along with sanity checks
 # get_info            - Info beyond that just for jails or jail parameters
 	# _CLIENTS         - All jails that <jail> serves a network connection
 	# _ONJAILS         - All currently running jails
@@ -75,7 +75,7 @@
 # chk_valid_schg       - none | sys | all ; quBSD convention, schg flags on jail
 # chk_valid_seclvl     - -1|0|1|2|3 ; Applied to jail after start
 # chk_valid_template   - Somewhat redundant with: chk_valid_jail
-# chk_valid_taps       - jmap designates number of taps to add (must be :digit:)
+# chk_valid_taps       - qmap designates number of taps to add (must be :digit:)
 # chk_valid_tmux       - tmux for terminal access to FreeBSD jails. true/false
 # chk_valid_template   - Must be any valid jail
 # chk_valid_vcpus      - Must be an integer less than cpuset -g
@@ -116,16 +116,16 @@ get_global_variables() {
 	# Define variables for files
 	JCONF="/etc/jail.conf"
 	QBDIR="/usr/local/etc/quBSD"
-	JMAP="${QBDIR}/jailmap.conf"
+	QMAP="${QBDIR}/jailmap.conf"
 	QBLOG="/var/log/quBSD.log"
 	QTMP="/tmp/quBSD/"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
-	sed -i '' -E 's/[[:blank:]]*$//' $JMAP
+	sed -i '' -E 's/[[:blank:]]*$//' $QMAP
 
 	# Get datasets, mountpoints; and define files.
-   JAILS_ZFS=$(sed -nE "s:#NONE[[:blank:]]+jails_zfs[[:blank:]]+::p" $JMAP)
-   ZUSR_ZFS=$(sed -nE "s:#NONE[[:blank:]]+zusr_zfs[[:blank:]]+::p" $JMAP)
+   JAILS_ZFS=$(sed -nE "s:#NONE[[:blank:]]+jails_zfs[[:blank:]]+::p" $QMAP)
+   ZUSR_ZFS=$(sed -nE "s:#NONE[[:blank:]]+zusr_zfs[[:blank:]]+::p" $QMAP)
 	M_JAILS=$(zfs get -H mountpoint $JAILS_ZFS | awk '{print $3}')
 	M_ZUSR=$(zfs get -H mountpoint $ZUSR_ZFS | awk '{print $3}')
 }
@@ -198,9 +198,9 @@ get_user_response() {
 }
 
 get_jail_parameter() {
-	# Get corresponding <value> for <jail> <param> from JMAP.
+	# Get corresponding <value> for <jail> <param> from QMAP.
 	# Assigns global variable of ALL CAPS <param> name, with <value>
-	 # -dp: Function default is to get the <#default> from JMAP, whenever the
+	 # -dp: Function default is to get the <#default> from QMAP, whenever the
 	     # retrieved <value> for <jail> <param> is NULL. [-d] prevents this.
 	 # -ep: echo <value> rather than setting the global variable
 	     # Otherwise variable indirection will set <$_PARAM> with <_value>
@@ -212,8 +212,8 @@ get_jail_parameter() {
 	 # -zp: don't error on zero/null values, just return
 
 	# Positional variables:
-	 # $1: _param : The parameter to pull from JMAP
-	 # $2: _jail  : <jail> to reference in JMAP
+	 # $1: _param : The parameter to pull from QMAP
+	 # $2: _jail  : <jail> to reference in QMAP
 
 	# Ensure all options variables are reset
 	local _dp='' ; local _ep='' ; local _qp='' ; local _sp='' ; local _xp='' ; local _zp=''
@@ -240,12 +240,12 @@ get_jail_parameter() {
 	[ -z "$_jail" ] && get_msg $_qp "_0" "jail" && eval $_sp return 1
 	[ -z "$_param" ] && get_msg $_qp "_0" "parameter" && eval $_sp return 1
 
-	# Get the <_value> from JMAP.
-	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
+	# Get the <_value> from QMAP.
+	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
 
 	# Substitute <#default> values, so long as [-d] was not passed
 	if [ -z "$_value" ] && [ -z "$_dp" ] ; then
-		_value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $JMAP)
+		_value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
 	fi
 
 	# If still blank, check for -z or -s options. Otherwise err message and return 1
@@ -289,7 +289,7 @@ get_info() {
 
 	case $_info in
 		_CLIENTS)
-			_value=$(sed -nE "s/[[:blank:]]+GATEWAY[[:blank:]]+${_jail}//p" $JMAP)
+			_value=$(sed -nE "s/[[:blank:]]+GATEWAY[[:blank:]]+${_jail}//p" $QMAP)
 		;;
 		_ONJAILS)
 			# Prints a list of all jails that are currently running
@@ -351,13 +351,13 @@ compile_jlist() {
 		;;
 
 		auto)
-			# Find jails tagged with autostart in jmap.
-			_JLIST=$(grep -E "AUTOSTART[[:blank:]]+true" $JMAP | awk '{print $1}' | uniq)
+			# Find jails tagged with autostart in qmap.
+			_JLIST=$(grep -E "AUTOSTART[[:blank:]]+true" $QMAP | awk '{print $1}' | uniq)
 		;;
 
 		all)
 			# ALL jails from jailmap, except commented lines
-			_JLIST=$(awk '{print $1}' $JMAP | uniq | sed "/^#/d")
+			_JLIST=$(awk '{print $1}' $QMAP | uniq | sed "/^#/d")
 		;;
 
 		?*)
@@ -650,7 +650,7 @@ connect_gateway_to_clients() {
 				# Restart _client pf service
 				jexec -l -U root "$_client" service pf restart > /dev/null 2>&1
 
-				# Reapply jail flags from jmap
+				# Reapply jail flags from qmap
 				qb-flags -r $_client > /dev/null 2>&1 &
 			fi
 		fi
@@ -980,7 +980,7 @@ chk_isvm() {
 
 chk_avail_jailname() {
 	# Checks that the proposed new jailname does not have any entries or partial entries
-	# in JCONF, JMAP, and ZFS datasets
+	# in JCONF, QMAP, and ZFS datasets
 	# Return 0 jailname available, return 1 for any failure
 
 	# Quiet option
@@ -1004,7 +1004,7 @@ chk_avail_jailname() {
    # Checks that proposed jailname doesn't exist or partially exist
 	if chk_valid_zfs "${JAILS_ZFS}/$_jail" || \
 		chk_valid_zfs "${ZUSR_ZFS}/$_jail"  || \
-		grep -Eq "^${_jail}[[:blank:]]+" $JMAP || \
+		grep -Eq "^${_jail}[[:blank:]]+" $QMAP || \
 		grep -Eq "^${_jail}[[:blank:]]*\{" $JCONF ; then
 		get_msg $_qa "_cj15_1" "$_jail" && return 1
 	fi
@@ -1025,7 +1025,7 @@ chk_valid_zfs() {
 }
 
 chk_valid_jail() {
-	# Checks that jail has JCONF, JMAP, and corresponding ZFS dataset
+	# Checks that jail has JCONF, QMAP, and corresponding ZFS dataset
 	# Return 0 for passed all checks, return 1 for any failure
 
 	# Quiet option
@@ -1039,13 +1039,13 @@ chk_valid_jail() {
 	# Fail if no jail specified
 	[ -z "$_value" ] && get_msg $_qv "_0" "jail" && return 1
 
-	# Must have class in JMAP. Used later to find the correct zfs dataset
-	_class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
+	# Must have class in QMAP. Used later to find the correct zfs dataset
+	_class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 	chk_valid_class $_qv "$_class" || return 1
 
 	case $_class in
 		"")
-			# Empty, no class exists in JMAP
+			# Empty, no class exists in QMAP
 			get_msg $_qv "_cj1" "$_value" "class" && return 1
 		;;
 		rootjail)
@@ -1062,13 +1062,13 @@ chk_valid_jail() {
 
 			# Verify the dataset of the template for dispjail
 			local _template=$(sed -nE \
-					"s/^${_value}[[:blank:]]+TEMPLATE[[:blank:]]+//p" $JMAP)
+					"s/^${_value}[[:blank:]]+TEMPLATE[[:blank:]]+//p" $QMAP)
 
 			# First ensure that it's not blank
 			[ -z "$_template" ] && get_msg $_qv "_cj5" "$_value" && return 1
 
 			local _class_of_temp=$(sed -nE \
-				"s/^${_template}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
+				"s/^${_template}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 
 			# Dispjails can only reference appjails.
 			[ "$_class_of_temp" = "dispjail" ] \
@@ -1096,8 +1096,8 @@ chk_valid_jail() {
 	# One more case statement for VMs vs jails
 	case $_class in
 		*jail)
-			# Must have a designated rootjail in JMAP
-			! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $JMAP \
+			# Must have a designated rootjail in QMAP
+			! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $QMAP \
 					&& get_msg $_qv "_cj1" "$_value" "ROOTENV" && return 1
 
 			# Must have an entry in JCONF
@@ -1105,8 +1105,8 @@ chk_valid_jail() {
 					&& get_msg $_qv "_cj3" && return 1
 		;;
 		*VM)
-			# Must have a designated rootVM in JMAP
-			! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $JMAP \
+			# Must have a designated rootVM in QMAP
+			! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $QMAP \
 					&& get_msg $_qv "_cj1" "$_value" "ROOTENV" && return 1
 		;;
 	esac
@@ -1229,7 +1229,7 @@ chk_valid_gateway() {
 	[ "$_gw" = "none" ] && return 0
 
 	# Nonlocal var, class of the gateway is important for jail startups
-	local _class_gw=$(sed -nE "s/^${_gw}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
+	local _class_gw=$(sed -nE "s/^${_gw}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 
 	# Class of gateway should never be a ROOTENV
 	if [ "$_class_gw" = "rootjail" ] || [ "$_class_gw" = "rootVM" ] ; then
@@ -1344,8 +1344,8 @@ chk_isqubsd_ipv4() {
 		;;
 	esac
 
-	# Compare against JMAP, and _USED_IPS.
-	if grep -v "^$_jail" $JMAP | grep -qs "$_value" \
+	# Compare against QMAP, and _USED_IPS.
+	if grep -v "^$_jail" $QMAP | grep -qs "$_value" \
 			|| $(get_info -e _USED_IPS | grep -qs "${_value%/*}") ; then
 		get_msg $_q "_cj11" "$_value" "$_jail" && return 1
 	fi
@@ -1355,7 +1355,7 @@ chk_isqubsd_ipv4() {
 	! [ "$_a0.$_a1.$_a3/$_a4" = "$_ip0.$_ip1.$_ip3/$_subnet" ] \
 			&& get_msg $_q "_cj12" "$_value" "$_jail" && return 1
 
-	_gateway=$(sed -nE "s/^${_jail}[[:blank:]]+GATEWAY[[:blank:]]+//p" $JMAP)
+	_gateway=$(sed -nE "s/^${_jail}[[:blank:]]+GATEWAY[[:blank:]]+//p" $QMAP)
 
 	# Assigning IP to jail that has no gateway
 	[ "$_gateway" = "none" ] && get_msg $_q "_cj14" "$_value" "$_jail" \
@@ -1413,7 +1413,7 @@ chk_valid_memsize() {
 	# None is not permitted for memsize
 	[ "$_value" = "none" ] && get_msg "_cj21_1" && return 1
 
-	# It's the exact same program/routine. Different jmap params to be technically specific.
+	# It's the exact same program/routine. Different qmap params to be technically specific.
 	chk_valid_maxmem $_q "$1" || return 1
 
 	return 0
@@ -1468,7 +1468,7 @@ chk_valid_ppt() {
 	# Get list of pci devices on the machine
 	_pciconf=$(pciconf -l | awk '{print $1}')
 
-	# Check all listed PPT devices from jmap
+	# Check all listed PPT devices from qmap
 	for _val in $_value ; do
 
 		# convert _val to native pciconf format with :colon: instead of /fwdslash/
@@ -1517,8 +1517,8 @@ chk_valid_rootenv() {
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "CLASS" && return 1
 
-	# Must be designated as the appropriate corresponding CLASS in jmap
-	_class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $JMAP)
+	# Must be designated as the appropriate corresponding CLASS in qmap
+	_class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 	if chk_isvm "$_value" ; then
 		[ ! "$_class" = "rootVM" ] && get_msg $_q "_cj16" "$_value" "rootVM" && return 1
 	else
@@ -1733,8 +1733,8 @@ discover_open_ipv4() {
 		# $_ip2 uses variable indirection, which subsitutes "cycle"
 		_ip_test="${_ip0}.${_ip1}.${_ip2}"
 
-		# Compare against JMAP, and the IPs already in use, including the temp file.
-		if grep -Fq "$_ip_test" $JMAP || echo "$_USED_IPS" | grep -Fq "$_ip_test" \
+		# Compare against QMAP, and the IPs already in use, including the temp file.
+		if grep -Fq "$_ip_test" $QMAP || echo "$_USED_IPS" | grep -Fq "$_ip_test" \
 				|| grep -Fqs "$_ip_test" "$_TMP_IP" ; then
 
 			# Increment for next cycle
@@ -1860,7 +1860,7 @@ prep_bhyve_options() {
 	# Assign _vm variable
 	_VM="$1"
 
-	# Get simple jmap variables
+	# Get simple qmap variables
 	_cpuset=$(get_jail_parameter -e CPUSET "$_VM")        || return 1
 	_gateway=$(get_jail_parameter -ez GATEWAY "$_VM")     || return 1
 	_ipv4=$(get_jail_parameter -ez IPV4 "$_VM")           || return 1
@@ -1881,7 +1881,7 @@ prep_bhyve_options() {
 	_BHOPTS="-${_bhyveopts}"
 
 	# Get wildcard bhyve option added by user
-	_bhyve_custm=$(sed -En "s/${_VM}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+//p" $JMAP \
+	_bhyve_custm=$(sed -En "s/${_VM}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+//p" $QMAP \
 						| sed -En "s/[[:blank:]]+/ /p")
 
 	# Handle CPU pinning, or if none, then just assign the number of vcpus
@@ -1972,7 +1972,7 @@ EOF
 	# Assign VNC FBUF options
 	if [ "$_vncres" ] && [ ! "$_vncres" = "none" ] ; then
 
-		# Define height/width from the jmap entry
+		# Define height/width from the qmap entry
 		_w=$(echo "$_vncres" | grep -Eo "^[[:digit:]]+")
 		_h=$(echo "$_vncres" | grep -Eo "[[:digit:]]+\$")
 

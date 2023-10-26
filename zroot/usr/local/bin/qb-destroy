@@ -87,7 +87,7 @@ main() {
 		&& zfs destroy -rRf ${ZUSR_ZFS}/${JAIL}
 
 	# Modify Files
-	sed -i '' -E "/^${JAIL}[[:blank:]]/d" $JMAP
+	sed -i '' -E "/^${JAIL}[[:blank:]]/d" $QMAP
 	sed -i '' -E "/^${JAIL}(\{|[[:blank:]])/,/^}/d" $JCONF
 }
 

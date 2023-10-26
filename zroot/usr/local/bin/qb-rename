@@ -32,8 +32,8 @@ checks_and_variables() {
 	# Finds jails dependent on the jail to be renamed
 	get_info _CLIENTS $JAIL
 
-	ROOT_FOR=$(sed -En "/ROOTENV[[:blank:]]+${JAIL}\$/s/^([^[:blank:]]+).*/\1/p" $JMAP)
-	TEMPL_FOR=$(sed -En "/TEMPLATE[[:blank:]]+${JAIL}\$/s/^([^[:blank:]]).*/\1/p" $JMAP)
+	ROOT_FOR=$(sed -En "/ROOTENV[[:blank:]]+${JAIL}\$/s/^([^[:blank:]]+).*/\1/p" $QMAP)
+	TEMPL_FOR=$(sed -En "/TEMPLATE[[:blank:]]+${JAIL}\$/s/^([^[:blank:]]).*/\1/p" $QMAP)
 
 	# Figure out which jails should be restarted
 	for _jail in $JAIL $_CLIENTS $ROOT_FOR $TEMPL_FOR ; do
@@ -51,7 +51,7 @@ rename_common() {
 	qb-stop -w "$JAIL $_RESTARTS" || get_msg_rename "_3" "exit_1"
 
 	# Modify jailmap. Roojails should update their own rootjail to self
-	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}  /g" $JMAP
+	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}  /g" $QMAP
 	[ "$JAIL" = "$ROOTENV" ] && qb-edit -fq ${NEWNAME} ${ROOTENV} ${NEWNAME}
 
 	# Rename associated zfs datasets
