@@ -1,9 +1,5 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-- qb-create
-	- Still havent tested multiline parameters (like PPT) or BHYVE_CUSTM
-	- I think there were still problems with some of the creates. Like ones with solely a template
-
 - qb-connect
 	- VM integration: jail/VM connections, specifically SSH preparation for files copy
 
