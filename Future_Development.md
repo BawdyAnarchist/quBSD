@@ -52,11 +52,6 @@ Host as Unprivileged user
 
 ### SPECIFIC SCRIPTS
 
-qb-cmd should pull from the user's chosen shell, not default to csh
-	- I do worry tho, that the csh -c '<commands>' construction might fail if I do that
-
-qb-hostnet _TIME variable should be called TIMEOUT, and it should have a better check
-
 qb-stat
 	- I like my hardcode setup, but columns sorting and even a generalized setup file might be better
 	- Also the ability to choose which columns are displayed
