@@ -8,21 +8,22 @@ get_options() {
 		case $opts in
 			d) _CMD="down" ;;
 			h) get_msg_hostnet "none" "usage_0" ;;
-			t) _TIME="$OPTARG" ;;
+			t) _TIMEOUT="$OPTARG" ;;
 			u) [ -z "$_CMD" ] && _CMD="up" || get_msg_hostnet "_1" "usage_1" ;;
 			*) exit 1 ;;
 		esac
 	done
 
-	_TIME="${_TIME:=300}"
+	_TIMEOUT="${_TIMEOUT:=300}"
 }
 
 get_parameters() {
 	# Did not specify an action
 	[ -z "$_CMD" ] && get_msg_hostnet "_2" "usage_1"
 
-	# [-t time] was invalid
-	[ "$_TIME" -ge 0 ] || get_msg_hostnet "_6" "usage_1"
+	# Check validity of timeout provided
+	echo "$_TIMEOUT" | grep -Eqs '^[[:digit:]]+$' || get_msg_hostnet "_6" "usage_1"
+	[ "$_TIMEOUT" -gt 0 ] || get_msg_hostnet "_6" "usage_1"
 
 	# Must get host network parameters.
 	get_jail_parameter GATEWAY "host" || exit 1
@@ -45,10 +46,10 @@ connection_down() {
 
 revert_connection() {
 	# User opted out of the <timeout> feature
-	[ "$_TIME" -eq 0 ] && get_msg_hostnet "_7" "exit_0"
+	[ "$_TIMEOUT" -eq 0 ] && get_msg_hostnet "_7" "exit_0"
 
 	# Wait the prescribed time
-	sleep $_TIME
+	sleep $_TIMEOUT
 
 	# Check that there aren't still `pkg` or `freebsd-update` commands being run
 	while $(pgrep -qf '/usr/sbin/freebsd-update') || $(pgrep -q 'pkg') ; do
