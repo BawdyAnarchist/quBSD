@@ -55,7 +55,7 @@ parse_jail_vars() {
 
 connect_vm_session() {
 
-	# Pull the qconf parameters for VM attachment
+	# Pull the qmap parameters for VM attachment
 	get_jail_parameter TMUX $JAIL
 	get_jail_parameter VNCRES $JAIL
 
