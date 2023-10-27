@@ -25,11 +25,6 @@ NICVM
   - Make a Linux VM so that it can use all the wireless protocols.
      - Someone made a post about this in FreeBSD
 
-net-firewall
-	- pf.conf 
-		- Currently does not integrate all unique wireguard ports of clients (net-jails).
-		- needs careful review. Use chatGPT-4
-
 
 ### UPGRADES
 
