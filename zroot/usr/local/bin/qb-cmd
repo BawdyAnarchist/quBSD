@@ -28,10 +28,10 @@ parse_jail_vars() {
 	# Passing commands through another terminal is tricky.
 	if [ -z "$_CMD" ] ; then
 		# No command is provided. Default to /bin/csh. Quotation not required
-		_CMD="${_CMD:=/bin/csh}"
+		_CMD="${_CMD:=$SHELL}"
 
 		# Redirect not desired, because we're using host xterm to access JAIL
-		_REDIRECT=''
+		unset _REDIRECT=''
 	else
 		# Quotations are required to pass multiple arguments to jail, through jexec
 		_CMD="'${_CMD}'"
@@ -104,7 +104,7 @@ main() {
 	else
 		# Start the gateways then the jail, then execute command
 		! chk_isrunning $JAIL && ! qb-start "$JAIL" && get_msg_cmd "_1" "exit_1"
-		eval $_NEWWIND "jexec -l -U $_USER $JAIL csh -c $_CMD $_REDIRECT"
+		eval $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c $_CMD $_REDIRECT"
 	fi
 }
 
