@@ -40,7 +40,7 @@ checks() {
 
 main() {
 	if [ "$DOWN" ] ; then
-		chflags -R noschg ${M_JAILS}/$JAIL
+		chflags -R noschg ${M_QROOT}/$JAIL
 		[ -e ${M_ZUSR}/$JAIL ] && chflags -R noschg ${M_ZUSR}/$JAIL  
 
 	elif [ "$UP" ] ; then
@@ -50,7 +50,7 @@ main() {
 
 		# Cycle through directories above and recursively schg  
 	   for _dir in $jdir; do
-			chflags -R schg "${M_JAILS}/${JAIL}/${_dir}" > /dev/null 2>&1
+			chflags -R schg "${M_QROOT}/${JAIL}/${_dir}" > /dev/null 2>&1
 		done
 
 	elif [ "$RESTORE" ] ; then

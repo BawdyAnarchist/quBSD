@@ -50,18 +50,18 @@ rename_common() {
 	# Stop all jails before renaming. Rename should not happen if stops fails
 	qb-stop -w "$JAIL $_RESTARTS" || get_msg_rename "_3" "exit_1"
 
-	# Modify jailmap. Roojails should update their own rootjail to self
+	# Modify qubsdmap. Roojails should update their own rootjail to self
 	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}  /g" $QMAP
 	[ "$JAIL" = "$ROOTENV" ] && qb-edit -fq ${NEWNAME} ${ROOTENV} ${NEWNAME}
 
 	# Rename associated zfs datasets
-	chk_valid_zfs ${ZUSR_ZFS}/${JAIL} \
-			&& zfs rename -f ${ZUSR_ZFS}/${JAIL} ${ZUSR_ZFS}/${NEWNAME} \
-			&& zfs inherit mountpoint ${ZUSR_ZFS}/${NEWNAME}
+	chk_valid_zfs ${U_ZFS}/${JAIL} \
+			&& zfs rename -f ${U_ZFS}/${JAIL} ${U_ZFS}/${NEWNAME} \
+			&& zfs inherit mountpoint ${U_ZFS}/${NEWNAME}
 
-	chk_valid_zfs ${JAILS_ZFS}/${JAIL} \
-			&& zfs rename -f ${JAILS_ZFS}/${JAIL} ${JAILS_ZFS}/${NEWNAME} \
-			&& zfs inherit mountpoint ${JAILS_ZFS}/${NEWNAME}
+	chk_valid_zfs ${R_ZFS}/${JAIL} \
+			&& zfs rename -f ${R_ZFS}/${JAIL} ${R_ZFS}/${NEWNAME} \
+			&& zfs inherit mountpoint ${R_ZFS}/${NEWNAME}
 }
 
 rename_jail() {

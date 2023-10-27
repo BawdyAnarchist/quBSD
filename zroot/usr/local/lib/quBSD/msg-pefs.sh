@@ -35,7 +35,7 @@ ENDOFMSG
 	;;
 	_6) cat << ENDOFMSG
 
-ERROR: Failed to unmount < $(echo $_dir | sed "s:${M_ZUSR}:${M_JAILS}:") > 
+ERROR: Failed to unmount < $(echo $_dir | sed "s:${M_ZUSR}:${M_QROOT}:") > 
 ENDOFMSG
 	;;
 	_7) cat << ENDOFMSG

@@ -10,7 +10,7 @@ main() {
 
 	# /rw/ nullfs mounts are best symlinked from within the cloned appjail's root 
 	if [ "$CLASS" != "rootjail" ] ; then
-        	chroot ${M_JAILS}/${JAIL} /bin/sh <<"EOT"
+        	chroot ${M_QROOT}/${JAIL} /bin/sh <<"EOT"
                 ln_files=$(find "/rw" -type f | sed "s:/rw::")
                 if [ -n "$ln_files" ] ; then
 			ln_dirs=$(echo "$ln_files" | sed "s#\(.*\)/.*#\1#" | sed '/^$/d' | uniq)

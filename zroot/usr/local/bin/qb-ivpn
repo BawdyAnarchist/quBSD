@@ -233,7 +233,7 @@ flags_down() {
 	chflags -RL noschg ${PATHMOD}/${PFCONF}
 	
 	# Make sure that qb-ivpn can be copied to the jail
-	chflags -R noschg "${M_JAILS}/${JAIL}/usr/local/bin"
+	chflags -R noschg "${M_QROOT}/${JAIL}/usr/local/bin"
 }
 
 update_api() {
@@ -364,7 +364,7 @@ main() {
 
 	else
 		# Copy qb-ivpn to ensure jail is operating off the most recent version
-		cp /usr/local/bin/qb-ivpn "${M_JAILS}/${JAIL}/usr/local/bin/qb-ivpn"
+		cp /usr/local/bin/qb-ivpn "${M_QROOT}/${JAIL}/usr/local/bin/qb-ivpn"
 
 		# Re-run script in jail to modify ivpn 
 		jexec -l -U root $JAIL qb-ivpn -x -p $PORT

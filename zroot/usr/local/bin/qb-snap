@@ -34,7 +34,7 @@ checks() {
 		get_jail_parameter CLASS "$JAIL"
 	
 		# var $_ZFS prevents multiple if/then statements later on.
-		[ "$CLASS" = "rootjail" ] && _ZFS="${JAILS_ZFS}" || _ZFS="${ZUSR_ZFS}"
+		[ "$CLASS" = "rootjail" ] && _ZFS="${R_ZFS}" || _ZFS="${U_ZFS}"
 
 	# _CMD specific checks and variable assignments
 	case $_CMD in 

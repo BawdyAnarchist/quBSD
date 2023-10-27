@@ -20,7 +20,7 @@ get_options() {
 	# Define script variables
 	JAIL="$1"
 	DATETIME=$(date +%b%d_%H%M)
-	NEWSNAP="${ZUSR_ZFS}/${JAIL}@DISP${DATETIME}"
+	NEWSNAP="${U_ZFS}/${JAIL}@DISP${DATETIME}"
 }
 
 newjail_name() {
@@ -63,8 +63,8 @@ main() {
 
 destroy_dispjail() {
 	stop_jail "$NEWJAIL"
-	zfs destroy -rRf ${JAILS_ZFS}/$NEWJAIL > /dev/null 2>&1
-	zfs destroy -rRf ${ZUSR_ZFS}/$NEWJAIL > /dev/null 2>&1
+	zfs destroy -rRf ${R_ZFS}/$NEWJAIL > /dev/null 2>&1
+	zfs destroy -rRf ${U_ZFS}/$NEWJAIL > /dev/null 2>&1
 	zfs destroy $NEWSNAP > /dev/null 2>&1
 	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QMAP
 	sed -i '' -E "\@${NEWJAIL}[[:blank:]]*\{@,\@^[[:blank:]]*\}[[:blank:]]*\$@d" $JCONF

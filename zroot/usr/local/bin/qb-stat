@@ -82,7 +82,7 @@ get_jails_loop() {
 	fi
 
 	# Get ZFS disk size
-	[ -z "${class##root*}" ] && _zfs="${JAILS_ZFS}" || _zfs="${ZUSR_ZFS}"
+	[ -z "${class##root*}" ] && _zfs="${R_ZFS}" || _zfs="${U_ZFS}"
 	chk_valid_zfs "${_zfs}/${_jail}" && disk=$(zfs list -Ho used "${_zfs}/${_jail}")
 
 	# This is for ordering purposes

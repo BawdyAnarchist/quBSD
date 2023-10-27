@@ -39,12 +39,12 @@ cleanup_disps() {
 	done
 
 	# Remove lingering DISP datasets in qubsd's zroot
-	for _disp in $(zfs list -Hro name "$JAILS_ZFS" | grep "DISP") ; do
+	for _disp in $(zfs list -Hro name "$R_ZFS" | grep "DISP") ; do
 		zfs destroy -rRf $_disp > /dev/null 2>&1
 	done
 
 	# Remove lingering DISP datasets in qubsd's zusr
-	for _disp in $(zfs list -Hro name "$ZUSR_ZFS" | grep "DISP") ; do
+	for _disp in $(zfs list -Hro name "$U_ZFS" | grep "DISP") ; do
 		zfs destroy -rRf $_disp > /dev/null 2>&1
 	done
 

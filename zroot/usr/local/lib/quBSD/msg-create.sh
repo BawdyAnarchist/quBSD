@@ -55,12 +55,12 @@ ENDOFMSG
 	_e5_3) cat << ENDOFMSG
 
 ERROR: Specified size < $U_ZOPT > for new zfs block device,
-       is greater than available < $ZUSR_ZFS > space: < $(zfs list -Ho available $ZUSR_ZFS) >
+       is greater than available < $U_ZFS > space: < $(zfs list -Ho available $U_ZFS) >
 ENDOFMSG
 	;;
 	_e5_4) cat << ENDOFMSG
 
-ERROR: [-z empty] for a new VM ${ZUSR_ZFS} block device,
+ERROR: [-z empty] for a new VM ${U_ZFS} block device,
        must specify [-v <volsize>].
 ENDOFMSG
 	;;
@@ -112,7 +112,7 @@ ENDOFMSG
 	;;
 	_e8_4) cat << ENDOFMSG
 
-ERROR: [-i] zfs already exists at < ${JAILS_ZFS}/${NEWJAIL} >. For safety
+ERROR: [-i] zfs already exists at < ${R_ZFS}/${NEWJAIL} >. For safety
        reasons, qb-create will not overwrite existing volumes.
        To use this location run qb-destroy, to eliminate
        possible conflicts with what might be another jail/VM.
@@ -131,7 +131,7 @@ ERROR: User specified [-c rootjail/VM] which will create a new
        ondisk ROOTENV from [-t ${TEMPLATE}] which isn't a
        ROOTENV. It's an edge usecase operation that creates a
        full, ondisk duplicate from a snapshot of the clone:
-       ${JAILS_ZFS}/${TEMPLATE}
+       ${R_ZFS}/${TEMPLATE}
 
        Please run command again with [-Z] option, to confirm.
 ENDOFMSG
@@ -159,11 +159,11 @@ ENDOFMSG
 	;;
 	_w1_2) cat << ENDOFMSG
 New disk space consumed:  $VOLSIZE
-New block storage device: ${ZUSR_ZFS}/${NEWJAIL}
+New block storage device: ${U_ZFS}/${NEWJAIL}
 ENDOFMSG
 	;;
 	_w1_3) cat << ENDOFMSG
-Creating $CLASS from:  ${ZUSR_ZFS}/${NEWJAIL}
+Creating $CLASS from:  ${U_ZFS}/${NEWJAIL}
 ENDOFMSG
 	;;
 	_w1_4) cat << ENDOFMSG
@@ -192,12 +192,12 @@ echo -e "     PROCEED? (Y/n): \c"
 ;;
 	_w6) cat << ENDOFMSG
 ALERT: No template was specified or found for the new appjail.
-       Creating an empty $ZUSR_ZFS dataset for < $NEWJAIL >
+       Creating an empty $U_ZFS dataset for < $NEWJAIL >
 ENDOFMSG
 	;;
 	_w7) cat << ENDOFMSG
 ALERT: No valid template was specified or found for the new VM.
-       Creating empty and unformatted $VOLSIZE $ZUSR_ZFS block device
+       Creating empty and unformatted $VOLSIZE $U_ZFS block device
        for < $NEWJAIL >, which will be attached to VM at boot;
        but the VM will not have custom script to execute at start.
 ENDOFMSG
@@ -305,7 +305,7 @@ At the command line, a new ROOTENV requires a template,
 to prevent accidental creation of an ondisk ROOTENV. Here
 we'll assume you want to use < $ROOTENV > as the template.
 
-Here are the jailmap.conf settings for:  $ROOTENV
+Here are the qubsdmap.conf settings for:  $ROOTENV
 ENDOFMSG
 		qb-list -j $ROOTENV
 
@@ -327,7 +327,7 @@ A TEMPLATE ACCOMPLISHES TWO DISTINCT FUNCITONS
    or use [-z] to copy only its directory structure (no files).
 
 IF NO TEMPLATE IS SPECIFIED
-1. "#default" Jail Parameters in jailmap.conf are used.
+1. "#default" Jail Parameters in qubsdmap.conf are used.
 2. The zusr template associated with the ROOTENV, is duplicated.
    (These have baseline files associated with their purpose).
    0base-template, 0net-template, 0gui-template, 0serv-template
@@ -545,7 +545,7 @@ Dispjail:           qb-create -c dispjail -t <template> <newjail>
 Duplicate ROOTENV:  qb-create -t <existing_rootenv> <newjail/VM>
 Install rootVM:     qb-create -i /usr/local/share/ISOs/<ISOfile> -v <size> <newVM>
 
-If no opts or <template> are specified, jailmap \'#default' are used.
+If no opts or <template> are specified, qubsdmap \'#default' are used.
   #default can be viewed with:   qb-list -j #default
   #default can be changed with:  qb-edit #default <PARAM> <value>
 
@@ -610,17 +610,17 @@ Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>]
           form or another. Use [-z] to specify zusr dataset handling.
           Note! [-c <rootjail|rootVM>] requires [-t <template>]
    -r: (r)ootenv. Designates the <rootenv> for <newjail/VM>
-   -v: (v)olsize for: rootVM at ${JAILS_ZFS}; or appVM at ${ZUSR_ZFS}
+   -v: (v)olsize for: rootVM at ${R_ZFS}; or appVM at ${U_ZFS}
        Use same convention as MEMSIZE.
    -y: (y)es: Assume "Y" for warnings/confirmations before proceeding.
    -z: (z)usropt: How to handle <newjail/VM> zusr dataset. Only applies
        to appjail/VM, not disp. Default behavior is <dupl>.
        <dupl>  Jail/VM. Duplicate dataset/block device. Consumes disk.
        <dirs>  Jail only. Copy <template> empty directories, no files.
-       <empty> Jail/VM. Create empty dataset/block device on $ZUSR_ZFS
+       <empty> Jail/VM. Create empty dataset/block device on $U_ZFS
                If VM, must specify [-v], and it will be unformatted.
    -Z: (Z)rootopt: Creates a new ROOTENV with an independent on-disk
-       dataset, from snapshot of:  ${JAILS_ZFS}/<template>
+       dataset, from snapshot of:  ${R_ZFS}/<template>
 
 FOR [-p <PARAMETERS>] LIST AND DETAILS, RUN:  qb-help params
 ENDOFUSAGE

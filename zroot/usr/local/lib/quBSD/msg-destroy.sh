@@ -16,7 +16,7 @@ ENDOFMSG
 	_2) cat << ENDOFMSG
 
 ERROR: < $JAIL > has the \`no_destroy protection flag' set in
-       jailmap.conf.  Change flag to \`false', and run again.
+       qubsdmap.conf.  Change flag to \`false', and run again.
 ENDOFMSG
 	;;
 	_3) cat << ENDOFMSG
@@ -71,11 +71,11 @@ ENDOFMSG
 usage() { cat << ENDOFUSAGE
 
 qb-destroy: Destroy <jail/VM> and purge associated configs:
-            jail.conf ; jailmap.conf ; zfs datasets
+            jail.conf ; qubsdmap.conf ; zfs datasets
 
 Even if jail is partially created, this command will purge it.
 
-There is a protection mechanism for all jails/VMs. jailmap.conf
+There is a protection mechanism for all jails/VMs. qubsdmap.conf
 has a parameter called: \`no_destroy', which defaults to true.
 Must manually edit this setting to false, before qb-destroy
 

@@ -56,8 +56,8 @@ toggle_service() {
 				sysctl hw.snd.basename_clone=1
 			;;
 			webcamd)
-				devfs -m ${M_JAILS}/${JAIL}/dev ruleset $HIDE applyset
-				devfs -m ${M_JAILS}/${JAIL}/dev rule -s $HIDE applyset
+				devfs -m ${M_QROOT}/${JAIL}/dev ruleset $HIDE applyset
+				devfs -m ${M_QROOT}/${JAIL}/dev rule -s $HIDE applyset
 			;;
 		esac
 
@@ -72,11 +72,11 @@ toggle_service() {
 			;;
 			webcamd)
 				# Change to the devfs ruleset that unhides the camera
-				devfs -m ${M_JAILS}/${JAIL}/dev ruleset $UNHIDE 
-				devfs -m ${M_JAILS}/${JAIL}/dev rule -s $UNHIDE applyset
+				devfs -m ${M_QROOT}/${JAIL}/dev ruleset $UNHIDE 
+				devfs -m ${M_QROOT}/${JAIL}/dev rule -s $UNHIDE applyset
 
 				# Must bring down flags to make changes to pwdb, then bring flags up again
-				chflags -R noschg ${M_JAILS}/${JAIL}/etc 
+				chflags -R noschg ${M_QROOT}/${JAIL}/etc 
 				jexec -l -U root $JAIL pw groupmod -n $_device -m 1001
 				qb-flags -r $JAIL
 			;;

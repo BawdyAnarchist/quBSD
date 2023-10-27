@@ -32,14 +32,14 @@ define_variables() {
 									| awk '{print $1}' | sed "s@.*/@@")
 
 	# Get sizes of datasets to be destroyed, and simulation messages from zfs
-	if chk_valid_zfs ${ZUSR_ZFS}/${JAIL} ; then
-		zusrSize=$(zfs list -o used ${ZUSR_ZFS}/${JAIL} | tail -1)
-		zusrDestroy=$(zfs destroy -nvrRf ${ZUSR_ZFS}/${JAIL} | grep -v "${JAIL}\@")
+	if chk_valid_zfs ${U_ZFS}/${JAIL} ; then
+		zusrSize=$(zfs list -o used ${U_ZFS}/${JAIL} | tail -1)
+		zusrDestroy=$(zfs destroy -nvrRf ${U_ZFS}/${JAIL} | grep -v "${JAIL}\@")
 	fi
 
-	if	chk_valid_zfs ${JAILS_ZFS}/$JAIL ; then
-		zrootSize=$(zfs list -o used ${JAILS_ZFS}/${JAIL} | tail -1)
-		zrootDestroy=$(zfs destroy -nvrRf ${JAILS_ZFS}/${JAIL} | grep -v "${JAIL}\@")
+	if	chk_valid_zfs ${R_ZFS}/$JAIL ; then
+		zrootSize=$(zfs list -o used ${R_ZFS}/${JAIL} | tail -1)
+		zrootDestroy=$(zfs destroy -nvrRf ${R_ZFS}/${JAIL} | grep -v "${JAIL}\@")
 	fi
 }
 
@@ -79,12 +79,12 @@ main() {
 
 	# Destroy datasets
 	[ "$zrootDestroy" ] \
-		&& chk_valid_zfs "${JAILS_ZFS}/${JAIL}" \
-		&& zfs destroy -rRf ${JAILS_ZFS}/${JAIL}
+		&& chk_valid_zfs "${R_ZFS}/${JAIL}" \
+		&& zfs destroy -rRf ${R_ZFS}/${JAIL}
 
 	[ "$zusrDestroy" ] \
-		&& chk_valid_zfs "${ZUSR_ZFS}/${JAIL}" \
-		&& zfs destroy -rRf ${ZUSR_ZFS}/${JAIL}
+		&& chk_valid_zfs "${U_ZFS}/${JAIL}" \
+		&& zfs destroy -rRf ${U_ZFS}/${JAIL}
 
 	# Modify Files
 	sed -i '' -E "/^${JAIL}[[:blank:]]/d" $QMAP

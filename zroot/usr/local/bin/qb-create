@@ -104,7 +104,7 @@ checks_install() {
 	[ -z "$VOLSIZE" ] && get_msg_create "_e8_2" "exit_1"
 	[ -e "$INSTALL" ] || get_msg_create "_e8_3" "exit_1"
 
-	chk_valid_zfs "${JAILS_ZFS}/${NEWJAIL}" && get_msg_create "_e8_4" "exit_1"
+	chk_valid_zfs "${R_ZFS}/${NEWJAIL}" && get_msg_create "_e8_4" "exit_1"
 
 	# Add qmap line to launch VM with ahci-cd ISO
 	echo "$NEWJAIL  BHYVE_CUSTM  -s #,ahci-cd,${INSTALL}" >> $_TMP_PARAMS
@@ -261,8 +261,8 @@ assign_datasets() {
 			# If no template for zusr, try to find one.
 			( [ -z "$temp_cl" ] || [ -z "${temp_cl##root*}" ] ) && TEMPLATE="${ROOTENV}-template"
 
-			R_ZPARENT="${JAILS_ZFS}/${ROOTENV}"
-			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
+			R_ZPARENT="${R_ZFS}/${ROOTENV}"
+			U_ZPARENT="${U_ZFS}/${TEMPLATE}"
 
 			# Handle missing zusr dataset. For VMs, minimum block device size that zfs allows, is 80M
 			if ! chk_valid_zfs "$U_ZPARENT" ; then
@@ -278,15 +278,15 @@ assign_datasets() {
 
 		disp*_app*)  # [-Z] is only for creating rootjails
 	     	[ "$R_ZOPT" ] && get_msg_create "_e7" "exit_1"
-			R_ZPARENT="${JAILS_ZFS}/${ROOTENV}"
-			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
+			R_ZPARENT="${R_ZFS}/${ROOTENV}"
+			U_ZPARENT="${U_ZFS}/${TEMPLATE}"
 
 			# Dispjails always clone from another jail
 			U_ZOPT="clone"
 		;;
 
 		rootVM_)  # New rootVM from install
-			R_ZPARENT="${JAILS_ZFS}/${NEWJAIL}"
+			R_ZPARENT="${R_ZFS}/${NEWJAIL}"
 			U_ZOPT="skip"
 
 			# The checks/assignments after this, arent applicable to new VM installation
@@ -294,13 +294,13 @@ assign_datasets() {
 		;;
 
 		root*_root*)  # New rootjail from any other rootjail.
-			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
-			R_ORIGIN="${JAILS_ZFS}/${TEMPLATE}"
+			R_ZPARENT="${R_ZFS}/${TEMPLATE}"
+			R_ORIGIN="${R_ZFS}/${TEMPLATE}"
 			U_ZOPT="skip"
 		;;
 
 		disp*_root*)  # Can create a dispjail from a rootjail too.
-			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
+			R_ZPARENT="${R_ZFS}/${TEMPLATE}"
 			U_ZOPT="skip"
 
 			# If the user entered conflicting options, error and exit
@@ -311,22 +311,22 @@ assign_datasets() {
 		# New rootjail, but checks for [-Z]. Ensures user intends new rootjail from app/disp jail.
 		root*_app*|root*_disp*)
 			[ "$R_ZOPT" ] || get_msg_create "_e10" "exit_1"
-			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
-			R_ORIGIN=$(zfs list -Ho origin "${JAILS_ZFS}/${TEMPLATE}" | sed -E "s/\@.*//")
+			R_ZPARENT="${R_ZFS}/${TEMPLATE}"
+			R_ORIGIN=$(zfs list -Ho origin "${R_ZFS}/${TEMPLATE}" | sed -E "s/\@.*//")
 			U_ZOPT="skip"
 		;;
 
 		# Provide a way to simply copy an existing dispjail. This is NOT creating a disp of a disp
 		disp*_disp*)
-			R_ZPARENT="${JAILS_ZFS}/${ROOTENV}"
+			R_ZPARENT="${R_ZFS}/${ROOTENV}"
 
 			# We need to replace the previous TEMPLATE assignment, as it references a dispjail
 			TEMP_TEMP=$(get_jail_parameter -eq TEMPLATE $TEMPLATE)
 			sed -i '' -E "s/^(${NEWJAIL}[[:blank:]]+TEMPLATE ).*/\1 ${TEMP_TEMP}/" $_TMP_PARAMS
 
 			# Either assign the valid zusr dataset to clone dispjail, or set it to skip later on.
-			if chk_valid_zfs "${ZUSR_ZFS}/${TEMP_TEMP}" ; then
-				U_ZPARENT="${ZUSR_ZFS}/${TEMP_TEMP}"
+			if chk_valid_zfs "${U_ZFS}/${TEMP_TEMP}" ; then
+				U_ZPARENT="${U_ZFS}/${TEMP_TEMP}"
 				TEMPLATE="$TEMP_TEMP"
 				U_ZOPT="clone"
 			else
@@ -336,8 +336,8 @@ assign_datasets() {
 
 		# Ephemeral will clone both zroot and zusr, and make a special jail and launch sequence
 		ephemeral_*)
-			R_ZPARENT="${JAILS_ZFS}/${TEMPLATE}"
-			U_ZPARENT="${ZUSR_ZFS}/${TEMPLATE}"
+			R_ZPARENT="${R_ZFS}/${TEMPLATE}"
+			U_ZPARENT="${U_ZFS}/${TEMPLATE}"
 		;;
 	esac
 
@@ -402,7 +402,7 @@ change_datasets() {
 																			"${R_ZPARENT}" && return 0
 	elif [ -z "${CLASS##root*}" ] ; then
 		echo ''
-		zfs send -vP "$R_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${JAILS_ZFS}/${NEWJAIL}"
+		zfs send -vP "$R_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${R_ZFS}/${NEWJAIL}"
 	else
 		reclone_zroot "$NEWJAIL" "$ROOTENV"
 	fi
@@ -414,7 +414,7 @@ change_datasets() {
 
 		dupl) # Full duplication of zfs data to new dataset
 			echo ''
-			zfs send -vP "$U_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
+			zfs send -vP "$U_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${U_ZFS}/${NEWJAIL}"
 			chk_isvm -c "$CLASS" && echo success && return 0
 		;;
 
@@ -425,7 +425,7 @@ change_datasets() {
 
 		dirs)
 			# Create the empty dataset
-			zfs create -o qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
+			zfs create -o qubsd:autosnap="$AUTOSNAP" "${U_ZFS}/${NEWJAIL}"
 
 			# Create the directory mapping of the template
 			for _dir in $(find "${M_ZUSR}/${TEMPLATE}" -type d) ; do
@@ -437,9 +437,9 @@ change_datasets() {
 		empty) # Create the empty dataset/volume
 			if chk_isvm -c "$CLASS" ; then
 				zfs create -V ${VOLSIZE} -o volmode=dev -o qubsd:autosnap="$AUTOSNAP" \
-																			"${ZUSR_ZFS}/${NEWJAIL}" && return 0
+																			"${U_ZFS}/${NEWJAIL}" && return 0
 			else
-				zfs create -o qubsd:autosnap="$AUTOSNAP" "${ZUSR_ZFS}/${NEWJAIL}"
+				zfs create -o qubsd:autosnap="$AUTOSNAP" "${U_ZFS}/${NEWJAIL}"
 			fi
 
 		;;
@@ -485,11 +485,11 @@ change_jconf() {
 	# and the fstab probably tries to link zusr/rw/etc/fstab instead of /qubsd/<jail>/etc/fstab
 	if [ "$CLASS" = "rootjail" ] ; then
 		TEMPLATE="$ROOTENV"
-		chflags -R noschg ${M_JAILS}/${NEWJAIL}/etc
+		chflags -R noschg ${M_QROOT}/${NEWJAIL}/etc
 
 		# You can't just copy over linked file. Must remove it
-		rm -f ${M_JAILS}/${NEWJAIL}/etc/fstab
-		cp -a "${M_JAILS}/0base/etc/fstab" "${M_JAILS}/${NEWJAIL}/etc"
+		rm -f ${M_QROOT}/${NEWJAIL}/etc/fstab
+		cp -a "${M_QROOT}/0base/etc/fstab" "${M_QROOT}/${NEWJAIL}/etc"
 	fi
 
 	# Modify /etc/jail.conf
@@ -626,8 +626,8 @@ cleanup_finished() {
 
 cleanup_trapped() {
 	# Can't be leaving partially transferred datasets and pieces of newjail laying around
-	zfs destroy -rRf "${JAILS_ZFS}/${NEWJAIL}" > /dev/null 2>&1
-	zfs destroy -rRf "${ZUSR_ZFS}/${NEWJAIL}" > /dev/null 2>&1
+	zfs destroy -rRf "${R_ZFS}/${NEWJAIL}" > /dev/null 2>&1
+	zfs destroy -rRf "${U_ZFS}/${NEWJAIL}" > /dev/null 2>&1
 
    sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QMAP > /dev/null 2>&1
 	sed -i '' -E "/^${NEWJAIL}(\{|[[:blank:]])/,/^}/d" $JCONF > /dev/null 2>&1
@@ -644,7 +644,7 @@ main() {
 
 	confirm_creation
 
-	# Add the parameters to jailmap. BHYVE_CUSTM has extra spaces. Remove at least the first one
+	# Add the parameters to qubsdmap. BHYVE_CUSTM has extra spaces. Remove at least the first one
 	grep -E "^$NEWJAIL" "$_TMP_PARAMS" | column -t >> $QMAP
 	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $QMAP
 

@@ -120,8 +120,8 @@ get_zresult() {
 	# Switches between full zfs list of system, and just for jail (if set)
 	[ "$JAIL" = "none" ] && _jail='' || _jail="/$JAIL"
 
-	_ZRESULT=$(zfs list -r $_snaps $_zparams "${JAILS_ZFS}${_jail}" 2>/dev/null; \
-					zfs list -r $_snaps $_zparams "${ZUSR_ZFS}${_jail}" 2>/dev/null)
+	_ZRESULT=$(zfs list -r $_snaps $_zparams "${R_ZFS}${_jail}" 2>/dev/null; \
+					zfs list -r $_snaps $_zparams "${U_ZFS}${_jail}" 2>/dev/null)
 
 	[ -z "$_ZRESULT" ] && _ZRESULT="NO ZFS DATASETS WERE FOUND"
 }

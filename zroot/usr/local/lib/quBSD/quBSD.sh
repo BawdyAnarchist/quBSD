@@ -60,7 +60,7 @@
 # chk_valid_jail       - Makes sure the jail has minimum essential elements
 # chk_valid_autosnap   - true|false ; Include in qb-autosnap /etc/crontab snapshots
 # chk_valid_autostart  - true|false ; Autostart at boot
-# chk_valid_bhyveopts  - Checks bhyve options in jailmap for valid or not
+# chk_valid_bhyveopts  - Checks bhyve options in qubsdmap for valid or not
 # chk_valid_class      - appjail | rootjail | dispjail | appVM | rootVM
 # chk_valid_cpuset     - Must be in man 1 cpuset format. Limit jail CPUs
 # chk_valid_gateway    - Jail adheres to gateway jail norms
@@ -116,7 +116,7 @@ get_global_variables() {
 	# Define variables for files
 	JCONF="/etc/jail.conf"
 	QBDIR="/usr/local/etc/quBSD"
-	QMAP="${QBDIR}/jailmap.conf"
+	QMAP="${QBDIR}/qubsdmap.conf"
 	QBLOG="/var/log/quBSD.log"
 	QTMP="/tmp/quBSD/"
 
@@ -124,10 +124,10 @@ get_global_variables() {
 	sed -i '' -E 's/[[:blank:]]*$//' $QMAP
 
 	# Get datasets, mountpoints; and define files.
-   JAILS_ZFS=$(sed -nE "s:#NONE[[:blank:]]+jails_zfs[[:blank:]]+::p" $QMAP)
-   ZUSR_ZFS=$(sed -nE "s:#NONE[[:blank:]]+zusr_zfs[[:blank:]]+::p" $QMAP)
-	M_JAILS=$(zfs get -H mountpoint $JAILS_ZFS | awk '{print $3}')
-	M_ZUSR=$(zfs get -H mountpoint $ZUSR_ZFS | awk '{print $3}')
+   R_ZFS=$(sed -nE "s:#NONE[[:blank:]]+jails_zfs[[:blank:]]+::p" $QMAP)
+   U_ZFS=$(sed -nE "s:#NONE[[:blank:]]+zusr_zfs[[:blank:]]+::p" $QMAP)
+	M_QROOT=$(zfs get -H mountpoint $R_ZFS | awk '{print $3}')
+	M_ZUSR=$(zfs get -H mountpoint $U_ZFS | awk '{print $3}')
 }
 
 get_networking_variables() {
@@ -356,7 +356,7 @@ compile_jlist() {
 		;;
 
 		all)
-			# ALL jails from jailmap, except commented lines
+			# ALL jails from qubsdmap, except commented lines
 			_JLIST=$(awk '{print $1}' $QMAP | uniq | sed "/^#/d")
 		;;
 
@@ -669,9 +669,9 @@ reclone_zroot() {
 
 	# Variables definitions
 	_jail="$1"
-	_jailzfs="${JAILS_ZFS}/${_jail}"
+	_jailzfs="${R_ZFS}/${_jail}"
 	_rootenv="$2"
-	_rootzfs="${JAILS_ZFS}/${_rootenv}"
+	_rootzfs="${R_ZFS}/${_rootenv}"
 
 	_date=$(date +%s)
 	_ttl=$(($_date + 30))
@@ -680,7 +680,7 @@ reclone_zroot() {
 	_presnap=$(zfs list -t snapshot -Ho name ${_rootzfs} | tail -1)
 
 	# Check that the _jail being destroyed/cloned has an origin (is a clone).
-	chk_valid_zfs "$_jailzfs" && [ "$(zfs list -Ho origin "${JAILS_ZFS}/${_jail}")" = "-" ] \
+	chk_valid_zfs "$_jailzfs" && [ "$(zfs list -Ho origin "${R_ZFS}/${_jail}")" = "-" ] \
 		&& get_msg $_qz "_jo0" "$_jail" && return 1
 
 	# `zfs diff` from simultaneous jail start, create momentary snapshot. Errors reclone
@@ -692,7 +692,7 @@ reclone_zroot() {
 	done
 
 	# Determine if there are any updates or pkg installations taking place inside the jail
-	if pgrep -qf "/usr/sbin/freebsd-update -b ${M_JAILS}/${_rootenv}" \
+	if pgrep -qf "/usr/sbin/freebsd-update -b ${M_QROOT}/${_rootenv}" \
 		|| pgrep -qj "$_rootenv" -qf '/usr/sbin/freebsd-update' > /dev/null 2>&1 \
 		|| pgrep -qj "$_rootenv" 'pkg' > /dev/null 2>&1
 	then
@@ -732,8 +732,8 @@ reclone_zroot() {
 
 	if ! chk_isvm "$_jail" ; then
 		# Drop the flags for etc directory and add the user for the jailname
-		chflags -R noschg ${M_JAILS}/${_jail}/etc/
-		pw -V ${M_JAILS}/${_jail}/etc/ \
+		chflags -R noschg ${M_QROOT}/${_jail}/etc/
+		pw -V ${M_QROOT}/${_jail}/etc/ \
 				useradd -n $_jail -u 1001 -d /usr/home/${_jail} -s /bin/csh 2>&1
 	fi
 
@@ -747,9 +747,9 @@ reclone_zusr() {
 
 	# Variables definitions
 	local _jail="$1"
-	local _jailzfs="${ZUSR_ZFS}/${_jail}"
-	local _template="$2"
-	local _templzfs="${ZUSR_ZFS}/${_template}"
+	local _jailzfs="${U_ZFS}/${_jail}"
+	local _template="$2" 
+	local _templzfs="${U_ZFS}/${_template}"
 
 	local _date=$(date +%s)
 	local _ttl=$(($_date + 30))
@@ -793,6 +793,8 @@ reclone_zusr() {
 }
 
 cleanup_oldsnaps() {
+	# First reclone any dependent clones with an origin, to the latest snapshot
+	# Then search for old snapshots for non-clone datasets to see if their past their ttl
 
 	# Option for clearning up "zero bytes" (_zb) snapshots
 	getopts z _opts && _zb='true' && shift
@@ -803,10 +805,11 @@ cleanup_oldsnaps() {
 	local _date=$(date +%s)
 
 	# Assemble list of cloned datasets with a separate origin.
-	local _clonelist=$(zfs list -Hro name,origin | grep -Ev -- '-$' \
-											| grep -E "^(${JAILS_ZFS}|${ZUSR_ZFS})" | awk '{print $1}')
+	local _rclonelist=$(zfs list -Hro name,origin ${R_ZFS} | grep -Ev -- '-$' | awk '{print $1}')
+	local _uclonelist=$(zfs list -Hro name,origin ${U_ZFS} | grep -Ev -- '-$' | awk '{print $1}')
 
-	for _clone in $_clonelist ; do
+	# Reclone zroot clones from latest snapshot (zfs lists the newest at the bottom).
+	for _clone in $_rclonelist ; do
 		if ! chk_isrunning "${_clone##*/}" ; then
 			_origin=$(zfs list -Ho origin $_clone)
 			_newsnap=$(zfs list -t snapshot -o name ${_origin%%@*} | tail -1)
@@ -814,22 +817,27 @@ cleanup_oldsnaps() {
 			zfs clone -o qubsd:autosnap='false' "$_newsnap"  $_clone
 		fi
 	done
+	# Reclone zusr separately, because it needs fstab replacement and home directory change 
+	for _clone in $_uclonelist ; do 
+		_origin=$(zfs list -Ho origin $_clone | sed -E "s/${U_ZFS}\///")
+		reclone_zusr ${_clone##*/} "${_origin%%@*}"
+	done
 
 	# Assemple list of datasets in zroot, tagged ttl. Note that empty $1 , pulls all datasets
 	local _snaplist=$(zfs list -Hrt snapshot -o name,qubsd:destroy-date $_dataset \
 										| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
 
 	for _snap in $_snaplist ; do
-
 		# Get the destroy-date for each snap, and destroy if past their date
 		chk_valid_zfs "$_snap" && _snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
 		[ "$_snap_dd" -lt "$_date" ] && zfs destroy $_snap > /dev/null 2>&1
 
 		# Only remove 0B datasets if instructed to with [-z]
 		if [ "$_zb" ] ; then
-			# Get data used by snap, destroy if 0B. Check exists first, b/c above might've deleted it.
+			# Destroy 0B snaps, but not the latest. Check it exists, b/c above might've deleted it.
 			chk_valid_zfs "$_snap" && _snap_used=$(zfs list -Ho used $_snap)
-			[ "$_snap_used" = "0B" ] && zfs destroy $_snap > /dev/null 2>&1
+			[ "$_snap_used" = "0B" ] && [ -n "${_snap##*$SNAPNAME}" ] \
+																	&& zfs destroy $_snap > /dev/null 2>&1
 		fi
 	done
 }
@@ -1002,8 +1010,8 @@ chk_avail_jailname() {
 			| grep -Eqv '(--|-_|_-|__)' && get_msg $_qa "_cj15_2" "$_jail" && return 1
 
    # Checks that proposed jailname doesn't exist or partially exist
-	if chk_valid_zfs "${JAILS_ZFS}/$_jail" || \
-		chk_valid_zfs "${ZUSR_ZFS}/$_jail"  || \
+	if chk_valid_zfs "${R_ZFS}/$_jail" || \
+		chk_valid_zfs "${U_ZFS}/$_jail"  || \
 		grep -Eq "^${_jail}[[:blank:]]+" $QMAP || \
 		grep -Eq "^${_jail}[[:blank:]]*\{" $JCONF ; then
 		get_msg $_qa "_cj15_1" "$_jail" && return 1
@@ -1050,13 +1058,13 @@ chk_valid_jail() {
 		;;
 		rootjail)
 			# Rootjail's zroot dataset should have no origin (not a clone)
-			! zfs get -H origin ${JAILS_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
-					| grep -Eq '^-$'  && get_msg $_qv "_cj4" "$_value" "$JAILS_ZFS" && return 1
+			! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
+					| grep -Eq '^-$'  && get_msg $_qv "_cj4" "$_value" "$R_ZFS" && return 1
 		;;
 		appjail)
 			# Appjails require a dataset at quBSD/zusr
-			! chk_valid_zfs ${ZUSR_ZFS}/${_value}\
-					&& get_msg $_qv "_cj4" "$_value" "$ZUSR_ZFS" && return 1
+			! chk_valid_zfs ${U_ZFS}/${_value}\
+					&& get_msg $_qv "_cj4" "$_value" "$U_ZFS" && return 1
 		;;
 		dispjail)
 
@@ -1083,8 +1091,8 @@ chk_valid_jail() {
 		;;
 		rootVM)
 			# VM zroot dataset should have no origin (not a clone)
-			! zfs get -H origin ${JAILS_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
-					| grep -Eq '^-$'  && get_msg $_qv "_cj4" "$_value" "$JAILS_ZFS" && return 1
+			! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
+					| grep -Eq '^-$'  && get_msg $_qv "_cj4" "$_value" "$R_ZFS" && return 1
 		;;
 		*VM)
 		;;
@@ -1530,8 +1538,8 @@ chk_valid_rootenv() {
 	fi
 
 	# Rootjails require a dataset at zroot/quBSD/jails
-	! chk_valid_zfs ${JAILS_ZFS}/${_value} \
-			&& get_msg $_q "_cj4" "$_value" "$JAILS_ZFS" && return 1
+	! chk_valid_zfs ${R_ZFS}/${_value} \
+			&& get_msg $_q "_cj4" "$_value" "$R_ZFS" && return 1
 
 	return 0
 }
@@ -1707,7 +1715,7 @@ define_ipv4_convention() {
 }
 
 discover_open_ipv4() {
-	# Finds an IP address unused by any running jails, or in jailmap.conf
+	# Finds an IP address unused by any running jails, or in qubsdmap.conf
 	# Echo open IP on success; Returns 1 if failure to find an available IP
 
 	# Positional params and func variables.
@@ -1928,13 +1936,13 @@ prep_bhyve_options() {
 	_slot=1
 
 	# Assign zroot blk device
-	_BLK_ROOT="-s ${_slot},virtio-blk,/dev/zvol/${JAILS_ZFS}/${_VM}"
+	_BLK_ROOT="-s ${_slot},virtio-blk,/dev/zvol/${R_ZFS}/${_VM}"
 	_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
 
 	# Assign zusr blk device. Must be a volume; or should be blank
-	chk_valid_zfs "${ZUSR_ZFS}/${_VM}" \
-		&& zfs list -Ho type "${ZUSR_ZFS}/${_VM}" | grep -qs "volume" \
-		&& _BLK_ZUSR="-s ${_slot},virtio-blk,/dev/zvol/${ZUSR_ZFS}/${_VM}" \
+	chk_valid_zfs "${U_ZFS}/${_VM}" \
+		&& zfs list -Ho type "${U_ZFS}/${_VM}" | grep -qs "volume" \
+		&& _BLK_ZUSR="-s ${_slot},virtio-blk,/dev/zvol/${U_ZFS}/${_VM}" \
 		&& _slot=$(( _slot + 1 )) || _BLK_ZUSR=''
 
 	[ "$_slot" -eq 29 ] && _slot=32

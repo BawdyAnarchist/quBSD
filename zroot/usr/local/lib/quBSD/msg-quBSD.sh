@@ -30,7 +30,7 @@ ENDOFMSG
 	;;
 	_cj1) cat << ENDOFMSG
 
-ERROR: < $_value > is missing a < $_passvar > in jailmap.conf
+ERROR: < $_value > is missing a < $_passvar > in qubsdmap.conf
 ENDOFMSG
 	;;
 	_cj2) cat << ENDOFMSG
@@ -51,7 +51,7 @@ ENDOFMSG
 	_cj5) cat << ENDOFMSG
 
 ERROR: < $_value > is a dispjail. Requires a valid template.
-       Missing < template > in jailmap.conf
+       Missing < template > in qubsdmap.conf
 ENDOFMSG
 	;;
 	_cj5_1) cat << ENDOFMSG
@@ -139,7 +139,7 @@ ENDOFMSG
 
 ERROR: Proposed jailname < $_value > is already in use
        for at least one of the following:  jail.conf,
-       jailmap.conf, or has a zfs dataset under quBSD.
+       qubsdmap.conf, or has a zfs dataset under quBSD.
 
 Use \`qb-destroy' to remove any lingering pieces of a jail
 
@@ -156,20 +156,20 @@ ENDOFMSG
 	_cj16) cat << ENDOFMSG
 
 ERROR: < $_value > needs to be designated as a
-       < $_passvar > in jailmap.conf
+       < $_passvar > in qubsdmap.conf
 ENDOFMSG
 	;;
 	_cj17) cat << ENDOFMSG
 
 ALERT: < $_value > for jail:< $_jail > was not found in
-         jailmap.conf. #default was applied instead.
+         qubsdmap.conf. #default was applied instead.
 ENDOFMSG
 	;;
 	_cj17_1) cat << ENDOFMSG
 
-WARNING: < $_value > was not found in jailmap.conf, and
+WARNING: < $_value > was not found in qubsdmap.conf, and
          < $_passvar > was blank in qmap. Manually edit
-         $_passvar in /usr/local/etc/quBSD/jailmap.conf
+         $_passvar in /usr/local/etc/quBSD/qubsdmap.conf
 ENDOFMSG
 	;;
 	_cj18) cat << ENDOFMSG
@@ -322,7 +322,7 @@ ENDOFMSG
 	_jf8) cat << ENDOFMSG
 
 ERROR: Parameter < $_value > for < $_passvar >
-       had a null value in $QBDIR/jailmap.conf
+       had a null value in $QBDIR/qubsdmap.conf
 
 ENDOFMSG
 	;;

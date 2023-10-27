@@ -10,7 +10,7 @@ get_parameters() {
 	get_jail_parameter -d ROOTENV "$JAIL" ||  exit 1
 
 	# Find any remaining mounts for the jail
-	JMOUNT=$(mount | egrep -o "${M_JAILS}/${JAIL}/[^[:blank:]]+")
+	JMOUNT=$(mount | egrep -o "${M_QROOT}/${JAIL}/[^[:blank:]]+")
 }
 
 main() {
@@ -28,7 +28,7 @@ main() {
 
 			# Dispjails also reclone the zusr portion from template (if it exists)
 			get_jail_parameter TEMPLATE "$JAIL" || exit 1
-			chk_valid_zfs "${ZUSR_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE"
+			chk_valid_zfs "${U_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE"
 		;;
 	esac
 

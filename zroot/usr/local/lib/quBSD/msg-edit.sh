@@ -42,7 +42,7 @@ ENDOFMSG
 		;;
 		_4) cat << ENDOFMSG
 
-ERROR: Combination of < $JAIL $PARAM > was not found in jailmap.conf
+ERROR: Combination of < $JAIL $PARAM > was not found in qubsdmap.conf
        No changes were made.
 ENDOFMSG
 		;;
@@ -115,7 +115,7 @@ ENDOFMSG
 }
 
 usage() { cat << ENDOFUSAGE
-qb-edit:  Modify jail parameters in jailmap.conf
+qb-edit:  Modify jail parameters in qubsdmap.conf
 
 Usage: qb-edit <jail> <PARAMETER> <value>
        qb-edit [-h] | [-f][-q][-r] <jail> <PARAM> <value>

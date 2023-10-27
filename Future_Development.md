@@ -1,10 +1,5 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-qb-edit
-	-I thought I'd put devfs_rules in there, but I think FILT_PARAMS is removing it as a possibility
-
-still getting problem with disp jails and ... I dont know. It happens after autosnap tho I think
-
 - qb-connect
 	- VM integration: jail/VM connections, specifically SSH preparation for files copy
 	- Maybe even a 2nd tap, with sshd for ubuntu (or other VMs) on vtnet0 and vtnet1
@@ -112,6 +107,7 @@ qb-update - Update rootjails, create snapshots
 qb-backup (already created in $ubin)
 	- cron to run on both sides of source and dest, with ssh hostname, to automate backups
 
+qb-edit - modify jconf devfs ruleset with qb-edit
 
 ### GENERAL / BEST PRACTICES / CLEANUP
 
@@ -153,6 +149,8 @@ Intelligent resizing of fonts depending on dpi or xrandr resolution
 ntpd - ntpd only runs during qb-hostnet. Needs a more "correct" solution.
 
 qme-firefox needs fixed (personal note)
+
+I think `jail` caches fstab before completion of exec.prepare which edits it. Need to prove/submit bug. Need dtrace
 
 
 ##### qubsd installer #######

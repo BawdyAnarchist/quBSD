@@ -39,8 +39,8 @@ security_flags() {
 
 	for _d in $_jdir; do
 
-		[ -e "${M_JAILS}/${JAIL}${_d}" ] \
-				&& chflags -R schg "${M_JAILS}/${JAIL}${_d}" > /dev/null 2>&1
+		[ -e "${M_QROOT}/${JAIL}${_d}" ] \
+				&& chflags -R schg "${M_QROOT}/${JAIL}${_d}" > /dev/null 2>&1
 	done 
 
 	# exec.poststart is always sent to background. Don't report seclvl change 

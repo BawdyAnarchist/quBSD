@@ -39,7 +39,7 @@ qb-flags: Toggles schg/noschg for the indicated jail
 Usage: qb-flags [-h|-d|-u|-r] <jail>
    -d: (d)own. Recursive noschg flags for <jail>
    -h: (h)elp. Outputs this help message
-   -r: (r)eapply jailmap settings for <jail> 
+   -r: (r)eapply qubsdmap settings for <jail> 
    -u: (u)p. Recursive schg flags for <jail> 
 
 ENDOFUSAGE

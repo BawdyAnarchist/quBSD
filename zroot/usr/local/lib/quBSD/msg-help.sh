@@ -31,7 +31,7 @@ qb-destroy:  Destroys jail/VM, and removes all lingering pieces
 qb-disp:     Launches a disposable jail/VM on the basis of any template.
              Useful for opening questionable files in an isolated env.
 qb-dpi:      Modify dpi to launch a program, then autoreverts to default.
-qb-edit:     Edit jailmap. Checks performed to ensure valid entry
+qb-edit:     Edit qubsdmap. Checks performed to ensure valid entry
 qb-flags:    Jails only - Modify chflags schg/noschg for a running jail.
 qb-floatcmd: Launches popup for user-entered command to runside <jail>.
 qb-hostnet:  Bring up internet connectivity for host.
@@ -39,7 +39,7 @@ qb-i3-genconf: Generates/adds key i3 bindings, based on: i3gen.conf
 qb-i3-launch:  Start jails/VMs and launch programes based on i3launch.conf
 qb-i3-windows: Lists all i3 workspaces, and the windows/programs in them.
 qb-ivpn:     Change ivpn servers for <gateway>. Jails only.
-qb-list:     List jailmap settings for <jail/VM>, host, or parameter.
+qb-list:     List qubsdmap settings for <jail/VM>, host, or parameter.
 qb-pefs:     Create pefs directory, mount, or decrypt pefs-kmod in jail.
 qb-record:   Toggles webcam and virtual_oss off/on.
 qb-rename:   Renames <jail/VM>. Dependencies are automatically updated.
@@ -53,7 +53,7 @@ ENDOFMSG
 	;;
 	params) cat << ENDOFMSG
 
-PARAMETERS SAVED AT /usr/local/etc/quBSD/jailmap.conf
+PARAMETERS SAVED AT /usr/local/etc/quBSD/qubsdmap.conf
 To see default values, run:  qb-list #default
 To see detailed description of each PARAMETER, run: qb-help <PARAMETER>
 

@@ -66,7 +66,7 @@ unmount_pefs() {
 		for _dir in $_zusr_umnt ; do
 
 			# Get the corresponding zroot nullfs mount for the zusr pefs mount
-			_jdir=$(echo $_dir | sed "s:${M_ZUSR}:${M_JAILS}:")
+			_jdir=$(echo $_dir | sed "s:${M_ZUSR}:${M_QROOT}:")
 
 			# The nullfs mount under zroot must be removed first. 
 			if mount | grep -q $_jdir ; then
@@ -83,7 +83,7 @@ unmount_pefs() {
 
 main() {
 	# Mount also takes place in running jail. Replace zusr mount with zroot jails mount 
-	J_FOLDER=$(echo $U_FOLDER | sed "s:${M_ZUSR}:${M_JAILS}:")	
+	J_FOLDER=$(echo $U_FOLDER | sed "s:${M_ZUSR}:${M_QROOT}:")	
 	
 	case $_CMD in 
 

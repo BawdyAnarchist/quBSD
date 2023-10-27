@@ -86,11 +86,11 @@ sync_from_qmap() {
 
 		# zroot vs zusr dataset depending on CLASS
 		case "$(get_jail_parameter -eqs CLASS "$_jail")" in
-			appjail)  chk_valid_zfs "${ZUSR_ZFS}/${_jail}" \
-						 && zfs set qubsd:autosnap="$_value" "${ZUSR_ZFS}/${_jail}"
+			appjail)  chk_valid_zfs "${U_ZFS}/${_jail}" \
+						 && zfs set qubsd:autosnap="$_value" "${U_ZFS}/${_jail}"
 			;;
 			rootjail) chk_valid_zfs "${ROOT_ZFS}/${_jail}" \
-						 && zfs set qubsd:autosnap="$_value" "${JAILS_ZFS}/${_jail}"
+						 && zfs set qubsd:autosnap="$_value" "${R_ZFS}/${_jail}"
 			;;
 		esac
 	done
