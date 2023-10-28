@@ -18,6 +18,13 @@ ERROR: No TMUX or valid vncviewer configuration was found for
        < $JAIL >. Check VM parameters with:  qb-list $JAIL
 ENDOFMSG
 	;;
+	_3) cat << ENDOFMSG
+ALERT: The command below is run with /bin/sh. If the current
+       SHELL is different, there will likely be ERRORS if you
+       simply copy/paste the command. Current shell is $SHELL
+
+ENDOFMSG
+	;;
 	esac
 
 	case $_pass_cmd in
