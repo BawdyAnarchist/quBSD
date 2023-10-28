@@ -52,20 +52,16 @@ Host as Unprivileged user
 
 ### SPECIFIC SCRIPTS
 
-qb-stat
-	- I like my hardcode setup, but columns sorting and even a generalized setup file might be better
-	- Also the ability to choose which columns are displayed
-	- You should use background colors for the RAM and CPU usage. Maybe disk as well
-
 qb-list [-e] (evaluate) option to check jail-param combos for validity.
 
 qb-stop - monitoring is still not right. It exits early, coz pgrep returns nothing after 2 cycles 
 
-qb-help:
-	- forget the docs, make the more in depth stuff part of qb-help. Like a man page
-	- Make it robust like qb-list
-	- Each PARAM has a verbose message
-/usr/local/share/quBSD - Will need a complete overhaul, and maybe roll all into qb-help 
+qb-help - overhaul to act like a manpage. Replacing /usr/local/share/quBSD
+	- Each PARAM should have verbose message
+
+qb-ephm
+	- Clone from zroot too. Tricky, because of "reclone_zroot" operation at start_jail 
+	- i3 Quick keys. Might need to rework that script to include EPHM as well. It's getting complex 
 
 quBSD.sh and msg-qubsd.sh
 	- Error messages are a bit disorganized now. Need to have useful higher function messages
@@ -78,27 +74,26 @@ quBSD.sh and msg-qubsd.sh
 		-(r)esolve value (for stuff like ip auto)
 	- Double check on things that are positional items vs if they should be options 
 	- chk_isinteger [-l lower_bound] [-u "upper_bound"]. You have a lot of integer checks.
-
-qb-ephm - Clone from zroot too. Tricky, because of "reclone_zroot" operation at start_jail 
+	- connect_client_to_gateway ; uses a lot of dumb switches and repeat code
+	- reclone_zroot probably needs to be optimized. Maybe not. Seems okay
 
 qb-update - Update rootjails, create snapshots
 
 qb-backup (already created in $ubin)
 	- cron to run on both sides of source and dest, with ssh hostname, to automate backups
 
+qb-stat
+	- I like my hardcode setup, but columns sorting and even a generalized setup file might be better
+	- Also the ability to choose which columns are displayed
+	- You should use background colors for heavy RAM and CPU usage (yellow/red). Maybe disk as well
+
 
 ### GENERAL / BEST PRACTICES / CLEANUP
 
-GRAMMAR and NOMENCLATURE
-	- ${JAILS_ZFS} should probably be ROOT_Z and maybe also then ZUSR_Z.  Also M_ROOT instead of M_JAILS
+GENERAL GUIDELINES, and maybe later double checks
+	- Attempt to make scripts more robust and account for user error, when it makes sense to do so.
+	- Try to use more redirects, tee's, and also try the 'wait' command for scripts that appear to hang (but are actually finished).
 	- PARAMETERS should be CAPS when refering to the generic PARAM; lowercase when refering to a specific value
-
-FUNCTIONS THAT NEED CLEANED UP AND REVIEWED STILL
-	- connect_client_to_gateway ; uses a lot of dumb switches and repeat code
-	- reclone_zroot probably needs to be optimized. Maybe not. Seems okay
-	- monitor_startstop is on hold and not looking great.
-
-Try to use more redirects, tee's, and also try the 'wait' command for scripts that appear to hang (but are actually finished).
 
 Cycle all scripts through shellcheck again. 
 	- local variables are fine for FreeBSD 
@@ -118,13 +113,11 @@ NOTE: The "net-firewall" switches solution is
 	- define_ipv4_convention
 	- discover_open_ipv4
 
-Attempt to make scripts more robust and account for user error, when it makes sense to do so.
-
 Crons - No crons running. Probably something long term security that should be integrated and automated.
 
 Intelligent resizing of fonts depending on dpi or xrandr resolution
 
-ntpd - ntpd only runs during qb-hostnet. Needs a more "correct" solution.
+ntpd - ntpd only runs during qb-hostnet. Needs a more "correct" solution. Maybe rolled into the control jail
 
 qme-firefox needs fixed (personal note)
 
