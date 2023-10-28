@@ -10,7 +10,7 @@ get_options() {
 		case $opts in
 			h) get_msg_cmd "none" "usage_0" ;;
 			n) _NEWWIND="xterm -e" ;;
-			N) _NORUN="true" ;;
+			N) _NORUN="exit 0" ; _VERBOSE="true" ;;
         	r) _USER="root" ;;
 			u) _USER="${OPTARG}" ;;
 			v) _REDIRECT='' ; _VERBOSE="true" ;;
@@ -25,22 +25,8 @@ get_options() {
 
 parse_jail_vars() {
 
-	# Passing commands through another terminal is tricky.
-	if [ -z "$_CMD" ] ; then
-		# No command is provided. Default to /bin/csh. Quotation not required
-		_CMD="${_CMD:=$SHELL}"
-
-		# Redirect not desired, because we're using host xterm to access JAIL
-		unset _REDIRECT=''
-	else
-		# Quotations are required to pass multiple arguments to jail, through jexec
-		_CMD="'${_CMD}'"
-
-		# {parameter-word} regards `null' as the "set" value. Default behavior of qb-cmd is to,
-		# suppress output. So if [-v] option was set `null' ; we want to leave it that way.
-		# NOTE: {paremeter-word} is not documented in man sh , but it works.
-		_REDIRECT="${_REDIRECT- > /dev/null 2>&1 &}"
-	fi
+	# Default _CMD is $SHELL. If [-v] keep REDIRECT null, ${parameter-word}, otherwise dev/null
+	[ -z "$_CMD" ] && _CMD="${_CMD:=$SHELL}" || _REDIRECT="${_REDIRECT- > /dev/null 2>&1 &}"
 
 	# If X is running, get the jailname of the active window
 	if pgrep -q Xorg ; then
@@ -78,33 +64,26 @@ connect_vm_session() {
 }
 
 main() {
+	parse_jail_vars
 
-	# If JAIL is still not assigned, assume user wants a host xterm
-	if [ -z "$JAIL" ] || [ "$JAIL" = "host" ] ; then
-		xterm &
-		exit 0
+	# Launch host xterm
+	[ "$JAIL" = "host" ] && exec xterm
+
+	# Start the jail/VM if off
+	if ! chk_isrunning $JAIL ; then
+		# Verbose prints the bhyve command, if NORUN, will exit
+		[ "$_VERBOSE" ] && get_msg_cmd "_3" "_cont" && start_jail -nq $JAIL && eval "$_NORUN"
+
+		! qb-start "$JAIL" && get_msg_cmd "_1" "exit_1"
 	fi
 
-	# Switch whether VM or jail
+	# Either connect the VM, or jexec the command to the jail
 	if chk_isvm "$JAIL" ; then
-		if ! chk_isrunning $JAIL && [ "$_NORUN" ] ; then
-			# -N option, do not start VM, just print bhyve command
-			start_jail -nq $JAIL
-			exit 0
-
-		elif ! chk_isrunning $JAIL ; then
-			# Verbose prints the bhyve command
-			[ "$_VERBOSE" ] && start_jail -nq $JAIL
-
-			# Start the VM, if successful, connect the session
-			! qb-start "$JAIL" && get_msg_cmd "_1" "exit_1"
-		fi
-
 		connect_vm_session
 	else
-		# Start the gateways then the jail, then execute command
-		! chk_isrunning $JAIL && ! qb-start "$JAIL" && get_msg_cmd "_1" "exit_1"
-		eval $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c $_CMD $_REDIRECT"
+		[ "$_NORUN" ] && get_msg_cmd "_3" "_cont" \
+			&& echo $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT" \
+			|| eval $_NORUN $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT"
 	fi
 }
 
@@ -112,8 +91,6 @@ main() {
 get_global_variables
 
 get_options "$@"
-
-parse_jail_vars
 
 main
 
