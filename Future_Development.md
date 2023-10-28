@@ -97,7 +97,6 @@ qb-update - Update rootjails, create snapshots
 qb-backup (already created in $ubin)
 	- cron to run on both sides of source and dest, with ssh hostname, to automate backups
 
-qb-edit - modify jconf devfs ruleset with qb-edit
 
 ### GENERAL / BEST PRACTICES / CLEANUP
 
