@@ -118,7 +118,7 @@ get_global_variables() {
 	QBDIR="/usr/local/etc/quBSD"
 	QMAP="${QBDIR}/qubsdmap.conf"
 	QBLOG="/var/log/quBSD.log"
-	QTMP="/tmp/quBSD/"
+	QTMP="/tmp/quBSD"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
 	sed -i '' -E 's/[[:blank:]]*$//' $QMAP
@@ -309,9 +309,11 @@ get_info() {
 		;;
 		_XJAIL)
 			# Gets the jailname of the active window. Converts $HOSTNAME to: "host"
-			_value=$(xprop -id $(get_info -e _XID) WM_CLIENT_MACHINE \
-					| sed "s/WM_CLIENT_MACHINE(STRING) = \"//" | sed "s/.$//" \
-					| sed "s/$(hostname)/host/g")
+			_xid=$(get_info -e _XID)
+			[ "$_xid" = "0x0" ] && _value=host \
+					|| _value=$(xprop -id $(get_info -e _XID) WM_CLIENT_MACHINE \
+							| sed "s/WM_CLIENT_MACHINE(STRING) = \"//" | sed "s/.$//" \
+							| sed "s/$(hostname)/host/g") || _value="host"
 		;;
 		_XNAME)
 			# Gets the name of the active window
@@ -424,6 +426,7 @@ start_jail() {
 			if chk_isvm "$_jail" ; then
 				exec_vm_coordinator $_norun $_qs "$_jail"
 			else
+				[ "$_norun" ] && return 0
 				jail -vc "$_jail"  >> $QBLOG 2>&1  ||  get_msg $_qs "_jf2" "$_jail"
 			fi
 		fi
@@ -2054,7 +2057,7 @@ launch_vm() {
 
 		# New script wont know about caller functions. Need to source them again
 		. /usr/local/lib/quBSD/quBSD.sh
-
+		. /usr/local/lib/quBSD/msg-quBSD.sh
 		get_global_variables
 
 		# Create trap for post VM exit
