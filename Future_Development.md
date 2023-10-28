@@ -59,11 +59,6 @@ qb-stat
 
 qb-list [-e] (evaluate) option to check jail-param combos for validity.
 
-qb-autosnap and qb-snap
-	- you might review that to see if listing the autosnaps could be improved on a per-jail basis
-	- either that, or just remove the list function entirely and roll into qb-list
-	- I'm really thinking that "autosnap" should just be a specific case of the general qb-snap
-
 qb-stop - monitoring is still not right. It exits early, coz pgrep returns nothing after 2 cycles 
 
 qb-help:
@@ -85,12 +80,9 @@ quBSD.sh and msg-qubsd.sh
 	- chk_isinteger [-l lower_bound] [-u "upper_bound"]. You have a lot of integer checks.
 
 qb-disp
-	- Really should be called class=ephemeral
 	- Should clone zroot from template as well. 
 	- Make it so you can run a specific command directly at the command line.
 	- Also make it so that you dont need a terminal. That's annoying. Keep jail alive based on presence of X-window from jail 
-	- Needs significant rework, to allow for using an appjail as a rootjail
-     and the reclone operation for that appjail's zroot.
 
 qb-update - Update rootjails, create snapshots
 

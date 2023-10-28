@@ -1087,9 +1087,6 @@ chk_valid_jail() {
 			! chk_valid_jail $_qv "$_template" \
 					&& get_msg $_qv "_cj6" "$_value" "$_template" && return 1
 		;;
-		ephemeral) # There are no checks for now. These are special types of dispjails
-					# But I might want to add the temporary cloned datasets. We'll see. Prob not.
-		;;
 		rootVM)
 			# VM zroot dataset should have no origin (not a clone)
 			! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
@@ -1178,7 +1175,7 @@ chk_valid_class() {
 	# Valid inputs are: appjail | rootjail | dispjail | appVM | rootVM
 	case $_value in
 		'') get_msg $_q "_0" "CLASS" && return 1 ;;
-		appjail|dispjail|ephemeral|rootjail|rootVM|appVM) return 0 ;;
+		appjail|dispjail|rootjail|rootVM|appVM) return 0 ;;
 		*) get_msg $_q "_cj2" "$_value" "CLASS" && return 1 ;;
 	esac
 }

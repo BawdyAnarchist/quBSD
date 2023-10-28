@@ -333,12 +333,6 @@ assign_datasets() {
 				U_ZOPT="skip"
 			fi
 		;;
-
-		# Ephemeral will clone both zroot and zusr, and make a special jail and launch sequence
-		ephemeral_*)
-			R_ZPARENT="${R_ZFS}/${TEMPLATE}"
-			U_ZPARENT="${U_ZFS}/${TEMPLATE}"
-		;;
 	esac
 
 	# If U_ZOPT wasn't specified, assign the default value: <dupl>

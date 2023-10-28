@@ -33,24 +33,24 @@ cleanup_files() {
 
 cleanup_disps() {
 
-	# Unmount DISP datasets which may still be mounted
-	for _mount in $(mount | awk '/DISP/ {print $3}') ; do
+	# Unmount EPHM datasets which may still be mounted
+	for _mount in $(mount | awk '/EPHM/ {print $3}') ; do
 		umount -f $_mount
 	done
 
-	# Remove lingering DISP datasets in qubsd's zroot
-	for _disp in $(zfs list -Hro name "$R_ZFS" | grep "DISP") ; do
+	# Remove lingering EPHM datasets in qubsd's zroot
+	for _disp in $(zfs list -Hro name "$R_ZFS" | grep "${R_ZFS}/EPHM-") ; do
 		zfs destroy -rRf $_disp > /dev/null 2>&1
 	done
 
-	# Remove lingering DISP datasets in qubsd's zusr
-	for _disp in $(zfs list -Hro name "$U_ZFS" | grep "DISP") ; do
+	# Remove lingering EPHM datasets in qubsd's zusr
+	for _disp in $(zfs list -Hro name "$U_ZFS" | grep "${U_ZFS}/EPHM-") ; do
 		zfs destroy -rRf $_disp > /dev/null 2>&1
 	done
 
-	# Remove anything that starts with ^DISP in qmap and jail.conf
-   sed -i '' -E "/^DISP/d" $QMAP
-	sed -i '' -E "/^DISP.*(\{|[[:blank:]])/,/^}/d" $JCONF
+	# Remove anything that starts with ^EPHM in qmap and jail.conf
+   sed -i '' -E "/^EPHM/d" $QMAP
+	sed -i '' -E "/^EPHM.*(\{|[[:blank:]])/,/^}/d" $JCONF
 }
 
 qb_cleanup_stop() {

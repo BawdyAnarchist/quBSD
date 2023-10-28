@@ -28,7 +28,8 @@ qb-create:   Automates creation of new jails/VMs. Options exist to clone
              an existing jail, initialize/cofigure from scratch,
              or a guided mode with descriptive help and input prompts
 qb-destroy:  Destroys jail/VM, and removes all lingering pieces
-qb-disp:     Launches a disposable jail/VM on the basis of any template.
+qb-ephm:     Launches ephemeral jail/VM based on a template. Same as a
+             dispjail, but destroyed when its primary window is closed.
              Useful for opening questionable files in an isolated env.
 qb-dpi:      Modify dpi to launch a program, then autoreverts to default.
 qb-edit:     Edit qubsdmap. Checks performed to ensure valid entry

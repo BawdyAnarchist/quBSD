@@ -4,12 +4,12 @@
 
 
 . /usr/local/lib/quBSD/quBSD.sh
-. /usr/local/lib/quBSD/msg-disp.sh
+. /usr/local/lib/quBSD/msg-ephm.sh
 
 get_options() {
 	while getopts hi opts ; do
 		case $opts in
-			h) get_msg_disp "none" "usage_0" ;;
+			h) get_msg_ephm "none" "usage_0" ;;
 			i) _i3wm="true" ;;
 			*) exit 1 ;;
 		esac
@@ -25,16 +25,16 @@ get_options() {
 
 newjail_name() {
 	# Valid jail or exit
-	chk_valid_jail "$JAIL" || get_msg_disp "none" "usage_1"
+	chk_valid_jail "$JAIL" || get_msg_ephm "none" "usage_1"
 
 	# Make name visually easy to identify
-	NEWJAIL="DISP-${JAIL}"
+	NEWJAIL="EPHM-${JAIL}"
 	_cycle=''
 
 	# If DISP-jail exists (even partially), increment the ending number and try again
 	while ! chk_avail_jailname "$NEWJAIL" ; do
 		_cycle=$(( _cycle + 1 ))
-		NEWJAIL="DISP-${JAIL}_${_cycle}"
+		NEWJAIL="EPHM-${JAIL}_${_cycle}"
 	done
 }
 
@@ -50,7 +50,7 @@ main() {
 														-c dispjail -t $JAIL $NEWJAIL > /dev/null 2>&1
 
 	#Trap to ensure DISP doesn't remain after use
-	trap	'destroy_dispjail' INT TERM HUP QUIT EXIT
+	trap	'destroy_ephemeral' INT TERM HUP QUIT EXIT
 
 	if [ -n "$_i3wm" ] ; then
 		# i3-specific command. Launch a floating terminal for the dispjail
@@ -61,7 +61,7 @@ main() {
 	fi
 }
 
-destroy_dispjail() {
+destroy_ephemeral() {
 	stop_jail "$NEWJAIL"
 	zfs destroy -rRf ${R_ZFS}/$NEWJAIL > /dev/null 2>&1
 	zfs destroy -rRf ${U_ZFS}/$NEWJAIL > /dev/null 2>&1
