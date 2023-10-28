@@ -277,7 +277,6 @@ ERROR: Tried to launch < $_value > but there were
 ENDOFMSG
 	;;
 	_jf1) cat << ENDOFMSG
-
 $0 is starting < $_value >
 ENDOFMSG
 	;;
@@ -288,8 +287,7 @@ ERROR: < $_value > could not be started. For more
 ENDOFMSG
 	;;
 	_jf3) cat << ENDOFMSG
-
-$0 is attempting to shutdown < $_value >
+$0 is shutting down < $_value >
 ENDOFMSG
 	;;
 	_jf4) cat << ENDOFMSG
