@@ -160,6 +160,7 @@ get_parameter_lists() {
 	VM_PARAMS="BHYVEOPTS MEMSIZE TAPS TMUX VCPUS VNCRES WIREMEM"
 	MULT_LN_PARAMS="BHYVE_CUSTM PPT"
 	ALL_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE $VM_PARAMS $MULT_LN_PARAMS"
+	NON_QMAP="DEVFS_RULE"
 
 	# Unless suppressed with [-n], group by CLASS
 	if [ -z "$_nc" ] ; then
@@ -748,7 +749,7 @@ reclone_zusr() {
 	# Variables definitions
 	local _jail="$1"
 	local _jailzfs="${U_ZFS}/${_jail}"
-	local _template="$2" 
+	local _template="$2"
 	local _templzfs="${U_ZFS}/${_template}"
 
 	local _date=$(date +%s)
@@ -817,8 +818,8 @@ cleanup_oldsnaps() {
 			zfs clone -o qubsd:autosnap='false' "$_newsnap"  $_clone
 		fi
 	done
-	# Reclone zusr separately, because it needs fstab replacement and home directory change 
-	for _clone in $_uclonelist ; do 
+	# Reclone zusr separately, because it needs fstab replacement and home directory change
+	for _clone in $_uclonelist ; do
 		_origin=$(zfs list -Ho origin $_clone | sed -E "s/${U_ZFS}\///")
 		reclone_zusr ${_clone##*/} "${_origin%%@*}"
 	done
@@ -1169,7 +1170,7 @@ chk_valid_class() {
 	# Return 0 if proposed class is valid ; return 1 if invalid
 
 	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
@@ -1188,7 +1189,7 @@ chk_valid_cpuset() {
 	local _q ; local _xtra
 	while getopts ex opts ; do
 		case $opts in
-			q) _q="-q" ;;
+			q) local _q="-q" ;;
 			*) get_msg "_1" ; return 1 ;;
 		esac
 	done
@@ -1218,6 +1219,21 @@ chk_valid_cpuset() {
 		! echo $_validcpuset | grep -Eq "${_cpu},|${_cpu}\$" \
 			&& get_msg $_q "_cj2" "$_value" "CPUSET" && return 1
 	done
+
+	return 0
+}
+
+chk_valid_devfs_rule() {
+
+	# Quiet option
+	getopts q _opts && local _q='-q' && shift
+	[ "$1" = "--" ] && shift
+
+	local _value="$1"
+	[ -z "$_value" ] && get_msg $_q "_0" "devfs_ruleset" && return 1
+
+	! grep -Eqs -- "=${_value}\]\$|\[devfsrules.*${_value}\]\$" /etc/devfs.rules \
+			&& get_msg $_q "_cj2" "$_value" "DEVFS_RULE" && return 1
 
 	return 0
 }
