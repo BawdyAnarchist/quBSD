@@ -57,6 +57,7 @@ WARNING: ROOTENV is typically not changed, but it can be if desired.
 ENDOFMSG
 		;;
 		_7) cat << ENDOFMSG
+
 ALERT: For changes to take effect, restart the following:
 ENDOFMSG
 

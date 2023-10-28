@@ -35,6 +35,7 @@ get_options() {
 
 	# Necessary for editing lines vs adding lines
 	OLDVALUE=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]].*" $QMAP)
+	DEFAULT=$(sed -En "s/^#default[[:blank:]]+${PARAM}[[:blank:]]+//p" $QMAP)
 
 	# This will return global variables: CLASS and FILT_PARAMS
 	get_parameter_lists "$JAIL"
@@ -65,6 +66,10 @@ checks() {
 		# All other PARAMs must be checked for validity, and determine if new line is needed
 		elif echo "$FILT_PARAMS" | grep -Eqs "$PARAM" ; then
 			[ -z "$OLDVALUE" ] && ACTION="add"
+			[ "$VALUE" = "$DEFAULT" ] && ACTION="revert_to_default"
+
+		elif echo "$NON_QMAP" | grep -Eqs "$PARAM" ; then
+			ACTION="none"
 
 		# Values of the #default can be modified regardless of CLASS
 		elif [ "$JAIL" = "#default" ] ; then :
@@ -80,10 +85,13 @@ checks() {
 				&& [ -z "$FORCE" ] && exit 1
 	fi
 
-	# Extra checks/interaction for GATEWAY and IPV4
+	# Extra checks/interaction for certain parameters and IPV4
 	case $PARAM in
+
+		# Should not be changing class, unless you really know what you're doing
 		CLASS) get_msg_edit "_5" "exit_1" "_f" ;;
 
+		# Warn about changing ROOTENV
 		ROOTENV) get_msg_edit "_6" "warn" ;;
 
 		GATEWAY)
@@ -109,11 +117,16 @@ modify_qmap() {
 			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QMAP)
 			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $QMAP
 		;;
+		revert_to_default)
+			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QMAP)
+			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]@ d" $QMAP
+		;;
 		add)
 			echo "$JAIL  $PARAM  $VALUE" >> $QMAP
 		;;
-		*)
-			# Modify QMAP and print new settings on success
+		none) :  # No action to take (devfs_ruleset)
+		;;
+		*) # Modify QMAP and print new settings on success
 			sed -i '' -E "s@^(${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+).*@\1${VALUE}@" $QMAP
 		;;
 	esac
@@ -129,9 +142,6 @@ modify_qmap() {
 
 	# BHYVE_CUSTM has extra spaces. At least remove the first space
 	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $QMAP
-
-	# Print the new value
-	[ "$ACTION" = "delete" ] && get_msg_edit "_8_1" || get_msg_edit "_8"
 }
 
 modify_autosnap() {
@@ -165,6 +175,31 @@ modify_autosnap() {
 					&& zfs get qubsd:autosnap "$_ZFS"
 		;;
 	esac
+}
+
+modify_jconf_devfs() {
+
+	# First convert the to just the numerical value if the user entered the long format
+	VALUE=$(echo "$VALUE" | grep -Eo '[[:digit:]]+$')
+
+# Hey, it's better than creating temp files to handle it. To explain what's going on here:
+# 1) search for: '^JAIL {'  which is the opening stanza for the jail
+# 2) :n  acts as a pointer, a way to loop over the same commands within sed
+# 3) N tells sed to load the next line (into the pattern space)
+# 4) Check the new line for ending curly '}' which would indicate end of jail entry in JCONF
+#    in which case branch to :z , end of function, to prevent changing some other jail
+# 5) If the line does not match .*devfs_rulset.* then branch to :n (loop)
+# 6) Finally replace the line with the desired $value
+
+sed -i '' -E "/^${JAIL}[[:blank:]]*\{/ {
+:n
+N
+/\}/bz
+/.*devfs_ruleset.*/!bn
+s/(devfs_ruleset).*/\1=\"${VALUE}\";/
+
+:z
+}" $JCONF
 }
 
 handle_restarts() {
@@ -205,11 +240,21 @@ handle_restarts() {
 
 main() {
 
-	# qubsdmap.conf edits
-	modify_qmap
+	# Some edits are coordinated across other quBSD configs/params, for user-facing simplicity
+	case "$PARAM" in
+		AUTOSNAP)
+			modify_autosnap
+			modify_qmap
+		;;
 
-	# Autosnap requires zfs changes
-	[ "$PARAM" = "AUTOSNAP" ] && modify_autosnap
+		DEVFS_RULE) modify_jconf_devfs ;;
+
+		*) modify_qmap ;;
+	esac
+
+	# Print the new value
+	([ "$ACTION" = "delete" ] || [ "$ACTION" = "revert_to_default" ]) \
+															&& get_msg_edit "_8_1" || get_msg_edit "_8"
 
 	handle_restarts
 }
