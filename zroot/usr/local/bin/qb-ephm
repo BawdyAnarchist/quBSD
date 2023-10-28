@@ -7,10 +7,12 @@
 . /usr/local/lib/quBSD/msg-ephm.sh
 
 get_options() {
-	while getopts hi opts ; do
+	while getopts hinr opts ; do
 		case $opts in
 			h) get_msg_ephm "none" "usage_0" ;;
 			i) _i3wm="true" ;;
+			n) _NEWWIND="xterm -e" ;;
+			r) _USER="root" ;;
 			*) exit 1 ;;
 		esac
 	done
@@ -18,47 +20,104 @@ get_options() {
 	shift $(( OPTIND - 1 ))
 
 	# Define script variables
-	JAIL="$1"
+	JAIL="$1" ; shift
+	_CMD="$@"
 	DATETIME=$(date +%b%d_%H%M)
-	NEWSNAP="${U_ZFS}/${JAIL}@DISP${DATETIME}"
+	NEWSNAP="${U_ZFS}/${JAIL}@EPHM${DATETIME}"
 }
 
-newjail_name() {
-	# Valid jail or exit
+parse_jail_vars() {
+	# Default _CMD is $SHELL
+	[ -z "$_CMD" ] && _CMD="${_CMD:=$SHELL}" || _REDIRECT=" > /dev/null 2>&1 &"
+
+	# If X is running, get the jailname of the active window
+	if pgrep -q Xorg ; then
+		# Jailname of the active window is assigned to: $_XJAIL
+		get_info _XJAIL
+	fi
+
+	# Unless already specified, set JAIL to the active window, and check valid
+	JAIL="${JAIL:=$_XJAIL}"
 	chk_valid_jail "$JAIL" || get_msg_ephm "none" "usage_1"
 
-	# Make name visually easy to identify
-	NEWJAIL="EPHM-${JAIL}"
-	_cycle=''
-
-	# If DISP-jail exists (even partially), increment the ending number and try again
+	# Make name visually easy to identify. Cycle to find available name if in use
+	NEWJAIL="EPHM-${JAIL}"  ;  _cycle=0
 	while ! chk_avail_jailname "$NEWJAIL" ; do
 		_cycle=$(( _cycle + 1 ))
 		NEWJAIL="EPHM-${JAIL}_${_cycle}"
 	done
+
+	# If user wasnt assigned as root, assign it as the regular user now
+	_USER=${_USER:=$NEWJAIL}
 }
 
-main() {
+create_newjail() {
 	# New snapshot ensures the most up-to-date version of the template jail
 	zfs snapshot $NEWSNAP
 
-	#Trap to destroy snapshot after use.
-	trap 'zfs destroy -rRf $NEWSNAP ; exit 0' INT TERM HUP QUIT EXIT
+	# Trap destroy snapshot and anything else that might exist after qb-create
+	trap 'destroy_ephemeral' INT TERM HUP QUIT EXIT
 
 	# Create dispjail and disable the no_destroy protection
 	qb-create -y -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false -p AUTOSNAP=false \
 														-c dispjail -t $JAIL $NEWJAIL > /dev/null 2>&1
+}
 
-	#Trap to ensure DISP doesn't remain after use
-	trap	'destroy_ephemeral' INT TERM HUP QUIT EXIT
+run_command() {
 
 	if [ -n "$_i3wm" ] ; then
-		# i3-specific command. Launch a floating terminal for the dispjail
+		# i3-specific command. Launch a floating terminal for the dispjail (ephemeral jail)
 		xterm -e csh -c "i3-msg -q floating enable, move position center; qb-cmd $NEWJAIL"
 	else
 		# Can be called without i3 as well.
-		csh -c "qb-cmd $NEWJAIL"
+		eval $_NEWWIND "jexec -l -U $_USER $NEWJAIL $SHELL -c '$_CMD' $_REDIRECT"
 	fi
+}
+
+monitor_ephm_windows() {
+
+	cat <<-ENDOFCMD > "${QTMP}/qb-${NEWJAIL}"
+	#!/bin/sh
+
+	# New script wont have the caller functions, or variables. Source them again
+	. /usr/local/lib/quBSD/quBSD.sh
+	. /usr/local/lib/quBSD/msg-quBSD.sh
+	get_global_variables
+
+	# X11 takes a moment launch window. Ineligant solution, but wait 5 seconds before checking
+	sleep 5
+
+	# Monitoring ephemeral jail ${NEWJAIL} until all windows close
+	while : ; do
+		# Unset the test variable and get all window IDs that might be associated with a jail
+		unset _ephm_running
+		_winlist=\$(xwininfo -root -tree | grep -v "has no name" \
+															| grep -Eo '^[[:blank:]]+0x[[:alnum:]]+')
+
+		# Check for EPHM jail among those IDs, and set the variable
+		for _id in \$_winlist ; do
+			xprop -id "\$_id" WM_CLIENT_MACHINE 2>&1 | grep -Eqs "$NEWJAIL" && _ephm_running="true"
+		done
+
+		# If the no window was found for the EPHM jail, break.
+		[ ! "\$_ephm_running" = "true" ] && break
+		sleep 2
+	done
+
+	# Destroy sequence
+	stop_jail "$NEWJAIL"
+	zfs destroy -rRf ${R_ZFS}/$NEWJAIL > /dev/null 2>&1
+	zfs destroy -rRf ${U_ZFS}/$NEWJAIL > /dev/null 2>&1
+	zfs destroy -rRf $NEWSNAP > /dev/null 2>&1
+	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QMAP
+	sed -i '' -E "\\@${NEWJAIL}[[:blank:]]*\\{@,\\@^[[:blank:]]*\\}[[:blank:]]*\\\$@d" $JCONF
+	rm "${QTMP}/qb-${NEWJAIL}" > /dev/null 2>&1
+	exit 0
+ENDOFCMD
+
+	# Make executable and run
+	chmod +x "${QTMP}/qb-${NEWJAIL}"
+	exec "${QTMP}/qb-${NEWJAIL}"
 }
 
 destroy_ephemeral() {
@@ -68,14 +127,33 @@ destroy_ephemeral() {
 	zfs destroy $NEWSNAP > /dev/null 2>&1
 	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QMAP
 	sed -i '' -E "\@${NEWJAIL}[[:blank:]]*\{@,\@^[[:blank:]]*\}[[:blank:]]*\$@d" $JCONF
+	rm "${QTMP}/qb-ephm_${NEWJAIL}" > /dev/null 2>&1
 	exit 0
 }
+
+main() {
+
+	parse_jail_vars
+
+	create_newjail
+
+	start_jail $NEWJAIL
+
+	# If the _CMD opens SHELL, it'll run until exited
+	run_command
+
+	# Monitor for any EPHM windows that are open with detached script. Will destroy EPHM after.
+	monitor_ephm_windows &
+
+	# Unset the the trap command, now that the detached monitoring script has executed. Exit
+	trap '' INT TERM HUP QUIT EXIT
+	exit 0
+}
+
 
 get_global_variables
 
 get_options "$@"
-
-newjail_name
 
 main
 

@@ -38,7 +38,7 @@ GUI SECURITY
 	Xephyr - Unfortunately I'm not sure this is a real solution. Everything still shares the unix socket
 		- Might not matter, but if I keep it, some ideas:
 			- the qb-xephyr command into qb-cmd -X, including VMs. Make sure works with -n as well.
-			- Integrate an "X" option for qb-disp as well.
+			- Integrate an "X" option for qb-ephm as well.
 
 pwd
 	- I think the right way to do this, is export any existing pwd db in /rw, and import it into the created jail (or maybe vice versa) 
@@ -79,10 +79,7 @@ quBSD.sh and msg-qubsd.sh
 	- Double check on things that are positional items vs if they should be options 
 	- chk_isinteger [-l lower_bound] [-u "upper_bound"]. You have a lot of integer checks.
 
-qb-disp
-	- Should clone zroot from template as well. 
-	- Make it so you can run a specific command directly at the command line.
-	- Also make it so that you dont need a terminal. That's annoying. Keep jail alive based on presence of X-window from jail 
+qb-ephm - Clone from zroot too. Tricky, because of "reclone_zroot" operation at start_jail 
 
 qb-update - Update rootjails, create snapshots
 
