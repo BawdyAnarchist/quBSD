@@ -43,7 +43,6 @@ qb-list:     List qubsdmap settings for <jail/VM>, host, or parameter.
 qb-pefs:     Create pefs directory, mount, or decrypt pefs-kmod in jail.
 qb-record:   Toggles webcam and virtual_oss off/on.
 qb-rename:   Renames <jail/VM>. Dependencies are automatically updated.
-qb-snap:     Create <jail> snapshot. Necessary for rootjails and dispjails
 qb-start:    Start <jails/VMs> in parallel. You MUST use this for parallel
              starts, or you WILL have errors. Dont use custom scripts.
 qb-stat:     Realtime status for all jails/VMs (on/off,CPU,RAM,disk,etc)
