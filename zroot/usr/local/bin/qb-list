@@ -96,21 +96,27 @@ get_results() {
 
 		# Show a particular jail
 		*_*_*_NONE)
-			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $QMAP)
-			[ "$ZLIST" = "t" ] && get_zresult
-
 			# Add in devfs if appropriate, and supplement missing values with #defaults
+			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $QMAP)
+			get_devfs_result
 			supplement_results
+			[ "$ZLIST" = "t" ] && get_zresult
 		;;
 
 		# Show a particular parameter
 		*_*_none_*)
-			_RESULT=$(grep -E "^[^[:blank:]]+[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
+			[ "$PARAM" = "DEVFS_RULE" ] && get_devfs_result \
+				|| _RESULT=$(grep -E "^[^[:blank:]]+[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
 		;;
 
 		# Show a jail/parameter combo
 		*_f_*_*)
-			_RESULT=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
+			[ "$PARAM" = "DEVFS_RULE" ] && get_devfs_result \
+				|| _RESULT=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
+
+			[ -z "$_RESULT" ] \
+					&& _RESULT=$(grep -E "^#default[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
+
 			[ "$ZLIST" = "t" ] && get_zresult
 		;;
 	esac
@@ -126,25 +132,24 @@ get_zresult() {
 	[ -z "$_ZRESULT" ] && _ZRESULT="NO ZFS DATASETS WERE FOUND"
 }
 
+get_devfs_result() {
+	# Get the rule number from jail.conf (this will just be blank for VMs)
+	_rulenum=$(sed -En "/^${JAIL}(\{|[[:blank:]])/,/^}/p" $JCONF \
+				| sed -En "s/devfs_ruleset=\"//p" | grep -Eo "[[:digit:]]+")
+
+	# Then get the full name of the rulenumber from devfs.rules
+	if [ -n "$_rulenum" ] ; then
+		_rulename=$(sed -En "s/.*devfsrules_(.*=${_rulenum}).*/\1/p" /etc/devfs.rules)
+
+		# Modify result
+		_RESULT=$(echo "$_RESULT" ; echo "$JAIL  DEVFS_RULE  ${_rulename}")
+	fi
+}
+
 supplement_results() {
 
 	# Will return globals: CLASS and FILT_PARAMS (which will change for jails vs VMs)
 	get_parameter_lists
-
-	# If jail modify result with the devfs ruleset
-	if [ -z "${CLASS##*jail}" ] ; then
-		# Get the rule number from jail.conf
-		_rulenum=$(sed -En "/^${JAIL}(\{|[[:blank:]])/,/^}/p" $JCONF \
-				| sed -En "s/devfs_ruleset=\"//p" | grep -Eo "[[:digit:]]+")
-
-		# Then get the full name of the rulenumber from devfs.rules
-		if [ -n "$_rulenum" ] ; then
-			_rulename=$(sed -En "s/.*devfsrules_(.*=${_rulenum}).*/\1/p" /etc/devfs.rules)
-
-			# Modify result
-			_RESULT=$(echo "$_RESULT" ; echo "$JAIL  DEVFS_RULE  ${_rulename}")
-		fi
-	fi
 
 	# Parameters enumerated for the jail/VM
 	_current_params=$(echo "$_RESULT" | awk '{print $2}')
