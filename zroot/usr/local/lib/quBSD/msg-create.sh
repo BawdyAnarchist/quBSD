@@ -602,6 +602,7 @@ Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>]
        store ISOs at: /usr/local/share/ISOs
    -p: (p)arameter. Multiple [-p] can be used in the same command to
        specify values for valid parameters listed in:  qb-help params
+   -r: (r)ootenv. Designates the <rootenv> for <newjail/VM>
    -t: (t)template <jail/VM> can be specified, and fills two functions:
        1. PARAMETERS are copied from <template>, except those specified
           at the command line. If neither <template> nor command line
@@ -609,7 +610,6 @@ Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>]
        2. The zusr dataset of the <template> will be copied in one
           form or another. Use [-z] to specify zusr dataset handling.
           Note! [-c <rootjail|rootVM>] requires [-t <template>]
-   -r: (r)ootenv. Designates the <rootenv> for <newjail/VM>
    -v: (v)olsize for: rootVM at ${R_ZFS}; or appVM at ${U_ZFS}
        Use same convention as MEMSIZE.
    -y: (y)es: Assume "Y" for warnings/confirmations before proceeding.
