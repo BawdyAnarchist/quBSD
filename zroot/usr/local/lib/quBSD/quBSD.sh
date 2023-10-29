@@ -208,8 +208,9 @@ get_jail_parameter() {
 	 	 ## NOTE: If using [-e] in $(command_substitution), best to [-q]
 		 ## quiet any error messages to prevent unpredictable behavior.
 	 # -qp: quiet any error/alert messages. Otherwise error messages are shown.
-	 # -sp: Skip checks, and return 0 regardless of any failures
-	 # -xp: Some parameters need extra functions/checks in certain cases. [-x] flags this
+	 # -rp: resolve value. Some values are "auto" and need further resolution.
+	 # -sp: skip checks, and return 0 regardless of any failures
+	 # -xp: extra checks. Some cases benefit from an extra check only invoked at certain moments 
 	 # -zp: don't error on zero/null values, just return
 
 	# Positional variables:
@@ -217,13 +218,14 @@ get_jail_parameter() {
 	 # $2: _jail  : <jail> to reference in QMAP
 
 	# Ensure all options variables are reset
-	local _dp='' ; local _ep='' ; local _qp='' ; local _sp='' ; local _xp='' ; local _zp=''
+	local _dp= ; local _ep= ; local _qp= ; local _rp= ; local _sp= ; local _xp= ; local _zp=
 
-	while getopts deqsxz opts ; do
+	while getopts deqrsxz opts ; do
 		case $opts in
 			d) _dp="-d" ;;
 			e) _ep="-e" ;;
 			q) _qp="-q" ;;
+			r) _rp="-r" ;;
 			s) _sp="true" ;;
 			x) _xp="-x" ;;
 			z) _zp="true" ;;
@@ -259,7 +261,7 @@ get_jail_parameter() {
 	# If -s was provided, checks are skipped by this eval
 	if ! [ $_sp ] ; then
 		# Variable indirection for checks. Escape \" avoids word splitting
-		eval "chk_valid_${_low_param}" $_qp $_xp '--' \"$_value\" \"$_jail\" || return 1
+		eval "chk_valid_${_low_param}" $_qp $_rp $_xp '--' \"$_value\" \"$_jail\" || return 1
 	fi
 
 	# Either echo <value> , or assign global variable (as specified by caller).
@@ -632,9 +634,7 @@ connect_gateway_to_clients() {
 		if chk_isrunning "$_client" ; then
 
 			# Get client IP
-			_cIP=$(get_jail_parameter -e IPV4 "$_client")
-
-			[ "$_cIP" = "auto" ] && _cIP=$(assign_ipv4_auto -e "$_client")
+			_cIP=$(get_jail_parameter -er IPV4 "$_client")
 
 			# Bring up connection, and return the VIF used for the client
 
@@ -1275,19 +1275,23 @@ chk_valid_ipv4() {
 	# local, because they're required for performing other checks.
 	#   $_a0  $_a1  $_a2  $_a3  $_a4
 
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
-	[ "$1" = "--" ] && shift
+	# OPTIONS
+	while getopts rx opts ; do case $opts in
+		r) _rp="-r" ;;
+		x) _xp="-x" ;;
+		*) get_msg "_1" ; return 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
-	# Positional parmeter / check.
-	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "IPV4" && return 1
+	# Positional parmeter checks. _value is not local here, it might get reassigned
+	_value="$1"
+	case $_value in
+		'') get_msg $_q "_0" "IPV4" && return 1 ;;
+		none|DHCP) return 0 ;;
+		auto) [ -n "$_rp" ] && { _value=$(assign_ipv4_auto -e "$_value") && return 0 ;} || return 1 ;;
+	esac
 
 	# Temporary variables used for checking ipv4 CIDR
 	local _b1 ; local _b2 ; local _b3
-
-	# None, auto, and DHCP are always considered valid.
-	[ "$_value" = "none" -o "$_value" = "auto" -o "$_value" = "DHCP" ] && return 0
 
 	# Not as technically correct as a regex, but it's readable and functional
 	# IP represented by the form: a0.a1.a2.a3/a4 ; b-variables are local/ephemeral
@@ -1887,7 +1891,7 @@ prep_bhyve_options() {
 	# Get simple qmap variables
 	_cpuset=$(get_jail_parameter -e CPUSET "$_VM")        || return 1
 	_gateway=$(get_jail_parameter -ez GATEWAY "$_VM")     || return 1
-	_ipv4=$(get_jail_parameter -ez IPV4 "$_VM")           || return 1
+	_ipv4=$(get_jail_parameter -erz IPV4 "$_VM")          || return 1
 	_memsize=$(get_jail_parameter -e MEMSIZE "$_VM")      || return 1
 	_wiremem=$(get_jail_parameter -e WIREMEM "$_VM")      || return 1
 	_bhyveopts=$(get_jail_parameter -e BHYVEOPTS "$_VM")  || return 1
@@ -1897,9 +1901,6 @@ prep_bhyve_options() {
 	_vncres=$(get_jail_parameter -ez VNCRES "$_VM")       || return 1
 	_ppt=$(get_jail_parameter -exz PPT "$_VM")            || return 1
 	_tmux=$(get_jail_parameter -ez TMUX "$_VM") 				|| return 1
-
-	# For VMs that are clients, their tap still needs an IPV4 inside the gateway
-	[ "$_ipv4" = "auto" ] && _ipv4=$(assign_ipv4_auto -e "$_VM")
 
 	# Add leading '-' to _bhyveopts
 	_BHOPTS="-${_bhyveopts}"

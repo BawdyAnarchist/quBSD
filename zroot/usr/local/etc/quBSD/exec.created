@@ -6,14 +6,11 @@ get_parameters() {
 	JAIL="$1"
 
 	# Get parameters. Class was already verified, so skip checks.
-	get_jail_parameter -dqs CLASS  "$JAIL" ||  exit 1
-	get_jail_parameter IPV4    "$JAIL"     ||  exit 1
+	get_jail_parameter -dqs CLASS "$JAIL"  ||  exit 1
+	get_jail_parameter -r   IPV4  "$JAIL"  ||  exit 1
 	get_jail_parameter GATEWAY "$JAIL"     ||  exit 1
 	get_jail_parameter MAXMEM  "$JAIL"     ||  exit 1
 	get_jail_parameter CPUSET  "$JAIL"     ||  exit 1
-
-	# Check/warn if outside of quBSD IPv4 convention, but don't fail
-	chk_isqubsd_ipv4 "$IPV4" "$JAIL"
 
 	# MTU only with valid IP. Quiet messages (MTU is not critical)
 	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter MTU "$JAIL"
@@ -38,14 +35,6 @@ modify_dhcpd() {
 	# Set MTU in the config file
 	[ -n "$MTU" ] && sed -i '' -E "s/(option interface-mtu ).*/\1${MTU};/g" \
 														"${M_ZUSR}/${JAIL}/rw/usr/local/etc/dhcpd.conf"
-}
-
-connect_to_gateway() {
-	# If auto, then assign the global variable IPV4 to have a real IP addr
-	[ "$IPV4" = "auto" ] && assign_ipv4_auto "$JAIL"
-
-	# Connect jail, to it's gateway, and assign VIF used for gateway
-	chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -e "$JAIL" "$GATEWAY" "$IPV4")
 }
 
 modify_files() {
@@ -102,9 +91,11 @@ resource_control() {
 
 main() {
 
+	# If there's a dhcpd.conf in the jail, then modify it
 	[ -e "${M_ZUSR}/${JAIL}/rw/usr/local/etc/dhcpd.conf" ] && modify_dhcpd
 
-	connect_to_gateway
+	# Connect jail to its gateway, retrieving the VIF assigned
+	chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -e "$JAIL" "$GATEWAY" "$IPV4")
 
 	modify_files
 
