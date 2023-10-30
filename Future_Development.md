@@ -2,6 +2,7 @@
 
 reinstall 0base
 qubsdmap can be shortened, for the most part. But have to hand jam it caz sometimes not
+qb-hostnet - add the edit for EXT_IF to pf_pass
 
 qubsd.sh
 	- get_jail_parameter
