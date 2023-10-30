@@ -3,26 +3,25 @@
 . /usr/local/lib/quBSD/quBSD.sh
 
 get_options() {
-	while getopts ch opts ; do
-		case $opts in
+	while getopts ch opts ; do case $opts in
 			c) close_windows ; exit 0 ;;
-			h) usage ; exit 0 ;; 
+			h) usage ; exit 0 ;;
 			*) exit ;;
-		esac
-	done
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-	shift $(( OPTIND - 1 ))
+	JAIL="$1"
+#	[ -z "$JAIL" ] && JAIL='.*'
 }
 
-usage() { cat << ENDOFMSG 
+usage() { cat << ENDOFMSG
 
 qb-i3-windows: Print a list of all open windows/programs currently
-               running, grouped by their respective i3 workspaces. 
+               running, grouped by their respective i3 workspaces.
 
 usage: qb-i3-windows [-h][-c]
        No options specified:  will print list.
    -c: (c)lose all open windows. Jails will stay running.
-       NOTE: Windows might not close immediately. Wait for 5-10 
+       NOTE: Windows might not close immediately. Wait for 5-10
        seconds, then run qb-i3-windows to verify if they closed.
    -h: (h)elp. Ouputs this help message.
 
@@ -33,8 +32,8 @@ close_windows() {
 
 	# Two passes are programmed. First attempts graceful TERM signal.
 	# Second sends KILL, if the process didn't stop.
- 
-	_SIG="-15 -15 -9" 
+
+	_SIG="-15 -15 -9"
 
 	for _sig in $_SIG ; do
 
@@ -42,28 +41,34 @@ close_windows() {
 		WINDOWS=$(xprop -root _NET_CLIENT_LIST | sed -nE "s/.*window id # //p" | sed "s/,//g")
 
 		# If it's the 3nd pass, and there are still windows, give them an extra moment to die
-		[ "$_sig" = "-9" ] && [ -n "$WINDOWS" ] && sleep 4 
-	
+		[ "$_sig" = "-9" ] && [ -n "$WINDOWS" ] && sleep 4
+
 		# Cycle through windows and kill them
 		for _win in $WINDOWS; do
 			eval kill $_sig $(xprop -id $_win _NET_WM_PID | grep -Eo "[[:alnum:]]+\$")
-		done	
+		done
 
-		# Give a moment for windows to die 
+		# Give a moment for windows to die
 		sleep 2
 	done
 }
 
 list_windows() {
 
-	# get_tree from i3wm, and parse the important bits. 
+	# get_tree from i3wm, and parse the important bits.
 	# Not the cleanest implementation, but paring JSON without a parser is cumbersome.
 	LIST=$(i3-msg -t get_tree | grep -Eo '(\"num\":[[:digit:]]+|\"machine\":\"[^\"]+|\"class\":\"[^\"]+)' | grep -v i3bar | sed 's/"num":/WORKSPACE: /g' | column -t | sed 's/"class":"/     /g' | sed 's/"machine":"/\tJail: /g' | sed 's/Jail: quBSD/Host/g' | sed "/WORKSPACE/ i\\
 
 #")
 
-	echo "$LIST" | sed 'N;s/\n/ /' | sed 's/WORKSPACE:[[:blank:]]*/WORKSPACE: /g' 
+	if [ "$JAIL" ] ; then
+		echo "$LIST" | sed 'N;s/\n/ /' | sed 's/WORKSPACE:[[:blank:]]*/WORKSPACE: /g' \
+																									| grep -B1 $JAIL
+	else
+		echo "$LIST" | sed 'N;s/\n/ /' | sed 's/WORKSPACE:[[:blank:]]*/WORKSPACE: /g'
+	fi
 }
+
 
 
 get_global_variables
