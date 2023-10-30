@@ -14,27 +14,29 @@ get_parameters() {
 
 	# MTU only with valid IP. Quiet messages (MTU is not critical)
 	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter MTU "$JAIL"
+	J_ZUSR="${M_ZUSR}/${JAIL}"
+	_0net_DHCP="${J_ZUSR}/rw/usr/local/etc/0net_dhcpd.conf"
 }
 
 modify_dhcpd() {
 
 	# If wireguard is enabled, DNS should come from wg0.conf. Otherwise, use /etc/resolv.conf
-	if grep -Eq 'wireguard_enable="YES"' "${M_ZUSR}/${JAIL}/rw/etc/rc.conf" ; then
+	if grep -Eq 'wireguard_enable="YES"' "${J_ZUSR}/rw/etc/rc.conf" ; then
 		_DNS=$(sed -En "s/^DNS.*=[[:blank:]]*([0-9]+.*[0-9]+)[[:blank:]]*\$/\1;/p" \
-											"${M_ZUSR}/${JAIL}/rw/usr/local/etc/wireguard/wg0.conf")
+												"${J_ZUSR}/rw/usr/local/etc/wireguard/wg0.conf")
 	else
 		# Get the DNS entries from resolv.conf, and use those for the dhcpd server
 		_DNS=$(sed -En "s/^nameserver (.*[0-9]+)[[:blank:]]*\$/\1,/p" \
-														"${M_ZUSR}/${JAIL}/rw/etc/resolv.conf")
+														"${J_ZUSR}/rw/etc/resolv.conf")
 		_DNS=$(echo $_DNS | sed -E "s/,\$/;/")
 	fi
 
 	# Modify dhcpd with new DNS
 	[ -n "$_DNS" ] && sed -i '' -E "s/(option domain-name-servers ).*/\1${_DNS}/g" \
-														"${M_ZUSR}/${JAIL}/rw/usr/local/etc/dhcpd.conf"
+														"${J_ZUSR}/rw/usr/local/etc/dhcpd.conf"
 	# Set MTU in the config file
 	[ -n "$MTU" ] && sed -i '' -E "s/(option interface-mtu ).*/\1${MTU};/g" \
-														"${M_ZUSR}/${JAIL}/rw/usr/local/etc/dhcpd.conf"
+														"$_0net_DHCP"
 }
 
 modify_files() {
@@ -46,7 +48,7 @@ modify_files() {
 		assemble_wgports
 
 		# Make sure flags are down
-		chflags -R noschg "${M_ZUSR}/${JAIL}/rw/etc"
+		chflags -R noschg "${J_ZUSR}/rw/etc"
 
 		# $VIF was assigned during the connect_client_to_gateway func. Modify pf.conf
 		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${_VIF}\"@" $JPF
@@ -61,8 +63,8 @@ modify_files() {
 	fi
 
 	# Make sure the MTU matches qmap
-	[ "$MTU" ] && [ -e "${M_ZUSR}/${JAIL}/${WG0CONF}" ] \
-						&& sed -i '' -E "s/^MTU.*/MTU = ${MTU}/" ${M_ZUSR}/${JAIL}/${WG0CONF}
+	[ "$MTU" ] && [ -e "${J_ZUSR}/${WG0CONF}" ] \
+						&& sed -i '' -E "s/^MTU.*/MTU = ${MTU}/" ${J_ZUSR}/${WG0CONF}
 }
 
 assemble_wgports() {
@@ -92,7 +94,7 @@ resource_control() {
 main() {
 
 	# If there's a dhcpd.conf in the jail, then modify it
-	[ -e "${M_ZUSR}/${JAIL}/rw/usr/local/etc/dhcpd.conf" ] && modify_dhcpd
+	[ -e "$_0net_DHCP" ] && modify_dhcpd
 
 	# Connect jail to its gateway, retrieving the VIF assigned
 	chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -e "$JAIL" "$GATEWAY" "$IPV4")
