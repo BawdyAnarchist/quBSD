@@ -210,7 +210,7 @@ get_jail_parameter() {
 	 # -qp: quiet any error/alert messages. Otherwise error messages are shown.
 	 # -rp: resolve value. Some values are "auto" and need further resolution.
 	 # -sp: skip checks, and return 0 regardless of any failures
-	 # -xp: extra checks. Some cases benefit from an extra check only invoked at certain moments 
+	 # -xp: extra checks. Some cases benefit from an extra check only invoked at certain moments
 	 # -zp: don't error on zero/null values, just return
 
 	# Positional variables:
@@ -219,9 +219,7 @@ get_jail_parameter() {
 
 	# Ensure all options variables are reset
 	local _dp= ; local _ep= ; local _qp= ; local _rp= ; local _sp= ; local _xp= ; local _zp=
-
-	while getopts deqrsxz opts ; do
-		case $opts in
+	while getopts deqrsxz opts ; do case $opts in
 			d) _dp="-d" ;;
 			e) _ep="-e" ;;
 			q) _qp="-q" ;;
@@ -230,10 +228,7 @@ get_jail_parameter() {
 			x) _xp="-x" ;;
 			z) _zp="true" ;;
 			*) get_msg "_1" ; return 1 ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Positional and function variables
 	local _param="$1"  ; local _low_param=$(echo "$_param" | tr '[:upper:]' '[:lower:]')
@@ -276,19 +271,13 @@ get_info() {
 	# $1: _info :
 
 	# Local options for this function
-	while getopts e opts ; do
-		case $opts in
-			e) _ei="-e" ;;
+	while getopts e opts ; do case $opts in
+			e) local _ei="-e" ;;
 			*) get_msg "_1" ; return 1 ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Positional variables
-	local _info="$1"
-	local _jail="$2"
-	local _value=''
+	local _info="$1"  ;  local _jail="$2"  ;  local _value=''
 
 	case $_info in
 		_CLIENTS)
@@ -398,23 +387,16 @@ start_jail() {
 	# Starts jail. Performs sanity checks before starting. Logs results.
 	# return 0 on success ; 1 on failure.
 
-   # Options
-	while getopts nqt opts ; do
-		case $opts in
-			n) _norun="-n" ;;
-			q) _qs="-q"    ;;
+	while getopts nq opts ; do case $opts in
+			n) local _norun="-n" ;;
+			q) local _qs="-q"    ;;
 			*) return 1 ;;
-		esac
-	done
-	shift $(( OPTIND - 1 ))
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-	# Positional parameter / checks
+	# Positional parameter checks. Must have value, must not be none
 	local _jail="$1"
-
-	[ -z "$_jail" ] && get_msg $_qs "_0" "jail" && return 1
-
-	# none is an invalid jailname. Never start it. Always return 0.
 	[ "$_jail" = "none" ] && return 0
+	[ -z "$_jail" ] && get_msg $_qs "_0" "jail" && return 1
 
 	# Check to see if _jail is already running
 	if	! chk_isrunning "$_jail" ; then
@@ -440,16 +422,13 @@ start_jail() {
 stop_jail() {
 	# If jail is running, remove it. Return 0 on success; return 1 if fail.
 
-	while getopts fqt:w opts ; do
-		case $opts in
-			f) _force="true" ;;
-			q) _qj="-q" ;;
-			t) _timeout="-t $OPTARG" ;;
-			w) _wait="true" ;;
+	while getopts fqt:w opts ; do case $opts in
+			f) local _force="true" ;;
+			q) local _qj="-q" ;;
+			t) local _timeout="-t $OPTARG" ;;
+			w) local _wait="true" ;;
 			*) get_msg "_1" ;;
-		esac
-	done
-	shift $(( OPTIND - 1 ))
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Positional parameter / check
 	local _jail="$1"
@@ -501,17 +480,18 @@ restart_jail() {
 	# Restarts jail. If a jail is off, this will start it. However, passing
 	# $2="hold" will override this default, so that an off jail stays off.
 
-	# Quiet option
-	getopts q _opts && _qr='-q' && shift
-	[ "$1" = "--" ] && shift
+	while getopts hq opts ; do case $opts in
+			h) local _hold="true" ;;
+			q) local _qr="-q" ;;
+			*) get_msg "_1" ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Positional parameters / check
 	local _jail="$1"
-	local _hold="$2"
 	[ -z "$_jail" ] && get_msg $_qr "_0" "jail"  && return 1
 
 	# If the jail was off, and the hold flag was given, don't start it.
-	! chk_isrunning "$_jail" && [ "$_hold" = "hold" ] && return 0
+	! chk_isrunning "$_jail" && [ "$_hold" ] && return 0
 
 	# Otherwise, cycle jail
 	stop_jail $_qr "$_jail" && start_jail $_qr "$_jail"
@@ -522,8 +502,7 @@ remove_tap() {
 	# Return 1 on failure, otherwise return 0 (even if tap was already on host)
 
 	# Assign name of tap
-	local _tap="$1"
-	local _jail="$2"
+	local _tap="$1"  ;  local _jail="$2"
 
 	# Check if it's already on host
 	ifconfig "$_tap" > /dev/null 2>&1  && ifconfig "$_tap" down && return 0
@@ -576,17 +555,6 @@ connect_client_to_gateway() {
 		# If there's any mtu setting other than 1500, apply it
 		[ ! "$_mtu" = "1500" ] && jexec -l -U root $_client ifconfig $_vif mtu $_mtu up
 
-# Run DHCP, or manuall add IP address
-#if [ "$_ipv4" = "DHCP" ] ; then
-# First remove any running instances of dhclient
-# jexec -l -U root $_client pkill -f dhclient > /dev/null 2>&1
-#	jexec -l -U root $_client dhclient $_vif > /dev/null 2>&1
-
-#else
-#	jexec -l -U root $_client ifconfig $_vif inet ${_ipv4} mtu $_mtu up
-#	jexec -l -U root $_client route add default "${_ipv4%.*/*}.1" > /dev/null 2>&1
-#fi
-
 		[ "$_ec" ] && echo "$_vif"
 
 		return 0
@@ -623,7 +591,7 @@ connect_gateway_to_clients() {
 	# When a jail/VM is started, this manages the connection to its downstream clients
 
 	# Quiet option
-	getopts q _opts && _qz='-q' && shift
+	getopts q _opts && local _qz='-q' && shift
 	[ "$1" = "--" ] && shift
 
 	_jail="$1"
@@ -668,7 +636,7 @@ reclone_zroot() {
 	# and destroys old snapshots when no longer needed.
 
 	# Quiet option
-	getopts q _opts && _qz='-q' && shift
+	getopts q _opts && local _qz='-q' && shift
 	[ "$1" = "--" ] && shift
 
 	# Variables definitions
@@ -905,11 +873,10 @@ monitor_vm_stop() {
 	[ "$1" = "--" ] && shift
 
 	local _jail="$1"
+		[ -z "$_jail" ] && return 1
 	local _timeout="$2"
-	: ${_timeout:=20}
+		: ${_timeout:=20}
 	local _count=1
-
-	[ -z "$_jail" ] && return 1
 
 	# Get message about waiting
 	get_msg $_qms "_jo4" "$_jail" "$_timeout"
@@ -939,10 +906,7 @@ monitor_vm_stop() {
 ########################################################################################
 
 chk_isblank() {
-	# Personally I think it's posix dumb that there are only VERBOSE ways of
-	# asking: Is this variable -z or only [[:blanks:]]*. Are you really going
-	# to be testing blank variables for the number of spaces/tabs they contain?
-
+	# Seems there are only verbose POSIX ways to test a variable is either null contains spaces.
 	[ "$1" = "${1#*[![:space:]]}" ] && return 0  ||  return 1
 }
 
@@ -961,12 +925,11 @@ chk_isrunning() {
 
 chk_truefalse() {
 	# Quiet option
-	getopts q _opts && _qf='-q' && shift
+	getopts q _opts && local _qf='-q' && shift
 	[ "$1" = "--" ] && shift
 
 	# Positional parmeters / check.
-	local _value="$1"
-	local _param="$2"
+	local _value="$1"  ;  local _param="$2"
 
 	[ -z "$_value" ] && get_msg $_qf "_0" "$_param" && return 1
 
@@ -985,7 +948,7 @@ chk_isvm() {
 	_value="$1"
 
 	# If -c was passed, then use the $1 as a class, not as a jailname
-	[ "$_class" ] && [ -z "${_value##*VM}" ] && return 0
+	[ "$_class" ] && [ "$_value" ] && [ -z "${_value##*VM}" ] && return 0
 
 	$(get_jail_parameter -qsde CLASS $_value | grep -qs "VM") && return 0 || return 1
 }
@@ -996,13 +959,11 @@ chk_avail_jailname() {
 	# Return 0 jailname available, return 1 for any failure
 
 	# Quiet option
-	getopts q _opts && _qa='-q' && shift
+	getopts q _opts && local _qa='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	# Positional parmeters and function specific variables.
+	# Positional parmeters
 	local _jail="$1"
-
-	# Fail if no jail specified
 	[ -z "$_jail" ] && get_msg $_qa "_0" "new jail name" && return 1
 
 	# Checks that proposed jailname isn't 'none' or 'qubsd' or starts with '#'
@@ -1029,10 +990,7 @@ chk_avail_jailname() {
 ########################################################################################
 
 chk_valid_zfs() {
-	# Verifies the existence of a zfs dataset, returns 0, or 1 on failure
-	# zfs provides no quiet option, and > null redirect takes up real-estate
-
-	# Perform check
+	# Silently verifies existence of zfs dataset, because zfs has no quiet option
 	zfs list $1 >> /dev/null 2>&1  &&  return 0  ||  return 1
 }
 
@@ -1041,15 +999,13 @@ chk_valid_jail() {
 	# Return 0 for passed all checks, return 1 for any failure
 
 	# Quiet option
-	getopts q _opts && _qv='-q' && shift
+	getopts q _opts && local _qv='-q' && shift
 	[ "$1" = "--" ] && shift
 
 	# Positional parmeters and function specific variables.
 	local _value="$1"
-	local _class ; local _template ; local _class_of_temp
-
-	# Fail if no jail specified
 	[ -z "$_value" ] && get_msg $_qv "_0" "jail" && return 1
+	local _class ; local _template ; local _class_of_temp
 
 	# Must have class in QMAP. Used later to find the correct zfs dataset
 	_class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
@@ -1125,34 +1081,26 @@ chk_valid_jail() {
 
 
 ##############################  JAIL/VM  PARAMETER CHECKS  ##############################
+# These functions are often called programmatically in relation to PARAMETERS
+# Return 1 on failure; otherwise, return 0
 
 chk_valid_autostart() {
-	# Standardization/consistency with get_jail_parameter() func.
-
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
-
 	chk_truefalse $_q "$1" "AUTOSTART"
 }
 
 chk_valid_autosnap() {
-	# Mostly for standardization/completeness with get_jail_parameter() func.
-
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
-
 	chk_truefalse $_q "$1" "AUTOSNAP"
 }
 
 chk_valid_bhyveopts() {
-	# Checks that only non arg based bhyve options were provided
+	# Only options that have no additional OPTARG required, are allowed here
 
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
-
 	_value="$1"
 
 	# Only bhyve opts with no argument
@@ -1160,19 +1108,14 @@ chk_valid_bhyveopts() {
 			&& get_msg $_q "_cj29" "$_value" && return 1
 
 	# No duplicate characters
-	[ "$(echo "$myvar" | fold -w1 | sort | uniq -d | wc -l)" -gt 0 ] \
+	[ "$(echo "$_value" | fold -w1 | sort | uniq -d | wc -l)" -gt 0 ] \
 			&& get_msg $_q "_cj30" "$_value" && return 1
-
 	return 0
 }
 
 chk_valid_class() {
-	# Return 0 if proposed class is valid ; return 1 if invalid
-
-	# Quiet option
 	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
-
 	local _value="$1"
 
 	# Valid inputs are: appjail | rootjail | dispjail | appVM | rootVM
@@ -1184,24 +1127,13 @@ chk_valid_class() {
 }
 
 chk_valid_cpuset() {
-	# Return 0 if proposed cpuset is valid ; return 1 if invalid
-
-	local _q ; local _xtra
-	while getopts ex opts ; do
-		case $opts in
+	while getopts ex opts ; do case $opts in
 			q) local _q="-q" ;;
 			*) get_msg "_1" ; return 1 ;;
-		esac
-	done
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
-	shift $(( OPTIND - 1 ))
-	[ "$1" = "--" ] && shift
-
-	# Positional parmeters / check.
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "CPUSET" && return 1
-
-	# None is always a valid cpuset
 	[ "$_value" = "none" ] && return 0
 
 	# Get the list of CPUs on the system, and edit for searching
@@ -1219,13 +1151,10 @@ chk_valid_cpuset() {
 		! echo $_validcpuset | grep -Eq "${_cpu},|${_cpu}\$" \
 			&& get_msg $_q "_cj2" "$_value" "CPUSET" && return 1
 	done
-
 	return 0
 }
 
 chk_valid_devfs_rule() {
-
-	# Quiet option
 	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
@@ -1234,22 +1163,14 @@ chk_valid_devfs_rule() {
 
 	! grep -Eqs -- "=${_value}\]\$|\[devfsrules.*${_value}\]\$" /etc/devfs.rules \
 			&& get_msg $_q "_cj2" "$_value" "DEVFS_RULE" && return 1
-
 	return 0
 }
 
 chk_valid_gateway() {
-	# Checks against the quBSD conventions.
-	# Return 0 if proposed gateway is valid ; return 1 if invalid
-
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	# Positional parmeters.
 	local _gw="$1"
-
-	# 'none' is always a valid gateway
 	[ "$_gw" = "none" ] && return 0
 
 	# Nonlocal var, class of the gateway is important for jail startups
@@ -1262,27 +1183,22 @@ chk_valid_gateway() {
 		# Check that gateway is a valid jail.
  		chk_valid_jail $_q "$_gw" || return 1
 	fi
-
 	return 0
 }
 
 chk_valid_ipv4() {
 	# Tests for validity of IPv4 CIDR notation.
-	# return 0 if valid (or none), return 1 if not
-	# Also assigns global variable: _valid_IPv4="true"
+	# Variables below are globally assigned because they're required for performing other checks.
+		# $_a0  $_a1  $_a2  $_a3  $_a4
 
-	# Variables below are assigned as global variables rather than
-	# local, because they're required for performing other checks.
-	#   $_a0  $_a1  $_a2  $_a3  $_a4
-
-	# OPTIONS
-	while getopts rx opts ; do case $opts in
-		r) _rp="-r" ;;
-		x) _xp="-x" ;;
+	while getopts qrx opts ; do case $opts in
+		q) local _q="-q" ;;
+		r) local _rp="-r" ;;
+		x) local _xp="-x" ;;
 		*) get_msg "_1" ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
-	# Positional parmeter checks. _value is not local here, it might get reassigned
+	# !! _value is not local here, it might get reassigned !!
 	_value="$1"
 	case $_value in
 		'') get_msg $_q "_0" "IPV4" && return 1 ;;
@@ -1316,13 +1232,11 @@ chk_valid_ipv4() {
 			&& [ "$_a3" -ge 0 ] && [ "$_a3" -le 255 ] \
 			&& [ "$_a4" -ge 0 ] && [ "$_a4" -le 32 ]  >> /dev/null 2>&1
 		then
-			_valid_IPv4="true"
 			return 0
 		else
 			# Error message, is invalid IPv4
 			get_msg $_q "_cj10" "$_value" && return 1
 		fi
-
 	else
 		# Error message, is invalid IPv4
 		get_msg $_q "_cj10" "$_value" && return 1
@@ -1331,15 +1245,12 @@ chk_valid_ipv4() {
 
 chk_isqubsd_ipv4() {
 	# Checks for IP overlaps and/or mismatch in quBSD convention.
-	# Returns 0 for IPv4 within convention ; return 1 if not.
 
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	# Positional parmeters. _
-	local _value="$1"
-	local _jail="$2"
+	local _value="$1"  ;  local _jail="$2"
+	[ -z "$_value" ] && get_msg $_q "_0" "IPV4"
 
 	# $_a0 - $_a4 vars are needed later. Check that they're all here, or get them.
 	echo "${_a0}#${_a1}#${_a2}#${_a3}#${_a4}" | grep -q "##" \
@@ -1348,26 +1259,18 @@ chk_isqubsd_ipv4() {
 	# Assigns global variables that will be used here for checks.
 	define_ipv4_convention "$_jail"
 
-	# No value specified
-	[ -z "$_value" ] && get_msg $_q "_0" "IPV4"
-
 	# Check the net-jails for IP values of none
 	case ${_value}_${_jail} in
-
-		none_net-firewall)
-			# IPV4 `none' with net-firewall shouldn't really happen
+		none_net-firewall)  # IPV4 `none' with net-firewall shouldn't really happen
 			get_msg $_q "_cj9" "$_value" "$_jail" && return 1
 		;;
-		*_net-firewall)
-			# net-firewall has external connection. No convention to judge
+		*_net-firewall)  # net-firewall has external connection. No convention to judge
 			return 0
 		;;
-		none_net-*)
-			# `none' shouldn't really happen with net-jails either
+		none_net-*)  # `none' shouldn't really happen with net-jails either
 			get_msg $_q "_cj13" "$_value" "$_jail" && return 1
 		;;
-		none_*|auto_*)
-			# All other jails, `none' is fine. No checks required
+		none_*|auto_*)  # All other jails, `none' is fine. No checks required
 			return 0
 		;;
 	esac
@@ -1378,34 +1281,24 @@ chk_isqubsd_ipv4() {
 		get_msg $_q "_cj11" "$_value" "$_jail" && return 1
 	fi
 
-# NOTE:  $a2 and $ip2 are missing, because that is the _cycle
-# Any change to quBSD naming convention will require manual change.
+	# NOTE:  $a2 and $ip2 are missing, because these are the variable positions
 	! [ "$_a0.$_a1.$_a3/$_a4" = "$_ip0.$_ip1.$_ip3/$_subnet" ] \
 			&& get_msg $_q "_cj12" "$_value" "$_jail" && return 1
 
-	_gateway=$(sed -nE "s/^${_jail}[[:blank:]]+GATEWAY[[:blank:]]+//p" $QMAP)
-
 	# Assigning IP to jail that has no gateway
-	[ "$_gateway" = "none" ] && get_msg $_q "_cj14" "$_value" "$_jail" \
-		&& return 1
+	[ "$(get_jail_parameter -eqs GATEWAY "$_jail")" = "none" ] \
+			&& get_msg $_q "_cj14" "$_value" "$_jail" \
+			&& return 1
 
-	# Catchall. return 0 if no other checks caused a return 1
 	return 0
 }
 
 chk_valid_maxmem() {
-	# Return 0 if proposed maxmem is valid ; return 1 if invalid
-	# IMPROVEMENT IDEA - check that proposal isn't greater than system memory
-
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	# Positional parmeter / check
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "MAXMEM" && return 1
-
-	# None is always a valid maxmem
 	[ "$_value" = "none" ] && return 0
 
 	# Per man 8 rctl, user can assign units: G|g|M|m|K|k
@@ -1430,15 +1323,10 @@ chk_valid_maxmem() {
 }
 
 chk_valid_memsize() {
-	# Return 0 if proposed memsize is valid ; return 1 if invalid
-
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-
-	# None is not permitted for memsize
 	[ "$_value" = "none" ] && get_msg "_cj21_1" && return 1
 
 	# It's the exact same program/routine. Different qmap params to be technically specific.
@@ -1448,13 +1336,8 @@ chk_valid_memsize() {
 }
 
 chk_valid_mtu() {
-	# Return 0 if proposed mtu is valid ; return 1 if invalid
-
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
-
-	# Positional parmeters / check.
 	local _value="$1"
 
 	# If MTU is not a number
@@ -1468,26 +1351,17 @@ chk_valid_mtu() {
 }
 
 chk_valid_no_destroy() {
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
-
 	chk_truefalse $_q "$1" "NO_DESTROY"
 }
 
 chk_valid_ppt() {
-
-	local _q ; local _xtra
-	while getopts ex opts ; do
-		case $opts in
-			q) _q="-q" ;;
-			x) _xtra="true" ;;
+	while getopts qx opts ; do case $opts in
+			q) local _q="-q" ;;
+			x) local _xtra="true" ;;
 			*) get_msg "_1" ; return 1 ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
-	[ "$1" = "--" ] && shift
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	_value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "PPT (passthru)" && return 1
@@ -1530,18 +1404,13 @@ chk_valid_ppt() {
 			fi
 		fi
 	done
-
 	return 0
 }
 
 chk_valid_rootenv() {
-	# Return 0 if proposed <rootenv> is valid ; return 1 if invalid
-
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	# Positional parmeter / check
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "CLASS" && return 1
 
@@ -1565,17 +1434,11 @@ chk_valid_rootenv() {
 }
 
 chk_valid_seclvl() {
-	# Return 0 if proposed seclvl is valid ; return 1 if invalid
-
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	# Positional parameter
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "SECLVL" && return 1
-
-	# None is always a valid seclvl
 	[ "$_value" = "none" ] && return 0
 
 	# If SECLVL is not a number
@@ -1586,16 +1449,15 @@ chk_valid_seclvl() {
 }
 
 chk_valid_taps() {
-	# Return 0 if vif is valid ; return 1 if invalid
+	# Taps in qmap just lists how many are wanted
 
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	# Positional parmeter
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "VIF" && return 1
 
+	# Make sure that it's an integer
 	for _val in $_value ; do
 		! echo "$_val" | grep -qE "^[[:digit:]]\$" \
 				&& get_msg $_q "_cj7" "$_val" && return 1
@@ -1605,20 +1467,14 @@ chk_valid_taps() {
 }
 
 chk_valid_tmux() {
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
-
 	chk_truefalse $_q "$1" "TMUX"
 }
 
 chk_valid_schg() {
-	# Return 0 if proposed schg is valid ; return 1 if invalid
-
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
-
 	local _value="$1"
 
 	# Valid inputs are: none | sys | all
@@ -1630,29 +1486,19 @@ chk_valid_schg() {
 }
 
 chk_valid_template() {
-	# Return 0 if proposed template is valid ; return 1 if invalid
-	# Exists mostly so that the get_jail_parameters() function works seamlessly
-
-	# Quiet option
-	getopts q _opts && _qt='-q' && shift
+	getopts q _opts && local _qt='-q' && shift
 	[ "$1" = "--" ] && shift
-
-	# Positional parmeters.
 	local _value="$1"
 
-	! chk_valid_jail $_qt "$_value" && return 1
-
-	return 0
+	! chk_valid_jail $_qt "$_value" && return 1 || return 0
 }
 
 chk_valid_vcpus() {
-	# Return 0 if proposed vcpus are valid; false if not.
+	# Make sure the formatting is correct, and the CPUs exist on the system
 
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	# Positional parmeters / check.
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "VCPUS" && return 1
 
@@ -1675,10 +1521,8 @@ chk_valid_vcpus() {
 chk_valid_vncres() {
 	# Make sure that the resolution is supported by bhyve
 
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
-
 	_value="$1"
 
 	case $_value in
@@ -1689,12 +1533,8 @@ chk_valid_vncres() {
 }
 
 chk_valid_wiremem() {
-	# Standardization/consistency with get_jail_parameter() func.
-
-	# Quiet option
-	getopts q _opts && _q='-q' && shift
+	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
-
 	chk_truefalse $_q "$1" "WIREMEM"
 }
 
@@ -1817,9 +1657,9 @@ cleanup_vm() {
 	# Positional params and func variables.
 	while getopts nqx opts ; do
 		case $opts in
-			n) _norun="-n" ;;
-			q) _qcv="-q" ;;
-			x) _exit="true" ;;
+			n) local _norun="-n" ;;
+			q) local _qcv="-q" ;;
+			x) local _exit="true" ;;
 		esac
 	done
 	shift $(( OPTIND - 1 ))
@@ -1879,7 +1719,7 @@ prep_bhyve_options() {
    # Options
 	while getopts qt opts ; do
 		case $opts in
-			q) _qs="-q" ;;
+			q) local _qs="-q" ;;
 		esac
 	done
 	shift $(( OPTIND - 1 ))
@@ -2093,9 +1933,9 @@ exec_vm_coordinator() {
    # Options
 	while getopts nqt opts ; do
 		case $opts in
-			n) _norun="-n" ;;
-			q) _qs="-q"    ;;
-			t) _tmux="-t"  ;;
+			n) local _norun="-n" ;;
+			q) local _qs="-q"    ;;
+			t) local _tmux="-t"  ;;
 		esac
 	done
 	shift $(( OPTIND - 1 ))
