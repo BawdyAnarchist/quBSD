@@ -1582,12 +1582,11 @@ discover_open_ipv4() {
 	getopts q _opts && local _qi='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	local _jail="$1"
-	local _ip_test
+	local _jail="$1"  ;  local _ip_test
 	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
 
-	# net-firewall connects to external network. Assign DHCP, and skip checks.
-	[ "$_jail" = "net-firewall" ] && echo "DHCP" && return 0
+	# If gateway is a VM, then DHCP will be required, regardless
+	chk_isvm "$(get_jail_parameter -eqs GATEWAY $_jail)" && echo "DHCP" && return 0
 
 	# Assigns values for each IP position, and initializes $_cycle
 	define_ipv4_convention "$_jail"
@@ -1595,13 +1594,11 @@ discover_open_ipv4() {
 	# Get a list of all IPs in use. Saves to variable $_USED_IPS
 	get_info _USED_IPS
 
-	# Increment _cycle to find an open IP.
+	# Increment $_ip2 until an open IP is found
 	while [ $_ip2 -le 255 ] ; do
 
-		# $_ip2 uses variable indirection, which subsitutes "cycle"
-		_ip_test="${_ip0}.${_ip1}.${_ip2}"
-
 		# Compare against QMAP, and the IPs already in use, including the temp file.
+		_ip_test="${_ip0}.${_ip1}.${_ip2}"
 		if grep -Fq "$_ip_test" $QMAP || echo "$_USED_IPS" | grep -Fq "$_ip_test" \
 				|| grep -Fqs "$_ip_test" "$_TMP_IP" ; then
 
@@ -1655,21 +1652,14 @@ cleanup_vm() {
 	# Cleanup function after VM is stopped or killed in any way
 
 	# Positional params and func variables.
-	while getopts nqx opts ; do
-		case $opts in
+	while getopts nqx opts ; do case $opts in
 			n) local _norun="-n" ;;
 			q) local _qcv="-q" ;;
 			x) local _exit="true" ;;
-		esac
-	done
-	shift $(( OPTIND - 1 ))
-	[ "$1" = "--" ] && shift
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Positional variables
-	local _VM="$1"
-	local _rootenv="$2"
-
-	# Make sure a VM was provided, or return
+	local _VM="$1"  ;  local _rootenv="$2"
 	[ -z "$_VM" ] && get_msg $_qcv "_0" && return 1
 
 	# Bring all recorded taps back to host, and destroy
@@ -1714,21 +1704,15 @@ cleanup_vm() {
 }
 
 prep_bhyve_options() {
-	# Starts VM. ALLCAPS variables are each a full line option for bhyve. Returns 1 if any errors.
+	# Prepares both line options and the host system for the bhyve command
+	# CAPS variables are the final line options for the bhyve command
 
-   # Options
-	while getopts qt opts ; do
-		case $opts in
+	while getopts qt opts ; do case $opts in
 			q) local _qs="-q" ;;
-		esac
-	done
-	shift $(( OPTIND - 1 ))
-	[ "$1" = "--" ] && shift
-
-	# Assign _vm variable
-	_VM="$1"
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Get simple qmap variables
+	_VM="$1"
 	_cpuset=$(get_jail_parameter -e CPUSET "$_VM")        || return 1
 	_gateway=$(get_jail_parameter -ez GATEWAY "$_VM")     || return 1
 	_ipv4=$(get_jail_parameter -erz IPV4 "$_VM")          || return 1
@@ -1742,12 +1726,24 @@ prep_bhyve_options() {
 	_ppt=$(get_jail_parameter -exz PPT "$_VM")            || return 1
 	_tmux=$(get_jail_parameter -ez TMUX "$_VM") 				|| return 1
 
+	# UEFI bootrom
+	_BOOT="-l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI.fd"
+
 	# Add leading '-' to _bhyveopts
 	_BHOPTS="-${_bhyveopts}"
 
 	# Get wildcard bhyve option added by user
 	_bhyve_custm=$(sed -En "s/${_VM}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+//p" $QMAP \
 						| sed -En "s/[[:blank:]]+/ /p")
+
+	# RAM and memory handling
+	_RAM="-m $_memsize"
+	[ "$_wiremem" = "true" ] && _WIRE='-S' || _WIRE=''
+
+	# Assign hostbridge based on CPU
+	grep -Eqs "^CPU.*AMD" /var/run/dmesg.boot \
+		&& _HOSTBRG="-s 0,amd_hostbridge" \
+		|| _HOSTBRG="-s 0,hostbridge"
 
 	# Handle CPU pinning, or if none, then just assign the number of vcpus
 	_vcpu_count=0 ; IFS=','
@@ -1774,35 +1770,23 @@ prep_bhyve_options() {
 			;;
 		esac
 	done
-
 	# Output the final _cpupin string
 	[ -z "$_CPU" ] && _CPU="-c $_vcpu_count"
 	unset IFS
 
-	# RAM and memory handling
-	_RAM="-m $_memsize"
-	[ "$_wiremem" = "true" ] && _WIRE='-S' || _WIRE=''
-
-	# Assign hostbridge based on CPU
-	grep -Eqs "^CPU.*AMD" /var/run/dmesg.boot \
-		&& _HOSTBRG="-s 0,amd_hostbridge" \
-		|| _HOSTBRG="-s 0,hostbridge"
-
-	# assign lpc, then start slot count for bhyve command construction
-	_LPC="-s 31,lpc"
+	# BEGIN SLOT ASSIGNMENTS FOR PCI DEVICES
 	_slot=1
+	_LPC="-s 31,lpc"
 
 	# Assign zroot blk device
 	_BLK_ROOT="-s ${_slot},virtio-blk,/dev/zvol/${R_ZFS}/${_VM}"
-	_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
+	_slot=$(( _slot + 1 ))
 
 	# Assign zusr blk device. Must be a volume; or should be blank
 	chk_valid_zfs "${U_ZFS}/${_VM}" \
 		&& zfs list -Ho type "${U_ZFS}/${_VM}" | grep -qs "volume" \
 		&& _BLK_ZUSR="-s ${_slot},virtio-blk,/dev/zvol/${U_ZFS}/${_VM}" \
 		&& _slot=$(( _slot + 1 )) || _BLK_ZUSR=''
-
-	[ "$_slot" -eq 29 ] && _slot=32
 
 	# Handling BHYVE_CUST options
 	[ "$_bhyve_custm" ] && while IFS= read -r _line ; do
@@ -1830,9 +1814,6 @@ EOF
 			_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
 		done
 	fi
-
-	# UEFI bootrom
-	_BOOT="-l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI.fd"
 
 	# Assign VNC FBUF options
 	if [ "$_vncres" ] && [ ! "$_vncres" = "none" ] ; then
@@ -1928,20 +1909,14 @@ ENDOFCMD
 }
 
 exec_vm_coordinator() {
-	# Oversees the launching of a VM
+	# Executive management of launching the VM
 
-   # Options
-	while getopts nqt opts ; do
-		case $opts in
+	while getopts nqt opts ; do case $opts in
 			n) local _norun="-n" ;;
 			q) local _qs="-q"    ;;
 			t) local _tmux="-t"  ;;
-		esac
-	done
-	shift $(( OPTIND - 1 ))
-	[ "$1" = "--" ] && shift
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
-	# Assign _vm variable
 	_VM="$1"
 
 	# Ensure that there's nothing lingering from this VM before trying to start it
