@@ -74,10 +74,9 @@ qb-destroy: Destroy <jail/VM> and purge associated configs:
             jail.conf ; qubsdmap.conf ; zfs datasets
 
 Even if jail is partially created, this command will purge it.
-
-There is a protection mechanism for all jails/VMs. qubsdmap.conf
-has a parameter called: \`no_destroy', which defaults to true.
-Must manually edit this setting to false, before qb-destroy
+qubsdmap.conf has a parameter called \`no_destroy', which
+prevents destruction of jail/VM if set to true (default).
+Manually edit this setting to false, to use qb-destroy.
 
 Usage: qb-destroy [-h] <jail/VM>"
    -h: (h)elp. Outputs this help message"

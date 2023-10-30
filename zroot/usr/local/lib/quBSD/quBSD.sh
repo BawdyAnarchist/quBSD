@@ -60,7 +60,7 @@
 # chk_valid_jail       - Makes sure the jail has minimum essential elements
 # chk_valid_autosnap   - true|false ; Include in qb-autosnap /etc/crontab snapshots
 # chk_valid_autostart  - true|false ; Autostart at boot
-# chk_valid_bhyveopts  - Checks bhyve options in qubsdmap for valid or not
+# chk_valid_bhyveopts  - Checks bhyve options in qmap for valid or not
 # chk_valid_class      - appjail | rootjail | dispjail | appVM | rootVM
 # chk_valid_cpuset     - Must be in man 1 cpuset format. Limit jail CPUs
 # chk_valid_gateway    - Jail adheres to gateway jail norms
@@ -350,7 +350,7 @@ compile_jlist() {
 		;;
 
 		all)
-			# ALL jails from qubsdmap, except commented lines
+			# ALL jails from qmap, except commented lines
 			_JLIST=$(awk '{print $1}' $QMAP | uniq | sed "/^#/d")
 		;;
 
@@ -1575,7 +1575,7 @@ define_ipv4_convention() {
 }
 
 discover_open_ipv4() {
-	# Finds an IP address unused by any running jails, or in qubsdmap.conf
+	# Finds an IP address unused by any running jails, or in qmap.conf
 	# Echo open IP on success; Returns 1 if failure to find an available IP
 
 	# Positional params and func variables.

@@ -50,7 +50,7 @@ rename_common() {
 	# Stop all jails before renaming. Rename should not happen if stops fails
 	qb-stop -w "$JAIL $_RESTARTS" || get_msg_rename "_3" "exit_1"
 
-	# Modify qubsdmap. Roojails should update their own rootjail to self
+	# Modify qmap. Roojails should update their own rootjail to self
 	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}  /g" $QMAP
 	[ "$JAIL" = "$ROOTENV" ] && qb-edit -fq ${NEWNAME} ${ROOTENV} ${NEWNAME}
 

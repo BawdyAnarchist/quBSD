@@ -8,7 +8,7 @@ get_msg_list() {
 	case "$_message" in
 	_1) cat << ENDOFMSG
 
-ERROR: Argument < $POS1 > was neither valid jail, nor qubsdmap parameter.
+ERROR: Argument < $POS1 > was neither valid jail, nor qmap parameter.
 ENDOFMSG
 	;;
 	_2) cat << ENDOFMSG
@@ -72,9 +72,9 @@ Usage: qb-list [-alsz]   {will show all jails/VMs}
 
    -a: (a)autosnap. Show qubsd:autosnap column in zfs output
    -h: (h)elp: Outputs this help message
-   -j: (j)ail: Show qubsdmap settings for <jail>
+   -j: (j)ail: Show qmap settings for <jail>
    -l: (l)ist: List names of all unique jails and VMs
-   -p: (p)arameter: All qubsdmap entries with <parameter>
+   -p: (p)arameter: Show all qmap entries with <parameter>
    -s: (s)napshots: Show zfs snapshots in results
    -z: (z)fs: Show zfs datasets (snapshots only with [-s])
    -Z: (Z)fs: ONLY show zfs datasets, but not parameters

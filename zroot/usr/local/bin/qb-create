@@ -638,7 +638,7 @@ main() {
 
 	confirm_creation
 
-	# Add the parameters to qubsdmap. BHYVE_CUSTM has extra spaces. Remove at least the first one
+	# Add the parameters to qmap. BHYVE_CUSTM has extra spaces. Remove at least the first one
 	grep -E "^$NEWJAIL" "$_TMP_PARAMS" | column -t >> $QMAP
 	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $QMAP
 
