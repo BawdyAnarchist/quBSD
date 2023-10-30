@@ -1,8 +1,11 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
+[test] { command ;} grouping. Can save alot of space and simply this construction
+
+while getopts <opts> opts ; do case $opts in
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
+
 reinstall 0base
-qubsdmap can be shortened, for the most part. But have to hand jam it caz sometimes not
-qb-hostnet - add the edit for EXT_IF to pf_pass
 
 qubsd.sh
 	- get_jail_parameter
@@ -95,11 +98,6 @@ qb-stat
 
 
 ### GENERAL / BEST PRACTICES / CLEANUP
-
-[test] { command ;} grouping. Can save alot of space and simply this construction
-
-while getopts <opts> opts ; do case $opts in
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 GENERAL GUIDELINES, and maybe later double checks
 	- Attempt to make scripts more robust and account for user error, when it makes sense to do so.
