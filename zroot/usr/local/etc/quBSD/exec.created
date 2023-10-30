@@ -44,22 +44,22 @@ modify_files() {
 	# Numerous variables need to be modified for pf.conf
 	if [ -e "$JPF" ] ; then
 
-		# For gateways that serve other gateways, get all the wgPorts of those gateways
+		# For gateways that serve other gateways, get all the WGPORTS of those gateways
 		assemble_wgports
 
 		# Make sure flags are down
 		chflags -R noschg "${J_ZUSR}/rw/etc"
 
 		# $VIF was assigned during the connect_client_to_gateway func. Modify pf.conf
-		sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${_VIF}\"@" $JPF
-		sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${IPV4}\"@" $JPF
+		sed -i '' -E "s@EXT_IF[[:blank:]]*=.*@EXT_IF = \"${_VIF}\"@" $JPF
+		sed -i '' -E "s@JIP[[:blank:]]*=.*@JIP = \"${IPV4}\"@" $JPF
 
 		# net-jail internal wireguard parameters
 		[ -n "$WG_ENDPT" ] \
-			&& sed -i '' -e "s@^Endpoint[[:blank:]]*=.*@Endpoint = \"${WG_ENDPT}\"@" $JPF
+			&& sed -i '' -e "s@ENDPOINT[[:blank:]]*=.*@ENDPOINT = \"${WG_ENDPT}\"@" $JPF
 
 		[ -n "$WG_PORTS" ] \
-			&& sed -i '' -e "s@^wgPorts[[:blank:]]*=.*@wgPorts = \"${WG_PORTS}\"@" $JPF
+			&& sed -i '' -e "s@WGPORTS[[:blank:]]*=.*@WGPORTS = \"${WG_PORTS}\"@" $JPF
 	fi
 
 	# Make sure the MTU matches qmap
@@ -68,11 +68,11 @@ modify_files() {
 }
 
 assemble_wgports() {
-	# All clients with a wg port, should be added to the gateway pf.conf wgPorts
+	# All clients with a wg port, should be added to the gateway pf.conf WGPORTS
 
 	for _jail in $(get_info -e _CLIENTS $JAIL) ; do
 		[ -e "${M_ZUSR}/${_jail}/${WIREGRD}" ] \
-			&& WG_PORTS="$WG_PORTS $(sed -nE "s/^Endpoint[[:blank:]]*=.*:(.*)[[:blank:]]*/\1/p" \
+			&& WG_PORTS="$WG_PORTS $(sed -nE "s/^ENDPOINT[[:blank:]]*=.*:(.*)[[:blank:]]*/\1/p" \
 																					${M_ZUSR}/${_jail}/${WG0CONF})"
 	done
 

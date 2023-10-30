@@ -139,9 +139,9 @@ get_networking_variables() {
 	# Get wireguard related variables
    if [ -e "${M_ZUSR}/${JAIL}/${WG0CONF}" ] ; then
 
-		WG_ENDPT=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*([^[:blank:]]+):.*/\1/p" \
+		WG_ENDPT=$(sed -nE "s/^ENDPOINT[[:blank:]]*=[[:blank:]]*([^[:blank:]]+):.*/\1/p" \
 				${M_ZUSR}/${JAIL}/${WG0CONF})
-		WG_PORTS=$(sed -nE "s/^Endpoint[[:blank:]]*=.*:(.*)[[:blank:]]*/\1/p" \
+		WG_PORTS=$(sed -nE "s/^ENDPOINT[[:blank:]]*=.*:(.*)[[:blank:]]*/\1/p" \
 				${M_ZUSR}/${JAIL}/${WG0CONF})
 		WG_MTU=$(sed -nE "s/^MTU[[:blank:]]*=[[:blank:]]*([[:digit:]]+)/\1/p" \
 				${M_ZUSR}/${JAIL}/${WG0CONF})
@@ -532,21 +532,23 @@ connect_client_to_gateway() {
 	[ "$1" = "--" ] && shift
 
 	# Positional variables
-	local _client="$1" ; local _gateway="$2" ; local _ipv4="$3"
+	local _client="$1"  ;  local _gateway="$2"  ;  local _ipv4="$3"  ;
 	local _mtu="${MTU:=$(get_jail_parameter -es MTU '#default')}"
 
 	# VM client uses pre-determined tap interfaces and DHCP on the gateway jail
 	if chk_isvm "$_client" ; then
 
+		# Get the virtual intf for the VM
+		_vif=$(head -1 "${QTMP}/qb-taps_${_client}" 2> /dev/null)
+
 		# Connect the tap to the gateway
 		ifconfig "$_vif" vnet "$_gateway"
 		jexec -l -U root $_gateway ifconfig $_vif inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
-		jexec -l -U root $_gateway service isc-dhcpd restart
 
 		return 0
 
 	elif chk_isvm "$_gateway" ; then
-		# This is called by exec scripts, which dont yet have the _vif (tap
+		# Get the virtual intf for the VM
 		_vif=$(head -1 "${QTMP}/qb-taps_${_gateway}" 2> /dev/null)
 
 		# Send tap to client
@@ -598,14 +600,11 @@ connect_gateway_to_clients() {
 	[ -z "$_jail" ] && get_msg $_q "_0" "Jail/VM" && return 1
 
 	for _client in $(get_info -e _CLIENTS "$_jail") ; do
-
 		if chk_isrunning "$_client" ; then
-
 			# Get client IP
 			_cIP=$(get_jail_parameter -er IPV4 "$_client")
 
 			# Bring up connection, and return the VIF used for the client
-
 			_cVIF=$(connect_client_to_gateway -e "$_client" "$_jail" "$_cIP")
 
 			# Need to modify the client pf.conf with the epair
@@ -615,9 +614,9 @@ connect_gateway_to_clients() {
 				# Make sure flags are down
 				chflags -R noschg "${M_ZUSR}/${_client}/rw/etc"
 
-				# pf needs the external interface and jIP for filtering variables
-				sed -i '' -e "s@^ext_if[[:blank:]]*=.*@ext_if = \"${_cVIF}\"@" $_cPF
-				sed -i '' -e "s@^jIP[[:blank:]]*=.*@jIP = \"${_cIP}\"@"  $_cPF
+				# pf needs the external interface and JIP for filtering variables
+				sed -i '' -e "s@^EXT_IF[[:blank:]]*=.*@EXT_IF = \"${_cVIF}\"@" $_cPF
+				sed -i '' -e "s@^JIP[[:blank:]]*=.*@JIP = \"${_cIP}\"@"  $_cPF
 
 				# Restart _client pf service
 				jexec -l -U root "$_client" service pf restart > /dev/null 2>&1
@@ -1199,11 +1198,12 @@ chk_valid_ipv4() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# !! _value is not local here, it might get reassigned !!
-	_value="$1"
+	_value="$1"  ;  local _jail="$2"
+
 	case $_value in
 		'') get_msg $_q "_0" "IPV4" && return 1 ;;
 		none|DHCP) return 0 ;;
-		auto) [ -n "$_rp" ] && { _value=$(assign_ipv4_auto -e "$_value") && return 0 ;} || return 1 ;;
+		auto) [ -n "$_rp" ] && { _value=$(assign_ipv4_auto -e "$_jail") && return 0 ;} || return 1 ;;
 	esac
 
 	# Temporary variables used for checking ipv4 CIDR
@@ -1627,7 +1627,7 @@ assign_ipv4_auto() {
 	[ "$1" = "--" ] && shift
 
 	local _jail="$1"
-	local _ipv4=''
+	local _ipv4=
 	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
 
 	# Try to pull pre-set IPV4 from the temp file if it exists.
