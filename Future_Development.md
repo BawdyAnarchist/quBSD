@@ -1,29 +1,40 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-- qb-connect
-	- VM integration: jail/VM connections, specifically SSH preparation for files copy
-	- Maybe even a 2nd tap, with sshd for ubuntu (or other VMs) on vtnet0 and vtnet1
+reinstall 0base
+qubsdmap can be shortened, for the most part. But have to hand jam it caz sometimes not
 
-New scripts
-	qb-pci
-		- summary of PCI devices relevant to user
-		- USB, NIC, maybe others
-		- Show what was is currently passthrough'd
+qubsd.sh
+	- get_jail_parameter
+		- Getting the #default shouldnt be the default behavior. -d should say "get default if nothing is there"
+	- Double check on things that are positional items vs if they should be options 
+	- chk_isinteger [-l lower_bound] [-u "upper_bound"]. You have a lot of integer checks.
+	- chk_isgateway ? maybe not needed
+	- connect_client_to_gateway ; uses a lot of dumb switches and repeat code
+	- reclone_zroot probably needs to be optimized. Maybe not. Seems okay
 
-Ubuntu upgrades
-	zusr dataset integration
-		- try Ubuntu zfs install 
-		- User profiles
+# After SSH and scp is hammered out, make another system backup 
+Overview - taps will live on host. Each VM gets 1, and it's vtnet0.
+This should tie in nicely with an eventual control jail. STEPS:
+	1) Beef up security of pf_pass.conf. TAPS never. Epair only. Unique static IP
+	2) Add cron to continually re-assert the DOWN state of taps 
+	3) qb-hostnet edits
+	4) prep_bhyve_options changes
+		- taps handled differenty now, automatic+1 for qmap entry
+	5) change the zusr of VMs to vtnet1, because all vtnet0 is now for control tap 
+
+qb-connect - VM integration: jail/VM connections, specifically SSH preparation for files copy
+
+qb-pci
+	- summary of PCI devices relevant to user
+	- USB, NIC, maybe others
+	- Show what was is currently passthrough'd
+
+Ubuntu - zusr dataset integration; user profiles
 
 USBVM 
 	- Create a proper unprivileged user with devd.conf and automounts     
 	- Auto remove password from unprivleged usbvm user     
-	- When xterm is closed with ssh connection, the tap1 connect between jail and usbvm should be severed. Need a "trap" command     
 	- usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
-
-NICVM 
-  - Make a Linux VM so that it can use all the wireless protocols.
-     - Someone made a post about this in FreeBSD
 
 
 ### UPGRADES
@@ -49,8 +60,18 @@ Host as Unprivileged user
 	- Unprivileged user on host will pass jails SSH commands via Control Jail     
 	- Control jail pf will block all, except port 22 between host and jails     
 
+NICVM - Linux VM so that it can use all the wireless protocols.
+     - Someone made a post about this in FreeBSD
+
 
 ### SPECIFIC SCRIPTS
+
+quBSD.sh and msg-qubsd.sh
+	- Error messages are a bit disorganized now. Need to have useful higher function messages
+		- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
+		- Master -V (verbose) command could be included on all top level scripts, with -q as default 
+		- Might need a -F force option.
+		- Beef up the log file, and make reference to it in error messages
 
 qb-list [-e] (evaluate) option to check jail-param combos for validity.
 
@@ -59,23 +80,7 @@ qb-stop - monitoring is still not right. It exits early, coz pgrep returns nothi
 qb-help - overhaul to act like a manpage. Replacing /usr/local/share/quBSD
 	- Each PARAM should have verbose message
 
-qb-ephm
-	- Clone from zroot too. Tricky, because of "reclone_zroot" operation at start_jail 
-	- i3 Quick keys. Might need to rework that script to include EPHM as well. It's getting complex 
-
-quBSD.sh and msg-qubsd.sh
-	- Error messages are a bit disorganized now. Need to have useful higher function messages
-		- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
-		- Master -V (verbose) command could be included on all top level scripts, with -q as default 
-		- Beef up the log file, and make reference to it in error messages
-	- get_jail_parameter
-		- Passing more variables like -f force , and -x extra , for extra checks sometimes
-		- Getting the #default shouldnt be the default behavior. -d should say "get default if nothing is there"
-		-(r)esolve value (for stuff like ip auto)
-	- Double check on things that are positional items vs if they should be options 
-	- chk_isinteger [-l lower_bound] [-u "upper_bound"]. You have a lot of integer checks.
-	- connect_client_to_gateway ; uses a lot of dumb switches and repeat code
-	- reclone_zroot probably needs to be optimized. Maybe not. Seems okay
+qb-ephm - Clone from zroot too. Tricky, because of "reclone_zroot" operation in exec.prepare 
 
 qb-update - Update rootjails, create snapshots
 
@@ -89,6 +94,11 @@ qb-stat
 
 
 ### GENERAL / BEST PRACTICES / CLEANUP
+
+[test] { command ;} grouping. Can save alot of space and simply this construction
+
+while getopts <opts> opts ; do case $opts in
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 GENERAL GUIDELINES, and maybe later double checks
 	- Attempt to make scripts more robust and account for user error, when it makes sense to do so.
@@ -138,12 +148,8 @@ qb-autostart
 Expand install options     
 	Can select to merge zroot and zusr with other existing dataset/mount     
 
-Double check the install script that it copies qb-ivpn to 0net
-
-/var/log/quBSD.log - line added to /usr/local/etc/X11/xinit/xinitrc to remove the log at each startx
-	- This could be made a cron, to periodically delete it.
-	
-/jails/0base installer needs to create the /rw/ folder, or appjails based on it, won't mount properly
+/qubsd/0base installer needs to create the /rw/ folder, or appjails based on it, won't mount properly
+I think I need to touch /etc/fstab with header so disps work? Or something like that
 
 0serv and 0serv-template need integrated	
 	- www and usr diretories are quite large. Script integration:
@@ -151,10 +157,6 @@ Double check the install script that it copies qb-ivpn to 0net
 		- qb-create should in realtime copy over /usr/local/etc from 0serv
 		- There might even be problems with pkg-upgrade operating on this dir
 		- Make sure to chown the directories as appropriate
-
-0net
-	- /usr/local/etc/rc.d/qb_dhcpd 
-	- /usr/local/etc/
 	
 devfs.rules
 	- add qubsd to the naming convention
@@ -163,14 +165,15 @@ devfs.rules
 
 net-jails
 	- isc-dhcp44-server installed
-	- /jails/0net/usr/local/etc/dhcpd.conf 
 	- Check that pf conf is updated with required dhcp port, and the simplified version
 
-JAILS_ZFS and ZUSR_ZFS ; and mountpoints changed. Less cumbersome, more straightforward
+R_ZFS and U_ZFS ; and mountpoints changed. Less cumbersome, more straightforward
 
 VMs integration
 	- install bhyve-uefi firmware
 	
 quBSD.conf removed. Everything now in jailmap.conf
+
+Should make the $qubsd/zroot/0net 0gui 0vms and everything files here for specific stuff like rc.conf
 
 
