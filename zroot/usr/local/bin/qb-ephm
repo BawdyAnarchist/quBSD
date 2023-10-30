@@ -69,6 +69,7 @@ run_command() {
 		# i3-specific command. Launch a floating terminal for the dispjail (ephemeral jail)
 		xterm -e csh -c "i3-msg -q floating enable, move position center; qb-cmd $NEWJAIL"
 	else
+
 		# Can be called without i3 as well.
 		eval $_NEWWIND "jexec -l -U $_USER $NEWJAIL $SHELL -c '$_CMD' $_REDIRECT"
 	fi
@@ -84,24 +85,13 @@ monitor_ephm_windows() {
 	. /usr/local/lib/quBSD/msg-quBSD.sh
 	get_global_variables
 
-	# X11 takes a moment launch window. Ineligant solution, but wait 5 seconds before checking
-	sleep 5
+	# X11 windows can take a moment launch. Ineligant solution, but wait 3 secs before check-loop
+	sleep 3
 
-	# Monitoring ephemeral jail ${NEWJAIL} until all windows close
+	# ps -o tt tty -> is associated with terminals/windows. Keepalive until all are gone
 	while : ; do
-		# Unset the test variable and get all window IDs that might be associated with a jail
-		unset _ephm_running
-		_winlist=\$(xwininfo -root -tree | grep -v "has no name" \
-															| grep -Eo '^[[:blank:]]+0x[[:alnum:]]+')
-
-		# Check for EPHM jail among those IDs, and set the variable
-		for _id in \$_winlist ; do
-			xprop -id "\$_id" WM_CLIENT_MACHINE 2>&1 | grep -Eqs "$NEWJAIL" && _ephm_running="true"
-		done
-
-		# If the no window was found for the EPHM jail, break.
-		[ ! "\$_ephm_running" = "true" ] && break
-		sleep 2
+		ps -axJ ${NEWJAIL} -o tt | tail -n +2 | grep -qv ' -' || break
+		sleep 1
 	done
 
 	# Destroy sequence
@@ -115,9 +105,9 @@ monitor_ephm_windows() {
 	exit 0
 ENDOFCMD
 
-	# Make executable and run
+	# Make executable and run. nohup prevents killing the process if host launch terminal closes
 	chmod +x "${QTMP}/qb-${NEWJAIL}"
-	exec "${QTMP}/qb-${NEWJAIL}"
+	nohup /bin/sh "${QTMP}/qb-${NEWJAIL}" > /dev/null 2>&1 &
 }
 
 destroy_ephemeral() {
@@ -139,15 +129,13 @@ main() {
 
 	start_jail $NEWJAIL
 
-	# If the _CMD opens SHELL, it'll run until exited
-	run_command
+	# Monitor for any EPHM ps TT that are open, with detached script. Will destroy EPHM after.
+	monitor_ephm_windows
 
-	# Monitor for any EPHM windows that are open with detached script. Will destroy EPHM after.
-	monitor_ephm_windows &
-
-	# Unset the the trap command, now that the detached monitoring script has executed. Exit
+	# Unset the the trap command, now that the detached monitoring script has executed.
 	trap '' INT TERM HUP QUIT EXIT
-	exit 0
+
+	run_command
 }
 
 
