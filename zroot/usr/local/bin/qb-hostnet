@@ -4,17 +4,19 @@
 . /usr/local/lib/quBSD/msg-hostnet.sh
 
 get_options() {
-	while getopts dht:u opts ; do
+	while getopts cdht:u opts ; do
 		case $opts in
+			c) cron_down ; exit 0 ;;
 			d) _CMD="down" ;;
 			h) get_msg_hostnet "none" "usage_0" ;;
-			t) _TIMEOUT="$OPTARG" ;;
+			t) TIMEOUT="$OPTARG" ;;
 			u) [ -z "$_CMD" ] && _CMD="up" || get_msg_hostnet "_1" "usage_1" ;;
 			*) exit 1 ;;
 		esac
 	done
 
-	_TIMEOUT="${_TIMEOUT:=300}"
+	TIMEOUT="${TIMEOUT:=300}"
+	PF_PASS="/etc/pf_pass.conf"
 }
 
 get_parameters() {
@@ -22,12 +24,12 @@ get_parameters() {
 	[ -z "$_CMD" ] && get_msg_hostnet "_2" "usage_1"
 
 	# Check validity of timeout provided
-	echo "$_TIMEOUT" | grep -Eqs '^[[:digit:]]+$' || get_msg_hostnet "_6" "usage_1"
-	[ "$_TIMEOUT" -gt 0 ] || get_msg_hostnet "_6" "usage_1"
+	echo "$TIMEOUT" | grep -Eqs '^[[:digit:]]+$' || get_msg_hostnet "_6" "usage_1"
+	[ "$TIMEOUT" -ge 0 ] || get_msg_hostnet "_6" "usage_1"
 
 	# Must get host network parameters.
 	get_jail_parameter GATEWAY "host" || exit 1
-	get_jail_parameter IPV4 "host" || exit 1
+	get_jail_parameter IPV4    "host" || exit 1
 }
 
 connection_down() {
@@ -44,16 +46,23 @@ connection_down() {
 	pfctl -f /etc/pf.conf
 }
 
+cron_down() {
+	for _tap in $(ifconfig -g tap) ; do
+		ifconfig $_tap -alias > /dev/null 2>&1
+		ifconfig $_tap down
+	done
+}
+
 revert_connection() {
 	# User opted out of the <timeout> feature
-	[ "$_TIMEOUT" -eq 0 ] && get_msg_hostnet "_7" "exit_0"
+	[ "$TIMEOUT" -eq 0 ] && get_msg_hostnet "_7" "exit_0"
 
 	# Wait the prescribed time
-	sleep $_TIMEOUT
+	sleep $TIMEOUT
 
 	# Check that there aren't still `pkg` or `freebsd-update` commands being run
 	while $(pgrep -qf '/usr/sbin/freebsd-update') || $(pgrep -q 'pkg') ; do
-		sleep 30
+		sleep 10
 	done
 
 	# Then bring down connection and exit
@@ -70,9 +79,13 @@ main() {
 	if [ "$_CMD" = "up" ] ; then
 
 		# start_jail command handles most error messages
-		start_jail "$GATEWAY" ||  get_msg_hostnet "_3" "usage_1"
+		start_jail "$GATEWAY" ||  get_msg_hostnet "_3" "exit_1"
 
-		connect_client_to_gateway "host" "$GATEWAY" "$IPV4"
+		_VIF=$(connect_client_to_gateway -e "host" "$GATEWAY" "$IPV4")
+
+      # Modify pf_pass with the cu
+		sed -i '' -E "s@EXT_IF[[:blank:]]*=.*@EXT_IF = \"${_VIF}\"@" $PF_PASS
+		sed -i '' -E "s@JIP[[:blank:]]*=.*@JIP = \"${IPV4}\"@" $PF_PASS
 
 		# Change pf to file that passes internet from host to outside.
 		pfctl -f /etc/pf_pass.conf
