@@ -85,7 +85,7 @@ sync_from_qmap() {
 		_value=$(sed -En "s/^${_jail}[[:blank:]]+AUTOSNAP[[:blank:]]+//gp" $QMAP)
 
 		# zroot vs zusr dataset depending on CLASS
-		case "$(get_jail_parameter -eqs CLASS "$_jail")" in
+		case "$(get_jail_parameter -deqs CLASS "$_jail")" in
 			appjail)  chk_valid_zfs "${U_ZFS}/${_jail}" \
 						 && zfs set qubsd:autosnap="$_value" "${U_ZFS}/${_jail}"
 			;;

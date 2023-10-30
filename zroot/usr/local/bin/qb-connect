@@ -74,7 +74,7 @@ check_security() {
 	else
 		# If not running, rely on rc.conf and QMAP
 		_pfG=$(grep -E "pf_enable=.*YES" ${M_ZUSR}/${GATEWAY}/rw/etc/rc.conf)
-		_secG=$(get_jail_parameter -eqs SECLVL "$GATEWAY")
+		_secG=$(get_jail_parameter -deqs SECLVL "$GATEWAY")
 	fi
 
 	# Seclvl of 3 will prevent pf mod for pf enabled jails

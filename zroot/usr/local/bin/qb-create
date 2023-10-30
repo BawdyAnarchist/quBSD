@@ -115,11 +115,12 @@ optimistic_vitals_assignments() {
 	# Parameter assignments based on precedence. Fill-in-the-blanks. jail/VM congruency checks.
 
 	# CL options take precedence, followed by -t <template>, followed by #default in quBSD.conf
-	[ -z "$CLASS" ] && ! get_jail_parameter CLASS "$TEMPLATE" \
+	[ -z "$CLASS" ] && ! get_jail_parameter -d CLASS "$TEMPLATE" \
 			&& get_msg_create "_e1" "exit_1" "CLASS"
-	[ -z "$ROOTENV" ] && ! get_jail_parameter ROOTENV "$TEMPLATE" \
+	[ -z "$ROOTENV" ] && ! get_jail_parameter -d ROOTENV "$TEMPLATE" \
 			&& get_msg_create "_e1" "exit_1" "ROOTENV"
-	[ -z "${CLASS##disp*}" ] && [ "$TEMPLATE" = "none" ] && ! get_jail_parameter TEMPLATE "$TEMPLATE" \
+	[ -z "${CLASS##disp*}" ] && [ "$TEMPLATE" = "none" ] \
+			&& ! get_jail_parameter -d TEMPLATE "$TEMPLATE" \
 			&& get_msg_create "_e1" "exit_1" "TEMPLATE"
 
 	# Need CLASS of ROOTENV to check for jail/VM congruency among vital parameters
@@ -137,7 +138,7 @@ checks_jailVM_congruency() {
 		# Add template params unique from #default, to the PARAM list (unless already specified).
 		for t_par in $temp_params ; do
 			! echo "$_PARAMS" | grep -Eqs "$t_par" && _PARAMS="$_PARAMS $t_par" \
-																&& get_jail_parameter -d "$t_par" "$TEMPLATE"
+																&& get_jail_parameter "$t_par" "$TEMPLATE"
 		done
 	fi
 
@@ -321,7 +322,7 @@ assign_datasets() {
 			R_ZPARENT="${R_ZFS}/${ROOTENV}"
 
 			# We need to replace the previous TEMPLATE assignment, as it references a dispjail
-			TEMP_TEMP=$(get_jail_parameter -eq TEMPLATE $TEMPLATE)
+			TEMP_TEMP=$(get_jail_parameter -deq TEMPLATE $TEMPLATE)
 			sed -i '' -E "s/^(${NEWJAIL}[[:blank:]]+TEMPLATE ).*/\1 ${TEMP_TEMP}/" $_TMP_PARAMS
 
 			# Either assign the valid zusr dataset to clone dispjail, or set it to skip later on.

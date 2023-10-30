@@ -167,7 +167,7 @@ define_variables() {
 	fi
 
 	# Define PORT 
-	PORT="${PORT:=$(sed -nE "s/ENDPOINT.*://p" ${PATHMOD}/${WG0CONF})}"
+	PORT="${PORT:=$(sed -nE "s/Endpoint.*://p" ${PATHMOD}/${WG0CONF})}"
 
 	[ "$PORT" -gt 0 ] && [ "$PORT" -le 65535 ] || get_msg_ivpn "_1" "usage_1"
 }
@@ -297,7 +297,7 @@ server() {
 modify_network() {
 	# Modify wg0.conf 
 	sed -i '' -E "s#PublicKey[[:blank:]]*=.*#PublicKey = $publickey#" $WG0CONF
-	sed -i '' -E "s#ENDPOINT[[:blank:]]*=.*#ENDPOINT = $endpoint#" $WG0CONF
+	sed -i '' -E "s#Endpoint[[:blank:]]*=.*#Endpoint = $endpoint#" $WG0CONF
 
 	# A bit of a hacky decision tree. Problem arises when removing schg from host 
 	if [ -z "$CALLED" ] ; then

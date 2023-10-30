@@ -58,7 +58,7 @@ get_stat_variables() {
 
 get_jails_loop() {
 	# Get key variables
-	class=$(get_jail_parameter -eqs CLASS "$_jail")
+	class=$(get_jail_parameter -deqs CLASS "$_jail")
 	gateway=$(get_jail_parameter -eqs GATEWAY "$_jail")
 	rootenv=$(sed -En "s/^${_jail}[[:blank:]]+ROOTENV.*[[:blank:]]+//p" $QMAP)
 	rootenv="${rootenv:=-}"

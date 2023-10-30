@@ -8,8 +8,6 @@ while getopts <opts> opts ; do case $opts in
 reinstall 0base
 
 qubsd.sh
-	- get_jail_parameter
-		- Getting the #default shouldnt be the default behavior. -d should say "get default if nothing is there"
 	- Double check on things that are positional items vs if they should be options 
 	- chk_isinteger [-l lower_bound] [-u "upper_bound"]. You have a lot of integer checks.
 	- chk_isgateway ? maybe not needed

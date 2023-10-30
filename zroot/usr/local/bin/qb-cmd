@@ -42,8 +42,8 @@ parse_jail_vars() {
 connect_vm_session() {
 
 	# Pull the qmap parameters for VM attachment
-	get_jail_parameter TMUX $JAIL
-	get_jail_parameter VNCRES $JAIL
+	get_jail_parameter -d TMUX $JAIL
+	get_jail_parameter -d VNCRES $JAIL
 
 	# Handle the vnc viewer port
 	if [ ! "$VNCRES" = "none" ] ; then

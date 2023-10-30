@@ -27,7 +27,7 @@ checks_and_variables() {
 	chk_avail_jailname "$NEWNAME" || get_msg_rename "none" "usage_1"
 
 	# Variables change if it's a VM or not
-	get_jail_parameter -sqd ROOTENV $JAIL
+	get_jail_parameter -qs ROOTENV $JAIL
 
 	# Finds jails dependent on the jail to be renamed
 	get_info _CLIENTS $JAIL

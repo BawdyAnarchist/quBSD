@@ -95,7 +95,7 @@ checks() {
 		ROOTENV) get_msg_edit "_6" "warn" ;;
 
 		GATEWAY)
-				get_jail_parameter -qs IPV4 "$JAIL"
+				get_jail_parameter -dqs IPV4 "$JAIL"
 
 				# Offer to change IPV4 from 'none' to 'auto', if gateway is valid
 				if [ ! "$VALUE" = "none" ] && [ "$IPV4" = "none" ] ; then
@@ -210,7 +210,7 @@ handle_restarts() {
 			chk_isrunning $JAIL && _restart1="$JAIL"
 		;;
 		IPV4|GATEWAY)
-			_gateway=$(get_jail_parameter -eqs GATEWAY $JAIL)
+			_gateway=$(get_jail_parameter -deqs GATEWAY $JAIL)
 
 			# If jail is running it needs restarted
 			if chk_isrunning $JAIL ; then

@@ -53,7 +53,7 @@ climb_hierarchy() {
 	_depth=$(( _depth + 1 ))
 
 	_JAIL="$1"
-	_gateway=$(get_jail_parameter -eqz GATEWAY "$_JAIL")
+	_gateway=$(get_jail_parameter -deqz GATEWAY "$_JAIL")
 
 	if echo "$_CLIMBED" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" ; then
 		# _JAIL gateway path was already handled. Skip further checks.

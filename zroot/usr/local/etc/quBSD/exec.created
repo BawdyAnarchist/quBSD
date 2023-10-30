@@ -6,14 +6,14 @@ get_parameters() {
 	JAIL="$1"
 
 	# Get parameters. Class was already verified, so skip checks.
-	get_jail_parameter -dqs CLASS "$JAIL"  ||  exit 1
-	get_jail_parameter -r   IPV4  "$JAIL"  ||  exit 1
-	get_jail_parameter GATEWAY "$JAIL"     ||  exit 1
-	get_jail_parameter MAXMEM  "$JAIL"     ||  exit 1
-	get_jail_parameter CPUSET  "$JAIL"     ||  exit 1
+	get_jail_parameter -qs CLASS "$JAIL"  ||  exit 1
+	get_jail_parameter -dr   IPV4  "$JAIL"  ||  exit 1
+	get_jail_parameter -d GATEWAY "$JAIL"     ||  exit 1
+	get_jail_parameter -d MAXMEM  "$JAIL"     ||  exit 1
+	get_jail_parameter -d CPUSET  "$JAIL"     ||  exit 1
 
 	# MTU only with valid IP. Quiet messages (MTU is not critical)
-	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter MTU "$JAIL"
+	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter -d MTU "$JAIL"
 	J_ZUSR="${M_ZUSR}/${JAIL}"
 	_0net_DHCP="${J_ZUSR}/rw/usr/local/etc/0net_dhcpd.conf"
 }

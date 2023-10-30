@@ -164,7 +164,7 @@ get_parameter_lists() {
 
 	# Unless suppressed with [-n], group by CLASS
 	if [ -z "$_nc" ] ; then
-		[ -z "$CLASS" ] && get_jail_parameter -dqs CLASS "$JAIL"
+		[ -z "$CLASS" ] && get_jail_parameter -qs CLASS "$JAIL"
 
 		case $CLASS in
 			appVM|rootVM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS $MULT_LN_PARAMS" ;;
@@ -242,7 +242,7 @@ get_jail_parameter() {
 	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
 
 	# Substitute <#default> values, so long as [-d] was not passed
-	if [ -z "$_value" ] && [ -z "$_dp" ] ; then
+	if [ -z "$_value" ] && [ -n "$_dp" ] ; then
 		_value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
 	fi
 
@@ -284,12 +284,12 @@ get_info() {
 			_value=$(sed -nE "s/[[:blank:]]+GATEWAY[[:blank:]]+${_jail}//p" $QMAP)
 		;;
 		_ONJAILS)
-			# Prints a list of all jails that are currently running
+			# Prints a list of all jails/VMs that are currently running
 			_value=$(jls | sed "1 d" | awk '{print $2}' ; \
 						pgrep -fl 'bhyve: ' | sed -E "s/.*[[:blank:]]([^[:blank:]]+)\$/\1/")
 		;;
 		_USED_IPS)
-			# Assemble list of ifconfig inet addresses for all running jails
+			# Assemble list of ifconfig inet addresses for all running jails/VMs
 			for _onjail in $(jls | sed "1 d" | awk '{print $2}') ; do
 				_intfs=$(jexec -l -U root "$_onjail" ifconfig -a inet | grep -Eo "inet [^[:blank:]]+")
 				_value=$(printf "%b" "$_value" "\n" "$_intfs")
@@ -533,7 +533,7 @@ connect_client_to_gateway() {
 
 	# Positional variables
 	local _client="$1"  ;  local _gateway="$2"  ;  local _ipv4="$3"  ;
-	local _mtu="${MTU:=$(get_jail_parameter -es MTU '#default')}"
+	local _mtu="${MTU:=$(get_jail_parameter -des MTU '#default')}"
 
 	# VM client uses pre-determined tap interfaces and DHCP on the gateway jail
 	if chk_isvm "$_client" ; then
@@ -602,7 +602,7 @@ connect_gateway_to_clients() {
 	for _client in $(get_info -e _CLIENTS "$_jail") ; do
 		if chk_isrunning "$_client" ; then
 			# Get client IP
-			_cIP=$(get_jail_parameter -er IPV4 "$_client")
+			_cIP=$(get_jail_parameter -der IPV4 "$_client")
 
 			# Bring up connection, and return the VIF used for the client
 			_cVIF=$(connect_client_to_gateway -e "$_client" "$_jail" "$_cIP")
@@ -915,7 +915,7 @@ chk_isrunning() {
 	local _jail="$1"
 	[ -z "$_jail" ] && return 1
 
-	if $(get_jail_parameter -deqs CLASS "$_jail" | grep -qs "VM") ; then
+	if $(get_jail_parameter -eqs CLASS "$_jail" | grep -qs "VM") ; then
 		pgrep -xqf "bhyve: $_jail" > /dev/null 2>&1  && return 0 ||  return 1
 	else
 		jls -j "$1" > /dev/null 2>&1  && return 0  ||  return 1
@@ -949,7 +949,7 @@ chk_isvm() {
 	# If -c was passed, then use the $1 as a class, not as a jailname
 	[ "$_class" ] && [ "$_value" ] && [ -z "${_value##*VM}" ] && return 0
 
-	$(get_jail_parameter -qsde CLASS $_value | grep -qs "VM") && return 0 || return 1
+	$(get_jail_parameter -eqs CLASS $_value | grep -qs "VM") && return 0 || return 1
 }
 
 chk_avail_jailname() {
@@ -1286,7 +1286,7 @@ chk_isqubsd_ipv4() {
 			&& get_msg $_q "_cj12" "$_value" "$_jail" && return 1
 
 	# Assigning IP to jail that has no gateway
-	[ "$(get_jail_parameter -eqs GATEWAY "$_jail")" = "none" ] \
+	[ "$(get_jail_parameter -deqs GATEWAY "$_jail")" = "none" ] \
 			&& get_msg $_q "_cj14" "$_value" "$_jail" \
 			&& return 1
 
@@ -1586,7 +1586,7 @@ discover_open_ipv4() {
 	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
 
 	# If gateway is a VM, then DHCP will be required, regardless
-	chk_isvm "$(get_jail_parameter -eqs GATEWAY $_jail)" && echo "DHCP" && return 0
+	chk_isvm "$(get_jail_parameter -deqs GATEWAY $_jail)" && echo "DHCP" && return 0
 
 	# Assigns values for each IP position, and initializes $_cycle
 	define_ipv4_convention "$_jail"
@@ -1670,7 +1670,7 @@ cleanup_vm() {
 		else
 			# Trying to prevent searching in all jails, by guessing where tap is
 			_tapjail=$(get_info -e _CLIENTS "$_VM")
-			[ -z "$_tapjail" ] && _tapjail=$(get_jail_parameter -esqz GATEWAY ${_VM})
+			[ -z "$_tapjail" ] && _tapjail=$(get_jail_parameter -deqsz GATEWAY ${_VM})
 
 			# Remove the tap
 			remove_tap "$_tap" "$_tapjail" && ifconfig "$_tap" destroy 2> /dev/null
@@ -1688,7 +1688,7 @@ cleanup_vm() {
 	[ -n "$_norun" ] && return 0
 
 	# Pull _rootenv in case it wasn't provided
-	[ -z "$_rootenv" ] && ! _rootenv=$(get_jail_parameter -ed ROOTENV $_VM) \
+	[ -z "$_rootenv" ] && ! _rootenv=$(get_jail_parameter -e ROOTENV $_VM) \
 		&& get_msg "$_cj32" "$_VM" && return 1
 
 	# Destroy the dataset
@@ -1713,18 +1713,18 @@ prep_bhyve_options() {
 
 	# Get simple qmap variables
 	_VM="$1"
-	_cpuset=$(get_jail_parameter -e CPUSET "$_VM")        || return 1
-	_gateway=$(get_jail_parameter -ez GATEWAY "$_VM")     || return 1
-	_ipv4=$(get_jail_parameter -erz IPV4 "$_VM")          || return 1
-	_memsize=$(get_jail_parameter -e MEMSIZE "$_VM")      || return 1
-	_wiremem=$(get_jail_parameter -e WIREMEM "$_VM")      || return 1
-	_bhyveopts=$(get_jail_parameter -e BHYVEOPTS "$_VM")  || return 1
-	_rootenv=$(get_jail_parameter -ed ROOTENV "$_VM")     || return 1
-	_taps=$(get_jail_parameter -e TAPS "$_VM")            || return 1
-	_vcpus=$(get_jail_parameter -e VCPUS "$_VM")          || return 1
-	_vncres=$(get_jail_parameter -ez VNCRES "$_VM")       || return 1
-	_ppt=$(get_jail_parameter -exz PPT "$_VM")            || return 1
-	_tmux=$(get_jail_parameter -ez TMUX "$_VM") 				|| return 1
+	_cpuset=$(get_jail_parameter -de CPUSET "$_VM")        || return 1
+	_gateway=$(get_jail_parameter -dez GATEWAY "$_VM")     || return 1
+	_ipv4=$(get_jail_parameter -derz IPV4 "$_VM")          || return 1
+	_memsize=$(get_jail_parameter -de MEMSIZE "$_VM")      || return 1
+	_wiremem=$(get_jail_parameter -de WIREMEM "$_VM")      || return 1
+	_bhyveopts=$(get_jail_parameter -de BHYVEOPTS "$_VM")  || return 1
+	_rootenv=$(get_jail_parameter -e ROOTENV "$_VM")       || return 1
+	_taps=$(get_jail_parameter -de TAPS "$_VM")            || return 1
+	_vcpus=$(get_jail_parameter -de VCPUS "$_VM")          || return 1
+	_vncres=$(get_jail_parameter -dez VNCRES "$_VM")       || return 1
+	_ppt=$(get_jail_parameter -dexz PPT "$_VM")            || return 1
+	_tmux=$(get_jail_parameter -dez TMUX "$_VM")           || return 1
 
 	# UEFI bootrom
 	_BOOT="-l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI.fd"
