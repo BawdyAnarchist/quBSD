@@ -39,13 +39,13 @@ cleanup_disps() {
 	done
 
 	# Remove lingering EPHM datasets in qubsd's zroot
-	for _disp in $(zfs list -Hro name "$R_ZFS" | grep "${R_ZFS}/EPHM-") ; do
-		zfs destroy -rRf $_disp > /dev/null 2>&1
+	for _ephm in $(zfs list -Hro name "$R_ZFS" | grep "${R_ZFS}/EPHM-") ; do
+		zfs destroy -rRf $_ephm > /dev/null 2>&1
 	done
 
 	# Remove lingering EPHM datasets in qubsd's zusr
-	for _disp in $(zfs list -Hro name "$U_ZFS" | grep "${U_ZFS}/EPHM-") ; do
-		zfs destroy -rRf $_disp > /dev/null 2>&1
+	for _ephm in $(zfs list -Hrt all -o name "$U_ZFS" | grep -i "ephm") ; do
+		zfs destroy -rRf $_ephm > /dev/null 2>&1
 	done
 
 	# Remove anything that starts with ^EPHM in qmap and jail.conf
