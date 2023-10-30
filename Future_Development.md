@@ -1,6 +1,6 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-[test] { command ;} grouping. Can save alot of space and simply this construction
+[test] { command ;} grouping. Can save alot of space and simplify the get_msg constructions
 
 while getopts <opts> opts ; do case $opts in
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
