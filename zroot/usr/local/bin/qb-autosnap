@@ -4,36 +4,28 @@
 . /usr/local/lib/quBSD/msg-autosnap.sh
 
 get_options() {
-	local OPTIND
-	while getopts ':dhl:st:' opts ; do
-		case $opts in
-			d) 	DESTROY=true ;;
-			h) 	get_msg_autosnap "none" "usage_0" ;;
-			l) 	LIST=${OPTARG} ;;
-			s) 	SNAPSHOT=true ;;
-			t) 	TTL="${OPTARG}" ;;
-			\:) 	LIST="all" ;;
-			\?)   get_msg_autosnap "_2" "usage_1"
-		esac
-	done
+	while getopts ':dhl:st:' opts ; do case $opts in
+		d) 	DESTROY=true ;;
+		h) 	get_msg_autosnap "none" "usage_0" ;;
+		l) 	LIST=${OPTARG} ;;
+		s) 	SNAPSHOT=true ;;
+		t) 	TTL="${OPTARG}" ;;
+		:) 	LIST="all" ;;
+		\?)   get_msg_autosnap "_2" "usage_1"
+	esac done  ;  shift $(( OPTIND - 1 ))
 
-	shift $(( OPTIND - 1 ))
-
-	# Separate integer from the units, for later use
-	_INT="${TTL%?}"
-	_UNITS="${TTL##*[0-9]}"
 	DATE_UNIX=$(date +%s)
 }
 
 checks() {
-	# Ensuring that _INT is an integer
-	if [ -n "$TTL" ] && ! echo "$_INT" | grep -Eq '^[0-9]+$' ; then
-		get_msg_autosnap "_1" "usage_1"
+	# Separate integer from the units for checks
+	_INT="${TTL%?}"
+	_UNITS="${TTL##*[0-9]}"
 
-	# Ensuring that _UNITS is in a proper time unit
-	elif [ -n "$TTL" ] && ! echo "$_UNITS" | grep -Eq "m|H|D|W|Y" ; then
-		get_msg_autosnap "_1" "usage_1"
-
+	# Ensure that <_INT><_UNITS> is an integer and proper time unit
+	if [ -n "$TTL" ] ; then
+		! echo "$_INT" | grep -Eq '^[0-9]+$' && get_msg_autosnap "_1" "usage_1"
+		! echo "$_UNITS" | grep -Eq "m|H|D|W|Y" && get_msg_autosnap "_1" "usage_1"
 	fi
 }
 
@@ -77,20 +69,17 @@ sync_from_qmap() {
 
 	# Get list of all jails with an AUTOSNAP setting in QMAP
 	_jlist=$(qb-list -p AUTOSNAP | grep -E "(true|false)" | awk '{print $1}')
-
-	# Check/set each entry one by one
 	for _jail in $_jlist ; do
 
-		# Pull the value of the autosnap option in QMAP
+		# Pull the value of the AUTOSNAP, and conform datasets to QMAP
 		_value=$(sed -En "s/^${_jail}[[:blank:]]+AUTOSNAP[[:blank:]]+//gp" $QMAP)
-
-		# zroot vs zusr dataset depending on CLASS
 		case "$(get_jail_parameter -deqs CLASS "$_jail")" in
-			appjail)  chk_valid_zfs "${U_ZFS}/${_jail}" \
-						 && zfs set qubsd:autosnap="$_value" "${U_ZFS}/${_jail}"
+
+			app*)  chk_valid_zfs "${U_ZFS}/${_jail}" \
+							 && zfs set qubsd:autosnap="$_value" "${U_ZFS}/${_jail}"
 			;;
-			rootjail) chk_valid_zfs "${ROOT_ZFS}/${_jail}" \
-						 && zfs set qubsd:autosnap="$_value" "${R_ZFS}/${_jail}"
+			root*) chk_valid_zfs "${ROOT_ZFS}/${_jail}" \
+							 && zfs set qubsd:autosnap="$_value" "${R_ZFS}/${_jail}"
 			;;
 		esac
 	done
@@ -118,17 +107,14 @@ list_datasets() {
 				  		"$SNAPLIST" "\n" | column -t
 		echo ""
 	fi
-	exit 0
 }
 
 new_snapshots() {
-
 	# Datasets tagged with qubsd:autosnap.
 	ZLIST=$(zfs list -rH -o name,qubsd:autosnap \
 								| grep -E "[[:blank:]]+true\$" | awk '{print $1}')
 
 	for _dataset in $ZLIST ; do
-
 		# Calculate unix-time destroy-dates based on user input time-to-live.
 		calculate_variables
 
@@ -148,20 +134,64 @@ new_snapshots() {
 	done
 }
 
+update_stale_clones() {
+	# Assemble list of children datasets and their origin (parent)
+	_rclonelist=$(zfs list -Hro name,origin ${R_ZFS} | grep -Ev -- '-$' | awk '{print $1}')
+	_uclonelist=$(zfs list -Hro name,origin ${U_ZFS} | grep -Ev -- '-$' | awk '{print $1}')
+
+	# Update stale zroot clones with latest parent snap (zfs lists chronolgically)
+	for _clone in $_rclonelist ; do
+		if ! chk_isrunning "${_clone##*/}" ; then
+			_origin=$(zfs list -Ho origin $_clone)
+			_newsnap=$(zfs list -t snapshot -o name ${_origin%%@*} | tail -1)
+			zfs destroy $_clone
+			zfs clone -o qubsd:autosnap='false' "$_newsnap"  $_clone
+		fi
+	done
+
+	# Update stale zusr clones. They might needs fstab replacement and home directory change
+	for _clone in $_uclonelist ; do
+		_origin=$(zfs list -Ho origin $_clone | sed -E "s/${U_ZFS}\///")
+		reclone_zusr ${_clone##*/} "${_origin%%@*}"
+	done
+}
+
+thin_old_snapshots() {
+	# Assemble datasets in zroot tagged with ttl
+	_snaplist=$(zfs list -Hrt snapshot -o name,qubsd:destroy-date \
+											| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
+
+	for _snap in $_snaplist ; do
+		_snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
+
+		# If dataset is still in use; `zfs destroy` without [-rRf], will fail to /dev/null
+		[ "$_snap_dd" -lt "$DATE_UNIX" ] && zfs destroy $_snap > /dev/null 2>&1
+
+		# Check dataset exists, last command might've deleted it
+		chk_valid_zfs "$_snap" && _snap_used=$(zfs list -Ho used $_snap)
+
+		# Destroy 0B snaps, except the one that was just created, (tagged with $SNAPNAME (date))
+		[ "$_snap_used" = "0B" ] && [ -n "${_snap##*"$SNAPNAME"}" ] \
+																	&& zfs destroy $_snap > /dev/null 2>&1
+	done
+}
+
 main() {
-	# Sync from QMAP just in case.
+	# Sync from QMAP just in case of differences or hand jammed updates
 	sync_from_qmap
 
 	# List first
-	[ -n "$LIST" ] && list_datasets
+	[ -n "$LIST" ] && list_datasets && exit 0
 
-	# Make new snapshots first so that oldsnaps have the latest snapshot to reference
-	[ -n "$SNAPSHOT" ] && new_snapshots
+	# Make new snapshots, then update stale jails/VMs to latest snapshot
+	if [ -n "$SNAPSHOT" ] ; then
+		new_snapshots
+		update_stale_clones
+	fi
 
-	# Destroy snaps with a TTL, or null `zfs-diff` to parent. [-z] to destroy zero-byte snaps.
-	[ -n "$DESTROY" ] && cleanup_oldsnaps -z
+	# Destroy snaps with a TTL, or null `zfs-diff` to parent
+	[ -n "$DESTROY" ] && thin_old_snapshots
 }
-
 
 get_global_variables
 
