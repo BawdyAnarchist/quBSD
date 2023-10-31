@@ -139,9 +139,9 @@ get_networking_variables() {
 	# Get wireguard related variables
    if [ -e "${M_ZUSR}/${JAIL}/${WG0CONF}" ] ; then
 
-		WG_ENDPT=$(sed -nE "s/^ENDPOINT[[:blank:]]*=[[:blank:]]*([^[:blank:]]+):.*/\1/p" \
+		WG_ENDPT=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*([^[:blank:]]+):.*/\1/p" \
 				${M_ZUSR}/${JAIL}/${WG0CONF})
-		WG_PORTS=$(sed -nE "s/^ENDPOINT[[:blank:]]*=.*:(.*)[[:blank:]]*/\1/p" \
+		WG_PORTS=$(sed -nE "s/^Endpoint[[:blank:]]*=.*:(.*)[[:blank:]]*/\1/p" \
 				${M_ZUSR}/${JAIL}/${WG0CONF})
 		WG_MTU=$(sed -nE "s/^MTU[[:blank:]]*=[[:blank:]]*([[:digit:]]+)/\1/p" \
 				${M_ZUSR}/${JAIL}/${WG0CONF})
@@ -493,64 +493,56 @@ connect_client_to_gateway() {
 	# When a jail/VM is started, this connects to its gateway
 	# GLOBAL VARIABLES must have been assigned already: $GATEWAY ; $IPV4 ; $MTU
 
-	getopts e _opts && _ec='true' && shift
-	[ "$1" = "--" ] && shift
+	while getopts em:q opts ; do case $opts in
+			e) local _ec='true' ;;
+			m) local _mtu="$OPTARG" ;;
+			q) local _q='-q' ;;
+			*) get_msg "_1" ; return 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
-	# Positional variables
 	local _client="$1"  ;  local _gateway="$2"  ;  local _ipv4="$3"  ;
-	local _mtu="${MTU:=$(get_jail_parameter -des MTU '#default')}"
+	local _mtu="${MTU:=$(get_jail_parameter -des MTU $_gateway)}"
 
-	# VM client uses pre-determined tap interfaces and DHCP on the gateway jail
+	# This function can be called by multiple scripts/functions that dont know which is a VM or jail
 	if chk_isvm "$_client" ; then
+		# Get tap, send to gateway jail, bring up jail connection
+		_vifb=$(sed -En "s/ NET//p" "${QTMP}/vmtaps_${_client}")
+		ifconfig "$_vifb" vnet "$_gateway"
+		jexec -l -U root $_gateway ifconfig $_vifb inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
 
-		# Get the virtual intf for the VM
-		_vif=$(head -1 "${QTMP}/qb-taps_${_client}" 2> /dev/null)
-
-		# Connect the tap to the gateway
-		ifconfig "$_vif" vnet "$_gateway"
-		jexec -l -U root $_gateway ifconfig $_vif inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
-
-		return 0
+		# It's necessary to restart dhcpd, to include the new IP
+		jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
 
 	elif chk_isvm "$_gateway" ; then
-		# Get the virtual intf for the VM
-		_vif=$(head -1 "${QTMP}/qb-taps_${_gateway}" 2> /dev/null)
+		# Get tap and sent to client jail. Should be DHCP, but modify mtu if necessary
+		_vifb=$(sed -En "s/ NET//p" "${QTMP}/vmtaps_${_gateway}")
+ 		ifconfig $_vifb vnet $_client
+		[ ! "$_mtu" = "1500" ] && jexec -l -U root $_client ifconfig $_vifb mtu $_mtu up
 
-		# Send tap to client
- 		ifconfig $_vif vnet $_client
+	else
+		# Create epair and assign _vif variables.
+		local _vif=$(ifconfig epair create)  ;  local _vifb="${_vif%?}b"
+		ifconfig "$_vif" vnet $_gateway
 
-		# If there's any mtu setting other than 1500, apply it
-		[ ! "$_mtu" = "1500" ] && jexec -l -U root $_client ifconfig $_vif mtu $_mtu up
+		# If connecting two jails (and not host), send the epair, and assign the command modifier.
+		if [ ! "$_client" = "host" ] ; then
+			ifconfig "${_vifb}" vnet $_client
+			local _cmdmod='jexec -l -U root $_client'
+		fi
 
-		[ "$_ec" ] && echo "$_vif"
+		# If there's no IP skip the epair assignments
+		if [ ! "$_ipv4" = "none" ] ; then
+			# Assign the gateway IP
+			jexec -l -U root "$_gateway" \
+					ifconfig "$_vif" inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
 
-		return 0
-	fi
-
-	# Create virtual interface. Gateway <_intf> can always be sent
-	local _intf=$(ifconfig epair create)
-	ifconfig "$_intf" vnet $_gateway
-
-	# If connecting two jails, send the epair, and assign a command modifier.
-	if [ ! "$_client" = "host" ] ; then
-		ifconfig "${_intf%?}b" vnet $_client
-		local _cmdmod='jexec -l -U root $_client'
-	fi
-
-	# If there is no IP or it's DHCP, skip the assignment
-	if [ ! "$_ipv4" = "none" ] ; then
-		# Assign the gateway IP
-		jexec -l -U root "$_gateway" \
-				ifconfig "$_intf" inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
-
-		# Assign the client IP and default route
-		eval "$_cmdmod" ifconfig ${_intf%?}b inet ${_ipv4} mtu $_mtu up
-		eval "$_cmdmod" route add default "${_ipv4%.*/*}.1" > /dev/null 2>&1
-	fi
+			# Assign the client IP and default route
+			eval "$_cmdmod" ifconfig $_vifb inet ${_ipv4} mtu $_mtu up
+			eval "$_cmdmod" route add default "${_ipv4%.*/*}.1" > /dev/null 2>&1
+	fi fi
 
 	# Echo option. Return epair-b ; it's the external interface for the jail.
-	[ "$_ec" ] && echo "${_intf%?}b" || VIF="${_intf%?}b"
-
+	[ "$_ec" ] && echo "$_vifb"
 	return 0
 }
 
@@ -851,7 +843,7 @@ chk_truefalse() {
 chk_integer() {
 	# Checks that _value is integer, and can checks boundaries. [-n] is a descriptive variable name
 	# from caller, for error message. Assumes that integers have been provided by the caller.
-	
+
 	while getopts g:G:l:L:qv: opts ; do case $opts in
 			g) local _g="$OPTARG" ; _msg="greater than or equal to" ;;
 			G) local _G="$OPTARG" ; _msg="greater than" ;;
@@ -861,12 +853,12 @@ chk_integer() {
 			q) local _q='-q' ;;
 			*) get_msg "_1" ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
-	_value="$1" 
+	_value="$1"
 
 	# Check that it's an integer
 	! echo "$_value" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1
 
-	# Check each option one by one 
+	# Check each option one by one
 	[ "$_g" ] && ! [ "$_value" -ge "$_g" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_g" && return 1
 	[ "$_G" ] && ! [ "$_value" -gt "$_G" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_G" && return 1
 	[ "$_l" ] && ! [ "$_value" -le "$_l" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_l" && return 1
@@ -1274,7 +1266,7 @@ chk_valid_mtu() {
 	[ "$1" = "--" ] && shift
 	_value="$1"
 
-	! chk_integer -v "MTU" -- "$_value" && return 1 
+	! chk_integer -v "MTU" -- "$_value" && return 1
 	! chk_integer -g 1200 -l 1600 -v "MTU sanity check:" -- "$_value" && return 1
 	return 0
 }
@@ -1590,7 +1582,7 @@ cleanup_vm() {
 	[ -z "$_VM" ] && get_msg $_qcv "_0" && return 1
 
 	# Bring all recorded taps back to host, and destroy
-	for _tap in $(cat "${QTMP}/qb-taps_${_VM}" 2> /dev/null) ; do
+	for _tap in $(sed -E 's/ .*$//' "${QTMP}/vmtaps_${_VM}" 2> /dev/null) ; do
 
 		if [ -n "$_norun" ] ; then
 			ifconfig "$_tap" destroy 2> /dev/null
@@ -1600,13 +1592,12 @@ cleanup_vm() {
 			[ -z "$_tapjail" ] && _tapjail=$(get_jail_parameter -deqsz GATEWAY ${_VM})
 
 			# Remove the tap
-			remove_tap "$_tap" "$_tapjail" && ifconfig "$_tap" destroy 2> /dev/null
+			remove_tap "$_tap" "$_tapjail" && ifconfig "$_tap" destroy
 		fi
 	done
 
-	# Remove the tracker files
-	rm "${QTMP}/qb-vnc_${_VM}"  > /dev/null 2>&1
-	rm "${QTMP}/qb-taps_${_VM}" > /dev/null 2>&1
+	# Remove the taps tracker file
+	rm "${QTMP}/vmtaps_${_VM}" > /dev/null 2>&1
 
 	# Destroy the VM
 	bhyvectl --vm="$_VM" --destroy > /dev/null 2>&1
@@ -1626,7 +1617,6 @@ cleanup_vm() {
 
 	# If called with [-x] send an exit message and run exit 0
 	[ -n "$_exit" ] && get_msg "_cj32" "$_VM" && exit 0
-
 	return 0
 }
 
@@ -1770,7 +1760,8 @@ EOF
 	# Invoke the trap function for VM cleanup, in case of any errors after modifying host/trackers
 	trap "cleanup_vm -n $_VM ; exit 0" INT TERM HUP QUIT
 
-	# Assign all taps to slots _VTNET. VM can have taps, even without gateway
+	# Add 1 to _taps for the SSH tap. _cycle helps resolve the _vif tag
+	_taps=$(( _taps + 1 ))  ;  _cycle=0
 	while [ "$_taps" -gt 0 ] ; do
 
 		# Use ifconfig to keep track of available taps.
@@ -1779,12 +1770,14 @@ EOF
 		_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
 		_taps=$(( _taps - 1 ))
 
-		# Tracker file for which taps are related to which VM
-		echo "$_tap" >> "${QTMP}/qb-taps_${_VM}"
+		# Tracker file for which taps are related to which VM, and for which purpose (_vif tags)
+		case "$_cycle" in
+			0) echo "$_tap SSH" >> "${QTMP}/vmtaps_${_VM}" ;;
+			1) echo "$_tap NET" >> "${QTMP}/vmtaps_${_VM}"  ;  _vif="$_tap"  ;;
+			*) echo "$_tap EXTRA_${_cycle}" >> "${QTMP}/vmtaps_${_VM}"  ;;
+		esac
+		_cycle=$(( _cycle + 1 ))
 	done
-
-	# First tap created is used for networking
-	_vif=$(head -1 "${QTMP}/qb-taps_${_VM}" 2> /dev/null)
 
 	# Define the full bhyve command
 	_BHYVE_CMD="$_TMUX1 bhyve $_CPU $_CPUPIN $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT \
@@ -1882,6 +1875,8 @@ exec_vm_coordinator() {
 			&& connect_client_to_gateway "$_VM" "$_gateway" "$_ipv4" > /dev/null
 
 		# Reconnect the downstream client. Will immediately return if there are no clients
+
+	# The VM should be up and running, or function would've already returned 1
 		connect_gateway_to_clients "$_VM"
 	fi
 
