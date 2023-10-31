@@ -23,8 +23,6 @@ ERROR: Tunnel < $JAIL > failed to start.
 ENDOFMSG
 	;;
 	_6) cat << ENDOFMSG
-
-ERROR: [-t <timeout>] must be a number greater than 0.
 ENDOFMSG
 	;;
 	_7) cat << ENDOFMSG

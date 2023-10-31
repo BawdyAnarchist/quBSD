@@ -52,6 +52,7 @@
 # chk_isblank          - Posix workaround: Variable is [-z <null> OR [[:blank:]]*]
 # chk_isrunning        - Searches jls -j for the jail
 # chk_truefalse        - When inputs must be either true or false
+# chk_integer          - Checks that a value is an integer, within a range
 # chk_avail_jailname   - Checks that a proposed jailname is acceptable
 
 #################################  SANITY  CHECKS  #################################
@@ -736,6 +737,10 @@ monitor_startstop() {
 		[ -z "$_timeout" ] && _timeout="1" && _nowrite="true"
 	fi
 
+	#######
+	# ADD LOGIC TO CONVERT TIMEOUT TO THE SLEEP PERIOD
+	#######
+
 	_cycle=0
 	while [ "$_cycle" -lt "$_timeout" ] ; do
 		# [-o] returns oldest process (just one). Otherwise we get multiple of the background procs
@@ -831,24 +836,45 @@ chk_isrunning() {
 }
 
 chk_truefalse() {
-	# Quiet option
 	getopts q _opts && local _qf='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	# Positional parmeters / check.
 	local _value="$1"  ;  local _param="$2"
-
 	[ -z "$_value" ] && get_msg $_qf "_0" "$_param" && return 1
 
 	# Must be either true or false.
 	[ ! "$_value" = "true" ] && [ ! "$_value" = "false" ] \
 			&& get_msg $_qf "_cj19" "$_param" && return 1
+	return 0
+}
 
+chk_integer() {
+	# Checks that _value is integer, and can checks boundaries. [-n] is a descriptive variable name
+	# from caller, for error message. Assumes that integers have been provided by the caller.
+	
+	while getopts g:G:l:L:qv: opts ; do case $opts in
+			g) local _g="$OPTARG" ; _msg="greater than or equal to" ;;
+			G) local _G="$OPTARG" ; _msg="greater than" ;;
+			l) local _l="$OPTARG" ; _msg="less than or equal to" ;;
+			L) local _L="$OPTARG" ; _msg="less than" ;;
+			v) local _var="$OPTARG" ;;
+			q) local _q='-q' ;;
+			*) get_msg "_1" ; return 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
+	_value="$1" 
+
+	# Check that it's an integer
+	! echo "$_value" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1
+
+	# Check each option one by one 
+	[ "$_g" ] && ! [ "$_value" -ge "$_g" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_g" && return 1
+	[ "$_G" ] && ! [ "$_value" -gt "$_G" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_G" && return 1
+	[ "$_l" ] && ! [ "$_value" -le "$_l" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_l" && return 1
+	[ "$_L" ] && ! [ "$_value" -lt "$_L" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_L" && return 1
 	return 0
 }
 
 chk_isvm() {
-	# Quiet option
 	getopts c _opts && local _class='true' && shift
 
 	# Checks if the positional variable is the name of a VM, return 0 if true 1 of not
@@ -1246,15 +1272,10 @@ chk_valid_memsize() {
 chk_valid_mtu() {
 	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
-	local _value="$1"
+	_value="$1"
 
-	# If MTU is not a number
-	echo "$_value" | ! grep -Eq '^[0-9]*$' && get_msg $_q "_cj18_1" "$_value" "MTU" && return 1
-
-	# Just push a warning, but don't error for MTU
-	[ "$_value" -lt 1200 ] > /dev/null 2>&1 && get_msg $_q "_cj18" "MTU"
-	[ "$_value" -gt 1600 ] > /dev/null 2>&1 && get_msg $_q "_cj18" "MTU"
-
+	! chk_integer -v "MTU" -- "$_value" && return 1 
+	! chk_integer -g 1200 -l 1600 -v "MTU sanity check:" -- "$_value" && return 1
 	return 0
 }
 
@@ -1367,8 +1388,7 @@ chk_valid_taps() {
 
 	# Make sure that it's an integer
 	for _val in $_value ; do
-		! echo "$_val" | grep -qE "^[[:digit:]]\$" \
-				&& get_msg $_q "_cj7" "$_val" && return 1
+		! chk_integer -g 0 -v "Number of TAPS (in QMAP)," -- $_value && return 1
 	done
 
 	return 0
@@ -1415,8 +1435,7 @@ chk_valid_vcpus() {
 	_syscpus=$(( _syscpus + 1 ))
 
 	# Ensure that the input is a number
- 	! echo "$_value" | grep -qE "^[[:digit:]]+\$" \
-			&& get_msg $_q "_cj2" "$_value" "VCPUS" && return 1
+	! chk_integer -G 0 -v "Number of VCPUS (in QMAP)," -- $_value && return 1
 
 	# Ensure that vpcus doesnt exceed the number of system cpus or bhyve limits
 	if [ "$_value" -gt "$_syscpus" ] || [ "$_value" -gt 16 ] ; then

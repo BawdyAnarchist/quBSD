@@ -4,25 +4,20 @@
 . /usr/local/lib/quBSD/msg-i3-launch.sh
 
 get_options() {
-	while getopts f:Fht: opts ; do
-		case $opts in
-			f) FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
-			F) FORCE="true" ;;
-			h) get_msg_i3_launch "none" "usage_0" ;;
-         t) _TIMEOUT="${OPTARG}" ; _TIMEOUT=$(( _TIMEOUT * 2 )) > /dev/null 2>&1 \
-					|| get_msg_launch "_2" "usage_1"  ;;
-			*) exit 1 ;;
-		esac
-	done
-
-   # Set timeout to default of 60 cycles (about 30 seconds)
-	_TIMEOUT="${_TIMEOUT:=60}"
-	[ "$_TIMEOUT" -gt 0 ] || get_msg_launch "_2" "usage_1"
-
-	shift $(( OPTIND - 1 ))
+	while getopts f:Fht: opts ; do case $opts in
+		f) FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
+		F) FORCE="true" ;;
+		h) get_msg_i3_launch "none" "usage_0" ;;
+		t) _TIMEOUT="${OPTARG}" ;;
+		*) exit 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 }
 
 parse_config() {
+	# Check TIMEOUT, if it was specified 
+	[ "$_TIMEOUT" ] && chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
+									&& _TIMEOUT="-t $_TIMEOUT" || get_msg_launch "_2" "exit_1"
+
 	# Assign default file if one wasn't optioned
 	FILE="${FILE:=${HOME}/.config/i3/i3launch.conf}"
 
@@ -31,16 +26,13 @@ parse_config() {
 	JAILS=$(mktemp -t "quBSD/i3-launch-jails")
 	trap "rm $CONF $JAILS > /dev/null 2>&1 ; exit 0" INT TERM HUP QUIT EXIT
 
-	# Copy the launch config to tmp ($CONF)
+	# Copy the launch config to tmp ($CONF), and remove comments and blank lines
 	cp -a $FILE $CONF
-
-	# Remove comments and blank lines
 	sed -i '' -e "/^$/ d ; /^[[:blank:]]*#.*/ d" $CONF
 
 	# Get all running windows. Adds "WORKSPACE" at bottom, to simplify sed command later on).
 	WINDS=$(qb-i3-windows| sed "s/Jail://g" | sed "$ a\\
 WORKSPACE")
-
 }
 
 qb_start_jails() {
@@ -53,7 +45,7 @@ qb_start_jails() {
 	grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}' | uniq > $JAILS
 
 	# Turn on any jails not started
-	qb-start -f $JAILS > /dev/null 2>&1
+	qb-start -f $JAILS $_TIMEOUT > /dev/null 2>&1 || get_msg_i3_launch
 
 	# Remove the temporary monitoring popup
 	kill -15 $_pid_stat
@@ -144,7 +136,7 @@ main() {
 		# This avoids an accidental re-launching of already existing jail/windows
 		check_existing || execute_commands > /dev/null 2>&1
 
-	_cycle=$(( _cycle + 1 ))
+		_cycle=$(( _cycle + 1 ))
 	done
 }
 
@@ -156,6 +148,4 @@ get_options "$@"
 parse_config
 
 main
-
-exit 0
 

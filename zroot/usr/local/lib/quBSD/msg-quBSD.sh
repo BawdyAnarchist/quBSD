@@ -13,6 +13,7 @@ get_msg() {
 	local _message="$1"
 	local _value="$2"
 	local _passvar="$3"
+	local _passvar2="$4"
 
 	case "$_message" in
 
@@ -388,6 +389,17 @@ ERROR: Valid bhyve resolutions for VNC viewer are as follows:
        640x480 | 800x600 | 1024x768 | 1920x1080
 ENDOFMSG
 	;;
+	_je7) cat << ENDOFMSG
+
+ERROR: $_value must be an integer 
+ENDOFMSG
+	;;
+	_je8) cat << ENDOFMSG
+
+ERROR: $_value Should be $_passvar < $_passvar2 >
+ENDOFMSG
+	;;
+
 	esac
 }
 

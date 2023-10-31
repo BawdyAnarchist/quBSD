@@ -9,7 +9,6 @@ reinstall 0base
 
 qubsd.sh
 	- Double check on things that are positional items vs if they should be options 
-	- chk_isinteger [-l lower_bound] [-u "upper_bound"]. You have a lot of integer checks.
 	- chk_isgateway ? maybe not needed
 	- connect_client_to_gateway ; uses a lot of dumb switches and repeat code
 	- reclone_zroot probably needs to be optimized. Maybe not. Seems okay
@@ -67,6 +66,8 @@ NICVM - Linux VM so that it can use all the wireless protocols.
 
 
 ### SPECIFIC SCRIPTS
+
+qb-i3-launch - had problems with double launching windows that already existed
 
 quBSD.sh and msg-qubsd.sh
 	- Error messages are a bit disorganized now. Need to have useful higher function messages

@@ -1,31 +1,25 @@
 #!/bin/sh
 
-# Starting jails in parallel comes with race-condition type problems.
+# Starting jails in parallel comes with race-condition problems.
 	# Overlapping starts of a shared gateway can lock the system
 	# auto IP assignments will likely overlap unless managed ahead of time
 	# Epair race conditions and mishandling between gateway/client
-
 # This script deconflicts these, starting jails in serial when necessary, parallel if possible
-
 
 . /usr/local/lib/quBSD/quBSD.sh
 . /usr/local/lib/quBSD/msg-start.sh
 
 get_options() {
-	while getopts aAeE:hf:t: opts ; do
-		case $opts in
-			a) _SOURCE="auto" ;;
-			A) [ "$_SOURCE" ]  && get_msg_start "_e1" "usage_1" || _SOURCE="all" ;;
-			e) _EXCLUDE="true" ;;
-			E) [ "$_EXCLUDE" ] && get_msg_start "_e2" "usage_1" || _EXFILE="$OPTARG" ;;
-			f) [ "$_SOURCE" ]  && get_msg_start "_e1" "usage_1" || _SOURCE="$OPTARG" ;;
-			h) get_msg_start "none" "usage_0" ;;
-			t) _TIMEOUT="$OPTARG" ;;
-			*) exit 1 ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	while getopts aAeE:hf:t: opts ; do case $opts in
+		a) _SOURCE="auto" ;;
+		A) [ "$_SOURCE" ]  && get_msg_start "_e1" "usage_1" || _SOURCE="all" ;;
+		e) _EXCLUDE="true" ;;
+		E) [ "$_EXCLUDE" ] && get_msg_start "_e2" "usage_1" || _EXFILE="$OPTARG" ;;
+		f) [ "$_SOURCE" ]  && get_msg_start "_e1" "usage_1" || _SOURCE="$OPTARG" ;;
+		h) get_msg_start "none" "usage_0" ;;
+		t) _TIMEOUT="$OPTARG" ;;
+		*) exit 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# This makes it so that _POSPARAMS has one parameter per line
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
@@ -38,14 +32,9 @@ get_options() {
 }
 
 checks() {
-
-	# Timeout must be an integer less than 300 and greater than 5
-	if [ "$_TIMEOUT" ] && echo "$_TIMEOUT" | ! grep -Eq '^[[:digit:]]+$' ; then
-		if [ "$_TIMEOUT" -le 600 ] && [ "$_TIMEOUT" -ge 5 ]
-		then _TIMEOUT=$(( _TIMEOUT * 2 ))
-		else get_msg_start "_e5" "usage_1"
-		fi
-	fi
+	# Check validity of TIMEOUT
+	[ "$_TIMEOUT" ] && ! chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
+																		&& get_msg_start "_e5" "exit_1"
 
 	# Absolutely do not run if another instance if qb-start or qb-stop is already running
 	monitor_startstop || get_msg_start "_e0" "exit_1"
@@ -121,7 +110,7 @@ begin_waterfall() {
 	for _JAIL in $_JAILS; do
 
 		# Only continue the waterfall if jail started successfully
-		start_jail "$_JAIL" > /dev/null 2>&1 || get_msg_start "_e4" "exit_1"
+		start_jail "$_JAIL" 2>&1 || get_msg_start "_e4" "exit_1"
 
 		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion)
 		_SUBGATEWAYS='' ; _ENDPOINTS=''
@@ -143,7 +132,7 @@ begin_waterfall() {
 
 			# Maintain a small stagger between parallel starts. Helps prevent conflicts
 			sleep .2
-			start_jail $_end > /dev/null 2>&1 &
+			start_jail $_end 2>&1 &
 		done
 
 		# Subgateways need their own waterfall
@@ -169,7 +158,6 @@ main() {
 
 	# Start the hierarchy tops, then their clients, until all of FULLIST is started
 	for _jail in $_HIERTOP; do
-
 		# Each hierarchy top is independent of each other, and can be started in parallel.
 		begin_waterfall $_jail &
 	done

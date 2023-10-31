@@ -4,23 +4,19 @@
 . /usr/local/lib/quBSD/msg-stop.sh
 
 get_options() {
-	while getopts aAeE:hf:Frt:w opts ; do
-		case $opts in
-			a) _SOURCE="auto" ;;
-			A) [ "$_SOURCE" ]  && get_msg_stop "_e1" "usage_1" || _SOURCE="all" ;;
-			e) _EXCLUDE="true" ;;
-			E) [ "$_EXCLUDE" ] && get_msg_stop "_e2" "usage_1" || _EXFILE="${OPTARG}" ;;
-			f) [ "$_SOURCE" ]  && get_msg_stop "_e1" "usage_1" || _SOURCE="$OPTARG" ;;
-			F) FORCE="true" ;;
-			h) get_msg_stop "none" "usage_0" ;;
-			r) _RESTART="true" ;;
-			t) _TIMEOUT="$OPTARG" ;;
-			w) _WAIT="true" ;;
-			*) exit 1 ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	while getopts aAeE:hf:Frt:w opts ; do case $opts in
+		a) _SOURCE="auto" ;;
+		A) [ "$_SOURCE" ]  && get_msg_stop "_e1" "usage_1" || _SOURCE="all" ;;
+		e) _EXCLUDE="true" ;;
+		E) [ "$_EXCLUDE" ] && get_msg_stop "_e2" "usage_1" || _EXFILE="${OPTARG}" ;;
+		f) [ "$_SOURCE" ]  && get_msg_stop "_e1" "usage_1" || _SOURCE="$OPTARG" ;;
+		F) FORCE="true" ;;
+		h) get_msg_stop "none" "usage_0" ;;
+		r) _RESTART="true" ;;
+		t) _TIMEOUT="$OPTARG" ;;
+		w) _WAIT="true" ;;
+		*) exit 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# This makes it so that _POSPARAMS has one parameter per line
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
@@ -33,14 +29,9 @@ get_options() {
 }
 
 checks() {
-
-	# Timeout must be an integer less than 300 and greater than 5
-	if [ "$_TIMEOUT" ] && echo "$_TIMEOUT" | ! grep -Eq '^[[:digit:]]+$' ; then
-		if [ "$_TIMEOUT" -le 600 ] && [ "$_TIMEOUT" -ge 5 ]
-		then _TIMEOUT=$(( _TIMEOUT * 2 ))
-		else get_msg_stop "_e5" "usage_1"
-		fi
-	fi
+	# Check validity of TIMEOUT
+	[ "$_TIMEOUT" ] && ! chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
+																			&& get_msg_stop "_e5" "exit_1"
 
    # Absolutely do not run if another instance of qb-start or qb-stop is already running
 	monitor_startstop || get_msg_stop "_e0" "exit_1"

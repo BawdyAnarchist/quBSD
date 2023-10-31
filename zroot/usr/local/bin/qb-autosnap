@@ -24,7 +24,7 @@ checks() {
 
 	# Ensure that <_INT><_UNITS> is an integer and proper time unit
 	if [ -n "$TTL" ] ; then
-		! echo "$_INT" | grep -Eq '^[0-9]+$' && get_msg_autosnap "_1" "usage_1"
+		! chk_integer -q -g 0 -- "$_INT" && get_msg_autosnap "_1" "usage_1"
 		! echo "$_UNITS" | grep -Eq "m|H|D|W|Y" && get_msg_autosnap "_1" "usage_1"
 	fi
 }

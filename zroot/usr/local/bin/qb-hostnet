@@ -24,8 +24,7 @@ get_parameters() {
 	[ -z "$_CMD" ] && get_msg_hostnet "_2" "usage_1"
 
 	# Check validity of timeout provided
-	echo "$TIMEOUT" | grep -Eqs '^[[:digit:]]+$' || get_msg_hostnet "_6" "usage_1"
-	[ "$TIMEOUT" -ge 0 ] || get_msg_hostnet "_6" "usage_1"
+	chk_integer -g 0 -v "[-t <timeout>]" -- $TIMEOUT
 
 	# Must get host network parameters.
 	get_jail_parameter -d GATEWAY "host" || exit 1

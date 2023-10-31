@@ -226,7 +226,7 @@ checks_zopts() {
 check_valid_volsize() {
    # Check that the volsize was given in proper format
 	! echo "$VOLSIZE" | grep -Eqs '(^[0-9]+(\.[0-9]*)?|^\.[0-9]+)(T|t|G|g|M|m|K|k)$' \
-																					&& get_msg_create "_e5_1" "exit_1"
+																				&& get_msg_create "_e5_1" "exit_1"
 	# Convert to raw bytes for comparison
 	_vol=$(echo $VOLSIZE | sed -nE "s/.\$//p")
 	_avail=$(zfs list -pHo available zusr)
