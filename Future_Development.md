@@ -1,16 +1,14 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-[test] { command ;} grouping. Can save alot of space and simplify the get_msg constructions
+check that DHCP in rc.conf works again for net-firewall.
+	- suspec that dhcp.conf was preventing it. Or maybe it was the dhcpd restart? Dunno, but check again
+	- could it be the MTU? nicvm MTU?
 
-while getopts <opts> opts ; do case $opts in
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
+qb-cmd VM is still spitting out noise
 
 reinstall 0base
 
 qubsd.sh
-	- Double check on things that are positional items vs if they should be options 
-	- chk_isgateway ? maybe not needed
-	- connect_client_to_gateway ; uses a lot of dumb switches and repeat code
 	- reclone_zroot probably needs to be optimized. Maybe not. Seems okay
 
 # After SSH and scp is hammered out, make another system backup 
@@ -78,7 +76,9 @@ quBSD.sh and msg-qubsd.sh
 
 qb-list [-e] (evaluate) option to check jail-param combos for validity.
 
-qb-stop - monitoring is still not right. It exits early, coz pgrep returns nothing after 2 cycles 
+qb-stop
+	- monitoring is still not right. It exits early, coz pgrep returns nothing after 2 cycles 
+	- It's too slow. There's got to be a way to make it more efficient
 
 qb-help - overhaul to act like a manpage. Replacing /usr/local/share/quBSD
 	- Each PARAM should have verbose message
@@ -102,6 +102,10 @@ GENERAL GUIDELINES, and maybe later double checks
 	- Attempt to make scripts more robust and account for user error, when it makes sense to do so.
 	- Try to use more redirects, tee's, and also try the 'wait' command for scripts that appear to hang (but are actually finished).
 	- PARAMETERS should be CAPS when refering to the generic PARAM; lowercase when refering to a specific value
+	- [test] { command ;} grouping. Can save alot of space and simplify the get_msg constructions
+	- while getopts <opts> opts ; do case $opts in
+	  esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
+	- Double check on things that are positional items vs if they should be options 
 
 Cycle all scripts through shellcheck again. 
 	- local variables are fine for FreeBSD 
