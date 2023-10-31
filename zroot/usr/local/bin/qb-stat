@@ -16,7 +16,7 @@ get_options() {
 	# Temp files for building the status report
 	TMP1=$(mktemp -t "quBSD/qb-stat1")
 	TMP2=$(mktemp -t "quBSD/qb-stat2")
-	COL="${COL:=6,6}"
+	COL="${COL:=6}"
 
 	# Trap to remove TMP files when exiting
 	trap 'rm $TMP1 $TMP2 > /dev/null 2>&1 ; exit 0' INT TERM HUP QUIT EXIT
@@ -58,8 +58,8 @@ get_stat_variables() {
 
 get_jails_loop() {
 	# Get key variables
-	class=$(get_jail_parameter -deqs CLASS "$_jail")
-	gateway=$(get_jail_parameter -eqs GATEWAY "$_jail")
+	class=$(get_jail_parameter -eqs CLASS "$_jail")
+	gateway=$(get_jail_parameter -deqs GATEWAY "$_jail")
 	rootenv=$(sed -En "s/^${_jail}[[:blank:]]+ROOTENV.*[[:blank:]]+//p" $QMAP)
 	rootenv="${rootenv:=-}"
 
