@@ -46,7 +46,6 @@
 # connect_gateway_to_clients - Connects a gateway jail to its clients
 # reclone_zroot       - Destroys and reclones jails dependent on ROOTENV
 # reclone_zusr        - Destroy and reclones jails with zusr dependency (dispjails)
-# cleanup_oldsnaps    - Destroys old snapshots beyond their time-to-live
 # monitor_startstop   - Monitors whether qb-start or qb-stop is still alive
 
 #################################  STATUS  CHECKS  #################################
@@ -60,7 +59,7 @@
 # chk_valid_jail       - Makes sure the jail has minimum essential elements
 # chk_valid_autosnap   - true|false ; Include in qb-autosnap /etc/crontab snapshots
 # chk_valid_autostart  - true|false ; Autostart at boot
-# chk_valid_bhyveopts  - Checks bhyve options in qmap for valid or not
+# chk_valid_bhyveopts  - Checks bhyve options in QMAP for valid or not
 # chk_valid_class      - appjail | rootjail | dispjail | appVM | rootVM
 # chk_valid_cpuset     - Must be in man 1 cpuset format. Limit jail CPUs
 # chk_valid_gateway    - Jail adheres to gateway jail norms
@@ -75,7 +74,7 @@
 # chk_valid_schg       - none | sys | all ; quBSD convention, schg flags on jail
 # chk_valid_seclvl     - -1|0|1|2|3 ; Applied to jail after start
 # chk_valid_template   - Somewhat redundant with: chk_valid_jail
-# chk_valid_taps       - qmap designates number of taps to add (must be :digit:)
+# chk_valid_taps       - QMAP designates number of taps to add (must be :digit:)
 # chk_valid_tmux       - tmux for terminal access to FreeBSD jails. true/false
 # chk_valid_template   - Must be any valid jail
 # chk_valid_vcpus      - Must be an integer less than cpuset -g
@@ -201,21 +200,14 @@ get_user_response() {
 get_jail_parameter() {
 	# Get corresponding <value> for <jail> <param> from QMAP.
 	# Assigns global variable of ALL CAPS <param> name, with <value>
-	 # -dp: Function default is to get the <#default> from QMAP, whenever the
-	     # retrieved <value> for <jail> <param> is NULL. [-d] prevents this.
-	 # -ep: echo <value> rather than setting the global variable
-	     # Otherwise variable indirection will set <$_PARAM> with <_value>
-	 	 ## NOTE: If using [-e] in $(command_substitution), best to [-q]
-		 ## quiet any error messages to prevent unpredictable behavior.
+	 # -dp: If _value is null, retreive #default from QMAP
+	 # -ep: echo _value rather than setting global variable. If using inside $(command_substitution),
+	 	  ## best to use [-q] with it to prevent unpredictable behavior
 	 # -qp: quiet any error/alert messages. Otherwise error messages are shown.
 	 # -rp: resolve value. Some values are "auto" and need further resolution.
-	 # -sp: skip checks, and return 0 regardless of any failures
+	 # -sp: skip checks, and return 0 regardless of failures, errors, or blanks
 	 # -xp: extra checks. Some cases benefit from an extra check only invoked at certain moments
 	 # -zp: don't error on zero/null values, just return
-
-	# Positional variables:
-	 # $1: _param : The parameter to pull from QMAP
-	 # $2: _jail  : <jail> to reference in QMAP
 
 	# Ensure all options variables are reset
 	local _dp= ; local _ep= ; local _qp= ; local _rp= ; local _sp= ; local _xp= ; local _zp=
@@ -242,15 +234,13 @@ get_jail_parameter() {
 	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
 
 	# Substitute <#default> values, so long as [-d] was not passed
-	if [ -z "$_value" ] && [ -n "$_dp" ] ; then
-		_value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
-	fi
+	[ -z "$_value" ] && [ -n "$_dp" ] \
+		&& _value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
 
 	# If still blank, check for -z or -s options. Otherwise err message and return 1
 	if [ -z "$_value" ] ; then
-		[ "$_zp" ] && return 0
-		[ "$_sp" ] && return 0
-		get_msg $_qp "$_cj17_1" "$_param" "$_value" && return 1
+		[ "$_zp" ] && return 0  ;  [ "$_sp" ] && return 0
+		get_msg $_qp "_cj17_1" "$_param" "$_value" && return 1
 	fi
 
 	# If -s was provided, checks are skipped by this eval
@@ -267,53 +257,44 @@ get_jail_parameter() {
 
 get_info() {
 	# Commonly required information that's not limited to jails or jail parameters
-	# Similar to: to get_jail_parameter(). But checks are not default.
-	# $1: _info :
+	# Use $1 to indicate the _info desired from case statement
 
-	# Local options for this function
 	while getopts e opts ; do case $opts in
 			e) local _ei="-e" ;;
 			*) get_msg "_1" ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-	# Positional variables
 	local _info="$1"  ;  local _jail="$2"  ;  local _value=''
 
 	case $_info in
-		_CLIENTS)
+		_CLIENTS)  # All _clients listed in QMAP, which depend on _jail as a gateway
 			_value=$(sed -nE "s/[[:blank:]]+GATEWAY[[:blank:]]+${_jail}//p" $QMAP)
 		;;
-		_ONJAILS)
-			# Prints a list of all jails/VMs that are currently running
+		_ONJAILS)  # All jails/VMs that are currently running
 			_value=$(jls | sed "1 d" | awk '{print $2}' ; \
 						pgrep -fl 'bhyve: ' | sed -E "s/.*[[:blank:]]([^[:blank:]]+)\$/\1/")
 		;;
-		_USED_IPS)
-			# Assemble list of ifconfig inet addresses for all running jails/VMs
+		_USED_IPS) # List of ifconfig inet addresses for all running jails/VMs
 			for _onjail in $(jls | sed "1 d" | awk '{print $2}') ; do
 				_intfs=$(jexec -l -U root "$_onjail" ifconfig -a inet | grep -Eo "inet [^[:blank:]]+")
 				_value=$(printf "%b" "$_value" "\n" "$_intfs")
 			done
 		;;
-		_XID)
+		_XID)    # X11 window ID of the current active window
 			_value=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
 		;;
-		_XJAIL)
-			# Gets the jailname of the active window. Converts $HOSTNAME to: "host"
+		_XJAIL)  # Gets the jailname of the active window. Converts $HOSTNAME to: "host"
 			_xid=$(get_info -e _XID)
 			[ "$_xid" = "0x0" ] && _value=host \
 					|| _value=$(xprop -id $(get_info -e _XID) WM_CLIENT_MACHINE \
 							| sed "s/WM_CLIENT_MACHINE(STRING) = \"//" | sed "s/.$//" \
 							| sed "s/$(hostname)/host/g") || _value="host"
 		;;
-		_XNAME)
-			# Gets the name of the active window
+		_XNAME)  # Gets the name of the active window
 			_value=$(xprop -id $(get_info -e _XID) WM_NAME _NET_WM_NAME WM_CLASS)
 		;;
-		_XPID)
-			# Gets the PID of the active window.
-			_value=$(xprop -id $(get_info -e _XID) _NET_WM_PID \
-					| grep -Eo "[[:alnum:]]+$")
+		_XPID)   # Gets the PID of the active window.
+			_value=$(xprop -id $(get_info -e _XID) _NET_WM_PID | grep -Eo "[[:alnum:]]+$")
 		;;
 	esac
 
@@ -345,12 +326,12 @@ compile_jlist() {
 		;;
 
 		auto)
-			# Find jails tagged with autostart in qmap.
+			# Find jails tagged with autostart in QMAP.
 			_JLIST=$(grep -E "AUTOSTART[[:blank:]]+true" $QMAP | awk '{print $1}' | uniq)
 		;;
 
 		all)
-			# ALL jails from qmap, except commented lines
+			# ALL jails from QMAP, except commented lines
 			_JLIST=$(awk '{print $1}' $QMAP | uniq | sed "/^#/d")
 		;;
 
@@ -393,18 +374,16 @@ start_jail() {
 			*) return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-	# Positional parameter checks. Must have value, must not be none
 	local _jail="$1"
 	[ "$_jail" = "none" ] && return 0
 	[ -z "$_jail" ] && get_msg $_qs "_0" "jail" && return 1
 
 	# Check to see if _jail is already running
 	if	! chk_isrunning "$_jail" ; then
-
 		# If not, running, perform prelim checks
 		if chk_valid_jail $_qs "$_jail" ; then
 
-			# If checks were good, start jail, make a log of it
+			# If checks were good, log start attempt, then start jail or VM
 			get_msg $_qs "_jf1" "$_jail" | tee -a $QBLOG
 
 			if chk_isvm "$_jail" ; then
@@ -412,10 +391,7 @@ start_jail() {
 			else
 				[ "$_norun" ] && return 0
 				jail -vc "$_jail"  >> $QBLOG 2>&1  ||  get_msg $_qs "_jf2" "$_jail"
-			fi
-		fi
-	fi
-
+	fi fi fi
 	return 0
 }
 
@@ -430,55 +406,44 @@ stop_jail() {
 			*) get_msg "_1" ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
-	# Positional parameter / check
 	local _jail="$1"
 	[ -z "$_jail" ] && get_msg $_qj "_0" "jail" && return 1
 
 	# Check that the jail is on
 	if chk_isrunning "$_jail" ; then
-		# Print message to log
+		# Log stop attempt, then switch by VM or jail
 		get_msg "_jf3" "$_jail" | tee -a $QBLOG
 
 		if chk_isvm "$_jail" ; then
-			# Kill the process gracefully; or if not, then forcefully
 			if [ -z "$_force" ] ; then
 				bhyvectl --vm="$_jail" --force-poweroff
 			else
 				bhyvectl --vm="$_jail" --destroy
 			fi
-
 			# If optioned, wait for the VM to stop
 			[ "$_wait" ] && ! monitor_vm_stop $_qj $_timeout "$_jail" && return 1
 
+		# Attempt normal removal [-r]. If failure, then remove forcibly [-R].
 		elif ! jail -vr "$_jail"  >> $QBLOG 2>&1 ; then
-
-			# If normal removal failed, forcibly remove
-			get_msg "_jf4" "$_jail" | tee -a $QBLOG
-			if jail -vR "$_jail"  >> $QBLOG  2>&1 ; then
+			if  jail -vR "$_jail"  >> $QBLOG 2>&1 ; then
 
 				# Forcible removal likely missed mounts. Clean them up.
 				sh ${QBDIR}/exec.release "$_jail"
 				[ -e "${M_ZUSR}/${JAIL}/rw/etc/fstab" ] \
-					&& umount -aF "${M_ZUSR}/${JAIL}/rw/etc/fstab" > /dev/null 2>&1
-
+									&& umount -aF "${M_ZUSR}/${JAIL}/rw/etc/fstab" > /dev/null 2>&1
 				# Notify about failure to remove normally
 				get_msg "_jf6" "$_jail" | tee -a $QBLOG
-
 			else
 				# Print warning about failure to forcibly remove jail
 				get_msg $_qj "_jf5" "$_jail"
 				return 1
-			fi
-		fi
-	fi
-
-	# Catch all. Either the jail was already off, or was succesfully removed
+	fi fi fi
 	return 0
 }
 
 restart_jail() {
 	# Restarts jail. If a jail is off, this will start it. However, passing
-	# $2="hold" will override this default, so that an off jail stays off.
+	# [-h] will override this default, so that an off jail stays off.
 
 	while getopts hq opts ; do case $opts in
 			h) local _hold="true" ;;
@@ -520,7 +485,6 @@ remove_tap() {
 			return 0
 		fi
 	done
-
 	return 1
 }
 
@@ -590,41 +554,35 @@ connect_client_to_gateway() {
 }
 
 connect_gateway_to_clients() {
-	# When a jail/VM is started, this manages the connection to its downstream clients
+	# If clients were already started, then the gateway needs to reconnect to its clients
 
-	# Quiet option
 	getopts q _opts && local _qz='-q' && shift
 	[ "$1" = "--" ] && shift
 
 	_jail="$1"
 	[ -z "$_jail" ] && get_msg $_q "_0" "Jail/VM" && return 1
 
+	# Restore connection to CLIENTS one by one
 	for _client in $(get_info -e _CLIENTS "$_jail") ; do
 		if chk_isrunning "$_client" ; then
-			# Get client IP
-			_cIP=$(get_jail_parameter -der IPV4 "$_client")
 
-			# Bring up connection, and return the VIF used for the client
+			# Get client IP, bring up connection, and save the VIF used
+			_cIP=$(get_jail_parameter -der IPV4 "$_client")
 			_cVIF=$(connect_client_to_gateway -e "$_client" "$_jail" "$_cIP")
 
-			# Need to modify the client pf.conf with the epair
+			# If client is itself a gateway, its pf.conf needs the new epair and IP (cVIF and cIP)
 			_cPF="${M_ZUSR}/${_client}/${PFCONF}"
-
 			if [ -e "$_cPF" ] ; then
-				# Make sure flags are down
-				chflags -R noschg "${M_ZUSR}/${_client}/rw/etc"
 
-				# pf needs the external interface and JIP for filtering variables
+				# Flags down, modify files
+				chflags -R noschg "${M_ZUSR}/${_client}/rw/etc"
 				sed -i '' -e "s@^EXT_IF[[:blank:]]*=.*@EXT_IF = \"${_cVIF}\"@" $_cPF
 				sed -i '' -e "s@^JIP[[:blank:]]*=.*@JIP = \"${_cIP}\"@"  $_cPF
 
-				# Restart _client pf service
+				# Restart _client pf service. Restore flags with qb-flags -r (we dont know seclvl here)
 				jexec -l -U root "$_client" service pf restart > /dev/null 2>&1
-
-				# Reapply jail flags from qmap
 				qb-flags -r $_client > /dev/null 2>&1 &
-			fi
-		fi
+		fi fi
 	done
 	return 0
 }
@@ -645,7 +603,7 @@ reclone_zroot() {
 	_rootzfs="${R_ZFS}/${_rootenv}"
 
 	_date=$(date +%s)
-	_ttl=$(($_date + 30))
+	_ttl=$(( _date + 30 ))
 	_newsnap="${_rootzfs}@${_date}"
 
 	_presnap=$(zfs list -t snapshot -Ho name ${_rootzfs} | tail -1)
@@ -723,7 +681,7 @@ reclone_zusr() {
 	local _templzfs="${U_ZFS}/${_template}"
 
 	local _date=$(date +%s)
-	local _ttl=$(($_date + 30))
+	local _ttl=$(( _date + 30 ))
 	local _newsnap="${_templzfs}@${_date}"
 	local _presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
 
@@ -761,56 +719,6 @@ reclone_zusr() {
 	mv ${M_ZUSR}/${_jail}/usr/home/${_template} ${M_ZUSR}/${_jail}/usr/home/${_jail} > /dev/null 2>&1
 
 	return 0
-}
-
-cleanup_oldsnaps() {
-	# First reclone any dependent clones with an origin, to the latest snapshot
-	# Then search for old snapshots for non-clone datasets to see if their past their ttl
-
-	# Option for clearning up "zero bytes" (_zb) snapshots
-	getopts z _opts && _zb='true' && shift
-	[ "$1" = "--" ] && shift
-
-	# Removes old snapshots for the given jail. Routine cleanup, necessary due to autosnapping.
-	local _dataset="$1"
-	local _date=$(date +%s)
-
-	# Assemble list of cloned datasets with a separate origin.
-	local _rclonelist=$(zfs list -Hro name,origin ${R_ZFS} | grep -Ev -- '-$' | awk '{print $1}')
-	local _uclonelist=$(zfs list -Hro name,origin ${U_ZFS} | grep -Ev -- '-$' | awk '{print $1}')
-
-	# Reclone zroot clones from latest snapshot (zfs lists the newest at the bottom).
-	for _clone in $_rclonelist ; do
-		if ! chk_isrunning "${_clone##*/}" ; then
-			_origin=$(zfs list -Ho origin $_clone)
-			_newsnap=$(zfs list -t snapshot -o name ${_origin%%@*} | tail -1)
-			zfs destroy $_clone
-			zfs clone -o qubsd:autosnap='false' "$_newsnap"  $_clone
-		fi
-	done
-	# Reclone zusr separately, because it needs fstab replacement and home directory change
-	for _clone in $_uclonelist ; do
-		_origin=$(zfs list -Ho origin $_clone | sed -E "s/${U_ZFS}\///")
-		reclone_zusr ${_clone##*/} "${_origin%%@*}"
-	done
-
-	# Assemple list of datasets in zroot, tagged ttl. Note that empty $1 , pulls all datasets
-	local _snaplist=$(zfs list -Hrt snapshot -o name,qubsd:destroy-date $_dataset \
-										| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
-
-	for _snap in $_snaplist ; do
-		# Get the destroy-date for each snap, and destroy if past their date
-		chk_valid_zfs "$_snap" && _snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
-		[ "$_snap_dd" -lt "$_date" ] && zfs destroy $_snap > /dev/null 2>&1
-
-		# Only remove 0B datasets if instructed to with [-z]
-		if [ "$_zb" ] ; then
-			# Destroy 0B snaps, but not the latest. Check it exists, b/c above might've deleted it.
-			chk_valid_zfs "$_snap" && _snap_used=$(zfs list -Ho used $_snap)
-			[ "$_snap_used" = "0B" ] && [ -n "${_snap##*$SNAPNAME}" ] \
-																	&& zfs destroy $_snap > /dev/null 2>&1
-		fi
-	done
 }
 
 monitor_startstop() {
@@ -915,7 +823,7 @@ chk_isrunning() {
 	local _jail="$1"
 	[ -z "$_jail" ] && return 1
 
-	if $(get_jail_parameter -eqs CLASS "$_jail" | grep -qs "VM") ; then
+	if get_jail_parameter -eqs CLASS "$_jail" | grep -qs "VM" ; then
 		pgrep -xqf "bhyve: $_jail" > /dev/null 2>&1  && return 0 ||  return 1
 	else
 		jls -j "$1" > /dev/null 2>&1  && return 0  ||  return 1
@@ -949,7 +857,7 @@ chk_isvm() {
 	# If -c was passed, then use the $1 as a class, not as a jailname
 	[ "$_class" ] && [ "$_value" ] && [ -z "${_value##*VM}" ] && return 0
 
-	$(get_jail_parameter -eqs CLASS $_value | grep -qs "VM") && return 0 || return 1
+	get_jail_parameter -eqs CLASS $_value | grep -qs "VM" && return 0 || return 1
 }
 
 chk_avail_jailname() {
@@ -1126,7 +1034,7 @@ chk_valid_class() {
 }
 
 chk_valid_cpuset() {
-	while getopts ex opts ; do case $opts in
+	while getopts q opts ; do case $opts in
 			q) local _q="-q" ;;
 			*) get_msg "_1" ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
@@ -1277,7 +1185,7 @@ chk_isqubsd_ipv4() {
 
 	# Compare against QMAP, and _USED_IPS.
 	if grep -v "^$_jail" $QMAP | grep -qs "$_value" \
-			|| $(get_info -e _USED_IPS | grep -qs "${_value%/*}") ; then
+			|| get_info -e _USED_IPS | grep -qs "${_value%/*}" ; then
 		get_msg $_q "_cj11" "$_value" "$_jail" && return 1
 	fi
 
@@ -1311,9 +1219,9 @@ chk_valid_maxmem() {
 
 	# Unit conversion to bytes
 	case $_value in
-		*G|*g) _bytes=$(( $_bytes * 1000000000 )) ;;
-		*M|*m) _bytes=$(( $_bytes * 1000000 ))    ;;
-		*K|*k) _bytes=$(( $_bytes * 1000 ))       ;;
+		*G|*g) _bytes=$(( _bytes * 1000000000 )) ;;
+		*M|*m) _bytes=$(( _bytes * 1000000 ))    ;;
+		*K|*k) _bytes=$(( _bytes * 1000 ))       ;;
 	esac
 
 	# Compare values, error if user input exceeds availabl RAM
@@ -1329,7 +1237,7 @@ chk_valid_memsize() {
 	local _value="$1"
 	[ "$_value" = "none" ] && get_msg "_cj21_1" && return 1
 
-	# It's the exact same program/routine. Different qmap params to be technically specific.
+	# It's the exact same program/routine. Different QMAP params to be technically specific.
 	chk_valid_maxmem $_q "$1" || return 1
 
 	return 0
@@ -1370,7 +1278,7 @@ chk_valid_ppt() {
 	# Get list of pci devices on the machine
 	_pciconf=$(pciconf -l | awk '{print $1}')
 
-	# Check all listed PPT devices from qmap
+	# Check all listed PPT devices from QMAP
 	for _val in $_value ; do
 
 		# convert _val to native pciconf format with :colon: instead of /fwdslash/
@@ -1387,7 +1295,7 @@ chk_valid_ppt() {
 		if [ "$_xtra" ] ; then
 
 			# If the pci device is detached, try to attach it.
-			[ -z "${_pciline##none*}" ] && ! $(devctl attach "$_pcidev") && _attached="true" \
+			[ -z "${_pciline##none*}" ] && ! devctl attach "$_pcidev" && _attached="true" \
 					&& get_msg "_cj26" "$_pciline" && return 1
 
 			# Make sure the PCI device is designated for passthrough
@@ -1414,7 +1322,7 @@ chk_valid_rootenv() {
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q "_0" "CLASS" && return 1
 
-	# Must be designated as the appropriate corresponding CLASS in qmap
+	# Must be designated as the appropriate corresponding CLASS in QMAP
 	_class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 	if chk_isvm "$_value" ; then
 		[ ! "$_class" = "rootVM" ] && get_msg $_q "_cj16" "$_value" "rootVM" && return 1
@@ -1449,7 +1357,7 @@ chk_valid_seclvl() {
 }
 
 chk_valid_taps() {
-	# Taps in qmap just lists how many are wanted
+	# Taps in QMAP just lists how many are wanted
 
 	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
@@ -1575,7 +1483,7 @@ define_ipv4_convention() {
 }
 
 discover_open_ipv4() {
-	# Finds an IP address unused by any running jails, or in qmap.conf
+	# Finds an IP address unused by any running jails, or in qubsdmap.conf
 	# Echo open IP on success; Returns 1 if failure to find an available IP
 
 	# Positional params and func variables.
@@ -1689,7 +1597,7 @@ cleanup_vm() {
 
 	# Pull _rootenv in case it wasn't provided
 	[ -z "$_rootenv" ] && ! _rootenv=$(get_jail_parameter -e ROOTENV $_VM) \
-		&& get_msg "$_cj32" "$_VM" && return 1
+		&& get_msg $_qcv "_cj32" "$_VM" && return 1
 
 	# Destroy the dataset
 	reclone_zroot -q "$_VM" "$_rootenv"
@@ -1707,11 +1615,12 @@ prep_bhyve_options() {
 	# Prepares both line options and the host system for the bhyve command
 	# CAPS variables are the final line options for the bhyve command
 
-	while getopts qt opts ; do case $opts in
+	while getopts q opts ; do case $opts in
 			q) local _qs="-q" ;;
+			*) get_msg "_1" ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
-	# Get simple qmap variables
+	# Get simple QMAP variables
 	_VM="$1"
 	_cpuset=$(get_jail_parameter -de CPUSET "$_VM")        || return 1
 	_gateway=$(get_jail_parameter -dez GATEWAY "$_VM")     || return 1
@@ -1818,7 +1727,7 @@ EOF
 	# Assign VNC FBUF options
 	if [ "$_vncres" ] && [ ! "$_vncres" = "none" ] ; then
 
-		# Define height/width from the qmap entry
+		# Define height/width from the QMAP entry
 		_w=$(echo "$_vncres" | grep -Eo "^[[:digit:]]+")
 		_h=$(echo "$_vncres" | grep -Eo "[[:digit:]]+\$")
 
@@ -1835,7 +1744,7 @@ EOF
 		_TAB="-s 30,xhci,tablet"
 	fi
 
-	# Launch a serial port if variable was passed
+	# Launch a serial port if tmux is set in QMAP. The \" and TMUX2 closing " are intentional.
 	[ "$_tmux" = "true" ] && _STDIO="-l com1,stdio" && _TMUX1="tmux new-session -d -s $_VM \"" \
 		&& _TMUX2='"'
 
@@ -1859,8 +1768,8 @@ EOF
 	_vif=$(head -1 "${QTMP}/qb-taps_${_VM}" 2> /dev/null)
 
 	# Define the full bhyve command
-	_BHYVE_CMD=$(echo $_TMUX1 bhyve $_CPU $_CPUPIN $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT \
-			$_BLK_ZUSR $_BHYVE_CUSTM $_PPT $_VTNET $_FBUF $_TAB $_LPC $_BOOT $_STDIO $_VM $_TMUX2)
+	_BHYVE_CMD="$_TMUX1 bhyve $_CPU $_CPUPIN $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT \
+			$_BLK_ZUSR $_BHYVE_CUSTM $_PPT $_VTNET $_FBUF $_TAB $_LPC $_BOOT $_STDIO $_VM $_TMUX2"
 
 	# unset the trap
 	trap ":" INT TERM HUP QUIT EXIT
@@ -1888,10 +1797,10 @@ launch_vm() {
 		# Log the exact bhyve command being run
 		date >> $QBLOG
 		echo "Starting VM: $_VM ; with the following command:" >> $QBLOG
-		echo "$_BHYVE_CMD" >> $QBLOG
+		echo $_BHYVE_CMD >> $QBLOG
 
 		# Launch the VM to background
-		eval "$_BHYVE_CMD"
+		eval $_BHYVE_CMD
 
 		sleep 2
 
@@ -1915,6 +1824,7 @@ exec_vm_coordinator() {
 			n) local _norun="-n" ;;
 			q) local _qs="-q"    ;;
 			t) local _tmux="-t"  ;;
+			*) get_msg "_1" ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	_VM="$1"

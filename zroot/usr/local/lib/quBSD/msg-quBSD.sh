@@ -24,7 +24,7 @@ ENDOFMSG
 	;;
 	_1) cat << ENDOFMSG
 
-ERROR: Invalid variable to quBSD.sh function: create_epairs()
+ERROR: Invalid option for a /usr/local/lib/quBSD/quBSD.sh function
 
 ENDOFMSG
 	;;
@@ -291,22 +291,22 @@ $0 is shutting down < $_value >
 ENDOFMSG
 	;;
 	_jf4) cat << ENDOFMSG
-
-Normal removal failed.
-$0 will attempt to forcibly removing < $_value >
 ENDOFMSG
 	;;
 	_jf5) cat << ENDOFMSG
 
-WARNING: < $_value > had to be forcibly stopped.
+WARNING: < $_value > had to be forcibly stopped. Recommend double
+         checking mounts with: mount | grep $_value
          For details see quBSD log:  /var/log/quBSD.log
 ENDOFMSG
 	;;
 	_jf6) cat << ENDOFMSG
 
-WARNING: < $_value > could not be stopped. Attempt to
-         forcibly stop, failed. For more info, see:
-         /var/log/quBSD.log
+WARNING: < $_value > could not be stopped. Forcible stop failed.
+         Recommend running the following commands:
+				jail -R $_value
+				mount | grep $_value
+         For more info, see: /var/log/quBSD.log
 ENDOFMSG
 	;;
 	_jf7) cat << ENDOFMSG
