@@ -1,6 +1,6 @@
 #!/bin/sh
 
-get_msg_() { 
+get_msg_stat() { 
 
 	local _message="$1"
 	local _pass_cmd="$2"
