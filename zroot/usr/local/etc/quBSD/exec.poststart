@@ -12,15 +12,12 @@ get_options() {
 handle_dhcp() {
 	# This is a bit of a hack, since I couldnt figure out why rc 'ifconfig_tapX="DHCP"' was not
 	# working. Obviously cant start dhclient in exec.created before netif is up.
-
 	if [ "$(get_jail_parameter -desz IPV4 "$JAIL")" = "DHCP" ] ; then 
 
 		# Get gateway, VIF, then start dhclient in the jail
 		get_jail_parameter -dqsz GATEWAY "$JAIL" 
-		VIF=$(head -1 "${QTMP}/qb-taps_${GATEWAY}" 2> /dev/null)
-
+		VIF=$(sed -En "s/ NET//p" "${QTMP}/vmtaps_${GATEWAY}")
 		jexec -l -U root $JAIL dhclient $VIF > /dev/null 2>&1 &
-		jexec -l -U root $JAIL service qb_dhcpd onestart > /dev/null 2>&1 &
 	fi
 }
 
