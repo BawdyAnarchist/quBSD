@@ -1,8 +1,6 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-check that DHCP in rc.conf works again for net-firewall.
-	- suspec that dhcp.conf was preventing it. Or maybe it was the dhcpd restart? Dunno, but check again
-	- could it be the MTU? nicvm MTU?
+net-firewall DHCP - could it be nicvm MTU?
 
 qb-cmd VM is still spitting out noise
 
@@ -65,7 +63,7 @@ NICVM - Linux VM so that it can use all the wireless protocols.
 
 ### SPECIFIC SCRIPTS
 
-qb-i3-launch - had problems with double launching windows that already existed
+qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
 quBSD.sh and msg-qubsd.sh
 	- Error messages are a bit disorganized now. Need to have useful higher function messages
@@ -90,10 +88,7 @@ qb-update - Update rootjails, create snapshots
 qb-backup (already created in $ubin)
 	- cron to run on both sides of source and dest, with ssh hostname, to automate backups
 
-qb-stat
-	- I like my hardcode setup, but columns sorting and even a generalized setup file might be better
-	- Also the ability to choose which columns are displayed
-	- You should use background colors for heavy RAM and CPU usage (yellow/red). Maybe disk as well
+qb-stat - Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
 
 
 ### GENERAL / BEST PRACTICES / CLEANUP
