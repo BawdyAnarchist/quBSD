@@ -4,51 +4,47 @@
 . /usr/local/lib/quBSD/msg-flags.sh
 
 get_options() {
-	while getopts dhru opts ; do
-		case $opts in
-			d) DOWN="true" ;;
-			h) get_msg_flags "none" "usage_0" ;;
-			u) UP="true" ;; 
-			r) RESTORE="true" ;; 
-			*) exit 1 ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	while getopts dhru opts ; do case $opts in
+		d) DOWN="true" ;;
+		h) get_msg_flags "none" "usage_0" ;;
+		u) UP="true" ;;
+		r) RESTORE="true" ;;
+		*) exit 1 ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	JAIL="$1"
 }
 
 checks() {
 	if [ -z "${DOWN}${UP}${RESTORE}" ] ; then
-		# User didn't specify an action 
+		# User didn't specify an action
 		get_msg_flags "_1" "usage_1"
 
 	elif echo "${DOWN}${UP}${RESTORE}" | grep -Eqs "truetrue" ; then
-		# Can't specify multiple actions 
+		# Can't specify multiple actions
 		get_msg_flags "_2" "usage_1"
 
 	elif [ -z "$JAIL" ] ; then
-		# Must have a jail to operate on 
+		# Must have a jail to operate on
 		get_msg_flags "_3" "usage_1"
 
 	fi
 
-	# Check for valid jail, exit if invalid 
+	# Check for valid jail, exit if invalid
 	chk_valid_jail "$JAIL" || get_msg_flags "none" "usage_1"
 }
 
 main() {
 	if [ "$DOWN" ] ; then
 		chflags -R noschg ${M_QROOT}/$JAIL
-		[ -e ${M_ZUSR}/$JAIL ] && chflags -R noschg ${M_ZUSR}/$JAIL  
+		[ -e ${M_ZUSR}/$JAIL ] && chflags -R noschg ${M_ZUSR}/$JAIL
 
 	elif [ "$UP" ] ; then
 
-		# Avoid errors by trying to set schg on /dev and other invalid locations 
+		# Avoid errors by trying to set schg on /dev and other invalid locations
 		jdir="/bin /sbin /boot /etc /home /lib /libexec /root /rw /usr"
 
-		# Cycle through directories above and recursively schg  
+		# Cycle through directories above and recursively schg
 	   for _dir in $jdir; do
 			chflags -R schg "${M_QROOT}/${JAIL}/${_dir}" > /dev/null 2>&1
 		done

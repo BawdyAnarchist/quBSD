@@ -1,26 +1,23 @@
 #!/bin/sh
 
 # This script is useful with quick-keys. Creates a popup xterm to receive a command to
-# to be run in a jail. However, passing commands to xterm subshell is not versatile 
-# (eg - won't store a `read` variable). So first, the xterm popup is launched; then 
-# qb-floatcmd is run again with [-x] option, which receives and runs the user command. 
+# to be run in a jail. However, passing commands to xterm subshell is not versatile
+# (eg - won't store a `read` variable). So first, the xterm popup is launched; then
+# qb-floatcmd is run again with [-x] option, which receives and runs the user command.
 
 . /usr/local/lib/quBSD/quBSD.sh
 . /usr/local/lib/quBSD/msg-floatcmd.sh
 
 get_options(){
-	while getopts hiru:x opts ; do
-		case $opts in
-			h) usage ;;
-			i) _i3wm="true" ;;
-			r) _USER="root" ; ROOT="-r" ;;
-			u) _USER="$OPTARG" ;;
-			x) PASS="true" ;;
-			*) exit 1 ;;
-		esac
-	done
+	while getopts hiru:x opts ; do case $opts in
+		h) usage ;;
+		i) _i3wm="true" ;;
+		r) _USER="root" ; ROOT="-r" ;;
+		u) _USER="$OPTARG" ;;
+		x) PASS="true" ;;
+		*) exit 1 ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-	shift $(( OPTIND - 1 ))
 	JAIL="$1"
 	_USER="${_USER:=$JAIL}"
 }
@@ -39,15 +36,15 @@ main() {
 						/bin/csh -c 'qb-floatcmd -x $JAIL'"
 		fi
 
-	else	
+	else
 	# Then start jail and read command in the new terminal
-			
+
 		start_jail "$JAIL" || get_msg_floatcmd "none" "exit_1"
 
 		printf "%b" "Enter Command for $JAIL. Popup will close automatically" \
 					   "\n${_USER}@${JAIL} # "
 		read _CMD
-		
+
 		# nohup is required, or the launched command will die with the xterm shell
 		nohup qb-cmd $ROOT $JAIL $_CMD > /dev/null
 	fi

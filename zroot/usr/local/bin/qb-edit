@@ -4,18 +4,14 @@
 . /usr/local/lib/quBSD/msg-edit.sh
 
 get_options() {
-	while getopts dfhqr opts ; do
-		case $opts in
-			d) ACTION="delete" ;;
-			f) FORCE="true" ; _q='-q' ;;
-			h) get_msg_edit "none" "usage_0" ;;
-			q) QUIET="true" ; _q='-q' ;;
-			r) RESTART="true" ;;
-			*) exit 1 ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	while getopts dfhqr opts ; do case $opts in
+		d) ACTION="delete" ;;
+		f) FORCE="true" ; _q='-q' ;;
+		h) get_msg_edit "none" "usage_0" ;;
+		q) QUIET="true" ; _q='-q' ;;
+		r) RESTART="true" ;;
+		*) exit 1 ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Script variables
 	JAIL="$1"

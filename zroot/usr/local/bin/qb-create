@@ -10,25 +10,21 @@ get_options() {
 	_PARAMS="CLASS ROOTENV"
 
 	# CLASS, ROOTENV, and TEMPLATE are important enough to merit their own options
-	while getopts c:eGhi:p:r:t:v:yz:Z _opts ; do
-		case $_opts in
-			c) CLASS="$OPTARG" ;;
-			e) get_msg_create "_examples" "exit_0" ;;
-			G) GUIDED="true" ;;
-			h) get_msg_create "none" "usage_0" ;;
-			i) INSTALL="$OPTARG" ;;
-			p) evaluate_p_option "$OPTARG" ;;
-			r) ROOTENV="$OPTARG" ;;
-			t) TEMPLATE="$OPTARG" ;;
-			v) VOLSIZE="$OPTARG" && check_valid_volsize ;;
-			y) _ASSM_Y="true" ;;
-			z) U_ZOPT="$OPTARG" ;;
-			Z) R_ZOPT="true" ;;
-			*) exit 1 ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	while getopts c:eGhi:p:r:t:v:yz:Z _opts ; do case $_opts in
+		c) CLASS="$OPTARG" ;;
+		e) get_msg_create "_examples" "exit_0" ;;
+		G) GUIDED="true" ;;
+		h) get_msg_create "none" "usage_0" ;;
+		i) INSTALL="$OPTARG" ;;
+		p) evaluate_p_option "$OPTARG" ;;
+		r) ROOTENV="$OPTARG" ;;
+		t) TEMPLATE="$OPTARG" ;;
+		v) VOLSIZE="$OPTARG" && check_valid_volsize ;;
+		y) _ASSM_Y="true" ;;
+		z) U_ZOPT="$OPTARG" ;;
+		Z) R_ZOPT="true" ;;
+		*) exit 1 ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	NEWJAIL="$1"
 

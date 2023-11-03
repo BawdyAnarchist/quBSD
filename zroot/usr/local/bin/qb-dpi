@@ -2,20 +2,16 @@
 
 . /usr/local/lib/quBSD/msg-dpi.sh
 
-get_options() { 
-	while getopts hrt: opts ; do
-		case $opts in
-			h) get_msg_dpi "none" "usage_0" ;;
-			r) DPI_START=96 ; REV_TIME=0 ; revert_dpi ;; 
-			t) REV_TIME="$OPTARG" ;;
-			*) exit 1 ;;
-		esac
-	done
+get_options() {
+	while getopts hrt: opts ; do case $opts in
+		h) get_msg_dpi "none" "usage_0" ;;
+		r) DPI_START=96 ; REV_TIME=0 ; revert_dpi ;;
+		t) REV_TIME="$OPTARG" ;;
+		*) exit 1 ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-	shift $(( OPTIND - 1 ))
+	DPI_IN="$1"
 
-	DPI_IN="$1" 
-	
 	# Scale references to typical standard default
 	SCALE=96
 
@@ -27,13 +23,13 @@ get_options() {
 }
 
 checks() {
-	# DPI less that 0.5 is too low 
+	# DPI less that 0.5 is too low
 	echo "$DPI_IN < 0.3" | bc | grep -qs 1 && get_msg_dpi "_1" "exit 1"
 
 	# DPI between 4 and 29 is too high to be a scaled entry; too low to be raw
 	echo "$DPI_IN > 4 && $DPI_IN < 29" | bc | grep -qs 1 && get_msg_dpi "_2" "exit 1"
 
-	# DPI above 384 (4x96) is too high for an automated script 
+	# DPI above 384 (4x96) is too high for an automated script
 	echo "$DPI_IN > 384" | bc | grep -qs 1 && get_msg_dpi "_3" "exit 1"
 }
 
@@ -43,7 +39,7 @@ main() {
 			&& DPI_RAW="$DPI_IN" \
 					|| DPI_RAW=$(echo "$DPI_IN * 96" | bc)
 
-	# Change DPI 
+	# Change DPI
 	echo "Xft.dpi: $DPI_RAW" | xrdb -merge
 
 	# Call the revert_dpi function to the background, then exit script
@@ -57,14 +53,14 @@ revert_dpi() {
 	# Try to revert back to .Xresources ; fallback to DPI_START if necessary
 	grep -Eq "Xft.dpi:[[:blank:]]+[[:digit:]]+" /root/.Xresources \
 			&& xrdb -merge /root/.Xresources	\
-					|| echo "Xft.dpi: $DPI_START" | xrdb -merge 
+					|| echo "Xft.dpi: $DPI_START" | xrdb -merge
 
 	exit 0
 }
 
 get_options "$@"
 
-checks 
+checks
 
 main
 

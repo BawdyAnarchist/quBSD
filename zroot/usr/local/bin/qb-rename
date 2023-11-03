@@ -4,16 +4,12 @@
 . /usr/local/lib/quBSD/msg-rename.sh
 
 get_options() {
-	while getopts fhn opts ; do
-		case $opts in
-			f) FORCE="true" ;;
-			h) get_msg_rename "none" "usage_0" ;;
-			n) NOUPDATE="true" ;;
-			*) exit 1 ;;
-		esac
-	done
-
-	shift $((OPTIND -1 ))
+	while getopts fhn opts ; do case $opts in
+		f) FORCE="true" ;;
+		h) get_msg_rename "none" "usage_0" ;;
+		n) NOUPDATE="true" ;;
+		*) exit 1 ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	JAIL="$1"
 	NEWNAME="$2"

@@ -1,23 +1,16 @@
 #!/bin/sh
 
-# IMPROVEMENT: Make it so that a command can be run immediately at terminal launch.
-
-
 . /usr/local/lib/quBSD/quBSD.sh
 . /usr/local/lib/quBSD/msg-ephm.sh
 
 get_options() {
-	while getopts hinr opts ; do
-		case $opts in
-			h) get_msg_ephm "none" "usage_0" ;;
-			i) _i3wm="true" ;;
-			n) _NEWWIND="xterm -e" ;;
-			r) _USER="root" ;;
-			*) exit 1 ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	while getopts hinr opts ; do case $opts in
+		h) get_msg_ephm "none" "usage_0" ;;
+		i) _i3wm="true" ;;
+		n) _NEWWIND="xterm -e" ;;
+		r) _USER="root" ;;
+		*) exit 1 ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Define script variables
 	JAIL="$1" ; shift

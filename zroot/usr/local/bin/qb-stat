@@ -4,14 +4,10 @@
 . /usr/local/lib/quBSD/msg-stat.sh
 
 get_options() {
-	while getopts c:h opts ; do
-		case $opts in
-			c) COL="$OPTARG" ;;
-			h) get_msg_stat "none" "usage_0" ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	while getopts c:h opts ; do case $opts in
+		c) COL="$OPTARG" ;;
+		h) get_msg_stat "none" "usage_0" ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Temp files for building the status report
 	TMP1=$(mktemp -t "quBSD/qb-stat1")

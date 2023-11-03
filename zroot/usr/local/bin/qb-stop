@@ -150,7 +150,7 @@ main() {
 	# If [-F] was passed, force stop each container serially, one at at time
 	[ "$FORCE" ] && force_stop_jlist
 
-	# Check saved for later. Might already be in the middle of qb-stop, when -F needs to kill 
+	# Check saved for later. Might already be in the middle of qb-stop, when -F needs to kill
 	checks
 
 	# Find gateway hierarchy top for each jail. Returns $_HIERTOP

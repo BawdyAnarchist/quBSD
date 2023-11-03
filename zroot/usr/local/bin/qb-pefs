@@ -9,18 +9,14 @@
 . /usr/local/lib/quBSD/msg-pefs.sh
 
 get_options() {
-	while getopts chd:mu opts ; do
-		case $opts in
-			c) _CMD="create" ;; 
-			h) get_msg_pefs "none" "usage_0" ;; 
-			d) U_FOLDER="$OPTARG" USERDIR="true" ;;
-			m) [ -z "$_CMD" ] && _CMD="mount" || get_msg_pefs "_1" "usage_1" ;; 
-			u) [ -z "$_CMD" ] && _CMD="unmount" || get_msg_pefs "_1" "usage_1" ;; 
-			*) exit 1 ;;
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	while getopts chd:mu opts ; do case $opts in
+		c) _CMD="create" ;;
+		h) get_msg_pefs "none" "usage_0" ;;
+		d) U_FOLDER="$OPTARG" USERDIR="true" ;;
+		m) [ -z "$_CMD" ] && _CMD="mount" || get_msg_pefs "_1" "usage_1" ;;
+		u) [ -z "$_CMD" ] && _CMD="unmount" || get_msg_pefs "_1" "usage_1" ;;
+		*) exit 1 ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	JAIL="$1"
 
@@ -33,23 +29,23 @@ checks() {
 	# Must specify an action
 	[ -z "$_CMD" ] && get_msg_pefs "_2" "usage_1"
 
-	# Must have a valid jail 
+	# Must have a valid jail
 	chk_valid_jail "$JAIL" || get_msg_pefs "none" "usage_1"
 
-	# If performing mount, the directory should already exist. 
+	# If performing mount, the directory should already exist.
 	[ "$_CMD" = "mount" ] && ! [ -d "$U_FOLDER" ] && get_msg_pefs "_3" "usage_1"
 
 	# Check that U_FOLDER path is relative to the zusr mount for the jail
 	echo "$U_FOLDER" | grep -qE "^${M_ZUSR}/${JAIL}" || get_msg_pefs "_4" "usage_1"
-				
+
 	# Make sure pefs kernel module is loaded, try to load, or exit on failure
 	kldstat -n pefs.ko > /dev/null 2>&1 || kldload pefs.ko > /dev/null 2>&1 \
 			|| get_msg_pefs "_5" "exit_1"
 }
 
 unmount_pefs() {
-	# If user specified directory, then unmount only that directory 
-	if [ -n "$USERDIR" ] ; then 
+	# If user specified directory, then unmount only that directory
+	if [ -n "$USERDIR" ] ; then
 		# unmount must be done in reverse order. First the nullfs to the zroot/jail
 		umount -f $J_FOLDER  > /dev/null 2>&1
 
@@ -60,32 +56,32 @@ unmount_pefs() {
 		# Otherwise, search <jail>'s /usr/local for any pefs.db, to remove them all
 		[ -e "${M_ZUSR}/${JAIL}/usr" ] \
 				&& _zusr_umnt=$(find ${M_ZUSR}/${JAIL}/usr -name '.pefs.db' \
-						| sed 's:/.pefs.db::g') 
+						| sed 's:/.pefs.db::g')
 
-		# Cycle through discovered directories 
+		# Cycle through discovered directories
 		for _dir in $_zusr_umnt ; do
 
 			# Get the corresponding zroot nullfs mount for the zusr pefs mount
 			_jdir=$(echo $_dir | sed "s:${M_ZUSR}:${M_QROOT}:")
 
-			# The nullfs mount under zroot must be removed first. 
+			# The nullfs mount under zroot must be removed first.
 			if mount | grep -q $_jdir ; then
-				umount -f $_jdir || get_msg_pefs "_6" 
+				umount -f $_jdir || get_msg_pefs "_6"
 			fi
 
-			# Now the actual pefs mount can be removed. 
+			# Now the actual pefs mount can be removed.
 			if mount | grep -q $_dir ; then
-				umount -f $_dir  || get_msg_pefs "_7" 
+				umount -f $_dir  || get_msg_pefs "_7"
 			fi
 		done
 	fi
 }
 
 main() {
-	# Mount also takes place in running jail. Replace zusr mount with zroot jails mount 
-	J_FOLDER=$(echo $U_FOLDER | sed "s:${M_ZUSR}:${M_QROOT}:")	
-	
-	case $_CMD in 
+	# Mount also takes place in running jail. Replace zusr mount with zroot jails mount
+	J_FOLDER=$(echo $U_FOLDER | sed "s:${M_ZUSR}:${M_QROOT}:")
+
+	case $_CMD in
 
 		create)
 			mkdir -p $U_FOLDER > /dev/null 2>&1

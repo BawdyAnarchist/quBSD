@@ -3,21 +3,19 @@
 . /usr/local/lib/quBSD/msg-help.sh
 
 get_options() {
-	while getopts hvp: opts ; do
-		case $opts in 
-			h) get_msg_help "help_msg" ; exit 0 ;;
-			p) PARAM="$OPTARG" ; shift ;;
-		esac
-	done
+	while getopts hvp: opts ; do case $opts in
+		h) get_msg_help "help_msg" ; exit 0 ;;
+		p) PARAM="$OPTARG" ; shift ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	ACTION="$1"
 }
 
 main() {
-	case $ACTION in 
-		list|show|scripts|commands) get_msg_help "list_scripts" ;;		
+	case $ACTION in
+		list|show|scripts|commands) get_msg_help "list_scripts" ;;
 
-		param|params|PARAM|PARAMS|parameter|parameters|PARAMETER|PARAMETERS) 
+		param|params|PARAM|PARAMS|parameter|parameters|PARAMETER|PARAMETERS)
 				[ "$VERBOSE" ] && get_msg_help "verb_params" || get_msg_help "params" ;;
 
 		'') get_msg_help "help_msg" ;;

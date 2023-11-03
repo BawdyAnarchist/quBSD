@@ -4,18 +4,14 @@
 . /usr/local/lib/quBSD/msg-connect.sh
 
 get_options() {
-	while getopts cdhi:l opts ; do
-		case $opts in
-			c) _CMD="create" ;;
-			d) [ -z "$_CMD" ] && _CMD="destroy" || get_msg_connect "_1" "usage_1" ;;
-			h) get_msg_connect "none" "usage_0" ;;
-			i) IPV4="$OPTARG" ;;
-			l) [ -z "$_CMD" ] && _CMD="list" || get_msg_connect "_1" "usage_1" ;;
-			*) get_msg "_1" && get_msg_connect "none" "usage_1" ;; 
-		esac
-	done
-
-	shift $(( OPTIND - 1 ))
+	while getopts cdhi:l opts ; do case $opts in
+		c) _CMD="create" ;;
+		d) [ -z "$_CMD" ] && _CMD="destroy" || get_msg_connect "_1" "usage_1" ;;
+		h) get_msg_connect "none" "usage_0" ;;
+		i) IPV4="$OPTARG" ;;
+		l) [ -z "$_CMD" ] && _CMD="list" || get_msg_connect "_1" "usage_1" ;;
+		*) get_msg "_1" && get_msg_connect "none" "usage_1" ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Define script variables
 	JAIL=${JAIL:="$1"}
@@ -23,34 +19,34 @@ get_options() {
 }
 
 checks() {
-	# Must specify a _CMD 
-	[ -z "$_CMD" ] && get_msg_connect "_0" "usage_1"	
+	# Must specify a _CMD
+	[ -z "$_CMD" ] && get_msg_connect "_0" "usage_1"
 
 	case "$_CMD" in
-		create) 
-			# JAIL must be running, but gateway can be started later 
+		create)
+			# JAIL must be running, but gateway can be started later
 			chk_isrunning "$JAIL" "return 1" || get_msg_connect "_2" "usage_1"
-			
+
 			# IP checks
 			if [ -n "$IPV4" ] ; then
 				# Invalid IP must be rejected
-				chk_valid_ipv4 "$IPV4" || exit 1 
+				chk_valid_ipv4 "$IPV4" || exit 1
 
-				# Just temporary connections. Warn for convention mismatch, but don't exit  
-				chk_isqubsd_ipv4 "$IPV4" 
+				# Just temporary connections. Warn for convention mismatch, but don't exit
+				chk_isqubsd_ipv4 "$IPV4"
 			else
 
-				# Assign IP if not specified by user 
-				IPV4=$(discover_open_ipv4 "$JAIL") || exit 1 
+				# Assign IP if not specified by user
+				IPV4=$(discover_open_ipv4 "$JAIL") || exit 1
 			fi
-			
+
 			# Check the pf status and security levels
 		   check_security || get_msg_connect "_4" "exit_1"
 		;;
 		destroy)
-			# JAIL and GATEWAY must be running (helps prevent accidents) 
+			# JAIL and GATEWAY must be running (helps prevent accidents)
 			chk_isrunning "$JAIL" "return 1" || get_msg_connect "_2" "usage_1"
-	
+
 			[ -n "$GATEWAY" ] && ! chk_isrunning "$GATEWAY" \
 					&& get_msg_connect "_3" "usage_1"
 		;;
@@ -98,28 +94,28 @@ get_bridge_members() {
 }
 
 assemble_interface_list() {
-	# For each jail that is running 
-	for _jail in $(get_info -e _ONJAILS) ; do 
-	
-		# Cycle through every interface on that jail
-		for _intf in $(jexec -l -U root $_jail ifconfig -l) ; do	
+	# For each jail that is running
+	for _jail in $(get_info -e _ONJAILS) ; do
 
-			# Pair each _jail/_intf , with the associated ip address 
+		# Cycle through every interface on that jail
+		for _intf in $(jexec -l -U root $_jail ifconfig -l) ; do
+
+			# Pair each _jail/_intf , with the associated ip address
 			_ALL_INTF=$(printf "%b" "$_ALL_INTF\n $_jail  $_intf  $(get_local_ip)")
 
-			# If the _intf is a bridge, add its bridge members to the list 
+			# If the _intf is a bridge, add its bridge members to the list
 			[ -z "${_intf##bridge*}" ] \
 				&& _ALL_INTF=$(printf "%b" "$_ALL_INTF\n$(get_bridge_members)")
 		done
 	done
-	
-	# Remove loopbacks; and set columns formatting 
+
+	# Remove loopbacks; and set columns formatting
 	_ALL_INTF=$(echo "$_ALL_INTF" | grep -v "[[:blank:]]lo0[[:blank:]]" | column -t)
 
 	# Clean up and categorize all_interfaces list for later usage
-	_jail_intfs=$(echo "$_ALL_INTF" | grep -E "^$JAIL ") 
-	_jail_eps=$(echo "$_jail_intfs" | awk '{print $2}' | grep -Eo "epair[[:digit:]]+")	
-	_gateway_pairs=$(echo "$_ALL_INTF" | grep -Ev "^$JAIL" | grep -E "$_jail_eps")	
+	_jail_intfs=$(echo "$_ALL_INTF" | grep -E "^$JAIL ")
+	_jail_eps=$(echo "$_jail_intfs" | awk '{print $2}' | grep -Eo "epair[[:digit:]]+")
+	_gateway_pairs=$(echo "$_ALL_INTF" | grep -Ev "^$JAIL" | grep -E "$_jail_eps")
 }
 
 destroy_epairs() {
@@ -127,46 +123,46 @@ destroy_epairs() {
 		# If no gateway, destroy all epairs on JAIL
 		_destr_epairs=$(jexec -l -U root $JAIL ifconfig -g epair)
 	else
-		# Othewise only remove the epairs common to both JAIL and GATEWAY	
+		# Othewise only remove the epairs common to both JAIL and GATEWAY
 		_destr_epairs=$(echo "$_gateway_pairs" | grep -E "^${GATEWAY}[[:blank:]]+epair" \
 														| awk '{print $2}')
 	fi
-	
+
 	ifconfig $_destr_epairs -vnet $GATEWAY
-	ifconfig $_destr_epairs destroy 
+	ifconfig $_destr_epairs destroy
 }
 
 list_output() {
 
-	if [ -n "$JAIL" ] ; then 
-		
-		# Show the interfaces on JAIL 
-		get_msg_connect "_5" 
+	if [ -n "$JAIL" ] ; then
+
+		# Show the interfaces on JAIL
+		get_msg_connect "_5"
 
 		# Show all other jails that connect to JAIL
-		[ -n "$_jail_eps" ] && get_msg_connect "_6" 
+		[ -n "$_jail_eps" ] && get_msg_connect "_6"
 	else
-		
+
 		# List all existing connections for all running jails
-		get_msg_connect "_7" 
+		get_msg_connect "_7"
 	fi
 }
 
 main() {
-	case $_CMD in 
+	case $_CMD in
 		create)
 				# Start gateway if it's off
 				chk_isrunning "$GATEWAY" || start_jail "$GATEWAY" || exit 1
-	
+
 				# Make the connection beteween jails
 				connect_client_to_gateway "$JAIL" "$GATEWAY" "$IPV4"
 		;;
 		destroy)
-				assemble_interface_list	
+				assemble_interface_list
 				destroy_epairs
 		;;
 		list)
-				assemble_interface_list	
+				assemble_interface_list
 				list_output
 		;;
 	esac

@@ -1,21 +1,11 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-qb-cmd VM is still spitting out noise
-
-reinstall 0base
-
-qubsd.sh
-	- reclone_zroot probably needs to be optimized. Maybe not. Seems okay
-
 # After SSH and scp is hammered out, make another system backup 
-Overview - taps will live on host. Each VM gets 1, and it's vtnet0.
-This should tie in nicely with an eventual control jail. STEPS:
-	1) Beef up security of pf_pass.conf. TAPS never. Epair only. Unique static IP
-	2) Add cron to continually re-assert the DOWN state of taps 
-	3) qb-hostnet edits
-	4) prep_bhyve_options changes
-		- taps handled differenty now, automatic+1 for qmap entry
-	5) change the zusr of VMs to vtnet1, because all vtnet0 is now for control tap 
+	qb-copy
+		- will use /media as the default copy locations between any two jail/VM combos
+		- Can specify copy location as well
+		- automatically brings up the SSH connection if necessary, then brings it down
+		- Is it time to implement a control jail?
 
 qb-connect - VM integration: jail/VM connections, specifically SSH preparation for files copy
 
@@ -29,7 +19,6 @@ Ubuntu - zusr dataset integration; user profiles
 USBVM 
 	- Create a proper unprivileged user with devd.conf and automounts     
 	- Auto remove password from unprivleged usbvm user     
-	- usbjail - Make a dedicated dispjail for usb handling, with some embedded scripts for copying (usbvm too)
 
 
 ### UPGRADES
@@ -58,17 +47,18 @@ Host as Unprivileged user
 NICVM - Linux VM so that it can use all the wireless protocols.
      - Someone made a post about this in FreeBSD
 
+Take another hack at the recording device problems
+
 
 ### SPECIFIC SCRIPTS
 
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
-quBSD.sh and msg-qubsd.sh
-	- Error messages are a bit disorganized now. Need to have useful higher function messages
-		- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
-		- Master -V (verbose) command could be included on all top level scripts, with -q as default 
-		- Might need a -F force option.
-		- Beef up the log file, and make reference to it in error messages
+Error messages are a bit disorganized now. Need to have useful higher function messages
+	- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
+	- Default should be top level basic messages. -q quiets all, and -v drills down to deeper messages
+	- Might need a -F force option.
+	- Beef up the log file, and make reference to it in error messages
 
 qb-list [-e] (evaluate) option to check jail-param combos for validity.
 
@@ -101,8 +91,6 @@ GENERAL GUIDELINES, and maybe later double checks
 	- Double check on things that are positional items vs if they should be options 
 
 Cycle all scripts through shellcheck again. 
-	- local variables are fine for FreeBSD 
-	- [] && || constructions are NOT if/then/else. Most are fine, just msg printing, but needs reviewed
 
 zusr fstabs
 	- They're hand jammed, but maybe qb-edit should come with a function for changing the zfs dataset and mounts
@@ -112,17 +100,15 @@ zusr fstabs
 Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file and code.
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
 
-NOTE: The "net-firewall" switches solution is
-	if [ ${_class_of_gateway##*VM} ] and also maybe _class_of_client
-	- chk_isqubsd_ipv4
-	- define_ipv4_convention
-	- discover_open_ipv4
+Generalize net-firewall
+	[ "${_class_of_gateway##*VM}" ] and also maybe _class_of_client
+	- chk_isqubsd_ipv4 - define_ipv4_convention - discover_open_ipv4
 
 Crons - No crons running. Probably something long term security that should be integrated and automated.
 
 Intelligent resizing of fonts depending on dpi or xrandr resolution
 
-ntpd - ntpd only runs during qb-hostnet. Needs a more "correct" solution. Maybe rolled into the control jail
+ntpd - ntpd only runs during qb-hostnet. Needs a more "correct" solution. Maybe rolled into the/a control jail
 
 qme-firefox needs fixed (personal note)
 

@@ -605,10 +605,8 @@ reclone_zroot() {
 	chk_valid_zfs "$_jailzfs" && [ "$(zfs list -Ho origin "${R_ZFS}/${_jail}")" = "-" ] \
 		&& get_msg $_qz "_jo0" "$_jail" && return 1
 
-	# `zfs diff` from simultaneous jail start, create momentary snapshot. Errors reclone
+	# `zfs diff` creates a momentary snapshot, which can interfere with snapshot selection
 	while [ -z "${_presnap##*@zfs-diff*}" ] ; do
-
-		# Loop until a proper snapshot is found
 		sleep .1
 		_presnap=$(zfs list -t snapshot -Ho name ${_rootzfs} | tail -1)
 	done
@@ -627,14 +625,12 @@ reclone_zroot() {
 
 		# Check for differences between pre existing snapshot, and current state of jail
 		if [ "$(zfs diff "$_presnap" "$_rootzfs")" ] ; then
-
 			# There are differences and the jail is busy. Fallback on pre-existing snapshot
 			[ "$_busy" ] && _newsnap="$_presnap"
 		else
 			# There have been no updates since the last snapshot. Use the pre existing snapshot
 			_newsnap="$_presnap"
 		fi
-
 	else
 		# There is no pre existing snapshot, and the rootjail is busy. Must error.
 		[ "$_busy" ] && get_msg "_jo1" "$_jail" "$_rootenv" && return 1
@@ -658,7 +654,6 @@ reclone_zroot() {
 		pw -V ${M_QROOT}/${_jail}/etc/ \
 				useradd -n $_jail -u 1001 -d /usr/home/${_jail} -s /bin/csh 2>&1
 	fi
-
 	return 0
 }
 
@@ -1764,8 +1759,9 @@ EOF
 	_taps=$(( _taps + 1 ))  ;  _cycle=0
 	while [ "$_taps" -gt 0 ] ; do
 
-		# Use ifconfig to keep track of available taps.
+		# Create tap, make sure it's down, increment slot 
 		_tap=$(ifconfig tap create)
+		ifconfig $_tap down	
 		_VTNET=$(printf "%b" "${_VTNET} -s ${_slot},virtio-net,${_tap}")
 		_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
 		_taps=$(( _taps - 1 ))

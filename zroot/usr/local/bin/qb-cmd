@@ -6,18 +6,15 @@
 . /usr/local/lib/quBSD/msg-cmd.sh
 
 get_options() {
-	while getopts hnNrtu:vV opts ; do
-		case $opts in
-			h) get_msg_cmd "none" "usage_0" ;;
-			n) _NEWWIND="xterm -e" ;;
-			N) _NORUN="exit 0" ; _VERBOSE="true" ;;
-        	r) _USER="root" ;;
-			u) _USER="${OPTARG}" ;;
-			v) _REDIRECT='' ; _VERBOSE="true" ;;
-			*) exit 1 ;;
-		esac
-	done
-	shift $(( OPTIND - 1 ))
+	while getopts hnNrtu:vV opts ; do case $opts in
+		h) get_msg_cmd "none" "usage_0" ;;
+		n) _NEWWIND="xterm -e" ;;
+		N) _NORUN="exit 0" ; _VERBOSE="true" ;;
+     	r) _USER="root" ;;
+		u) _USER="${OPTARG}" ;;
+		v) _REDIRECT='' ; _VERBOSE="true" ;;
+		*) exit 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	JAIL="$1" ; shift
 	_CMD="$@"

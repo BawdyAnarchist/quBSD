@@ -4,16 +4,14 @@
 . /usr/local/lib/quBSD/msg-hostnet.sh
 
 get_options() {
-	while getopts cdht:u opts ; do
-		case $opts in
-			c) cron_down ; exit 0 ;;
-			d) _CMD="down" ;;
-			h) get_msg_hostnet "none" "usage_0" ;;
-			t) TIMEOUT="$OPTARG" ;;
-			u) [ -z "$_CMD" ] && _CMD="up" || get_msg_hostnet "_1" "usage_1" ;;
-			*) exit 1 ;;
-		esac
-	done
+	while getopts cdht:u opts ; do case $opts in
+		c) cron_down ; exit 0 ;;
+		d) _CMD="down" ;;
+		h) get_msg_hostnet "none" "usage_0" ;;
+		t) TIMEOUT="$OPTARG" ;;
+		u) [ -z "$_CMD" ] && _CMD="up" || get_msg_hostnet "_1" "usage_1" ;;
+		*) exit 1 ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	TIMEOUT="${TIMEOUT:=300}"
 	PF_PASS="/etc/pf_pass.conf"

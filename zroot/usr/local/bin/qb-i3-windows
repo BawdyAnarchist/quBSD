@@ -4,13 +4,12 @@
 
 get_options() {
 	while getopts ch opts ; do case $opts in
-			c) close_windows ; exit 0 ;;
-			h) usage ; exit 0 ;;
-			*) exit ;;
+		c) close_windows ; exit 0 ;;
+		h) usage ; exit 0 ;;
+		*) exit ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	JAIL="$1"
-#	[ -z "$JAIL" ] && JAIL='.*'
 }
 
 usage() { cat << ENDOFMSG

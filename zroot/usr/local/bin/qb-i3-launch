@@ -14,7 +14,7 @@ get_options() {
 }
 
 parse_config() {
-	# Check TIMEOUT, if it was specified 
+	# Check TIMEOUT, if it was specified
 	[ "$_TIMEOUT" ] && chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
 									&& _TIMEOUT="-t $_TIMEOUT" || get_msg_launch "_2" "exit_1"
 
