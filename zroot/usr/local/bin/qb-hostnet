@@ -70,8 +70,11 @@ revert_connection() {
 }
 
 main() {
-	# Regardless of [-u] or [-d], first remove all interfaces,
-	# to ensure that host network is in a known good state.
+
+	# Terminate any other instances of qb-hostnet that might be running (waiting for TIMEOUT)
+	pkill -f '/bin/sh /usr/local/bin/qb-hostnet'
+
+	# Remove all interfaces, to ensure that host network is in a known good state
 	connection_down
 
 	# Bring up host network connection
