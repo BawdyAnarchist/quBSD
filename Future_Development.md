@@ -1,7 +1,5 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-net-firewall DHCP - could it be nicvm MTU?
-
 qb-cmd VM is still spitting out noise
 
 reinstall 0base
