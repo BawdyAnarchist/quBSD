@@ -74,6 +74,11 @@ Deleted the following line(s):
 $_delline
 ENDOFMSG
 		;;
+		_8_2) cat << ENDOFMSG
+New setting is same as #default:
+$_default
+ENDOFMSG
+		;;
 		_10) cat << ENDOFMSG
 
 ALERT: Changing GATEWAY to < $VALUE > but IPV4 is set to 'none'.

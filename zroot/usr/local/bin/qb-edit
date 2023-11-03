@@ -118,7 +118,7 @@ modify_qmap() {
 			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $QMAP
 		;;
 		revert_to_default)
-			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QMAP)
+			_default=$(grep -E "^#default[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
 			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]@ d" $QMAP
 		;;
 		add)
@@ -242,19 +242,17 @@ main() {
 
 	# Some edits are coordinated across other quBSD configs/params, for user-facing simplicity
 	case "$PARAM" in
-		AUTOSNAP)
-			modify_autosnap
-			modify_qmap
-		;;
-
-		DEVFS_RULE) modify_jconf_devfs ;;
-
-		*) modify_qmap ;;
+		AUTOSNAP)  modify_autosnap ; modify_qmap  ;;
+		DEVFS_RULE) modify_jconf_devfs  ;;
+		*) modify_qmap  ;;
 	esac
 
 	# Print the new value
-	([ "$ACTION" = "delete" ] || [ "$ACTION" = "revert_to_default" ]) \
-															&& get_msg_edit "_8_1" || get_msg_edit "_8"
+	case $ACTION in
+		delete) get_msg_edit "_8_1"  ;;
+		revert_to_default) get_msg_edit "_8_2"  ;;
+		*) get_msg_edit "_8"  ;;
+	esac
 
 	handle_restarts
 }
