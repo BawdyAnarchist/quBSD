@@ -28,3 +28,4 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 1         2     *    *    *    root qb-autosnap -st 7D 
 1         14    *    *    *    root qb-autosnap -st 2D 
 1         5     *    *    1    root qb-autosnap -st 6W 
+10        *     *    *    *    root qb-hostnet -c
