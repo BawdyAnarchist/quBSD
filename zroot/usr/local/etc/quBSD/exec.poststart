@@ -4,7 +4,6 @@
 
 get_options() {
 	JAIL="$1"
-
 	get_jail_parameter -d SCHG "$JAIL"
 	get_jail_parameter -d SECLVL "$JAIL" 
 }
@@ -22,7 +21,6 @@ handle_dhcp() {
 }
 
 security_flags() {
-	
 	# Different directories are schg flagged depending on user settings
 	case $SCHG in
 		all)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw /usr"
@@ -35,7 +33,6 @@ security_flags() {
 	esac
 
 	for _d in $_jdir; do
-
 		[ -e "${M_QROOT}/${JAIL}${_d}" ] \
 				&& chflags -R schg "${M_QROOT}/${JAIL}${_d}" > /dev/null 2>&1
 	done 
