@@ -1,0 +1,126 @@
+#!/bin/sh
+
+detect_distro() {
+	# Detect OS
+	if [ -f /etc/os-release ] ; then
+		. /etc/os-release
+		OS=$NAME
+	elif [ -f /etc/alpine-release ] ; then
+		OS="Alpine Linux"
+   elif [ "$(uname -s)" = "FreeBSD" ] ; then
+		OS="FreeBSD"
+	elif [ "$(uname -s)" = "OpenBSD" ] ; then
+		OS="OpenBSD"
+	elif [ "$(uname -s)" = "NetBSD" ] ; then
+		OS="NetBSD"
+	else
+		echo "Cannot detect OS or OS not supported"
+		exit 1
+	fi
+}
+
+install_openssh() {
+	# Detect package manager, and install openSSH based on that 
+	if command -v apt-get 		> /dev/null 2>&1; then
+		apt-get update
+		apt-get install -y openssh-server || return1
+	elif command -v dnf 			> /dev/null 2>&1; then
+		dnf install -y openssh-server || return1
+	elif command -v yum 			> /dev/null 2>&1; then
+		yum install -y openssh-server || return1
+	elif command -v pacman		> /dev/null 2>&1; then
+		pacman -Sy --noconfirm openssh || return1
+	elif command -v apk 			> /dev/null 2>&1; then
+		apk add openssh || return1
+	elif command -v zypper 		> /dev/null 2>&1; then
+		zypper install -y openssh || return1
+	elif command -v emerge 		> /dev/null 2>&1; then
+		emerge --ask net-misc/openssh || return1
+	elif command -v slackpkg 	> /dev/null 2>&1; then
+		slackpkg install openssh || return1
+	elif command -v eopkg 		> /dev/null 2>&1; then
+		eopkg install openssh-server || return1
+	elif command -v xbps-install > /dev/null 2>&1; then
+		xbps-install -Su || return1
+		xbps-install -y openssh || return1
+	else
+		echo "No known package manager found. Exiting."
+		exit 1
+	fi
+}
+
+modify_ssh_config() {
+	# Make a backup of the default sshd_config
+	cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+
+	# Set PermitRootLogin to yes
+	sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+	sed -i '/^PermitRootLogin/s/prohibit-password/yes/' /etc/ssh/sshd_config
+	sed -i '/^PermitRootLogin/s/without-password/yes/' /etc/ssh/sshd_config
+	sed -i '/^PermitRootLogin/s/forced-commands-only/yes/' /etc/ssh/sshd_config
+
+	# Set PasswordAuthentication to yes
+	sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
+	sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+	# Set ChallengeResponseAuthentication to yes
+	sed -i 's/^ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/' \
+																							/etc/ssh/sshd_config
+	sed -i 's/^#ChallengeResponseAuthentication yes/ChallengeResponseAuthentication yes/' \
+																							/etc/ssh/sshd_config
+	# Disable public key authentication to allow password authentication
+	sed -i 's/^PubkeyAuthentication yes/PubkeyAuthentication no/' /etc/ssh/sshd_config
+	sed -i 's/^#PubkeyAuthentication yes/PubkeyAuthentication no/' /etc/ssh/sshd_config
+}
+
+start_ssh() {
+	# Start sshd service based on OS and init system.
+	case "$OS" in
+		"Void Linux")
+			ln -s /etc/sv/sshd /var/service/
+			;;
+		"Slackware")
+			chmod +x /etc/rc.d/rc.sshd
+			/etc/rc.d/rc.sshd start
+			;;
+		"NetBSD")
+			echo 'sshd=YES' >> /etc/rc.conf
+			/etc/rc.d/sshd start
+			;;
+		"Devuan"|"Artix Linux")
+			if command -v s6-rc >/dev/null 2>&1; then
+				s6-rc -u change sshd
+			elif command -v runit >/dev/null 2>&1; then
+				ln -s /etc/sv/sshd /run/runit/service/
+				sv up sshd
+			elif command -v sysv-rc-conf >/dev/null 2>&1; then
+				sysv-rc-conf sshd on
+				/etc/init.d/sshd start
+			fi
+			;;
+		*)
+			if command -v systemctl >/dev/null 2>&1; then
+				systemctl enable sshd
+				systemctl start sshd
+			elif command -v service >/dev/null 2>&1; then
+				service sshd enable
+				service sshd start
+			elif command -v rc-update >/dev/null 2>&1; then
+				rc-update add sshd default
+				rc-service sshd start
+			elif command -v rcctl >/dev/null 2>&1; then
+				rcctl enable sshd
+				rcctl start sshd
+			else
+				echo "Unsupported init system for $OS."
+				return 1
+			fi
+			;;
+	esac
+}
+
+# Main routine
+detect_distro
+! install_openssh && echo "Failed to install to $OS" && exit 1 
+modify_sshd_config	
+start_ssh && echo "SSH Server setup complete for $OS." || exit 1 
