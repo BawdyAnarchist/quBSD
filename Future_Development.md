@@ -5,9 +5,13 @@ it looks like chk_valid_ipv4 at the end, it'll never make it to $_xp, coz return
 # After SSH and scp is hammered out, make another system backup 
 
 # 0CONTROL JAIL
-	pf such that incoming only from the control jail IPs can access the files
-	qb_ssh installs openssh-server (already done), scp pubkey from 0control, and set sshd_conf
-	make sure that VMs are modified to auto start SSHD
+*Too many jails overlap trying to restart dhcpd*	
+	qb_ssh
+		ftp pubkey from 0control
+		install openss-server (done)
+		configure sshd_conf
+			- permissions only to pubkey
+			- autostart sshd
 	add permanent checks to prevent any changes to 0control via normal qb-commands
 	0control key needs added to all rootjails
 
@@ -179,7 +183,7 @@ quBSD.conf removed. Everything now in jailmap.conf
 
 Should make the $qubsd/zroot/0net 0gui 0vms and everything files here for specific stuff like rc.conf
 
-Control Jail
+### Control Jail
 	- cp -a group master.passwd passwd pwd.db spwd.db from 0net to /zusr/0control/rw/etc/
 	- mkdir -p /zusr/0control/usr/home/0control
 	- chown -R 1001:1001 /zusr/0control/usr/home/0control
@@ -195,6 +199,7 @@ Control Jail
 	- cp -a qb_ssh script to /usr/home/ftpd 
 	- chmod 755 /zusr/0control/usr/home/ftpd/*
 	
+rootjails need copy of 0control pubkey	
 	
 
 
