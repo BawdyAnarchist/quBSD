@@ -1,13 +1,26 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
 # After SSH and scp is hammered out, make another system backup 
-	qb-copy
-		- will use /media as the default copy locations between any two jail/VM combos
-		- Can specify copy location as well
-		- automatically brings up the SSH connection if necessary, then brings it down
-		- Is it time to implement a control jail?
 
-qb-connect - VM integration: jail/VM connections, specifically SSH preparation for files copy
+# 0CONTROL JAIL
+	pf such that incoming only from the control jail IPs can access the files
+	qb_ssh installs openssh-server (already done), scp pubkey from 0control, and set sshd_conf
+	make sure that VMs are modified to auto start SSHD
+	add permanent checks to prevent any changes to 0control via normal qb-commands
+	0control key needs added to all rootjails
+
+qb-copy
+	- Library functions b/c qb-connect will also integrate
+	- will use /media as the default copy locations between any two jail/VM combos
+	- Can specify copy location as well
+	- automatically brings up the SSH connection if necessary, then brings it down
+
+
+# Finish VM setup
+
+qb-connect
+	- VM integration: jail/VM connections, specifically SSH preparation for files copy
+	- Inside VMs - qb-copy <file> ... which sends to the ssh-jail, or copies from it
 
 qb-pci
 	- summary of PCI devices relevant to user
@@ -38,6 +51,7 @@ GUI SECURITY
 pwd
 	- I think the right way to do this, is export any existing pwd db in /rw, and import it into the created jail (or maybe vice versa) 
 	- Right now I'm not so confident on how that's working
+	- To get around the pw -V problem, you could put /usr/local/bin/pw wrapper
 
 Host as Unprivileged user     
 	- All jails will have an epair to an offline *Control Jail*      
@@ -49,8 +63,12 @@ NICVM - Linux VM so that it can use all the wireless protocols.
 
 Take another hack at the recording device problems
 
+QMAP - New PARAM - CONNECT, that establishes a connection to a specified jail/VM
+
 
 ### SPECIFIC SCRIPTS
+
+qb-stop - Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
 
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
@@ -80,6 +98,8 @@ qb-stat - Change hardcoded to more flexible setup: config file, col selector, RA
 
 
 ### GENERAL / BEST PRACTICES / CLEANUP
+
+The test for exec.created modifying wg0, pf, and dhcp, should be if they're included/enabled in the jail's rc script
 
 GENERAL GUIDELINES, and maybe later double checks
 	- Attempt to make scripts more robust and account for user error, when it makes sense to do so.
@@ -156,5 +176,24 @@ VMs integration
 quBSD.conf removed. Everything now in jailmap.conf
 
 Should make the $qubsd/zroot/0net 0gui 0vms and everything files here for specific stuff like rc.conf
+
+Control Jail
+	- cp -a group master.passwd passwd pwd.db spwd.db from 0net to /zusr/0control/rw/etc/
+	- mkdir -p /zusr/0control/usr/home/0control
+	- chown -R 1001:1001 /zusr/0control/usr/home/0control
+	- mkdir -p /zusr/0control/usr/home/ftpd
+	- chown -R 1002:1002 /zusr/0control/usr/home/ftpd
+	- chmod 755 /zusr/0control/usr/home/ftpd
+	- mkdir -p /zusr/0control/rw/root/.ssh
+	- chmod 700 /zusr/0control/rw/root/.ssh
+	- pw -V /zusr/0control/rw/etc useradd -n 0control -u 1001 -d /usr/home/0control -s /bin/csh
+	- pw -V /zusr/0control/rw/etc useradd -n ftpd -u 1002 -d /usr/home/ftpd -s /bin/sbin/nologin
+	- ssh-keygen -t rsa -b 4096 -N "" -f /zusr/0control/rw/root/.ssh/id_rsa
+	- cp -a /zusr/0control/rw/root/.ssh/id_rsa.pub /zusr/0control/usr/home/ftpd
+	- cp -a qb_ssh script to /usr/home/ftpd 
+	- chmod 755 /zusr/0control/usr/home/ftpd/*
+	
+	
+
 
 
