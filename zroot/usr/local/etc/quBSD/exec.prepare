@@ -20,6 +20,9 @@ preparation_actions() {
 	# Sometimes bridge module unloads
 	kldstat -q -m if_bridge || kldload -q if_bridge
 
+	# The control jail should always be on
+	[ ! "$JAIL" = "0control" ] && ! jls -j 0control > /dev/null 2>&1 && start_jail -q 0control
+
 	# Prefer to start gateways here; as jail.conf dependencies can limit versatility
 	start_jail "$GATEWAY"
 

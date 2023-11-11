@@ -1,0 +1,3 @@
+# Device                Mountpoint                FStype Options Dump Pass#
+/zusr/0control/rw/      /qubsd/0control/rw/       nullfs rw      0    0
+/zusr/0control/usr/home /qubsd/0control/usr/home/ nullfs rw      0    0

@@ -81,7 +81,7 @@ main() {
 		# start_jail command handles most error messages
 		start_jail "$GATEWAY" ||  get_msg_hostnet "_3" "exit_1"
 
-		_VIF=$(connect_client_to_gateway -e "host" "$GATEWAY" "$IPV4")
+		_VIF=$(connect_client_to_gateway -ei "$IPV4" "host" "$GATEWAY")
 
       # Modify pf_pass with the cu
 		sed -i '' -E "s@EXT_IF[[:blank:]]*=.*@EXT_IF = \"${_VIF}\"@" $PF_PASS

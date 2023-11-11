@@ -1,0 +1,149 @@
+#!/bin/sh
+
+detect_distro() {
+	# Detect OS
+	if [ -f /etc/os-release ] ; then
+		. /etc/os-release
+		OS=$NAME
+	elif [ -f /etc/alpine-release ] ; then
+		OS="Alpine Linux"
+   elif [ "$(uname -s)" = "FreeBSD" ] ; then
+		OS="FreeBSD"
+	elif [ "$(uname -s)" = "OpenBSD" ] ; then
+		OS="OpenBSD"
+	elif [ "$(uname -s)" = "NetBSD" ] ; then
+		OS="NetBSD"
+	else
+		echo "Cannot detect OS or OS not supported"
+		exit 1
+	fi
+}
+
+install_openssh() {
+	# Detect package manager, and install openSSH based on that 
+	if command -v apt-get 		> /dev/null 2>&1; then
+		apt-get update
+		apt-get install -y openssh-server || return1
+	elif command -v dnf 			> /dev/null 2>&1; then
+		dnf install -y openssh-server || return1
+	elif command -v yum 			> /dev/null 2>&1; then
+		yum install -y openssh-server || return1
+	elif command -v pacman		> /dev/null 2>&1; then
+		pacman -Sy --noconfirm openssh || return1
+	elif command -v apk 			> /dev/null 2>&1; then
+		apk add openssh || return1
+	elif command -v zypper 		> /dev/null 2>&1; then
+		zypper install -y openssh || return1
+	elif command -v emerge 		> /dev/null 2>&1; then
+		emerge --ask net-misc/openssh || return1
+	elif command -v slackpkg 	> /dev/null 2>&1; then
+		slackpkg install openssh || return1
+	elif command -v eopkg 		> /dev/null 2>&1; then
+		eopkg install openssh-server || return1
+	elif command -v xbps-install > /dev/null 2>&1; then
+		xbps-install -Su || return1
+		xbps-install -y openssh || return1
+	else
+		echo "No known package manager found. Exiting."
+		exit 1
+	fi
+}
+
+modify_sshd_config() {
+	# Make a backup of the default sshd_config
+	cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+
+	# Set PermitRootLogin to yes
+	sed -Ei 's/^#(PermitRootLogin).*/\1 without-password/' /etc/ssh/sshd_config
+	sed -Ei 's/^(PermitRootLogin).*/\1 without-password/' /etc/ssh/sshd_config
+
+	# Set ChallengeResponseAuthentication to yes
+	if grep -qs "ChallengeResponseAuthentication" /etc/ssh/sshd_config ; then
+		sed -Ei 's/^#(ChallengeResponseAuthentication).*/\1 no/' /etc/ssh/sshd_config
+		sed -Ei 's/^(ChallengeResponseAuthentication).*/\1 no/' /etc/ssh/sshd_config
+	else
+		echo "ChallengeResponseAuthentication no" >> /etc/ssh/sshd_config
+	fi
+}
+
+start_ssh() {
+	# Start sshd service based on OS and init system.
+	case "$OS" in
+		"Void Linux")
+			ln -s /etc/sv/sshd /var/service/
+			;;
+		"Slackware")
+			chmod +x /etc/rc.d/rc.sshd
+			if [ -f /etc/rc.d/rc.sshd ]; then
+				/etc/rc.d/rc.sshd start
+			else
+				echo "sshd service script not found for Slackware."
+				return 1
+			fi
+			;;
+		"NetBSD")
+			echo 'sshd=YES' >> /etc/rc.conf
+			/etc/rc.d/sshd start
+			;;
+		"Devuan"|"Artix Linux")
+			if command -v s6-rc >/dev/null 2>&1; then
+				s6-rc -u change sshd
+			elif command -v runit >/dev/null 2>&1; then
+				ln -s /etc/sv/sshd /run/runit/service/
+				sv up sshd
+			elif command -v sysv-rc-conf >/dev/null 2>&1; then
+				sysv-rc-conf sshd on
+				/etc/init.d/sshd start
+			else
+				echo "No recognized init system found for $OS."
+				return 1
+			fi
+			;;
+		*)
+			if command -v systemctl >/dev/null 2>&1; then
+				if systemctl list-unit-files --full -all | grep -q '^ssh.service'; then
+					systemctl enable --now ssh
+				elif systemctl list-unit-files --full -all | grep -q '^sshd.service'; then
+					systemctl enable --now sshd
+				else
+					echo "No SSH service file found for $OS."
+					return 1
+				fi
+			elif command -v service >/dev/null 2>&1; then
+				service sshd enable || service ssh enable
+				service sshd start || service ssh start
+			elif command -v rc-update >/dev/null 2>&1; then
+				rc-update add sshd default
+				rc-service sshd start
+			elif command -v rcctl >/dev/null 2>&1; then
+				rcctl enable sshd
+				rcctl start sshd
+			else
+				echo "Unsupported init system for $OS."
+				return 1
+			fi
+			;;
+	esac
+}
+
+main() {
+	
+	# scp qb_ssh from 0control
+
+	# scp the id_rsa.pub
+
+	detect_distro
+
+	! install_openssh && echo "Failed to install to $OS" && exit 1 
+
+# This will need changed
+#modify_sshd_config	
+
+	start_ssh && echo "SSH Server setup complete for $OS." || exit 1 
+
+}
+
+
+
+
+main

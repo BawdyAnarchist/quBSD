@@ -492,21 +492,29 @@ remove_tap() {
 connect_client_to_gateway() {
 	# When a jail/VM is started, this connects to its gateway
 	# GLOBAL VARIABLES must have been assigned already: $GATEWAY ; $IPV4 ; $MTU
+		# -e (e)cho result  ;  -m (m)tu  ;  -q (q)uiet  ;  -t (t)ype [NET or SSH]
 
-	while getopts em:q opts ; do case $opts in
+	local _ipv4=
+	while getopts ei:m:q opts ; do case $opts in
 			e) local _ec='true' ;;
+			i) local _ipv4="$OPTARG"  ;;
 			m) local _mtu="$OPTARG" ;;
 			q) local _q='-q' ;;
 			*) get_msg "_1" ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
-	local _client="$1"  ;  local _gateway="$2"  ;  local _ipv4="$3"  ;
+	# Pos params, default MTU, and _type
+	local _client="$1"  ;  local _gateway="$2"
 	local _mtu="${MTU:=$(get_jail_parameter -des MTU $_gateway)}"
+	[ "$_gateway" = "0control" ] && local _type="SSH" || _type="NET"
+
+	# If IP wasnt provided, then find an available one
+	[ -z "$_ipv4" ] && local _ipv4=$(assign_ipv4_auto -e "$_client" "$_gateway")
 
 	# This function can be called by multiple scripts/functions that dont know which is a VM or jail
 	if chk_isvm "$_client" ; then
 		# Get tap, send to gateway jail, bring up jail connection
-		_vifb=$(sed -En "s/ NET//p" "${QTMP}/vmtaps_${_client}")
+		_vifb=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_client}")
 		ifconfig "$_vifb" vnet "$_gateway"
 		jexec -l -U root $_gateway ifconfig $_vifb inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
 
@@ -515,7 +523,7 @@ connect_client_to_gateway() {
 
 	elif chk_isvm "$_gateway" ; then
 		# Get tap and sent to client jail. Should be DHCP, but modify mtu if necessary
-		_vifb=$(sed -En "s/ NET//p" "${QTMP}/vmtaps_${_gateway}")
+		_vifb=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_gateway}")
  		ifconfig $_vifb vnet $_client
 		[ ! "$_mtu" = "1500" ] && jexec -l -U root $_client ifconfig $_vifb mtu $_mtu up
 
@@ -534,11 +542,12 @@ connect_client_to_gateway() {
 		if [ ! "$_ipv4" = "none" ] ; then
 			# Assign the gateway IP
 			jexec -l -U root "$_gateway" \
-					ifconfig "$_vif" inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
+							ifconfig "$_vif" inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
 
-			# Assign the client IP and default route
+			# Assign the client IP and, default route (if not 0control gateway)
 			eval "$_cmdmod" ifconfig $_vifb inet ${_ipv4} mtu $_mtu up
-			eval "$_cmdmod" route add default "${_ipv4%.*/*}.1" > /dev/null 2>&1
+			[ ! "$_gateway" = "0control" ] \
+							&& eval "$_cmdmod" route add default "${_ipv4%.*/*}.1" > /dev/null 2>&1
 	fi fi
 
 	# Echo option. Return epair-b ; it's the external interface for the jail.
@@ -552,16 +561,23 @@ connect_gateway_to_clients() {
 	getopts q _opts && local _qz='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	_jail="$1"
-	[ -z "$_jail" ] && get_msg $_q "_0" "Jail/VM" && return 1
+	local _gateway="$1"
+	[ -z "$_gateway" ] && get_msg $_q "_0" "Jail/VM" && return 1
+
+	# All onjails connect to 0control
+	if [ "$_gateway" = "0control" ] ; then
+		for _client in $(get_info -e _ONJAILS | grep -v "0control") ; do
+			connect_client_to_gateway "$_client" "$_gateway"
+		done
+	fi
 
 	# Restore connection to CLIENTS one by one
-	for _client in $(get_info -e _CLIENTS "$_jail") ; do
+	for _client in $(get_info -e _CLIENTS "$_gateway") ; do
 		if chk_isrunning "$_client" ; then
 
 			# Get client IP, bring up connection, and save the VIF used
 			_cIP=$(get_jail_parameter -der IPV4 "$_client")
-			_cVIF=$(connect_client_to_gateway -e "$_client" "$_jail" "$_cIP")
+			_cVIF=$(connect_client_to_gateway -ei "$_cIP" "$_client" "$_gateway")
 
 			# If client is itself a gateway, its pf.conf needs the new epair and IP (cVIF and cIP)
 			_cPF="${M_ZUSR}/${_client}/${PFCONF}"
@@ -1110,6 +1126,7 @@ chk_valid_ipv4() {
 	# Tests for validity of IPv4 CIDR notation.
 	# Variables below are globally assigned because they're required for performing other checks.
 		# $_a0  $_a1  $_a2  $_a3  $_a4
+	# -(q)uiet  ;  -(r)esolve _value  ;  -(x)tra check
 
 	while getopts qrx opts ; do case $opts in
 		q) local _q="-q" ;;
@@ -1162,6 +1179,10 @@ chk_valid_ipv4() {
 		# Error message, is invalid IPv4
 		get_msg $_q "_cj10" "$_value" && return 1
 	fi
+
+	[ -n "$_xp" ] && chk_isqubsd_ipv4 $_q "$_value" "$_jail"
+
+	return 0
 }
 
 chk_isqubsd_ipv4() {
@@ -1460,13 +1481,11 @@ chk_valid_wiremem() {
 
 define_ipv4_convention() {
 	# Defines the quBSD internal IP assignment convention.
-	# Variables: $ip0.$ip1.$ip2.$ip3/subnet ; are global. They're required
-	# for functions:  discover_open_ipv4()  ;  chk_isqubsd_ipv4()
+	# Variables: $ip0.$ip1.$ip2.$ip3/subnet ; are global; required for discover_open_ipv4(),
+	# and chk_isqubsd_ipv4(). Not best practice, but they're unique from any others.
+	# Return: 0 for normal assignment; 1 for net-firewall. gateway=0control goes first
 
-	# Returns 0 for any normal IP assignment, returns 1 if
-	# operating on net-firewall (which needs special handling).
-
-	local _jail="$1"
+	local _client="$1"  ;  local _gateway="$2"
 
 	# _ip assignments are static, except for $_ip1
 	_ip0=10 ; _ip2=1 ; _ip3=2 ; _subnet=30
@@ -1474,15 +1493,17 @@ define_ipv4_convention() {
 	# Combo of function caller and JAIL/VM determine which IP form to use
 	case "$0" in
 		*qb-connect) # Temporary, adhoc connections have the form: 10.99.x.2/30
-			_ip1=99 ;;
-		*) case $_jail in
-				net-firewall) # firewall IP is not internally assigned, but router dependent.
+			_ip1=88 ; _subnet=29 ;;
+		*) case "${_client}_${_gateway}" in
+				*_0control) # The control jail operates on 10.99.x.0/30
+					_ip1=99 ; _subnet=30 ;;
+				net-firewall*) # firewall IP is not internally assigned, but router dependent.
 					_cycle=256 ; return 1 ;;
-				net-*) # net jails IP address convention is: 10.255.x.2/30
+				net-*) # net jails IP address convention is: 10.255.x.0/30
 					_ip1=255 ;;
-				serv-*) # Server jails IP address convention is: 10.128.x.2/30
+				serv-*) # Server jails IP address convention is: 10.128.x.0/30
 					_ip1=128 ;;
-				*) # All other jails should receive convention: 10.1.x.2/30
+				*) # All other jails should receive convention: 10.1.x.0/30
 					_ip1=1 ;;
 			esac
 	esac
@@ -1496,14 +1517,15 @@ discover_open_ipv4() {
 	getopts q _opts && local _qi='-q' && shift
 	[ "$1" = "--" ] && shift
 
-	local _jail="$1"  ;  local _ip_test
+	local _client="$1"  ;  local _gateway="$2"  ;  local _ip_test
 	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
+	_gateway=${_gateway:="$(get_jail_parameter -deqs GATEWAY $_client)"}
 
 	# If gateway is a VM, then DHCP will be required, regardless
-	chk_isvm "$(get_jail_parameter -deqs GATEWAY $_jail)" && echo "DHCP" && return 0
+	chk_isvm "$_gateway" && echo "DHCP" && return 0
 
 	# Assigns values for each IP position, and initializes $_cycle
-	define_ipv4_convention "$_jail"
+	define_ipv4_convention "$_client" "$_gateway"
 
 	# Get a list of all IPs in use. Saves to variable $_USED_IPS
 	get_info _USED_IPS
@@ -1522,7 +1544,7 @@ discover_open_ipv4() {
 			# Failure to find IP in the quBSD conventional range
 			if [ $_ip2 -gt 255 ] ; then
 				_pass_var="${_ip0}.${_ip1}.x.${_ip3}"
-				get_msg $_qi "_jf7" "$_jail"
+				get_msg $_qi "_jf7" "$_client"
 				return 1
 			fi
 		else
@@ -1540,15 +1562,19 @@ assign_ipv4_auto() {
 	getopts e _opts && _echo="true" && shift
 	[ "$1" = "--" ] && shift
 
-	local _jail="$1"
-	local _ipv4=
+	local _client="$1"  ;  _gateway="$2"  ;  local _ipv4=
 	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
 
-	# Try to pull pre-set IPV4 from the temp file if it exists.
-	[ -e "$_TMP_IP" ] && local _ipv4=$(sed -nE "s#^[[:blank:]]*${_jail}[[:blank:]]+##p" $_TMP_IP)
+	# Pull pre-set IPV4 from the temp file if it exists, based on 0control or normal
+	if [ -e "$_TMP_IP" ] ; then
+		if [ "$_gateway" = "0control" ] ; then
+			local _ipv4=$(sed -nE "s#^${_client} SSH ##p" $_TMP_IP)
+		else
+			local _ipv4=$(sed -nE "s#^${_client} NET ##p" $_TMP_IP)
+	fi fi
 
-	# If there was no ipv4 assigned to _jail in the temp file, then find an open ip for the jail.
-	[ -z "$_ipv4" ] && _ipv4=$(discover_open_ipv4 "$_jail")
+	# If there was no ipv4 assigned to _client in the temp file, then find an open ip for the jail.
+	[ -z "$_ipv4" ] && _ipv4=$(discover_open_ipv4 "$_client" "$_gateway")
 
 	# Echo option or assign global IPV4
 	[ "$_echo" ] && echo "$_ipv4" || IPV4="$_ipv4"
@@ -1759,16 +1785,16 @@ EOF
 	_taps=$(( _taps + 1 ))  ;  _cycle=0
 	while [ "$_taps" -gt 0 ] ; do
 
-		# Create tap, make sure it's down, increment slot 
+		# Create tap, make sure it's down, increment slot
 		_tap=$(ifconfig tap create)
-		ifconfig $_tap down	
+		ifconfig $_tap down
 		_VTNET=$(printf "%b" "${_VTNET} -s ${_slot},virtio-net,${_tap}")
 		_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
 		_taps=$(( _taps - 1 ))
 
 		# Tracker file for which taps are related to which VM, and for which purpose (_vif tags)
 		case "$_cycle" in
-			0) echo "$_tap SSH" >> "${QTMP}/vmtaps_${_VM}" ;;
+			0) echo "$_tap SSH" >> "${QTMP}/vmtaps_${_VM}"  ;;
 			1) echo "$_tap NET" >> "${QTMP}/vmtaps_${_VM}"  ;  _vif="$_tap"  ;;
 			*) echo "$_tap EXTRA_${_cycle}" >> "${QTMP}/vmtaps_${_VM}"  ;;
 		esac
@@ -1840,6 +1866,9 @@ exec_vm_coordinator() {
 	# Ensure that there's nothing lingering from this VM before trying to start it
 	cleanup_vm $_norun $_qs "$_VM"
 
+	# 0control should always be on
+	jls -j 0control > /dev/null 2>&1 || start_jail -q 0control
+
 	# Pulls variables for the VM, and assembles them into bhyve line options
 	! prep_bhyve_options $_qs $_tmux "$_VM" && [ -z "$_norun" ] && get_msg "_cj33"
 
@@ -1863,12 +1892,15 @@ exec_vm_coordinator() {
 		_count=$(( _count + 1 ))
 	done
 
+	# Connect 0control
+	connect_client_to_gateway "$_VM" "0control" > /dev/null
+
 	# The VM should be up and running, or function would've already returned 1
 	if [ -n "$_vif" ] ; then
 
 		# Connect to the upstream gateway
 		[ -n "$_gateway" ] && [ ! "$_gateway" = "none" ] && chk_isrunning "$_gateway" \
-			&& connect_client_to_gateway "$_VM" "$_gateway" "$_ipv4" > /dev/null
+				&& connect_client_to_gateway -i "$_ipv4" "$_VM" "$_gateway" > /dev/null
 
 		# Reconnect the downstream client. Will immediately return if there are no clients
 

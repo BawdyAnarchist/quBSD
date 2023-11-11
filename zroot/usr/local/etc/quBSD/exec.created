@@ -93,14 +93,18 @@ resource_control() {
 }
 
 main() {
-
 	# If there's a dhcpd.conf in the jail, then modify it
 	[ -e "$_0net_DHCP" ] && modify_dhcpd
 
-	# Connect jail to its gateway, retrieving the VIF assigned
-	chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -e "$JAIL" "$GATEWAY" "$IPV4")
+	if [ ! "$JAIL" = "0control" ] ; then
+		# Connect JAIL to 0control SSH 
+		connect_client_to_gateway "$JAIL" "0control"
 
-	modify_files
+		# Connect jail to its gateway, retrieving the VIF assigned
+		chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -ei $IPV4 "$JAIL" "$GATEWAY")
+
+		modify_files
+	fi
 
 	connect_gateway_to_clients "$JAIL"
 
