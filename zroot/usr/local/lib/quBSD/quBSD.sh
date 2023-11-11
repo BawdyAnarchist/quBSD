@@ -585,8 +585,8 @@ connect_gateway_to_clients() {
 
 				# Flags down, modify files
 				chflags -R noschg "${M_ZUSR}/${_client}/rw/etc"
-				sed -i '' -e "s@^EXT_IF[[:blank:]]*=.*@EXT_IF = \"${_cVIF}\"@" $_cPF
-				sed -i '' -e "s@^JIP[[:blank:]]*=.*@JIP = \"${_cIP}\"@"  $_cPF
+				sed -i '' -e "s@^[[:blank:]]*EXT_IF[[:blank:]]*=.*@\tEXT_IF = \"${_cVIF}\"@" $_cPF
+				sed -i '' -e "s@^[[:blank:]]*JIP[[:blank:]]*=.*@\tJIP = \"${_cIP}\"@"  $_cPF
 
 				# Restart _client pf service. Restore flags with qb-flags -r (we dont know seclvl here)
 				jexec -l -U root "$_client" service pf restart > /dev/null 2>&1
