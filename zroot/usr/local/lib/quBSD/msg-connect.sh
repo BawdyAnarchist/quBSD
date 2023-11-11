@@ -25,13 +25,13 @@ ENDOFMSG
 	;;	
 	_3) cat << ENDOFMSG
 
-ERROR: < $TUNNEL > isn't running.
+ERROR: < $GATEWAY > isn't running.
 
 ENDOFMSG
 	;;
 	_4) cat << ENDOFMSG
 
-ERROR: < $JAIL > or < $TUNNEL > or both, have securelevel=3,
+ERROR: < $JAIL > or < $GATEWAY > or both, have securelevel=3,
        and pf applied. It will be impossible to modify pf to 
        to pass packets between the jails, without modifying
        and restarting the jail(s). Moreover, such an elevated
@@ -83,7 +83,7 @@ Usage: qb-connect [-i <IP>] [-c|-d] <client-jail> <gateway-jail>
    -d: (d)estroy all epairs for < target >. If < gateway > jail 
        is specified, only epairs common to both are destroyed. 
    -h: (h)elp. Outputs this help message
-   -i: (i)p. Override auto IP assignment. Must be CIDR notation. 
+   -i: (i)p. Manual IP, CIDR. Only for jail-to-jail connection
    -l: (l)ist epairs/IPs of <jail> if specified; otherwise, all. 
 
 ENDOFUSAGE
