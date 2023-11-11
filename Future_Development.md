@@ -1,5 +1,7 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
+it looks like chk_valid_ipv4 at the end, it'll never make it to $_xp, coz return0 in digits checks
+
 # After SSH and scp is hammered out, make another system backup 
 
 # 0CONTROL JAIL
