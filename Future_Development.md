@@ -171,7 +171,7 @@ devfs.rules
 	- Maybe the file should be added to the get_global_variables assignments library
 
 net-jails
-	- isc-dhcp44-server installed
+	pkg install isc-dhcp44-server bind918 wireguard wireguard-go jq
 	- Check that pf conf is updated with required dhcp port, and the simplified version
 
 R_ZFS and U_ZFS ; and mountpoints changed. Less cumbersome, more straightforward

@@ -128,9 +128,8 @@ start_ssh() {
 
 main() {
 	
-	# scp qb_ssh from 0control
-
 	# scp the id_rsa.pub
+	f
 
 	detect_distro
 

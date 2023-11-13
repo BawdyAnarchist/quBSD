@@ -16,7 +16,7 @@ get_parameters() {
 	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter -d MTU "$JAIL"
 
 	J_ZUSR="${M_ZUSR}/${JAIL}"
-	_0net_DHCP="${J_ZUSR}/rw/usr/local/etc/0net_dhcpd.conf"
+	DHCPD="${J_ZUSR}/rw/usr/local/etc/dhcpd.0net.conf"
 }
 
 modify_dhcpd() {
@@ -37,7 +37,7 @@ modify_dhcpd() {
 														"${J_ZUSR}/rw/usr/local/etc/dhcpd.conf"
 	# Set MTU in the config file
 	[ -n "$MTU" ] && sed -i '' -E "s/(option interface-mtu ).*/\1${MTU};/g" \
-														"$_0net_DHCP"
+														"$DHCPD"
 }
 
 modify_files() {
@@ -94,7 +94,7 @@ resource_control() {
 
 main() {
 	# If there's a dhcpd.conf in the jail, then modify it
-	[ -e "$_0net_DHCP" ] && modify_dhcpd
+	[ -e "$DHCP" ] && modify_dhcpd
 
 	if [ ! "$JAIL" = "0control" ] ; then
 		# Connect JAIL to 0control SSH 
@@ -119,3 +119,6 @@ get_parameters "$@"
 get_networking_variables
 
 main
+
+
+
