@@ -1,17 +1,16 @@
-### IMPORTANT NOTE ###
-
-If anyone new is coming to check out my project, just know that I'm in the middle of a significant re-write of the shell scripts. I'm writing a common library, and have significantly improved my shell/code practices since last year. For now, the installer doesn't set the new pieces in place, and half of the shell scripts depend on those pieces. 
-
-You can probably get some mileage out of the scripts in a manual sense, but as a whole, v0.2 isn't ready. 
-
-I realize now that I should've created a separate branch while leaving the main version untouched, but well, hindsight. First time using a repository management tool. Give me a month or so, and it should be significantly better.
-
-Finally, if anyone knows how to do packaging for FreeBSD ports, please let me know, because after this re-write, this should be a pretty solid project, worth adding to ports. 
-
-
 #### quBSD is wrapper for a jails/bhyve implementation of a Qubes-inspired containerization schema. Written in shell, based on zfs, and uses the underlying FreeBSD tools.
 
-The goal is to run all workloads inside of jails, and make host merely a coordinator. quBSD comes with an installer script, which creates and configures a series of jails, and even a couple VMs for PCI device isolation. There are a set of scripts which facilitate management of the entire setup.
+
+#### 2023 Nov 13 UPDATE
+
+Significant work is ongoing with quBSD. The original take was good, but this next iteration will be quite good. The code is MUCH cleaner, robust, best practices. VMs are largely integrated. The common library is comprehensive. Automatic snapshots, with time-to-live thinning are native to the system. Help files are useful. Safety checks are inbuilt throughout.
+
+UP NEXT: Tor gateway/workstation pair. GUI isolation. ZFS encrypted jails. Run quBSD host as a normal user (not root) via a control jail. 
+
+Once these are implemented, a new installer script will be written, a port created, and I intend to add this to the ports collection, as well as package it up for pkg.
+
+If anyone feels like helping develop any of the remaining pieces listed above, please contact me. I'd like to get this project to a production state, and hopefully find at least one other person to help maintain it.
+
 
 #### Summary of functionality and features: 
 
@@ -46,5 +45,3 @@ Additional Features
    - Realtime continuous monitoring of jail status and resource usage     
    - Descriptive help pages      
    - Simplified handling/access for nicvm and usbvm virtual machines     
-
-For a full description of system functionality at [quBSD/zroot/usr/local/share/quBSD/](https://github.com/BawdyAnarchist/quBSD/tree/master/zroot/usr/local/share/quBSD)

@@ -6,6 +6,7 @@ it looks like chk_valid_ipv4 at the end, it'll never make it to $_xp, coz return
 
 # 0CONTROL JAIL
 *Too many jails overlap trying to restart dhcpd*	
+*Service restart for 0control needs programmed for isc-dhcpd and named 
 	qb_ssh
 		ftp pubkey from 0control
 		install openss-server (done)
