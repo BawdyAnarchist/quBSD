@@ -5,7 +5,7 @@
 
 Significant work is ongoing with quBSD. The original take was good, but this next iteration will be quite good. The code is MUCH cleaner, robust, best practices. VMs are largely integrated. The common library is comprehensive. Automatic snapshots, with time-to-live thinning are native to the system. Help files are useful. Safety checks are inbuilt throughout.
 
-UP NEXT: Tor gateway/workstation pair. GUI isolation. ZFS encrypted jails. Run quBSD host as a normal user (not root) via a control jail. 
+UP NEXT: Tor gateway/workstation pair. GUI isolation. ZFS encrypted jails. Run quBSD host as an unprivileged user via a control jail. 
 
 Once these are implemented, a new installer script will be written, a port created, and I intend to add this to the ports collection, as well as package it up for pkg.
 
