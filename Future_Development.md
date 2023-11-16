@@ -5,16 +5,10 @@ it looks like chk_valid_ipv4 at the end, it'll never make it to $_xp, coz return
 # After SSH and scp is hammered out, make another system backup 
 
 # 0CONTROL JAIL
-*Too many jails overlap trying to restart dhcpd*	
-*Service restart for 0control needs programmed for isc-dhcpd and named 
-	qb_ssh
-		ftp pubkey from 0control
-		install openss-server (done)
-		configure sshd_conf
-			- permissions only to pubkey
-			- autostart sshd
+* Too many jails overlap trying to restart dhcpd*	
+* any VM/jail start needs: service named restart
 	add permanent checks to prevent any changes to 0control via normal qb-commands
-	0control key needs added to all rootjails
+	0control key needs added to all rootjails - also to qb-create
 
 qb-copy
 	- Library functions b/c qb-connect will also integrate
@@ -80,6 +74,9 @@ qb-stop - Detect settings if the VM has PPT, and warn to stop internally. Popup 
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
 Error messages are a bit disorganized now. Need to have useful higher function messages
+	- Change the exit action to an option command instead of postional
+	- Change the message selection to an OPTARG. Two messages -m and -M   
+	- All positinals are for related variables only. Reference them with $1, $2, $3, etc
 	- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
 	- Default should be top level basic messages. -q quiets all, and -v drills down to deeper messages
 	- Might need a -F force option.
