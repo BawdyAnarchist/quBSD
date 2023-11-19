@@ -342,12 +342,14 @@ ENDOFMSG
 	;;
 	_jo2) cat << ENDOFMSG
 
-${_value##*/}: All jails have ${_value#*qb-}ed
+ALERT: Another instance of qb-start or qb-stop is running.
+       Will wait for < $_value secs > before aborting. 
 ENDOFMSG
 	;;
 	_jo3) cat << ENDOFMSG
 
-ERROR: ${_value##*/} timeout. Gave up waiting for jails to ${_value#*qb-}
+ERROR: ${_value##*bin/} failed to ${_value##*qb-} all jails/VMs
+       within the allotted timeout of < $_passvar secs >.
 ENDOFMSG
 	;;
 	_jo4) cat << ENDOFMSG

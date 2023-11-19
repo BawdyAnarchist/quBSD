@@ -24,9 +24,11 @@ get_options() {
 	# This makes it so that _POSPARAMS has one parameter per line
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
 
-	# Temp file for IP tracking
+	# Temp files for locking, timeouts, and IP resolution 
+	_TMP_LOCK="${QTMP}/qb-startstop_lock"
+	_TMP_TIME="${QTMP}/qb-startstop_timeout"
 	_TMP_IP="${QTMP}/qb-start_temp_ip"
-
+	
 	# _STARTS is used for calculating the TIMEOUT later on. Initialize to zero
 	_STARTS=0
 }
@@ -36,11 +38,11 @@ checks() {
 	[ "$_TIMEOUT" ] && ! chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
 																		&& get_msg_start "_e5" "exit_1"
 
-	# Absolutely do not run if another instance if qb-start or qb-stop is already running
-	monitor_startstop || get_msg_start "_e0" "exit_1"
+	# Trap function
+	trap "cleanup_trapped" INT HUP TERM QUIT EXIT
 
-	# Function above removes the temp_ip tracker
-	mktemp "$_TMP_IP" > /dev/null 2>&1
+	# Ping check if qb-start may continue, get placed in queue, or exit if timeout happens 
+	monitor_startstop -p || get_msg_start "_e0" "exit_1"
 }
 
 climb_hierarchy() {
@@ -110,20 +112,16 @@ determine_ips() {
 begin_waterfall() {
 
 	_JAILS="$1"
-
 	for _JAIL in $_JAILS; do
-
 		# Only continue the waterfall if jail started successfully
 		start_jail "$_JAIL" 2>&1 || get_msg_start "_e4" "exit_1"
 
 		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion)
 		_SUBGATEWAYS='' ; _ENDPOINTS=''
-
 		for _client in $(get_info -e _CLIENTS $_JAIL); do
 
 			# Check that _client is on the FULLIST (save time)
 			if echo "$_FULLIST" | grep -Eq "(^|[[:blank:]]+)${_client}([[:blank:]]+|\$)" ; then
-
 				# If the _client has no further clients, it returns 1, and is an ENDPOINT
 				get_info _CLIENTS "$_client" \
 					&& _SUBGATEWAYS="$_SUBGATEWAYS $_client" \
@@ -133,15 +131,28 @@ begin_waterfall() {
 
 		# Start each endpoint
 		for _end in $_ENDPOINTS ; do
-
 			# Maintain a small stagger between parallel starts. Helps prevent conflicts
 			sleep .2
 			start_jail $_end 2>&1 &
+			_PIDS="$_PIDS $!"
 		done
 
 		# Subgateways need their own waterfall
 		[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS"
 	done
+	return 0
+}
+
+cleanup_trapped() {
+
+	# Immediately kill the monitoring PID, to help prevent any races for cleanup
+	ps -p $_MONITOR_PID > /dev/null 2>&1 && kill -9 $_MONITOR_PID
+
+	# Remove PID from the lock file. If it's empty, all tmp files can be removed
+	if [ -e "$_TMP_LOCK" ] ; then
+		sed -i '' -E "/^$$\$/ d" $_TMP_LOCK
+		[ ! -s "$_TMP_LOCK" ] && rm $_TMP_LOCK $_TMP_IP $_TMP_TIME > /dev/null 2>&1
+	fi
 }
 
 main() {
@@ -164,11 +175,21 @@ main() {
 	for _jail in $_HIERTOP; do
 		# Each hierarchy top is independent of each other, and can be started in parallel.
 		begin_waterfall $_jail &
+		_PIDS="$_PIDS $!"
 	done
 
-	# User specified, OR, 7.5 secs for every hierarchy level. Monitoring loop sleeps 0.5 sec
-	: ${_TIMEOUT:=$(( _STARTS * 15 ))}
-	monitor_startstop "$_TIMEOUT" || get_msg "_e6" "exit_1"
+	# STARTS keeps track of the number of hierchy levels. If 0, there was nothing to start
+echo S: $_STARTS
+	if [ "$_STARTS" -gt 0 ] ; then
+		# User specified timeout, or use 5 seconds for every hierarchy level 
+		monitor_startstop "${_TIMEOUT:=$(( _STARTS * 5))}" &
+		_MONITOR_PID="$!"
+
+		# Wait for starts to finish. If TIMEOUT, monitor_startstop will kill -15 this script 
+		wait $_PIDS && get_msg_start "_m1"
+	else
+		get_msg_start "_m2"
+	fi
 }
 
 

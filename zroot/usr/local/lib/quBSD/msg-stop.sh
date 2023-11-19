@@ -60,6 +60,17 @@ ALERT: Force stopping jails/VMs is non-graceful and not preferred.
 ENDOFMSG
 echo -e "Continue? (Y/n): \c"
 	;;
+	_m2) cat << ENDOFMSG
+
+All jails/VMs have been stopped 
+ENDOFMSG
+	;;
+	_m3) cat << ENDOFMSG
+
+All jails/VMs were already stopped. No action to take.
+ENDOFMSG
+	;;
+
 	esac
 
 	case $_pass_cmd in

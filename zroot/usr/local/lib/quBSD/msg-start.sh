@@ -49,10 +49,14 @@ ERROR: [-t <timeout>] must be integer from 5 to 600. Caution,
        longer if starting multiple gateways/clients in a row 
 ENDOFMSG
 	;;	
-	_e6) cat << ENDOFMSG
+	_m1) cat << ENDOFMSG
 
-ERROR: One or more jails appear to be hung and havent started.
-       Check /var/log/quBSD.sh for details.
+All jails/VMs have been started.
+ENDOFMSG
+	;;
+	_m2) cat << ENDOFMSG
+
+All jails/VMs were already running. No action to take. 
 ENDOFMSG
 	;;
 	esac

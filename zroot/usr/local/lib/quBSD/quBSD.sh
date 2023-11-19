@@ -726,72 +726,42 @@ reclone_zusr() {
 }
 
 monitor_startstop() {
-	# General function for monitoring start/stop functions sent to background. Can be used as a
-	# simple ping to avoid conflicting script execution; or to put a new start/stop in queue
-
-	# Ping option
-	getopts p _opts && local _ping=true && shift
-
-	# Files variables
-	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
-	_TMP_TIME="${_TMP_TIME:=${QTMP}/qb-startstop_timeout}"
-
-	# Timeout handling: Use passed timeout; then what's in file; then fallback to 1
-	_timeout="$1"
-	if [ -z "$_timeout" ] ; then
-		[ -e "$_TMP_TIME" ] && _timeout=$(cat $_TMP_TIME) && _nowrite="true"
-		[ -z "$_timeout" ] && _timeout="1"
-	fi
-
-	#######
-	# ADD LOGIC TO CONVERT TIMEOUT TO THE SLEEP PERIOD
-	#######
-
-	# Timeout logic
-	_cycle=0
-	while [ "$_cycle" -lt "$_timeout" ] ; do
-
-		if [ "$_ping" ] ; then
-			# If timeout file exists, wait for timeout. Sleep 0.6, because of process delays.
-			{ [ -e "$_TMP_TIME" ] && _cycle=$(( _cycle + 1 )) && sleep .6 ;} || return 0
-		else
-			echo "$(( _timeout - _cycle ))" > "$_TMP_TIME"
-			_cycle=$(( _cycle + 1 )) ; sleep 0.5
-		fi
-	done
-
-	if [ -z "$_ping" ] ; then
-		[ -e "$_TMP_IP" ] && rm "$_TMP_IP"
-		[ -e "$_TMP_TIME" ] && rm "$_TMP_TIME"
-
-		# Popup window to ask for forcible shutdown
-		_PROMPT=$(printf "%b" "\"i3-msg -q floating enable, move position center ; " \
-		"echo -e \'WARNING: VM < $JAIL > failed to shut down. Kill it? (Y/n): \\\c\' ; " \
-		"read _option ; if echo \\\\\$_option | grep -Eqs \'^(Y|y|yes|YES)$\' ; " \
-		"then _ASSM_Y=true sh /usr/local/bin/qb-stop -F $JAIL ; fi\"")
-#eval xterm -e sh -c $_PROMPT
-	fi
-	return 1
-}
-
-monitor_startstop() {
 	# PING: There's legit cases where consecutive calls to qb-start/stop could happen. [-p] handles
 	# potential races via _tmp_lock; puts the 2nd call into a timeout queue; and any calls after
 	# the 2nd one, are dropped. Not perfectly user friendly, but it's unclear if allowing a long
 	# queue is desirable. Better to error, and let the user try again.
-	# NON-PING: Give qb-start/stop time: _timeout for jails/VMs to start/stop before intervention
+	# NON-PING: Give qb-start/stop until $_timeout for jails/VMs to start/stop before intervention
 
-	local _timeout ; local _cycle
 	getopts p _opts && local _ping=true && shift
-	if [ "$_ping" ] ; then
 
+	# Monitoring loop is predicated on main script killing this one after successful starts/stops
+	if [ -z "$_ping" ] ; then
+		local _timeout="$1"
+		while [ "$_timeout" -ge 0 ] ; do
+			echo "$_timeout" > $_TMP_TIME
+			_timeout=$(( _timeout - 1 )) ; sleep 1
+echo ms1: $_timeout
+		done
+
+		# Last check before kill. If self PID was removed, then main has already completed.
+		if [ -e "$_TMP_LOCK" ] && [ ! "$(sed -n 1p $_TMP_LOCK)" = "$$" ] ; then
+			return 0
+		fi
+echo ms2
+		# Timeout has passed, kill qb-start/stop and cleanup files 
+		get_msg "_jo3" "$0" "$_TIMEOUT"
+		kill -15 --	-$$
+	fi
+
+	# Handle the [-p] ping case
+	if [ "$_ping" ] ; then
 		# Resolve any races. 1st line on lock file wins. 2nd line queues up. All others fail.
 		echo "$$" >> $_TMP_LOCK && sleep .1
 		[ "$(sed -n 1p $_TMP_LOCK)" = "$$" ] && return 0
 		[ ! "$(sed -n 2p $_TMP_LOCK)" = "$$" ] && sed -i '' -E "/^$$\$/ d" && return 1
 
 		# Timeout loop, wait for _TMP_TIME to be set with a _timeout
-		_cycle=0
+		local _cycle=0
 		while ! _timeout=$(cat $_TMP_TIME 2>&1) ; do
 			# Limit to 5 secs before returning error, so that one hang doesnt cause another
 			sleep .5  ;  _cycle=$(( _cycle + 1 ))
@@ -801,33 +771,15 @@ monitor_startstop() {
 			[ "$(sed -n 1p $_TMP_LOCK)" = "$$" ] && return 0
 		done
 
-# Inform the user of the new _timeout, waiting for jails/VMs to start/stop before proceding
-		get_msg "_" "$_timeout"
+		# Inform the user of the new _timeout, waiting for jails/VMs to start/stop before proceding
+		get_msg "_jo2" "$_timeout"
 
-		# Wait for primary qb-start/stop to complete, which removes PID, thus promoting this one
-		_cycle=0	 ; _timeout=$(( _timeout + 1 ))
-		while [ ! "$(sed -n 1p $_TMP_LOCK)" = "$$" ] ; do
-			sleep 0.5  ;  _cycle=$(( _cycle + 1 ))
-
-			# Check _TMP_TIME once more, since these arent perfect clocks, give it one more chance
-			if [ "$_cycle" -gt "$_timeout" ] ; then
-
-				# Get new timeout. Assume there's a problem, if -gt 2sec discrepancy (return 1)
-				_timeout=$(cat $_TMP_TIME 2>&1)
-				[ "$_timeout" -gt 2 ] && return 1
-
-				# Last chance
-				sleep "$(( _timeout + 1 ))"
-				[ "$(sed -n 1p $_TMP_LOCK)" = "$$" ] && return 0 || return 1
-			fi
+		# Wait for primary qb-start/stop to either complete, or timeout
+		while [ "$(cat $_TMP_TIME 2>&1)" -gt 0 ] 2>&1 ; do
+			[ "$(sed -n 1p $_TMP_LOCK)" = "$$" ] && return 0
+			sleep 0.5
 		done
-
-		# The loop exited because self PID was detected in the #1 spot. Ready to go.
-		return 0
 	fi
-
-	# EVERYTHING B
-	_timeout="$1"
 }
 
 monitor_vm_stop() {
@@ -1977,10 +1929,6 @@ setlog2() {
 	set -x
 	rm /root/debug2 > /dev/null 2>&1
 	exec > /root/debug2 2>&1
-}
-
-testtt() {
-	echo in testfunctpid: "$$"
 }
 
 

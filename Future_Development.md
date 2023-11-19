@@ -1,5 +1,15 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
+jail -r disp3 causes error about nonexistent 0net-template. I think it's the home dir problem
+
+qb-stop
+LAST MAJOR HURDLE. `wait $_PID` actually needs to be yet another tmp file, coz grandchild processes arent include in script `wait`
+- Dont forget to change TMP files to dot files. User doesnt need to see these
+- Remember to reset the TIMEOUT to 5
+	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
+	- It's too slow. There's got to be a way to make it more efficient
+	
+
 it looks like chk_valid_ipv4 at the end, it'll never make it to $_xp, coz return0 in digits checks
 
 # After SSH and scp is hammered out, make another system backup 
@@ -69,7 +79,6 @@ QMAP - New PARAM - CONNECT, that establishes a connection to a specified jail/VM
 
 ### SPECIFIC SCRIPTS
 
-qb-stop - Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
 
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
@@ -84,9 +93,6 @@ Error messages are a bit disorganized now. Need to have useful higher function m
 
 qb-list [-e] (evaluate) option to check jail-param combos for validity.
 
-qb-stop
-	- monitoring is still not right. It exits early, coz pgrep returns nothing after 2 cycles 
-	- It's too slow. There's got to be a way to make it more efficient
 
 qb-help - overhaul to act like a manpage. Replacing /usr/local/share/quBSD
 	- Each PARAM should have verbose message
@@ -99,6 +105,7 @@ qb-backup (already created in $ubin)
 	- cron to run on both sides of source and dest, with ssh hostname, to automate backups
 
 qb-stat - Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
+
 
 
 ### GENERAL / BEST PRACTICES / CLEANUP
