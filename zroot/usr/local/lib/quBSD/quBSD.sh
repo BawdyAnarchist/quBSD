@@ -740,14 +740,13 @@ monitor_startstop() {
 		while [ "$_timeout" -ge 0 ] ; do
 			echo "$_timeout" > $_TMP_TIME
 			_timeout=$(( _timeout - 1 )) ; sleep 1
-echo ms1: $_timeout
 		done
 
 		# Last check before kill. If self PID was removed, then main has already completed.
 		if [ -e "$_TMP_LOCK" ] && [ ! "$(sed -n 1p $_TMP_LOCK)" = "$$" ] ; then
 			return 0
 		fi
-echo ms2
+
 		# Timeout has passed, kill qb-start/stop and cleanup files 
 		get_msg "_jo3" "$0" "$_TIMEOUT"
 		kill -15 --	-$$

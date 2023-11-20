@@ -2,14 +2,6 @@
 
 jail -r disp3 causes error about nonexistent 0net-template. I think it's the home dir problem
 
-qb-stop
-LAST MAJOR HURDLE. `wait $_PID` actually needs to be yet another tmp file, coz grandchild processes arent include in script `wait`
-- Dont forget to change TMP files to dot files. User doesnt need to see these
-- Remember to reset the TIMEOUT to 5
-	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
-	- It's too slow. There's got to be a way to make it more efficient
-	
-
 it looks like chk_valid_ipv4 at the end, it'll never make it to $_xp, coz return0 in digits checks
 
 # After SSH and scp is hammered out, make another system backup 
@@ -79,6 +71,9 @@ QMAP - New PARAM - CONNECT, that establishes a connection to a specified jail/VM
 
 ### SPECIFIC SCRIPTS
 
+qb-stop
+	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
+	- It's too slow. There's got to be a way to make it more efficient
 
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 

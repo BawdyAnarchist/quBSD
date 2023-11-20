@@ -23,8 +23,8 @@ get_options() {
 	_TMP_LOCK="${QTMP}/qb-startstop_lock"
 	_TMP_TIME="${QTMP}/qb-startstop_timeout"
 
-	# _STARTS is used for calculating the TIMEOUT later on. Initialize to zero
-	_STARTS=0
+	# _STOPS is used for calculating the TIMEOUT later on. Initialize to zero
+	_STOPS=0
 }
 
 checks() {
@@ -62,7 +62,7 @@ climb_hierarchy() {
 
       # If _JAIL is on JLIST, and is running, increment _starts, for timeout calculation
 		echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" \
-			&& chk_isrunning "$_JAIL" && _starts=$(( _starts + 1 ))
+			&& chk_isrunning "$_JAIL" && _stops=$(( _stops + 1 ))
 
 	# jail has a gateway, which (might) be preferenced for shutdown ahead of it
 	else
@@ -71,14 +71,14 @@ climb_hierarchy() {
 
       # If _JAIL is on JLIST, and is running, increment _starts, for timeout calculation
 		echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" \
-			&& chk_isrunning "$_JAIL" && _starts=$(( _starts + 1 ))
+			&& chk_isrunning "$_JAIL" && _stops=$(( _stops + 1 ))
 
 		# Will continue recursively until hierarchy top is reached
 		climb_hierarchy "$_gateway"
 	fi
 
 	# Chose the larger of the two values. This is the number of serial starts for TIMEOUT calc
-	[ "$_starts" -gt "$_STARTS" ] && _STARTS="$_starts"
+	[ "$_stops" -gt "$_STOPS" ] && _STOPS="$_stops"
 }
 
 begin_waterfall() {
@@ -115,12 +115,16 @@ begin_waterfall() {
 			# If the endpoint is on JLIST, stop it in the background
 			echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_end}([[:blank:]]+|\$)" \
 				&& stop_jail "$_end" &
-				_PIDS="$_PIDS $!"
+				_SJ_PIDS="$_SJ_PIDS $!"		
 		done
 
 		# Subgateways need their own recursive waterfall
 		[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS"
 	done
+
+	# Wait for all of the stop_jail sent to background to finish, and then return 0
+	wait $_SJ_PIDS
+	return 0
 }
 
 force_stop_jlist() {
@@ -146,7 +150,7 @@ cleanup_trapped() {
    # Remove PID from the lock file. If it's empty, all tmp files can be removed
 	if [ -e "$_TMP_LOCK" ] ; then
 		sed -i '' -E "/^$$\$/ d" $_TMP_LOCK
-		[ ! -s "$_TMP_LOCK" ] && rm $_TMP_LOCK $_TMP_IP $_TMP_TIME > /dev/null 2>&1
+		[ ! -s "$_TMP_LOCK" ] && rm $_TMP_LOCK $_TMP_IP $_TMP_TIME $_TMP_PIDS > /dev/null 2>&1
 	fi
 } 
 
@@ -165,7 +169,7 @@ main() {
 	for _jlist in $_JLIST ; do
 
 		# Function is recursive, so _depth tracks # of cycles to prevent infinite loop.
-		_depth=0 ; _starts=0
+		_depth=0 ; _stops=0
 		climb_hierarchy "$_jlist"
 	done
 
@@ -174,22 +178,20 @@ main() {
 
 		# Hierarchy tops are independent, can be stopped in parallel.
 		begin_waterfall $_JAIL &
-		_PIDS="$_PIDS $!"
+		_WF_PIDS="$_WF_PIDS $!"	
 	done
 
 	# STARTS keeps track of the number of hiearchy leves. If 0, there was nothing to stop
-echo S: $_STARTS
-	if [ "$_STARTS" -gt 0 ] ; then 
-		# User specified timeout, or 5 secs for every hierarchy level
-		monitor_startstop "${_TIMEOUT:=$(( _STARTS * 5 ))}" &
-		_MONITOR_PID="$!"
+	[ "$_STOPS" = 0 ] && get_msg_stop "_m3"	
+
+	# User specified timeout, or 5 secs for every hierarchy level
+	monitor_startstop "${_TIMEOUT:=$(( _STOPS * 5 ))}" &
+	_MONITOR_PID="$!"
 	
-		# Wait for stops to finish. If TIMEOUT, monitor_startstop will kill -15 this script
-		wait $_PIDS && get_msg_stop "_m2"
-		[ "$_RESTART" ] && exec qb-start "$_JLIST"
-	else
-		get_msg_stop "_m3"	
-	fi
+	# Wait for stops to finish. If TIMEOUT, monitor_startstop will kill -15 this script
+	wait $_WF_PIDS && get_msg_stop "_m2"
+
+	[ "$_RESTART" ] && cleanup_trapped && exec qb-start "$_JLIST"
 }
 
 get_global_variables

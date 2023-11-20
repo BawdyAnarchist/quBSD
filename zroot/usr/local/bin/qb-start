@@ -132,14 +132,17 @@ begin_waterfall() {
 		# Start each endpoint
 		for _end in $_ENDPOINTS ; do
 			# Maintain a small stagger between parallel starts. Helps prevent conflicts
-			sleep .2
+			sleep .1
 			start_jail $_end 2>&1 &
-			_PIDS="$_PIDS $!"
+			_SJ_PIDS="$_SJ_PIDS $!"
 		done
 
 		# Subgateways need their own waterfall
 		[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS"
 	done
+
+	# Wait for all of the start_jail sent to background to finish
+	wait $_SJ_PIDS
 	return 0
 }
 
@@ -151,7 +154,7 @@ cleanup_trapped() {
 	# Remove PID from the lock file. If it's empty, all tmp files can be removed
 	if [ -e "$_TMP_LOCK" ] ; then
 		sed -i '' -E "/^$$\$/ d" $_TMP_LOCK
-		[ ! -s "$_TMP_LOCK" ] && rm $_TMP_LOCK $_TMP_IP $_TMP_TIME > /dev/null 2>&1
+		[ ! -s "$_TMP_LOCK" ] && rm $_TMP_LOCK $_TMP_IP $_TMP_TIME $_TMP_PIDS > /dev/null 2>&1
 	fi
 }
 
@@ -175,21 +178,19 @@ main() {
 	for _jail in $_HIERTOP; do
 		# Each hierarchy top is independent of each other, and can be started in parallel.
 		begin_waterfall $_jail &
-		_PIDS="$_PIDS $!"
+		_WF_PIDS="$_WF_PIDS $!"	
 	done
 
 	# STARTS keeps track of the number of hierchy levels. If 0, there was nothing to start
-echo S: $_STARTS
-	if [ "$_STARTS" -gt 0 ] ; then
-		# User specified timeout, or use 5 seconds for every hierarchy level 
-		monitor_startstop "${_TIMEOUT:=$(( _STARTS * 5))}" &
-		_MONITOR_PID="$!"
+	[ "$_STARTS" = 0 ] && get_msg_start "_m2"
 
-		# Wait for starts to finish. If TIMEOUT, monitor_startstop will kill -15 this script 
-		wait $_PIDS && get_msg_start "_m1"
-	else
-		get_msg_start "_m2"
-	fi
+	# User specified timeout, or use 5 seconds for every hierarchy level 
+	monitor_startstop "${_TIMEOUT:=$(( _STARTS * 5))}" &
+	_MONITOR_PID="$!"
+
+	# Wait for starts to finish. If TIMEOUT, monitor_startstop will kill -15 this script 
+	wait $_WF_PIDS
+	get_msg_start "_m1"
 }
 
 
