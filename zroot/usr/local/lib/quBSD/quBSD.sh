@@ -155,7 +155,7 @@ get_parameter_lists() {
 	getopts n _opts && local _nc="true" && shift
 
 	# List out normal parameters which can be checked (vs BHYVE_CUSTM)
-	COMN_PARAMS="AUTOSTART AUTOSNAP CLASS CPUSET GATEWAY IPV4 MTU NO_DESTROY ROOTENV"
+	COMN_PARAMS="AUTOSTART AUTOSNAP CLASS CONTROL CPUSET GATEWAY IPV4 MTU NO_DESTROY ROOTENV"
 	JAIL_PARAMS="MAXMEM SCHG SECLVL"
 	VM_PARAMS="BHYVEOPTS MEMSIZE TAPS TMUX VCPUS VNCRES WIREMEM"
 	MULT_LN_PARAMS="BHYVE_CUSTM PPT"
@@ -170,7 +170,7 @@ get_parameter_lists() {
 			appVM|rootVM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS $MULT_LN_PARAMS" ;;
 			dispVM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS $MULT_LN_PARAMS TEMPLATE" ;;
 			dispjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE" ;;
-			appjail|rootjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS" ;;
+			appjail|rootjail|cjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS" ;;
 		esac
 	fi
 
@@ -494,22 +494,23 @@ connect_client_to_gateway() {
 	# GLOBAL VARIABLES must have been assigned already: $GATEWAY ; $IPV4 ; $MTU
 		# -e (e)cho result  ;  -m (m)tu  ;  -q (q)uiet  ;  -t (t)ype [NET or SSH]
 
-	local _ipv4=
-	while getopts ei:m:q opts ; do case $opts in
-			e) local _ec='true' ;;
-			i) local _ipv4="$OPTARG"  ;;
-			m) local _mtu="$OPTARG" ;;
-			q) local _q='-q' ;;
+	local _ipv4=  ;  local _type  ;  local _ec  ;  local _mtu  ;  local _q
+	while getopts cei:m:q opts ; do case $opts in
+			c) _type="SSH" ;;
+			e) _ec='true' ;;
+			i) _ipv4="$OPTARG"  ;;
+			m) _mtu="$OPTARG" ;;
+			q) _q='-q' ;;
 			*) get_msg "_1" ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Pos params, default MTU, and _type
 	local _client="$1"  ;  local _gateway="$2"
-	local _mtu="${MTU:=$(get_jail_parameter -des MTU $_gateway)}"
-	[ "$_gateway" = "0control" ] && local _type="SSH" || _type="NET"
+	_mtu="${MTU:=$(get_jail_parameter -des MTU $_gateway)}"
+	_type="${_type:=NET}"
 
 	# If IP wasnt provided, then find an available one
-	[ -z "$_ipv4" ] && local _ipv4=$(assign_ipv4_auto -e "$_client" "$_gateway")
+	[ -z "$_ipv4" ] && local _ipv4=$(assign_ipv4_auto -et "$_type" "$_client" "$_gateway")
 
 	# This function can be called by multiple scripts/functions that dont know which is a VM or jail
 	if chk_isvm "$_client" ; then
@@ -565,9 +566,10 @@ connect_gateway_to_clients() {
 	[ -z "$_gateway" ] && get_msg $_q "_0" "Jail/VM" && return 1
 
 	# All onjails connect to 0control
-	if [ "$_gateway" = "0control" ] ; then
-		for _client in $(get_info -e _ONJAILS | grep -v "0control") ; do
-			connect_client_to_gateway "$_client" "$_gateway"
+	if [ "$CLASS" = "cjail" ] ; then
+		for _client in $(get_info -e _ONJAILS | grep -v "$_gateway") ; do
+			[ "$(get_jail_parameter -dqsz CONTROL $_client)" = "$_gateway" ] \
+					&& connect_client_to_gateway "$_client" "$_gateway"
 		done
 	fi
 
@@ -713,9 +715,9 @@ reclone_zusr() {
 	zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs}
 
 	# Drop the flags for etc directory and add the user for the jailname
-	chflags -R noschg ${M_ZUSR}/${_jail}/rw
-	chflags noschg ${M_ZUSR}/${_jail}/usr/home/${_template}
-
+	[ -e "${M_ZUSR}/${_jail}/rw" ] && chflags -R noschg ${M_ZUSR}/${_jail}/rw
+	[ -e "${M_ZUSR}/${_jail}/usr/home/${_template}" ] \
+			&& chflags noschg ${M_ZUSR}/${_jail}/usr/home/${_template}
 	# Replace the <template> jailname in fstab with the new <jail>
 	sed -i '' -e "s/${_template}/${_jail}/g" ${M_ZUSR}/${_jail}/rw/etc/fstab > /dev/null 2>&1
 
@@ -747,7 +749,7 @@ monitor_startstop() {
 			return 0
 		fi
 
-		# Timeout has passed, kill qb-start/stop and cleanup files 
+		# Timeout has passed, kill qb-start/stop and cleanup files
 		get_msg "_jo3" "$0" "$_TIMEOUT"
 		kill -15 --	-$$
 	fi
@@ -935,17 +937,19 @@ chk_valid_jail() {
 	# Checks that jail has JCONF, QMAP, and corresponding ZFS dataset
 	# Return 0 for passed all checks, return 1 for any failure
 
-	# Quiet option
-	getopts q _opts && local _qv='-q' && shift
-	[ "$1" = "--" ] && shift
+	local _class ; local _template ; local _class_of_temp
+	while getopts c:q opts ; do case $opts in
+			c) _class="$OPTARG" ;;
+			q) _qv='-q' ;;
+			*) get_msg "_1" ; return 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	# Positional parmeters and function specific variables.
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_qv "_0" "jail" && return 1
-	local _class ; local _template ; local _class_of_temp
 
 	# Must have class in QMAP. Used later to find the correct zfs dataset
-	_class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
+	_class="${_class:=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)}"
 	chk_valid_class $_qv "$_class" || return 1
 
 	case $_class in
@@ -958,7 +962,7 @@ chk_valid_jail() {
 			! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
 					| grep -Eq '^-$'  && get_msg $_qv "_cj4" "$_value" "$R_ZFS" && return 1
 		;;
-		appjail)
+		appjail|cjail)
 			# Appjails require a dataset at quBSD/zusr
 			! chk_valid_zfs ${U_ZFS}/${_value}\
 					&& get_msg $_qv "_cj4" "$_value" "$U_ZFS" && return 1
@@ -980,7 +984,7 @@ chk_valid_jail() {
 					&& get_msg $_qv "_cj5_1" "$_value" "$_template" && return 1
 
 			# Ensure that the template being referenced is valid
-			! chk_valid_jail $_qv "$_template" \
+			! chk_valid_jail $_qv -c "$_class_of_temp" "$_template" \
 					&& get_msg $_qv "_cj6" "$_value" "$_template" && return 1
 		;;
 		rootVM)
@@ -1055,10 +1059,10 @@ chk_valid_class() {
 	[ "$1" = "--" ] && shift
 	local _value="$1"
 
-	# Valid inputs are: appjail | rootjail | dispjail | appVM | rootVM
+	# Valid inputs are: appjail | rootjail | cjail | dispjail | appVM | rootVM
 	case $_value in
 		'') get_msg $_q "_0" "CLASS" && return 1 ;;
-		appjail|dispjail|rootjail|rootVM|appVM) return 0 ;;
+		appjail|dispjail|rootjail|cjail|rootVM|appVM) return 0 ;;
 		*) get_msg $_q "_cj2" "$_value" "CLASS" && return 1 ;;
 	esac
 }
@@ -1091,6 +1095,14 @@ chk_valid_cpuset() {
 	return 0
 }
 
+chk_valid_control() {
+	getopts q _opts && local _qt='-q' && shift
+	[ "$1" = "--" ] && shift
+	local _value="$1"
+	local _class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
+	! chk_valid_jail $_qt -c "$_class" "$_value" && return 1 || return 0
+}
+
 chk_valid_devfs_rule() {
 	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
@@ -1118,7 +1130,7 @@ chk_valid_gateway() {
 		get_msg $_q "_cj7_1" "$_gw" && return 1
 	else
 		# Check that gateway is a valid jail.
- 		chk_valid_jail $_q "$_gw" || return 1
+ 		chk_valid_jail $_q -c "$_class_gw" "$_gw" || return 1
 	fi
 	return 0
 }
@@ -1142,7 +1154,8 @@ chk_valid_ipv4() {
 	case $_value in
 		'') get_msg $_q "_0" "IPV4" && return 1 ;;
 		none|DHCP) return 0 ;;
-		auto) [ -n "$_rp" ] && { _value=$(assign_ipv4_auto -e "$_jail") && return 0 ;} || return 1 ;;
+		auto) [ "$_rp" ] && { _value=$(assign_ipv4_auto -et NET "$_jail") && return 0 ;} || return 1
+			;;
 	esac
 
 	# Temporary variables used for checking ipv4 CIDR
@@ -1353,7 +1366,7 @@ chk_valid_rootenv() {
 	[ -z "$_value" ] && get_msg $_q "_0" "CLASS" && return 1
 
 	# Must be designated as the appropriate corresponding CLASS in QMAP
-	_class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
+	local _class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 	if chk_isvm "$_value" ; then
 		[ ! "$_class" = "rootVM" ] && get_msg $_q "_cj16" "$_value" "rootVM" && return 1
 	else
@@ -1486,18 +1499,22 @@ define_ipv4_convention() {
 	# and chk_isqubsd_ipv4(). Not best practice, but they're unique from any others.
 	# Return: 0 for normal assignment; 1 for net-firewall. gateway=0control goes first
 
-	local _client="$1"  ;  local _gateway="$2"
+	while getopts t: opts ; do case $opts in
+			t) local _type="$OPTARG" ;;
+			*) get_msg "_1" ; return 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
+	local _client="$1"
 	# _ip assignments are static, except for $_ip1
 	_ip0=10 ; _ip2=1 ; _ip3=2 ; _subnet=30
 
 	# Combo of function caller and JAIL/VM determine which IP form to use
-	case "$0" in
-		*qb-connect) # Temporary, adhoc connections have the form: 10.99.x.2/30
+	case $_type in
+		ADHOC) # Temporary, adhoc connections have the form: 10.99.x.2/30
 			_ip1=88 ; _subnet=29 ;;
-		*) case "${_client}_${_gateway}" in
-				*_0control) # The control jail operates on 10.99.x.0/30
-					_ip1=99 ; _subnet=30 ;;
+		SSH) # Control jails operate on 10.99.x.0/30
+			_ip1=99 ; _subnet=30 ;;
+		NET|*) case "${_client}" in
 				net-firewall*) # firewall IP is not internally assigned, but router dependent.
 					_cycle=256 ; return 1 ;;
 				net-*) # net jails IP address convention is: 10.255.x.0/30
@@ -1511,22 +1528,25 @@ define_ipv4_convention() {
 }
 
 discover_open_ipv4() {
-	# Finds an IP address unused by any running jails, or in qubsdmap.conf
-	# Echo open IP on success; Returns 1 if failure to find an available IP
+	# Finds an IP address unused by any running jails, or in qubsdmap.conf. Requires [-t], to resolve
+	# the different types of IPs, like with control jails, net jails, or adhoc connections.
+	# Echo open IP on success; Returns 1 if failure to find an available IP.
 
-	# Positional params and func variables.
-	getopts q _opts && local _qi='-q' && shift
-	[ "$1" = "--" ] && shift
+	while getopts qt: opts ; do case $opts in
+			q) _qi="-q" ;;
+			t) local _type="$OPTARG" ;;
+			*) get_msg "_1" ; return 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
-	local _client="$1"  ;  local _gateway="$2"  ;  local _ip_test
-	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
+	local _client="$1"  ;  local _ip_test
+	_TMP_IP="${_TMP_IP:=${QTMP}/.qb-start_temp_ip}"
 	_gateway=${_gateway:="$(get_jail_parameter -deqs GATEWAY $_client)"}
 
 	# If gateway is a VM, then DHCP will be required, regardless
 	chk_isvm "$_gateway" && echo "DHCP" && return 0
 
 	# Assigns values for each IP position, and initializes $_cycle
-	define_ipv4_convention "$_client" "$_gateway"
+	define_ipv4_convention -t "$_type" "$_client" "$_gateway"
 
 	# Get a list of all IPs in use. Saves to variable $_USED_IPS
 	get_info _USED_IPS
@@ -1559,23 +1579,22 @@ assign_ipv4_auto() {
 	# IPV4 assignment during parallel jail starts, has potetial for overlapping IPs. $_TMP_IP
 	# file is used for deconfliction during qb-start, and must be referenced by exec.created
 
-	# Positional params and func variables.
-	getopts e _opts && _echo="true" && shift
-	[ "$1" = "--" ] && shift
+	while getopts et: opts ; do case $opts in
+			e) _echo="true" ;;
+			t) local _type="$OPTARG" ;;
+			*) get_msg "_1" ; return 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	local _client="$1"  ;  _gateway="$2"  ;  local _ipv4=
-	_TMP_IP="${_TMP_IP:=${QTMP}/qb-start_temp_ip}"
+	_TMP_IP="${_TMP_IP:=${QTMP}/.qb-start_temp_ip}"
 
 	# Pull pre-set IPV4 from the temp file if it exists, based on 0control or normal
 	if [ -e "$_TMP_IP" ] ; then
-		if [ "$_gateway" = "0control" ] ; then
-			local _ipv4=$(sed -nE "s#^${_client} SSH ##p" $_TMP_IP)
-		else
-			local _ipv4=$(sed -nE "s#^${_client} NET ##p" $_TMP_IP)
-	fi fi
+		_ipv4=$(sed -nE "s#^${_client} $_type ##p" $_TMP_IP)
+	fi
 
 	# If there was no ipv4 assigned to _client in the temp file, then find an open ip for the jail.
-	[ -z "$_ipv4" ] && _ipv4=$(discover_open_ipv4 "$_client" "$_gateway")
+	[ -z "$_ipv4" ] && _ipv4=$(discover_open_ipv4 -t "$_type" "$_client" "$_gateway")
 
 	# Echo option or assign global IPV4
 	[ "$_echo" ] && echo "$_ipv4" || IPV4="$_ipv4"

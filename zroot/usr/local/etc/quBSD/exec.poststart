@@ -5,16 +5,16 @@
 get_options() {
 	JAIL="$1"
 	get_jail_parameter -d SCHG "$JAIL"
-	get_jail_parameter -d SECLVL "$JAIL" 
+	get_jail_parameter -d SECLVL "$JAIL"
 }
 
 handle_dhcp() {
 	# This is a bit of a hack, since I couldnt figure out why rc 'ifconfig_tapX="DHCP"' was not
 	# working. Obviously cant start dhclient in exec.created before netif is up.
-	if [ "$(get_jail_parameter -desz IPV4 "$JAIL")" = "DHCP" ] ; then 
+	if [ "$(get_jail_parameter -desz IPV4 "$JAIL")" = "DHCP" ] ; then
 
 		# Get gateway, VIF, then start dhclient in the jail
-		get_jail_parameter -dqsz GATEWAY "$JAIL" 
+		get_jail_parameter -dqsz GATEWAY "$JAIL"
 		VIF=$(sed -En "s/ NET//p" "${QTMP}/vmtaps_${GATEWAY}")
 		jexec -l -U root $JAIL dhclient $VIF > /dev/null 2>&1 &
 	fi
@@ -35,9 +35,9 @@ security_flags() {
 	for _d in $_jdir; do
 		[ -e "${M_QROOT}/${JAIL}${_d}" ] \
 				&& chflags -R schg "${M_QROOT}/${JAIL}${_d}" > /dev/null 2>&1
-	done 
+	done
 
-	# exec.poststart is always sent to background. Don't report seclvl change 
+	# exec.poststart is always sent to background. Don't report seclvl change
 	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL" > /dev/null 2>&1
 }
 

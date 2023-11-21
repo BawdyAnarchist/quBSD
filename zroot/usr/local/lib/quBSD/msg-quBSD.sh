@@ -113,6 +113,7 @@ net-firewall      nicvm          External Router Dependent
 net-<gateway>     net-firewall   10.255.x.2/30
 serv-jails        net-firewall   10.128.x.2/30
 appjails          net-<gateway>  10.1.x.2/30
+cjails            none           10.99.x.2/30
 usbvm             variable       10.88.88.1/30
 < adhoc created by qb-connect >  10.99.x.2/30
 ENDOFMSG
@@ -343,7 +344,7 @@ ENDOFMSG
 	_jo2) cat << ENDOFMSG
 
 ALERT: Another instance of qb-start or qb-stop is running.
-       Will wait for < $_value secs > before aborting. 
+       Will wait for < $_value secs > before aborting.
 ENDOFMSG
 	;;
 	_jo3) cat << ENDOFMSG
@@ -393,7 +394,7 @@ ENDOFMSG
 	;;
 	_je7) cat << ENDOFMSG
 
-ERROR: $_value must be an integer 
+ERROR: $_value must be an integer
 ENDOFMSG
 	;;
 	_je8) cat << ENDOFMSG

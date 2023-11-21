@@ -1,10 +1,10 @@
 #!/bin/sh
 
-# Cleanly remove and destroy epairs before shutdown 
+# Cleanly remove and destroy epairs before shutdown
 
 # Script variables
 JAIL="$1"
-echo "Stopping $JAIL. $(date "+%Y-%m-%d_%H:%M")" >> /var/log/quBSD.log 
+echo "Stopping $JAIL. $(date "+%Y-%m-%d_%H:%M")" >> /var/log/quBSD.log
 
 TAPS=$(jexec -l -U root $JAIL ifconfig -g tap)
 EPAIRS=$(jexec -l -U root $JAIL ifconfig -g epair)
@@ -12,16 +12,16 @@ EPAIRS=$(jexec -l -U root $JAIL ifconfig -g epair)
 # Remove all taps from jail
 for _tap in $TAPS; do
 	ifconfig $_tap -vnet $JAIL
-	ifconfig $_tap down 
+	ifconfig $_tap down
 done
 
-# Remove all epairs from jail 
+# Remove all epairs from jail
 for _epair in $EPAIRS ; do
 	ifconfig $_epair -vnet $JAIL
 	ifconfig $_epair destroy
 done
 
-# Must remove pefs mounts to avoid umount errors as jail is stopped 
+# Must remove pefs mounts to avoid umount errors as jail is stopped
 qb-pefs -u $JAIL | tee -a $QBLOG
 
 # Prevents error for wg-quick changing resolv.conf

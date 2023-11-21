@@ -153,7 +153,7 @@ modify_autosnap() {
 		;;
 
 		# Appjail/VM will have zusr. Dispjail might, but if not will fail to continue
-		appjail|dispjail|appVM)
+		appjail|cjail|dispjail|appVM)
 			_ZFS="${U_ZFS}/${JAIL}"
 			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
 					&& zfs get qubsd:autosnap "$_ZFS"

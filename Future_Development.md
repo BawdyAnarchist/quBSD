@@ -1,6 +1,12 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-jail -r disp3 causes error about nonexistent 0net-template. I think it's the home dir problem
+
+# Stuff fkd up with 0control, causing networking errors on starts. Generalize 0control
+all jails must now have SSHD installed
+connect_gateway_to_clients
+	- maybe that's the place for isc-dhcpd, named, pf, and wireguard restarts
+double check the handling of `none` for 0control
+
 
 it looks like chk_valid_ipv4 at the end, it'll never make it to $_xp, coz return0 in digits checks
 

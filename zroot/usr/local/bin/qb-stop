@@ -20,8 +20,8 @@ get_options() {
 	# This makes it so that _POSPARAMS has one parameter per line
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
 
-	_TMP_LOCK="${QTMP}/qb-startstop_lock"
-	_TMP_TIME="${QTMP}/qb-startstop_timeout"
+	_TMP_LOCK="${QTMP}/.qb-startstop_lock"
+	_TMP_TIME="${QTMP}/.qb-startstop_timeout"
 
 	# _STOPS is used for calculating the TIMEOUT later on. Initialize to zero
 	_STOPS=0
@@ -34,7 +34,7 @@ checks() {
 	# Set trap to cleanup files on exit
 	trap "cleanup_trapped" INT TERM HUP QUIT EXIT
 
-   # Ping check if qb-stop may continue, get placed in queue, or exit if timeout happens 
+   # Ping check if qb-stop may continue, get placed in queue, or exit if timeout happens
 	monitor_startstop -p || get_msg_stop "_e0" "exit_1"
 }
 
@@ -93,7 +93,7 @@ begin_waterfall() {
 
 		# Serial stop for gateways. Exception: VMs can stop in background (no VIF race conds)
 		echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" \
-			&& eval stop_jail "$_JAIL"
+			&& echo eval stop_jail "$_JAIL"
 
 		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion)
 		_SUBGATEWAYS='' ; _ENDPOINTS=''
@@ -114,8 +114,8 @@ begin_waterfall() {
 
 			# If the endpoint is on JLIST, stop it in the background
 			echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_end}([[:blank:]]+|\$)" \
-				&& stop_jail "$_end" &
-				_SJ_PIDS="$_SJ_PIDS $!"		
+				&& echo stop_jail "$_end" &
+				_SJ_PIDS="$_SJ_PIDS $!"
 		done
 
 		# Subgateways need their own recursive waterfall
@@ -144,7 +144,7 @@ force_stop_jlist() {
 
 cleanup_trapped() {
 
-	# Immediately kill the monitoring PID, to help prevent any races for cleanup 
+	# Immediately kill the monitoring PID, to help prevent any races for cleanup
 	ps -p $_MONITOR_PID > /dev/null 2>&1 && kill -9 $_MONITOR_PID
 
    # Remove PID from the lock file. If it's empty, all tmp files can be removed
@@ -152,7 +152,7 @@ cleanup_trapped() {
 		sed -i '' -E "/^$$\$/ d" $_TMP_LOCK
 		[ ! -s "$_TMP_LOCK" ] && rm $_TMP_LOCK $_TMP_IP $_TMP_TIME $_TMP_PIDS > /dev/null 2>&1
 	fi
-} 
+}
 
 main() {
 
@@ -173,21 +173,24 @@ main() {
 		climb_hierarchy "$_jlist"
 	done
 
+	# Stop 0control first. It has
+	echo "$_HIERTOP" | grep -qs 0control && echo stop_jail 0control
+
 	# Stop the hierarchy tops, then their clients, until all of _JLIST is stopped.
 	for _JAIL in $_HIERTOP; do
 
 		# Hierarchy tops are independent, can be stopped in parallel.
 		begin_waterfall $_JAIL &
-		_WF_PIDS="$_WF_PIDS $!"	
+		_WF_PIDS="$_WF_PIDS $!"
 	done
 
 	# STARTS keeps track of the number of hiearchy leves. If 0, there was nothing to stop
-	[ "$_STOPS" = 0 ] && get_msg_stop "_m3"	
+	[ "$_STOPS" = 0 ] && get_msg_stop "_m3" "exit_1"
 
 	# User specified timeout, or 5 secs for every hierarchy level
 	monitor_startstop "${_TIMEOUT:=$(( _STOPS * 5 ))}" &
 	_MONITOR_PID="$!"
-	
+
 	# Wait for stops to finish. If TIMEOUT, monitor_startstop will kill -15 this script
 	wait $_WF_PIDS && get_msg_stop "_m2"
 

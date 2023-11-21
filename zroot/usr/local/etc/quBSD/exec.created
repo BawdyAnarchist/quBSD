@@ -11,6 +11,7 @@ get_parameters() {
 	get_jail_parameter -d  GATEWAY "$JAIL"  ||  exit 1
 	get_jail_parameter -d  MAXMEM  "$JAIL"  ||  exit 1
 	get_jail_parameter -d  CPUSET  "$JAIL"  ||  exit 1
+	get_jail_parameter -d  CONTROL "$JAIL"  ||  exit 1
 
 	# MTU only with valid IP. Quiet messages (MTU is not critical)
 	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter -d MTU "$JAIL"
@@ -96,9 +97,9 @@ main() {
 	# If there's a dhcpd.conf in the jail, then modify it
 	[ -e "$DHCP" ] && modify_dhcpd
 
-	if [ ! "$JAIL" = "0control" ] ; then
-		# Connect JAIL to 0control SSH 
-		connect_client_to_gateway "$JAIL" "0control"
+	if [ ! "$CLASS" = "cjail" ] ; then
+		# Connect JAIL to 0control SSH
+		chk_isrunning "$CONTROL" && connect_client_to_gateway -c "$JAIL" "$CONTROL"
 
 		# Connect jail to its gateway, retrieving the VIF assigned
 		chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -ei $IPV4 "$JAIL" "$GATEWAY")

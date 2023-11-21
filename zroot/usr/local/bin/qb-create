@@ -524,7 +524,7 @@ guided_mode() {
 		# Messages diverge based on CLASS
 		case $CLASS in
 			rootjail) get_msg_create "_m5" ; get_msg_create "_resp2" ;;
-			appjail)  get_msg_create "_m6" ; get_msg_create "_resp2" ;;
+			appjail|cjail)  get_msg_create "_m6" ; get_msg_create "_resp2" ;;
 			dispjail) get_msg_create "_m7" ;;
 		esac
 
@@ -537,11 +537,11 @@ guided_mode() {
 			rootjail_3) get_msg_create "_resp2" ;;
 
 			# Will either use template and return to main program, or stay and get parameters
-			appjail_1)  return 0 ;;
-			appjail_2)  : ;;
+			appjail_1|cjail_1)  return 0 ;;
+			appjail_2|cjail_2)  : ;;
 
 			# These cases need to get user entered template, show parameters, and confirm again
-			appjail_3|dispjail*)
+			appjail_3|cjail_3|dispjail*)
 					get_msg_create "_resp1" "_cont" "TEMPLATE"
 
 					# Give user opportunity to keep checking different template parameters

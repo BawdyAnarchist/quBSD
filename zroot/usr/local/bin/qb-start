@@ -24,11 +24,11 @@ get_options() {
 	# This makes it so that _POSPARAMS has one parameter per line
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
 
-	# Temp files for locking, timeouts, and IP resolution 
-	_TMP_LOCK="${QTMP}/qb-startstop_lock"
-	_TMP_TIME="${QTMP}/qb-startstop_timeout"
-	_TMP_IP="${QTMP}/qb-start_temp_ip"
-	
+	# Temp files for locking, timeouts, and IP resolution
+	_TMP_LOCK="${QTMP}/.qb-startstop_lock"
+	_TMP_TIME="${QTMP}/.qb-startstop_timeout"
+	_TMP_IP="${QTMP}/.qb-start_temp_ip"
+
 	# _STARTS is used for calculating the TIMEOUT later on. Initialize to zero
 	_STARTS=0
 }
@@ -41,7 +41,7 @@ checks() {
 	# Trap function
 	trap "cleanup_trapped" INT HUP TERM QUIT EXIT
 
-	# Ping check if qb-start may continue, get placed in queue, or exit if timeout happens 
+	# Ping check if qb-start may continue, get placed in queue, or exit if timeout happens
 	monitor_startstop -p || get_msg_start "_e0" "exit_1"
 }
 
@@ -98,14 +98,15 @@ determine_ips() {
 	# Map IPs in serial, write to TMP
 	for _jail in $_FULLIST ; do
 
-		# IP calculation for 0control
-		! chk_isrunning "$_jail" \
-				&& printf "%b" "$_jail SSH $(discover_open_ipv4 $_jail 0control)\n" >> $_TMP_IP
+		# Only get IPs for offjails
+		if ! chk_isrunning "$_jail" ; then
+			# IP calculation for 0control
+			printf "%b" "$_jail SSH $(discover_open_ipv4 -t SSH $_jail)\n" >> $_TMP_IP
 
-		# IP calaculation unnecessary for hierchy tops or running jails
-		! chk_isrunning "$_jail" \
-			&& ! echo "$_HIERTOP" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" \
-				&& printf "%b" "$_jail NET $(discover_open_ipv4 $_jail)\n" >> $_TMP_IP
+			# IP calaculation unnecessary for hierchy tops
+			! echo "$_HIERTOP" | grep -Eq "^[[:blank:]]*${_jail}[[:blank:]]*\$" \
+					&& printf "%b" "$_jail NET $(discover_open_ipv4 -t NET $_jail)\n" >> $_TMP_IP
+		fi
 	done
 }
 
@@ -178,17 +179,17 @@ main() {
 	for _jail in $_HIERTOP; do
 		# Each hierarchy top is independent of each other, and can be started in parallel.
 		begin_waterfall $_jail &
-		_WF_PIDS="$_WF_PIDS $!"	
+		_WF_PIDS="$_WF_PIDS $!"
 	done
 
 	# STARTS keeps track of the number of hierchy levels. If 0, there was nothing to start
 	[ "$_STARTS" = 0 ] && get_msg_start "_m2"
 
-	# User specified timeout, or use 5 seconds for every hierarchy level 
+	# User specified timeout, or use 5 seconds for every hierarchy level
 	monitor_startstop "${_TIMEOUT:=$(( _STARTS * 5))}" &
 	_MONITOR_PID="$!"
 
-	# Wait for starts to finish. If TIMEOUT, monitor_startstop will kill -15 this script 
+	# Wait for starts to finish. If TIMEOUT, monitor_startstop will kill -15 this script
 	wait $_WF_PIDS
 	get_msg_start "_m1"
 }

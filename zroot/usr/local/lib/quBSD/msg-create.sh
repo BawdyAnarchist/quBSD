@@ -225,13 +225,17 @@ ENDOFMSG
 
 [-c <class>]
 
-quBSD classes:  rootjail | appjail | dispjail | appVM | rootVM
+quBSD classes:  rootjail | cjail | appjail | dispjail | appVM | rootVM
 
    rootjail - Contains a full FreeBSD installation and pkgs.
               These are pristine root environments which serve
               zfs clones to dependent jails. No workstation
               activity or command execution should ever take
               place here, except updates and pkg installation.
+
+   cjail   -  Control Jail connects via SSH to all jails/VMs.
+              Default is 0control, but this can be changed
+              with the CONTROL parameter in qmap.
 
    appjail -  These are the actual workstation jails. The root
               filesystem is cloned from a designated rootjail,
@@ -460,6 +464,7 @@ net-firewall      nicvm            Router Dependent
 net-<gateway>     net-firewall     10.255.x.2/30
 serv-jails        net-firewall     10.128.x.2/30
 appjails          net-<gateway>    10.1.x.2/30
+cjails            none             10.99.x.2/30
 usbvm             variable         10.88.88.1/30
 < adhoc created with qb-connect >  10.99.x.2/30
 
@@ -592,8 +597,8 @@ Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>]
                  [-p <PARAMETER>=<value>] <newjail/VM>
        qb-create -i <ISO_filepath> -v <volsize> <newVM>
 
-   -c: (c)lass: <appjail|rootjail|dispjail|appVM|rootVM> is a critical
-       parameter for new jail/VM. Can also be defined using [-p].
+   -c: (c)lass: <appjail|rootjail|cjail|dispjail|appVM|rootVM> is a
+       critical parameter for new jail/VM. Can also defined with [-p]
    -e: (e)examples. Print examples of how to use qb-create
    -G: (G)uided: Informative messages guide user via input prompts.
         All other command line options are ignored. For <jail> only.

@@ -37,7 +37,7 @@ checks() {
 			else
 
 				# Assign IP if not specified by user
-				IPV4=$(discover_open_ipv4 "$JAIL") || exit 1
+				IPV4=$(discover_open_ipv4 -t ADHOC "$JAIL") || exit 1
 			fi
 
 			# Check the pf status and security levels

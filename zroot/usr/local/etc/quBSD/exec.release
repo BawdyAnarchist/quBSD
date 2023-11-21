@@ -18,7 +18,7 @@ main() {
 	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
 
 	case $CLASS in
-		appjail)
+		appjail|cjail)
          # Reclone the root filesystem for JAIL
 			reclone_zroot "$JAIL" "$ROOTENV"
 		;;
@@ -42,4 +42,3 @@ get_parameters "$@"
 
 main
 
-exit 0

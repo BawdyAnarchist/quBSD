@@ -62,7 +62,7 @@ AUTOSTART:   Automatically start <jail/VM> during host boot
 BHYVEOPTS:   Options to pass to bhyve (non-argument options only).
 BHYVE_CUSTM: One or more custom [-option <args>] for bhyve launch command.
              Dont include bus:slot, they're automatically set at launch.
-CLASS:       rootjail|rootVM|appjail|appVM|dispjail
+CLASS:       rootjail|rootVM|cjail|appjail|appVM|dispjail
 CPUSET:      Limit <jail/VM> to specific CPU threads. \`none' is unrestricted
              Comma separated, or range:  0,1,2,3 is the same as 0-3
 GATEWAY:     Gateway through which <jail/VM> connects to external network
