@@ -93,7 +93,7 @@ begin_waterfall() {
 
 		# Serial stop for gateways. Exception: VMs can stop in background (no VIF race conds)
 		echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" \
-			&& echo eval stop_jail "$_JAIL"
+			&& eval stop_jail "$_JAIL"
 
 		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion)
 		_SUBGATEWAYS='' ; _ENDPOINTS=''
@@ -114,7 +114,7 @@ begin_waterfall() {
 
 			# If the endpoint is on JLIST, stop it in the background
 			echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_end}([[:blank:]]+|\$)" \
-				&& echo stop_jail "$_end" &
+				&& stop_jail "$_end" &
 				_SJ_PIDS="$_SJ_PIDS $!"
 		done
 
@@ -174,7 +174,7 @@ main() {
 	done
 
 	# Stop 0control first. It has
-	echo "$_HIERTOP" | grep -qs 0control && echo stop_jail 0control
+#	echo "$_HIERTOP" | grep -qs 0control && echo stop_jail 0control
 
 	# Stop the hierarchy tops, then their clients, until all of _JLIST is stopped.
 	for _JAIL in $_HIERTOP; do
