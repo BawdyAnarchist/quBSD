@@ -176,7 +176,6 @@ main() {
 	[ "$_STARTS" = 0 ] && get_msg_start "_m2"
 
 	# User specified timeout, or use 5 seconds for every hierarchy level
-echo STARTS: $_STARTS
 	monitor_startstop "${_TIMEOUT:=$(( _STARTS * 5))}" &
 	_MONITOR_PID="$!"
 

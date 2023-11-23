@@ -590,8 +590,8 @@ connect_gateway_to_clients() {
 	# All onjails connect to 0control
 	if [ "$CLASS" = "cjail" ] ; then
 		for _client in $(get_info -e _ONJAILS | grep -v "$_gateway") ; do
-			[ "$(get_jail_parameter -dqsz CONTROL $_client)" = "$_gateway" ] \
-					&& connect_client_to_gateway "$_client" "$_gateway"
+			[ "$(get_jail_parameter $_q -de CONTROL $_client)" = "$_gateway" ] \
+					&& connect_client_to_gateway -c $_q "$_client" "$_gateway"
 		done
 	fi
 
@@ -1121,6 +1121,10 @@ chk_valid_control() {
 	getopts q _opts && local _qt='-q' && shift
 	[ "$1" = "--" ] && shift
 	local _value="$1"
+
+	# 'none' is valid for control jail
+	[ "$_value" = "none" ] && return 0
+
 	local _class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 	! chk_valid_jail $_qt -c "$_class" "$_value" && return 1 || return 0
 }

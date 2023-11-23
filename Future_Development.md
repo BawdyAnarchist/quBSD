@@ -20,6 +20,7 @@ it looks like chk_valid_ipv4 at the end, it'll never make it to $_xp, coz return
 * any VM/jail start needs: service named restart
 	add permanent checks to prevent any changes to 0control via normal qb-commands
 	0control key needs added to all rootjails - also to qb-create
+* 0bsdvm needs to have a daemon for continually checking/attmepting dhclient on vtnet0 
 
 qb-copy
 	- Library functions b/c qb-connect will also integrate
