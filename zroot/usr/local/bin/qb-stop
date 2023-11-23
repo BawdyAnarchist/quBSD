@@ -38,46 +38,40 @@ checks() {
 	monitor_startstop -p || get_msg_stop "_e0" "exit_1"
 }
 
-climb_hierarchy() {
+echo_grep() {
+	# Too many echo | greps looks dirty. Put into a function 
+	echo "$1" | grep -Eq "(^|[[:blank:]]+)${2}([[:blank:]]+|\$)" && return 0 || return 1
+}
 
-	# Prevent infinite loop. Unlikely to be 50 gateways; more likely circular reference.
-	[ "$_depth" -gt 50 ] && get_msg_stop "_e3" "exit_1"
+climb_hierarchy() {
+	# Prevent infinite loop. Unlikely to be 10 gateways; more likely circular reference
+	[ "$_depth" -gt 10 ] && get_msg_stop "_e3" "exit_1"
 	_depth=$(( _depth + 1 ))
 
 	_JAIL="$1"
+
+	# _JAIL gateway path was already handled. Skip further checks.
+	echo_grep "$_CLIMBED" "$_JAIL" && return 0
+
+	# JAIL hasnt been handled yet. Add to climbed, and account for extra start time
+	_CLIMBED=$(printf "%b" "${_JAIL}\n${_CLIMBED}")
+	echo_grep "$_JLIST" "$_JAIL" && chk_isrunning "$_JAIL" && _stops=$(( _stops + 1 ))
+
+	# Disposition JAIL based on gateway, and whether or not it's a control jail (stopped first)
 	_gateway=$(get_jail_parameter -deqz GATEWAY "$_JAIL")
-
-	if echo "$_CLIMBED" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" ; then
-		# _JAIL gateway path was already handled. Skip further checks.
-		return 0
-
-	# jail is an endpoint. Either has no network, or is top of hierarchy.
-	elif [ "$_gateway" = "none" ] || [ -z "$_gateway" ] ; then
-
-		# Assemble list of hierarchy tops. Will later begin shutdowns from this list
-		_HIERTOP=$(printf "%b" "${_JAIL}\n${_HIERTOP}" | uniq)
-
-		# Add _JAIL to the list of jails already climbed and checked.
-		_CLIMBED=$(printf "%b" "${_JAIL}\n${_CLIMBED}")
-
-      # If _JAIL is on JLIST, and is running, increment _starts, for timeout calculation
-		echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" \
-			&& chk_isrunning "$_JAIL" && _stops=$(( _stops + 1 ))
-
-	# jail has a gateway, which (might) be preferenced for shutdown ahead of it
+	if [ "$_gateway" = "none" ] || [ -z "$_gateway" ] ; then
+		if [ "$(get_jail_parameter -de CLASS $_JAIL)" = "cjail" ] ; then
+			_CJAILS="$(printf "%b" "${_JAIL}\n${_CJAILS}")"
+		else
+			# JAIL is an endpoint. Either has no network, or is top of hierarchy.
+			_HIERTOP=$(printf "%b" "${_JAIL}\n${_HIERTOP}" | uniq)
+		fi
 	else
-		# Add _JAIL to the list of jails already climbed and checked.
-		_CLIMBED=$(printf "%b" "${_JAIL}\n${_CLIMBED}")
-
-      # If _JAIL is on JLIST, and is running, increment _starts, for timeout calculation
-		echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" \
-			&& chk_isrunning "$_JAIL" && _stops=$(( _stops + 1 ))
-
-		# Will continue recursively until hierarchy top is reached
+		# Continue recursively until hierarchy top is reached
 		climb_hierarchy "$_gateway"
 	fi
 
-	# Chose the larger of the two values. This is the number of serial starts for TIMEOUT calc
+   # _STARTS is global, _starts is local. Multiple `climb_hierarchy &` ; so choose largest
 	[ "$_stops" -gt "$_STOPS" ] && _STOPS="$_stops"
 }
 
@@ -92,8 +86,7 @@ begin_waterfall() {
 	for _JAIL in $_JAILS; do
 
 		# Serial stop for gateways. Exception: VMs can stop in background (no VIF race conds)
-		echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_JAIL}([[:blank:]]+|\$)" \
-			&& eval stop_jail "$_JAIL"
+		echo_grep "$_JLIST" "$_JAIL" && eval stop_jail "$_JAIL"
 
 		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion)
 		_SUBGATEWAYS='' ; _ENDPOINTS=''
@@ -113,8 +106,7 @@ begin_waterfall() {
 			sleep .1
 
 			# If the endpoint is on JLIST, stop it in the background
-			echo "$_JLIST" | grep -Eq "(^|[[:blank:]]+)${_end}([[:blank:]]+|\$)" \
-				&& stop_jail "$_end" &
+			echo_grep "$_JLIST" "$_end" && stop_jail "$_end" &
 				_SJ_PIDS="$_SJ_PIDS $!"
 		done
 
@@ -128,7 +120,6 @@ begin_waterfall() {
 }
 
 force_stop_jlist() {
-
 	# _ASSM_Y is only passed via env variable in monitor_startstop. Should not be user option
 	if [ -z "$_ASSM_Y" ] ; then
 		get_msg_stop "_m1" "_cont"
@@ -143,7 +134,6 @@ force_stop_jlist() {
 }
 
 cleanup_trapped() {
-
 	# Immediately kill the monitoring PID, to help prevent any races for cleanup
 	ps -p $_MONITOR_PID > /dev/null 2>&1 && kill -9 $_MONITOR_PID
 
@@ -155,7 +145,6 @@ cleanup_trapped() {
 }
 
 main() {
-
 	# Returns $_JLIST, from options and positional arguments. Func shared with qb-start.
 	compile_jlist
 
@@ -173,8 +162,10 @@ main() {
 		climb_hierarchy "$_jlist"
 	done
 
-	# Stop 0control first. It has
-#	echo "$_HIERTOP" | grep -qs 0control && echo stop_jail 0control
+   # Control jails should be stopped first, for same reasons as hierarchy tops
+	for _cjail in $(echo "$_CJAILS" | sort | uniq) ; do
+		stop_jail $_cjail
+	done
 
 	# Stop the hierarchy tops, then their clients, until all of _JLIST is stopped.
 	for _JAIL in $_HIERTOP; do

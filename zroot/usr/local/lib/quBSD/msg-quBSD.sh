@@ -268,7 +268,6 @@ ERROR: VM < $_value > failed to launch
 ENDOFMSG
 	;;
 	_cj32) cat << ENDOFMSG
-
 quBSD msg: VM < $_value > has ended
 ENDOFMSG
 	;;
@@ -279,7 +278,7 @@ ERROR: Tried to launch < $_value > but there were
 ENDOFMSG
 	;;
 	_jf1) cat << ENDOFMSG
-$0 is starting < $_value >
+${0##*/} is starting < $_value >
 ENDOFMSG
 	;;
 	_jf2) cat << ENDOFMSG
@@ -289,7 +288,7 @@ ERROR: < $_value > could not be started. For more
 ENDOFMSG
 	;;
 	_jf3) cat << ENDOFMSG
-$0 is shutting down < $_value >
+${0##*/} is shutting down < $_value >
 ENDOFMSG
 	;;
 	_jf4) cat << ENDOFMSG

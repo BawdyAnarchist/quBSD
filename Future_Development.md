@@ -1,19 +1,22 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
+qb-start
+	- We're adding time to STARTS for each solo/island jail/VM, but technically, only necessary once 
+	- Still not quite getting the STARTS correct. If the gateway was checked first, the client's start path wont include that path for starts
+		- Either could sort in compile_jlist() or could create another variable, file, or array to track a jail's STARTS, and add it together
+
+qb-stop
+	- I really thought I had fixed some inefficiencies, but it's still slow to climb hierarchy
 
 # Stuff fkd up with 0control, causing networking errors on starts. Generalize 0control
 all jails must now have SSHD installed
-connect_gateway_to_clients
-	- maybe that's the place for isc-dhcpd, named, pf, and wireguard restarts
 double check the handling of `none` for 0control
-
 
 it looks like chk_valid_ipv4 at the end, it'll never make it to $_xp, coz return0 in digits checks
 
-# After SSH and scp is hammered out, make another system backup 
+# After SSH, scp, 0control, and the startstop issues are all hammered out, make another system backup 
 
 # 0CONTROL JAIL
-* Too many jails overlap trying to restart dhcpd*	
 * any VM/jail start needs: service named restart
 	add permanent checks to prevent any changes to 0control via normal qb-commands
 	0control key needs added to all rootjails - also to qb-create
