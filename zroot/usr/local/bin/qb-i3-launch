@@ -15,8 +15,8 @@ get_options() {
 
 parse_config() {
 	# Check TIMEOUT, if it was specified
-	[ "$_TIMEOUT" ] && chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
-									&& _TIMEOUT="-t $_TIMEOUT" || get_msg_launch "_2" "exit_1"
+	[ "$_TIMEOUT" ] && { chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
+									&& _TIMEOUT="-t $_TIMEOUT" || get_msg_i3_launch "_2" "exit_1" ;}
 
 	# Assign default file if one wasn't optioned
 	FILE="${FILE:=${HOME}/.config/i3/i3launch.conf}"
