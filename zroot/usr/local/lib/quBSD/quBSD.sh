@@ -371,7 +371,7 @@ start_jail() {
 
 	while getopts nq opts ; do case $opts in
 			n) local _norun="-n" ;;
-			q) local _qs="-q"    ;;
+			q) local _qs="-q" ; _quiet='> /dev/null 2>&1' ;;
 			*) return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
@@ -385,10 +385,10 @@ start_jail() {
 		if chk_valid_jail $_qs "$_jail" ; then
 
 			# If checks were good, log start attempt, then start jail or VM
-			get_msg $_qs "_jf1" "$_jail" | tee -a $QBLOG
+			get_msg "_jf1" "$_jail" | tee -a $QBLOG
 
 			if chk_isvm "$_jail" ; then
-				exec_vm_coordinator $_norun $_qs "$_jail"
+				eval exec_vm_coordinator $_norun $_qs $_jail $_quiet
 			else
 				[ "$_norun" ] && return 0
 				jail -vc "$_jail"  >> $QBLOG 2>&1  ||  get_msg $_qs "_jf2" "$_jail"
@@ -495,11 +495,14 @@ connect_client_to_gateway() {
 		# -e (e)cho result  ;  -m (m)tu  ;  -q (q)uiet  ;  -t (t)ype [NET or SSH]
 
 	local _ipv4=  ;  local _type  ;  local _ec  ;  local _mtu  ;  local _q
-	while getopts cei:m:q opts ; do case $opts in
+	local _dhcpd_restart  ;  local _named_restart
+	while getopts cdei:mn:q opts ; do case $opts in
 			c) _type="SSH" ;;
+			d) _dhcpd_restart="true" ;;
 			e) _ec='true' ;;
 			i) _ipv4="$OPTARG"  ;;
 			m) _mtu="$OPTARG" ;;
+			n) _named_restart="true" ;;
 			q) _q='-q' ;;
 			*) get_msg "_1" ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
@@ -507,7 +510,7 @@ connect_client_to_gateway() {
 	# Pos params, default MTU, and _type
 	local _client="$1"  ;  local _gateway="$2"
 	_mtu="${MTU:=$(get_jail_parameter -des MTU $_gateway)}"
-	_type="${_type:=NET}"
+	local _type="${_type:=NET}"
 
 	# If IP wasnt provided, then find an available one
 	[ -z "$_ipv4" ] && local _ipv4=$(assign_ipv4_auto -et "$_type" "$_client" "$_gateway")
@@ -519,8 +522,25 @@ connect_client_to_gateway() {
 		ifconfig "$_vifb" vnet "$_gateway"
 		jexec -l -U root $_gateway ifconfig $_vifb inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
 
-		# It's necessary to restart dhcpd, to include the new IP
-		jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
+		# If flagged, restart dhcpd, so the new IP will be included
+		if [ "$_dhcpd_restart" ] ; then
+			# While loop avoids races/overlaps for potential multiple VM simultaneous starts
+			local _count=0
+			while jexec -l -U root net-ivpn-var pgrep -fq 'isc-dhcpd restart' > /dev/null 2>&1 ; do
+				{ [ "$_count" -le 10 ] && sleep .2 ; _count=$(( _count + 1 )) ;} || return 1
+			done
+			jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
+		fi
+
+		# If flagged, restart dhcpd, so the new IP will be included
+		if [ "$_named_restart" ] ; then
+			# While loop avoids races/overlaps for potential multiple VM simultaneous starts
+			local _count=0
+			while jexec -l -U root net-ivpn-var pgrep -fq 'isc-dhcpd restart' > /dev/null 2>&1 ; do
+				{ [ "$_count" -le 10 ] && sleep .2 ; _count=$(( _count + 1 )) ;} || return 1
+			done
+			jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
+		fi
 
 	elif chk_isvm "$_gateway" ; then
 		# Get tap and sent to client jail. Should be DHCP, but modify mtu if necessary
@@ -528,6 +548,9 @@ connect_client_to_gateway() {
  		ifconfig $_vifb vnet $_client
 		[ ! "$_mtu" = "1500" ] && jexec -l -U root $_client ifconfig $_vifb mtu $_mtu up
 
+		#if chk_isvm "$_client" ; then
+			# To be fully generalizable, you would create a promisc bridge with both taps inside
+		#fi
 	else
 		# Create epair and assign _vif variables.
 		local _vif=$(ifconfig epair create)  ;  local _vifb="${_vif%?}b"
@@ -545,10 +568,9 @@ connect_client_to_gateway() {
 			jexec -l -U root "$_gateway" \
 							ifconfig "$_vif" inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
 
-			# Assign the client IP and, default route (if not 0control gateway)
+			# Assign the client IP and, default route (if not control gateway)
 			eval "$_cmdmod" ifconfig $_vifb inet ${_ipv4} mtu $_mtu up
-			[ ! "$_gateway" = "0control" ] \
-							&& eval "$_cmdmod" route add default "${_ipv4%.*/*}.1" > /dev/null 2>&1
+			[ "$_type" = "NET" ] && eval "$_cmdmod" route add default "${_ipv4%.*/*}.1" >/dev/null 2>&1
 	fi fi
 
 	# Echo option. Return epair-b ; it's the external interface for the jail.
@@ -1674,6 +1696,7 @@ prep_bhyve_options() {
 	_VM="$1"
 	_cpuset=$(get_jail_parameter -de CPUSET "$_VM")        || return 1
 	_gateway=$(get_jail_parameter -dez GATEWAY "$_VM")     || return 1
+	_control=$(get_jail_parameter -de  CONTROL "$_VM")     || return 1
 	_ipv4=$(get_jail_parameter -derz IPV4 "$_VM")          || return 1
 	_memsize=$(get_jail_parameter -de MEMSIZE "$_VM")      || return 1
 	_wiremem=$(get_jail_parameter -de WIREMEM "$_VM")      || return 1
@@ -1887,7 +1910,7 @@ exec_vm_coordinator() {
 	cleanup_vm $_norun $_qs "$_VM"
 
 	# 0control should always be on
-	jls -j 0control > /dev/null 2>&1 || start_jail -q 0control
+	start_jail -q $_control
 
 	# Pulls variables for the VM, and assembles them into bhyve line options
 	! prep_bhyve_options $_qs $_tmux "$_VM" && [ -z "$_norun" ] && get_msg "_cj33"
@@ -1912,22 +1935,18 @@ exec_vm_coordinator() {
 		_count=$(( _count + 1 ))
 	done
 
-	# Connect 0control
-	connect_client_to_gateway "$_VM" "0control" > /dev/null
+	# Connect control jail
+	connect_client_to_gateway -cnd "$_VM" "$_control" > /dev/null
 
 	# The VM should be up and running, or function would've already returned 1
 	if [ -n "$_vif" ] ; then
-
 		# Connect to the upstream gateway
 		[ -n "$_gateway" ] && [ ! "$_gateway" = "none" ] && chk_isrunning "$_gateway" \
-				&& connect_client_to_gateway -i "$_ipv4" "$_VM" "$_gateway" > /dev/null
-
-		# Reconnect the downstream client. Will immediately return if there are no clients
+				&& connect_client_to_gateway -di "$_ipv4" "$_VM" "$_gateway" > /dev/null
 
 	# The VM should be up and running, or function would've already returned 1
 		connect_gateway_to_clients "$_VM"
 	fi
-
 	return 0
 }
 
