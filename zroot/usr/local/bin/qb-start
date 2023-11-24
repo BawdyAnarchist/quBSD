@@ -28,9 +28,6 @@ get_options() {
 	_TMP_LOCK="${QTMP}/.qb-startstop_lock"
 	_TMP_TIME="${QTMP}/.qb-startstop_timeout"
 	_TMP_IP="${QTMP}/.qb-start_temp_ip"
-
-	# _STARTS is used for calculating the TIMEOUT later on. Initialize to zero
-	_STARTS=0
 }
 
 checks() {
@@ -45,40 +42,47 @@ checks() {
 }
 
 echo_grep() {
-	# Too many echo | greps looks dirty. Put into a function 
+	# Too many echo | greps looks dirty. Put into a function
 	echo "$1" | grep -Eqs "(^|[[:blank:]]+)${2}([[:blank:]]+|\$)" && return 0 || return 1
-} 
+}
 
 climb_hierarchy() {
+	# Trickiest part is calulating the number of hierarchy levels that need to start. The full
+	# hierarchy path is resolved recursively, and as it unwinds at the end, _starts are tallied
+
 	# Prevent infinite loop. Unlikely to be 10 gateways; more likely circular reference
 	[ "$_depth" -gt 10 ] && get_msg_start "_e3" "exit_1"
 	_depth=$(( _depth + 1 ))
 
-	_JAIL="$1"
+	local _JAIL="$1"
 
-	# JAIL gateway path was already handled. Skip further checks, but increment STARTS
-	echo_grep "$_CLIMBED" "$_JAIL" && return 0 
+	# JAIL gateway path was already handled. Skip further checks.
+	echo_grep "$_CLIMBED" "$_JAIL" && return 0
 
-	# JAIL has not been handled yet. Add to FULLIST, CLIMBED, and account for extra start time
+	# JAIL has not been handled yet. Add count to starts; add to FULLIST, and CLIMBED
 	_CLIMBED=$(printf "%b" "${_JAIL}\n${_CLIMBED}")
 	_FULLIST=$(printf "%b" "${_FULLIST}\n${_JAIL}")
-	chk_isrunning "$_JAIL" || _starts=$(( _starts + 1 ))
 
 	# Disposition JAIL based on _gateway, and also identify its control jail for ordered start
-	_gateway=$(get_jail_parameter -deqsz GATEWAY "$_JAIL")
-	_control=$(get_jail_parameter -deqsz CONTROL $_JAIL)
+	local _gateway=$(get_jail_parameter -deqsz GATEWAY "$_JAIL")
+	local _control=$(get_jail_parameter -deqsz CONTROL $_JAIL)
 	_CJAILS="$(printf "%b" "${_control}\n${_CJAILS}")"
 
 	if [ "$_gateway" = "none" ] || [ -z "$_gateway" ] ; then
 		# JAIL is an endpoint. Either has no network, or is top of hierarchy.
 		_HIERTOP=$(printf "%b" "${_JAIL}\n${_HIERTOP}")
 	else
-		# Continue recursively until hierarchy top is reached
-		climb_hierarchy "$_gateway"
-	fi
+		# If _gw was already climbed, then we'll exit here, but need to add its _starts to _JAIL
+		if _gw_st=$(echo "$_CLIMBED" | grep -E "^$_gateway " | grep -Eo ' [[:digit:]]+$') ; then
+			_starts=$_gw_st
+			_CLIMBED=$(echo "$_CLIMBED" | sed -E "s/^($_JAIL ).*/\1${_starts}/")
+		else
+			climb_hierarchy "$_gateway"
+	fi fi
 
-	# _STARTS is global, _starts is local. Multiple `climb_hierarchy &` ; so choose largest
-	[ "$_starts" -gt "$_STARTS" ] && _STARTS="$_starts"
+	# As the recursive loop unwinds now, count up how many of the hierarchy levels must start
+	! chk_isrunning "$_JAIL" && _starts=$(( _starts + 1 ))
+	_CLIMBED=$(echo "$_CLIMBED" | sed -E "s/^(${_JAIL})\$/\1 ${_starts}/")
 }
 
 determine_ips() {
@@ -107,7 +111,7 @@ begin_waterfall() {
 		for _client in $(get_info -e _CLIENTS $_JAIL); do
 
 			# Check that _client is on the FULLIST (save time)
-			if echo_grep "$_FULLIST" "$_client" ; then 
+			if echo_grep "$_FULLIST" "$_client" ; then
 				# If the _client has no further clients, it returns 1, and is an ENDPOINT
 				get_info _CLIENTS "$_client" \
 					&& _SUBGATEWAYS="$_SUBGATEWAYS $_client" \
@@ -124,11 +128,14 @@ begin_waterfall() {
 		done
 
 		# Subgateways need their own waterfall
-		[ -n "$_SUBGATEWAYS" ] && begin_waterfall "$_SUBGATEWAYS"
+		for _subgateway in $_SUBGATEWAYS ; do
+			begin_waterfall "$_subgateway" &
+			_SW_PIDS="$_SW_PIDS $!"
+		done
 	done
 
 	# Wait for all of the start_jail sent to background to finish
-	ps -p $_SJ_PIDS > /dev/null 2>&1 && wait $_SJ_PIDS
+	ps -p "$_SJ_PIDS $_SW_PIDS" > /dev/null 2>&1 && wait $_SJ_PIDS $_SW_PIDS
 	return 0
 }
 
@@ -154,8 +161,10 @@ main() {
 		climb_hierarchy "$_jlist"
 	done
 
-	# Reduce FULLIST to only unique jails
+	# Set and/or cleanup variables from the climb_hierarcy loop
+	_HIERTOP=$(echo "$_HIERTOP" | sort | uniq)
 	_FULLIST=$(echo "$_FULLIST" | sort | uniq)
+	_STARTS=$(echo "$_CLIMBED" | awk 'NR == 1 || $2 > max { max = $2 } END { print max }')
 
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
 	determine_ips
@@ -166,7 +175,7 @@ main() {
 	done
 
 	# Start the hierarchy tops, then their clients, until all of FULLIST is started
-	for _jail in $(echo "$_HIERTOP" | sort | uniq) ; do
+	for _jail in $_HIERTOP ; do
 		# Each hierarchy top is independent of each other, and can be started in parallel.
 		begin_waterfall $_jail &
 		_WF_PIDS="$_WF_PIDS $!"
@@ -176,7 +185,7 @@ main() {
 	[ "$_STARTS" = 0 ] && get_msg_start "_m2"
 
 	# User specified timeout, or use 5 seconds for every hierarchy level
-	monitor_startstop "${_TIMEOUT:=$(( _STARTS * 5))}" &
+	monitor_startstop "${_TIMEOUT:=$(( _STARTS * 10))}" &
 	_MONITOR_PID="$!"
 
 	# Wait for starts to finish. If TIMEOUT, monitor_startstop will kill -15 this script

@@ -39,7 +39,7 @@ checks() {
 }
 
 echo_grep() {
-	# Too many echo | greps looks dirty. Put into a function 
+	# Too many echo | greps looks dirty. Put into a function
 	echo "$1" | grep -Eq "(^|[[:blank:]]+)${2}([[:blank:]]+|\$)" && return 0 || return 1
 }
 

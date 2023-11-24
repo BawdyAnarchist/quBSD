@@ -71,7 +71,7 @@ main() {
 		# Verbose prints the bhyve command, if NORUN, will exit
 		[ "$_VERBOSE" ] && get_msg_cmd "_3" "_cont" && start_jail -nq $JAIL && eval "$_NORUN"
 
-		! qb-start "$JAIL" > /dev/null 2>&1 && get_msg_cmd "_1" "exit_1"
+		! qb-start "$JAIL" && get_msg_cmd "_1" "exit_1"
 	fi
 
 	# Either connect the VM, or jexec the command to the jail
