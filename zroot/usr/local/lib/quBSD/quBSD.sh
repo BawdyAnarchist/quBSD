@@ -494,7 +494,7 @@ connect_client_to_gateway() {
 	# GLOBAL VARIABLES must have been assigned already: $GATEWAY ; $IPV4 ; $MTU
 		# -e (e)cho result  ;  -m (m)tu  ;  -q (q)uiet  ;  -t (t)ype [NET or SSH]
 
-	local _ipv4=  ;  local _type  ;  local _ec  ;  local _mtu  ;  local _q
+	local _ipv4=  ;  local _type=  ;  local _ec  ;  local _mtu  ;  local _q
 	local _dhcpd_restart  ;  local _named_restart
 	while getopts cdei:mn:q opts ; do case $opts in
 			c) _type="SSH" ;;
@@ -545,6 +545,7 @@ connect_client_to_gateway() {
 	elif chk_isvm "$_gateway" ; then
 		# Get tap and sent to client jail. Should be DHCP, but modify mtu if necessary
 		_vifb=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_gateway}")
+
  		ifconfig $_vifb vnet $_client
 		[ ! "$_mtu" = "1500" ] && jexec -l -U root $_client ifconfig $_vifb mtu $_mtu up
 
@@ -1842,7 +1843,7 @@ EOF
 		# Tracker file for which taps are related to which VM, and for which purpose (_vif tags)
 		case "$_cycle" in
 			0) echo "$_tap SSH" >> "${QTMP}/vmtaps_${_VM}"  ;;
-			1) echo "$_tap NET" >> "${QTMP}/vmtaps_${_VM}"  ;  _vif="$_tap"  ;;
+			1) echo "$_tap NET" >> "${QTMP}/vmtaps_${_VM}"  ;;
 			*) echo "$_tap EXTRA_${_cycle}" >> "${QTMP}/vmtaps_${_VM}"  ;;
 		esac
 		_cycle=$(( _cycle + 1 ))
@@ -1943,12 +1944,9 @@ exec_vm_coordinator() {
 	connect_client_to_gateway -cnd "$_VM" "$_control" > /dev/null
 
 	# The VM should be up and running, or function would've already returned 1
-	if [ -n "$_vif" ] ; then
-		# Connect to the upstream gateway
-		[ -n "$_gateway" ] && [ ! "$_gateway" = "none" ] && chk_isrunning "$_gateway" \
-				&& connect_client_to_gateway -di "$_ipv4" "$_VM" "$_gateway" > /dev/null
-
-	# The VM should be up and running, or function would've already returned 1
+	# Connect to the upstream gateway
+	if chk_isrunning "$_gateway" ; then
+		connect_client_to_gateway -di "$_ipv4" "$_VM" "$_gateway" > /dev/null
 		connect_gateway_to_clients "$_VM"
 	fi
 	return 0
