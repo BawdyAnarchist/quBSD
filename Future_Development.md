@@ -1,16 +1,8 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-qb-start
-	- We're adding time to STARTS for each solo/island jail/VM, but technically, only necessary once 
-	- Still not quite getting the STARTS correct. If the gateway was checked first, the client's start path wont include that path for starts
-		- Either could sort in compile_jlist() or could create another variable, file, or array to track a jail's STARTS, and add it together
-
-qb-stop
-	- I really thought I had fixed some inefficiencies, but it's still slow to climb hierarchy
 
 # Stuff fkd up with 0control, causing networking errors on starts. Generalize 0control
 all jails must now have SSHD installed
-double check the handling of `none` for 0control
 
 it looks like chk_valid_ipv4 at the end, it'll never make it to $_xp, coz return0 in digits checks
 
@@ -27,7 +19,6 @@ qb-copy
 	- will use /media as the default copy locations between any two jail/VM combos
 	- Can specify copy location as well
 	- automatically brings up the SSH connection if necessary, then brings it down
-
 
 # Finish VM setup
 

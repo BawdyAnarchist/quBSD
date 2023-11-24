@@ -54,9 +54,8 @@ climb_hierarchy() {
 	[ "$_depth" -gt 10 ] && get_msg_start "_e3" "exit_1"
 	_depth=$(( _depth + 1 ))
 
-	local _JAIL="$1"
-
 	# JAIL gateway path was already handled. Skip further checks.
+	local _JAIL="$1"
 	echo_grep "$_CLIMBED" "$_JAIL" && return 0
 
 	# JAIL has not been handled yet. Add count to starts; add to FULLIST, and CLIMBED
@@ -77,6 +76,7 @@ climb_hierarchy() {
 			_starts=$_gw_st
 			_CLIMBED=$(echo "$_CLIMBED" | sed -E "s/^($_JAIL ).*/\1${_starts}/")
 		else
+			# Continue recursively until hiearchy top is reached
 			climb_hierarchy "$_gateway"
 	fi fi
 
