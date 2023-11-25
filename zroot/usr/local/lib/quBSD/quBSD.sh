@@ -1211,7 +1211,7 @@ chk_valid_ipv4() {
 			&& [ "$_a3" -ge 0 ] && [ "$_a3" -le 255 ] \
 			&& [ "$_a4" -ge 0 ] && [ "$_a4" -le 32 ]  >> /dev/null 2>&1
 		then
-			return 0
+			:
 		else
 			# Error message, is invalid IPv4
 			get_msg $_q "_cj10" "$_value" && return 1
