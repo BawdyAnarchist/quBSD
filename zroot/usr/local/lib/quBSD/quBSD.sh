@@ -496,7 +496,7 @@ connect_client_to_gateway() {
 
 	local _ipv4=  ;  local _type=  ;  local _ec  ;  local _mtu  ;  local _q
 	local _dhcpd_restart  ;  local _named_restart
-	while getopts cdei:mn:q opts ; do case $opts in
+	while getopts cdei:m:nq opts ; do case $opts in
 			c) _type="SSH" ;;
 			d) _dhcpd_restart="true" ;;
 			e) _ec='true' ;;
@@ -526,7 +526,7 @@ connect_client_to_gateway() {
 		if [ "$_dhcpd_restart" ] ; then
 			# While loop avoids races/overlaps for potential multiple VM simultaneous starts
 			local _count=0
-			while jexec -l -U root net-ivpn-var pgrep -fq 'isc-dhcpd restart' > /dev/null 2>&1 ; do
+			while jexec -l -U root $_gateway pgrep -fq 'isc-dhcpd restart' > /dev/null 2>&1 ; do
 				{ [ "$_count" -le 10 ] && sleep .2 ; _count=$(( _count + 1 )) ;} || return 1
 			done
 			jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
@@ -536,10 +536,10 @@ connect_client_to_gateway() {
 		if [ "$_named_restart" ] ; then
 			# While loop avoids races/overlaps for potential multiple VM simultaneous starts
 			local _count=0
-			while jexec -l -U root net-ivpn-var pgrep -fq 'isc-dhcpd restart' > /dev/null 2>&1 ; do
+			while jexec -l -U root $_gateway pgrep -fq 'named restart' > /dev/null 2>&1 ; do
 				{ [ "$_count" -le 10 ] && sleep .2 ; _count=$(( _count + 1 )) ;} || return 1
 			done
-			jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
+			jexec -l -U root $_gateway service named restart > /dev/null 2>&1
 		fi
 
 	elif chk_isvm "$_gateway" ; then
@@ -1899,12 +1899,36 @@ ENDOFCMD
 	return 0
 }
 
+finish_vm_connections() {
+	# While the _BHYVE_CMD appears in ps immediately, emulated devices are not yet attached, and
+	# would cause an error. Due to qb-start dynamics/timeouts, we dont want to wait. Instead,
+	# return 0 so that launches can continue, and let this function handle the connections later.
+
+	# Wait for the actual bhyve VM to appear in ps. If ppt a device is bad, launch can delay 15 secs
+	_count=0
+	while ! pgrep -xfq "bhyve: $_VM" ; do
+		sleep 1 ; _count=$(( _count + 1 ))
+		[ "$_count" -ge 15 ] && get_msg get_msg "_cj31" "$_VM" && return 1
+	done
+
+	# Connect control jail
+echo connect_client_to_gateway -cdn -- "$_VM" "$_control" > /dev/null
+	connect_client_to_gateway -cdn -- "$_VM" "$_control" > /dev/null
+
+	# Connect to the upstream gateway
+	if chk_isrunning "$_gateway" ; then
+		connect_client_to_gateway -di "$_ipv4" "$_VM" "$_gateway" > /dev/null
+		connect_gateway_to_clients "$_VM"
+	fi
+	return 0
+}
+
 exec_vm_coordinator() {
 	# Executive management of launching the VM
 
 	while getopts nqt opts ; do case $opts in
 			n) local _norun="-n" ;;
-			q) local _qs="-q"    ;;
+			q) local _qs="-q" ; _quiet='/dev/null 2>&1'   ;;
 			t) local _tmux="-t"  ;;
 			*) get_msg "_1" ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
@@ -1928,27 +1952,18 @@ exec_vm_coordinator() {
 	fi
 
 	# Launch VM sent to background, so connections can be made (network, vnc, tmux)
-	launch_vm &
+	eval launch_vm $_quiet &
 
-	# Monitor for VM start, before attempting connections. 3 secs to start
-	_count=1
-	while : ; do
-		sleep .5
-		pgrep -xfq "bhyve: $_VM" && break
-
+	# Monitor to make sure that the bhyve command started running, then return 0
+	_count=0 ; sleep .5
+	while ! { pgrep -xfq "bhyve: $_VM" \
+				|| pgrep -fl "bhyve" | grep -Eqs "^[[:digit:]]+ .* $_VM[[:blank:]]*\$" ;} ; do
+		sleep .5 ; _count=$(( _count + 1 ))
 		[ "$_count" -ge 6 ] && get_msg get_msg "_cj31" "$_VM" && return 1
-		_count=$(( _count + 1 ))
 	done
 
-	# Connect control jail
-	connect_client_to_gateway -cnd "$_VM" "$_control" > /dev/null
+	finish_vm_connections &
 
-	# The VM should be up and running, or function would've already returned 1
-	# Connect to the upstream gateway
-	if chk_isrunning "$_gateway" ; then
-		connect_client_to_gateway -di "$_ipv4" "$_VM" "$_gateway" > /dev/null
-		connect_gateway_to_clients "$_VM"
-	fi
 	return 0
 }
 
