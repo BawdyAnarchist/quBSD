@@ -1,18 +1,17 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-
-# Stuff fkd up with 0control, causing networking errors on starts. Generalize 0control
-all jails must now have SSHD installed
-
-it looks like chk_valid_ipv4 at the end, it'll never make it to $_xp, coz return0 in digits checks
-
 # After SSH, scp, 0control, and the startstop issues are all hammered out, make another system backup 
 
+remove_tap is getting a jexec ifconfig 'none' 
+
 # 0CONTROL JAIL
-* any VM/jail start needs: service named restart
 	add permanent checks to prevent any changes to 0control via normal qb-commands
 	0control key needs added to all rootjails - also to qb-create
-* 0bsdvm needs to have a daemon for continually checking/attmepting dhclient on vtnet0 
+	0bsdvm needs to have a daemon for continually checking/attmepting dhclient on vtnet0 
+	all jails must have SSHD installed
+	Might need to add isc-dhcpd restart for 0control and gateway to the /tmp VM script
+
+You can probably bring seclvl=3 for gateways now. Also I dont think gateway require restarts anymore on qb-edit
 
 qb-copy
 	- Library functions b/c qb-connect will also integrate
@@ -74,7 +73,7 @@ QMAP - New PARAM - CONNECT, that establishes a connection to a specified jail/VM
 
 qb-stop
 	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
-	- It's too slow. There's got to be a way to make it more efficient
+	- monitor_vm_stop is probably outdated now since `wait` commands are being used. Needs reviewed 
 
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
@@ -185,6 +184,7 @@ quBSD.conf removed. Everything now in jailmap.conf
 Should make the $qubsd/zroot/0net 0gui 0vms and everything files here for specific stuff like rc.conf
 
 ### Control Jail
+# KEYGEN
 	- cp -a group master.passwd passwd pwd.db spwd.db from 0net to /zusr/0control/rw/etc/
 	- mkdir -p /zusr/0control/usr/home/0control
 	- chown -R 1001:1001 /zusr/0control/usr/home/0control
@@ -200,8 +200,8 @@ Should make the $qubsd/zroot/0net 0gui 0vms and everything files here for specif
 	- cp -a qb_ssh script to /usr/home/ftpd 
 	- chmod 755 /zusr/0control/usr/home/ftpd/*
 	
-rootjails need copy of 0control pubkey	
-	
+# rootjails need copy of 0control pubkey	
+# SSHD in all rootjails 
 
 
 
