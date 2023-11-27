@@ -2,16 +2,10 @@
 
 # After SSH, scp, 0control, and the startstop issues are all hammered out, make another system backup 
 
-remove_tap is getting a jexec ifconfig 'none' 
-
-# 0CONTROL JAIL
-	add permanent checks to prevent any changes to 0control via normal qb-commands
-	0control key needs added to all rootjails - also to qb-create
+# CONTROL JAIL
+	control key needs added to all rootjails - also to qb-create
 	0bsdvm needs to have a daemon for continually checking/attmepting dhclient on vtnet0 
-	all jails must have SSHD installed
-	Might need to add isc-dhcpd restart for 0control and gateway to the /tmp VM script
-
-You can probably bring seclvl=3 for gateways now. Also I dont think gateway require restarts anymore on qb-edit
+	add permanent checks to prevent any changes to control via normal qb-commands
 
 qb-copy
 	- Library functions b/c qb-connect will also integrate
@@ -70,6 +64,8 @@ QMAP - New PARAM - CONNECT, that establishes a connection to a specified jail/VM
 
 
 ### SPECIFIC SCRIPTS
+
+You can probably bring seclvl=3 for gateways now. Also I dont think gateway require restarts anymore on qb-edit
 
 qb-stop
 	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
@@ -202,6 +198,7 @@ Should make the $qubsd/zroot/0net 0gui 0vms and everything files here for specif
 	
 # rootjails need copy of 0control pubkey	
 # SSHD in all rootjails 
+# 0bsdvm needs to have a daemon for continually checking/attmepting dhclient on vtnet0 
 
 
 
