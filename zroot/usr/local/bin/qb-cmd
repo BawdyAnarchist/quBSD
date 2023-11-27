@@ -44,10 +44,18 @@ connect_vm_session() {
 
 	# Handle the vnc viewer port
 	if [ ! "$VNCRES" = "none" ] ; then
-		_vmpid=$(pgrep -xf "bhyve: $JAIL")
+		# Sometimes it can take 5-15 secs for a VM to launch (if ppt is bad). Wait
+		_count=0
+		while ! _vmpid=$(pgrep -fxq "bhyve: $JAIL") ; do
+			# Wait 3 secs before message, to avoid unnecesary clutter
+			[ "$_count" = 3 ] && get_msg_cmd "_4"
+			[ "$_count" -gt 15 ] && get_msg_cmd "_5" "exit_1"
+			sleep 1 ; _count=$(( _count + 1 ))
+		done
+
+		# Launch vnc viewer
 		_vncport=$(sockstat -P tcp \
 							| sed -nE "s/.*bhyve[[:blank:]]+${_vmpid}.*\*:([[:digit:]]+).*/\1/p")
-		# Launch vnc viewer
 		[ -z "$_vncport" ] && _novnc="true"	|| vncviewer 0.0.0.0:$_vncport > /dev/null 2>&1 &
 	else
 		_novnc="true"
