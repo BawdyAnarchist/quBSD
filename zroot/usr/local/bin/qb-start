@@ -104,7 +104,7 @@ begin_waterfall() {
 	_JAILS="$1"
 	for _JAIL in $_JAILS; do
 		# Only continue the waterfall if jail started successfully
-		start_jail "$_JAIL" 2>&1 || get_msg_start "_e4" "exit_1"
+		start_jail -q "$_JAIL" 2>&1 || get_msg_start "_e4" "exit_1"
 
 		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion)
 		_SUBGATEWAYS='' ; _ENDPOINTS=''
@@ -189,7 +189,8 @@ main() {
 	_MONITOR_PID="$!"
 
 	# Wait for starts to finish. If TIMEOUT, monitor_startstop will kill -15 this script
-	ps -p $_WF_PIDS > /dev/null 2>&1 && wait $_WF_PIDS && get_msg_start "_m1"
+	ps -p $_WF_PIDS > /dev/null 2>&1 && wait $_WF_PIDS
+	get_msg_start "_m1"
 
 	# Remove /tmp files and kill monitoring process
 	cleanup_trapped
