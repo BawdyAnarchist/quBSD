@@ -25,6 +25,15 @@ ALERT: The command below is run with /bin/sh. If the current
 
 ENDOFMSG
 	;;
+	_4) cat << ENDOFMSG
+ALERT: < $JAIL > is tagged with VNCRES, but the FBUF device
+       hasnt been detected yet. Waiting 15 seconds before quitting
+ENDOFMSG
+	;;
+	_5) cat << ENDOFMSG
+ERROR: Timeout waiting for vnc FBUF device to appear in sockstat
+ENDOFMSG
+	;;
 	esac
 
 	case $_pass_cmd in
