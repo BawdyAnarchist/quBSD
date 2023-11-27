@@ -62,7 +62,7 @@ echo -e "Continue? (Y/n): \c"
 	;;
 	_m2) cat << ENDOFMSG
 
-All jails/VMs have been stopped 
+All jails/VMs have been stopped
 ENDOFMSG
 	;;
 	_m3) cat << ENDOFMSG
