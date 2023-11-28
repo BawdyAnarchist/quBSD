@@ -78,24 +78,28 @@ monitor_ephm_windows() {
 	. /usr/local/lib/quBSD/msg-quBSD.sh
 	get_global_variables
 
+	destroy_ephemeral() {
+		# Destroy sequence
+		stop_jail "$NEWJAIL"
+		zfs destroy -rRf ${R_ZFS}/$NEWJAIL > /dev/null 2>&1
+		zfs destroy -rRf ${U_ZFS}/$NEWJAIL > /dev/null 2>&1
+		zfs destroy -rRf $NEWSNAP > /dev/null 2>&1
+		sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QMAP
+		sed -i '' -E "\\@${NEWJAIL}[[:blank:]]*\\{@,\\@^[[:blank:]]*\\}[[:blank:]]*\\\$@d" $JCONF
+		rm "${QTMP}/qb-${NEWJAIL}" > /dev/null 2>&1
+		exit 0
+	}
+
+	trap 'destroy_ephemeral' INT TERM HUP QUIT EXIT
+
 	# X11 windows can take a moment launch. Ineligant solution, but wait 3 secs before check-loop
 	sleep 3
 
 	# ps -o tt tty -> is associated with terminals/windows. Keepalive until all are gone
 	while : ; do
-		ps -axJ ${NEWJAIL} -o tt | tail -n +2 | grep -qv ' -' || break
+		ps -axJ ${NEWJAIL} -o tt -o command | tail -n +2 | grep -v 'dbus' | grep -qv ' -' || break
 		sleep 1
 	done
-
-	# Destroy sequence
-	stop_jail "$NEWJAIL"
-	zfs destroy -rRf ${R_ZFS}/$NEWJAIL > /dev/null 2>&1
-	zfs destroy -rRf ${U_ZFS}/$NEWJAIL > /dev/null 2>&1
-	zfs destroy -rRf $NEWSNAP > /dev/null 2>&1
-	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QMAP
-	sed -i '' -E "\\@${NEWJAIL}[[:blank:]]*\\{@,\\@^[[:blank:]]*\\}[[:blank:]]*\\\$@d" $JCONF
-	rm "${QTMP}/qb-${NEWJAIL}" > /dev/null 2>&1
-	exit 0
 ENDOFCMD
 
 	# Make executable and run. nohup prevents killing the process if host launch terminal closes
