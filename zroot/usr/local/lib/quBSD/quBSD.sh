@@ -549,9 +549,6 @@ connect_client_to_gateway() {
  		ifconfig $_vifb vnet $_client
 		[ ! "$_mtu" = "1500" ] && jexec -l -U root $_client ifconfig $_vifb mtu $_mtu up
 
-		#if chk_isvm "$_client" ; then
-			# To be fully generalizable, you would create a promisc bridge with both taps inside
-		#fi
 	else
 		# Create epair and assign _vif variables.
 		local _vif=$(ifconfig epair create)  ;  local _vifb="${_vif%?}b"
@@ -1912,14 +1909,15 @@ finish_vm_connections() {
 	done
 
 	# Connect control jail
-echo connect_client_to_gateway -cdn -- "$_VM" "$_control" > /dev/null
 	connect_client_to_gateway -cdn -- "$_VM" "$_control" > /dev/null
 
 	# Connect to the upstream gateway
 	if chk_isrunning "$_gateway" ; then
 		connect_client_to_gateway -di "$_ipv4" "$_VM" "$_gateway" > /dev/null
-		connect_gateway_to_clients "$_VM"
 	fi
+
+	# If VM isnt a gateway, this will return 0 
+	connect_gateway_to_clients "$_VM"
 	return 0
 }
 
