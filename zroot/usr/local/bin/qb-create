@@ -56,7 +56,7 @@ evaluate_p_option() {
    if chk_isblank "$(eval echo \${$_param})" ; then
 		eval $_param=\"\${_value}\"
 	else
-		# Only assign value if it's a multi line PARAM. Else there's potential for duplicate params
+		# Only assign value if it's multi line PARAM. Else there's potential for duplicate params
 		echo $MULT_LN_PARAMS | grep -qs "$_param" \
 			&& eval $_param="\$(echo \${$_param} ; echo "$_value")"
 	fi
@@ -66,7 +66,7 @@ checks_master() {
 	# Parameter assignment precedence:  1) command line, 2) template, 3) #default in qmap.
 	# The set of checks and parameter assignments are somewhat complicated and intertwined,
 	# in large part, due to overlap of many qmap parameters for both jails and VMs, but also due
-	# to attempting to optimistically "fill in the blanks" for users that dont specify all params.
+	# to attempting to optimistically "fill in the blanks" for users that dont specify all params
 
 	# Check that proposed name is available and valid
 	chk_avail_jailname "$NEWJAIL" || exit 1
@@ -391,7 +391,7 @@ change_datasets() {
 		# Create the empty dataset
 		zfs create -V ${VOLSIZE} -o volmode=dev -o qubsd:autosnap="$AUTOSNAP" \
 																			"${R_ZPARENT}" && return 0
-	elif [ -z "${CLASS##root*}" ] ; then
+	elif [ -z "${CLASS##rootjail}" ] ; then
 		echo ''
 		zfs send -vP "$R_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${R_ZFS}/${NEWJAIL}"
 	else
@@ -420,9 +420,18 @@ change_datasets() {
 
 			# Create the directory mapping of the template
 			for _dir in $(find "${M_ZUSR}/${TEMPLATE}" -type d) ; do
-			   _newdir=$(echo $_dir | sed -e "s#${M_ZUSR}/${TEMPLATE}#${M_ZUSR}/${NEWJAIL}#")
+			   _newdir=$(echo $_dir | sed -e "s#/${TEMPLATE}#/${NEWJAIL}#g")
 				mkdir -p "$_newdir" > /dev/null 2>&1
 			done
+				
+			# Handle control jail keys
+			CONTROL=$(sed -En "s/.* CONTROL[[:blank:]]+//p" $_TMP_PARAMS)
+			[ ! -d "${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}/.ssh" ] \
+				&& mkdir -p ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}/.ssh
+			chmod 700 ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}/.ssh
+			chown -R 1001:1001 ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}/.ssh
+			cp -a ${M_ZUSR}/${CONTROL}/rw/root/.ssh/id_rsa.pub \
+					${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}/.ssh/authorized_keys
 		;;
 
 		empty) # Create the empty dataset/volume
@@ -432,7 +441,6 @@ change_datasets() {
 			else
 				zfs create -o qubsd:autosnap="$AUTOSNAP" "${U_ZFS}/${NEWJAIL}"
 			fi
-
 		;;
 	esac
 
