@@ -60,8 +60,9 @@ calculate_variables() {
 				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
 		esac
 	else
-		# If user did not input any [-t] TTL, tag the snapshot as manually created.
+		# If there's no [-t], tag snapshot as manually created, and set '-' for TTL, ddate
 		SNAPNAME=$(date +%b%d_%H:%M_Indef)
+		TTL='-' ; _ddate_unix='-'
 	fi
 }
 
@@ -110,27 +111,22 @@ list_datasets() {
 }
 
 new_snapshots() {
+	# Calculate unix-time destroy-dates based on user input time-to-live.
+	calculate_variables
+
 	# Datasets tagged with qubsd:autosnap.
 	ZLIST=$(zfs list -rH -o name,qubsd:autosnap \
 								| grep -E "[[:blank:]]+true\$" | awk '{print $1}')
 
 	for _dataset in $ZLIST ; do
-		# Calculate unix-time destroy-dates based on user input time-to-live.
-		calculate_variables
-
-		# Snapshot datasets from the auto list
-		zfs snapshot "${_dataset}@${SNAPNAME}"
-		zfs set qubsd:autocreated=yes "${_dataset}@${SNAPNAME}"
-		zfs set qubsd:autosnap="-" "${_dataset}@${SNAPNAME}"
-
-		# Set the time-to-live and destroy-date for new snapshots
-		if [ -n "$TTL" ] ; then
-			zfs set qubsd:time-to-live="$TTL" "${_dataset}@${SNAPNAME}"
-			zfs set qubsd:destroy-date="$_ddate_unix" "${_dataset}@${SNAPNAME}"
-		else
-			zfs set qubsd:time-to-live="-" "${_dataset}@${SNAPNAME}"
-			zfs set qubsd:destroy-date="-" "${_dataset}@${SNAPNAME}"
-		fi
+		# If the dataset is a zroot dataset (thus a ROOTENV), only snap if not running
+		{ [ -z "${_dataset##"${R_ZFS}*"}" ] && chk_isrunning "${_dataset##*/}" ;} \
+			|| zfs snapshot \
+					-o qubsd:autocreated=yes \
+					-o qubsd:autosnap="-" \
+					-o qubsd:time-to-live="$TTL" \
+					-o qubsd:destroy-date="$_ddate_unix" \
+					"${_dataset}@${SNAPNAME}"
 	done
 }
 
@@ -149,7 +145,7 @@ update_stale_clones() {
 		fi
 	done
 
-	# Update stale zusr clones. They might needs fstab replacement and home directory change
+	# Update stale zusr clones. They might need fstab replacement and home directory change
 	for _clone in $_uclonelist ; do
 		_origin=$(zfs list -Ho origin $_clone | sed -E "s/${U_ZFS}\///")
 		reclone_zusr ${_clone##*/} "${_origin%%@*}"
