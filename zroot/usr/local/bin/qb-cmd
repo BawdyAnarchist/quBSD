@@ -46,7 +46,7 @@ connect_vm_session() {
 	if [ ! "$VNCRES" = "none" ] ; then
 		# Sometimes it can take 5-15 secs for a VM to launch (if ppt is bad). Wait
 		_count=0
-		while ! _vmpid=$(pgrep -fxq "bhyve: $JAIL") ; do
+		while ! _vmpid=$(pgrep -fx "bhyve: $JAIL") ; do
 			# Wait 3 secs before message, to avoid unnecesary clutter
 			[ "$_count" = 3 ] && get_msg_cmd "_4"
 			[ "$_count" -gt 15 ] && get_msg_cmd "_5" "exit_1"
