@@ -1,9 +1,15 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
+
+qb-autosnap
+	- Make sure that it never snapshots a running VM 
+
+qb_ssh
+	- Needs modified. FreeBSD should really be it's own run script like in 0bsdvm
+
 # After SSH, scp, 0control, and the startstop issues are all hammered out, make another system backup 
 
 # CONTROL JAIL
-	control key needs added to all rootjails - also to qb-create
 	0bsdvm needs to have a daemon for continually checking/attmepting dhclient on vtnet0 
 	add permanent checks to prevent any changes to control via normal qb-commands
 
