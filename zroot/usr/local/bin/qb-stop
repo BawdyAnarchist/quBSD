@@ -191,7 +191,7 @@ main() {
 	[ "$_STOPS" = 0 ] && get_msg_stop "_m3" "exit_1"
 
 	# User specified timeout, or 5 secs for every hierarchy level
-	monitor_startstop "${_TIMEOUT:=$(( _STOPS * 5 ))}" &
+	monitor_startstop "${_TIMEOUT:=$(( _STOPS * 10 ))}" &
 	_MONITOR_PID="$!"
 
 	# Wait for stops to finish. If TIMEOUT, monitor_startstop will kill -15 this script
