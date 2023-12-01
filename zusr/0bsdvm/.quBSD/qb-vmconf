@@ -1,31 +1,59 @@
 #!/bin/sh
 
-# Edit rc.conf
-{ echo '' ; echo '# quBSD - generic boot script' ; echo 'qb_vmboot_enable="YES"' ;} >> /etc/rc.conf
+modify_rc() {
+  # Edit rc.conf
+  { echo ; echo '# quBSD - generic boot script' ; echo 'qb_vmboot_enable="YES"' ;} >> /etc/rc.conf
 
-# Copy the rc.d script
-[ -d "/usr/local/etc/rc.d" ] || mkdir -p /usr/local/etc/rc.d
-cp /vmusr/.quBSD/qb_vmboot /usr/local/etc/rc.d
+  # Copy the rc.d script
+  [ -d "/usr/local/etc/rc.d" ] || mkdir -p /usr/local/etc/rc.d
+  cp /vmusr/.quBSD/qb_vmboot /usr/local/etc/rc.d
+}
 
-# Bring up connection to the control jail
-dhclient vtnet0
+modify_dhclient() {
+  # Modify dhclient to retry lost connections more quickly, then bring up control jail connection
 
-# Create a user
-pw useradd -n user -md /usr/home/user -s /bin/csh
+  cat << ENDOFCONF->> /etc/dhclient.conf
 
-# Copy ssh pubkeys from the control jail and set permissions
-[ -d "/root/.ssh/" ] || mkdir -p /root/.ssh
-chmod 700 /root/.ssh
-fetch -o /root/.ssh/authorized_keys ftp://0control.qubsd.local/id_rsa.pub
-chmod 600 /root/.ssh/authorized_keys
-cp -a /root/.ssh /usr/home/user/
+	# quBSD dhclient.conf for VMs
 
-# Modify sshd, enable, and restart sshd
-sed -i '' -E 's/^#(PermitRootLogin).*/\1 yes/' /etc/ssh/sshd_config
-sed -i '' -E 's/^(PermitRootLogin).*/\1 yes/' /etc/ssh/sshd_config
-sed -i '' -E 's/^#(PasswordAuthentication).*/\1 no/' /etc/ssh/sshd_config
-sed -i '' -E 's/^(PasswordAuthentication).*/\1 no/' /etc/ssh/sshd_config
-sysrc sshd_enable="YES"
-service sshd restart
+	# DHCPREQUEST and retry every 30 seconds
+	timeout 30;
+	retry 30;
+	initial-interval 30;
+	# Select the most recently offered lease
+	select-timeout 1;
+ENDOFCONF
 
+  # Start the client
+  dhclient vtnet0
+}
 
+handle_users() {
+  pw useradd -n user -md /usr/home/user -s /bin/csh
+}
+
+manage_ssh() {
+  # Copy ssh pubkeys from the control jail and set permissions
+  [ -d "/root/.ssh/" ] || mkdir -p /root/.ssh
+  chmod 700 /root/.ssh
+  fetch -o /root/.ssh/authorized_keys ftp://0control.qubsd.local/id_rsa.pub
+  chmod 600 /root/.ssh/authorized_keys
+  cp -a /root/.ssh /usr/home/user/
+
+  # Modify sshd, enable, and restart sshd
+  sed -i '' -E 's/^#(PermitRootLogin).*/\1 yes/' /etc/ssh/sshd_config
+  sed -i '' -E 's/^(PermitRootLogin).*/\1 yes/' /etc/ssh/sshd_config
+  sed -i '' -E 's/^#(PasswordAuthentication).*/\1 no/' /etc/ssh/sshd_config
+  sed -i '' -E 's/^(PasswordAuthentication).*/\1 no/' /etc/ssh/sshd_config
+  sysrc sshd_enable="YES"
+  service sshd restart
+}
+
+main() {
+  modify_rc
+  modify_dhclient
+  handle_users
+  manage_ssh
+}
+
+main
