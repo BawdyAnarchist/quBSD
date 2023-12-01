@@ -46,9 +46,9 @@ Usage:  qb-autosnap
 
 This tool creates custom ZFS User Properties to track and 
 manage all datasets associated with qb-autosnap:
-   qubsd:autosnap      Designates inclusion in autosnap 
+   qubsd:autosnap      'true' designates inclusion in autosnap 
    qubsd:time-to-live  Human readable surive time of snapshot 
-   qubsd:destroy-date  Unix time to destroy snapshot (thin) 
+   qubsd:destroy-date  Unix time to destroy (thin) the snap
    qubsd:autocreated   All datasets associated with this tool 
    qubsd:backup        Backups sync'd to secondary dataset 
        Recommend using a separate zpool disk for backups. 
