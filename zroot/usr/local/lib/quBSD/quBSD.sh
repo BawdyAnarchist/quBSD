@@ -571,6 +571,9 @@ connect_client_to_gateway() {
 			[ "$_type" = "NET" ] && eval "$_cmdmod" route add default "${_ipv4%.*/*}.1" >/dev/null 2>&1
 	fi fi
 
+	# Add the jail and vif to a tracking file
+	[ "$_type" = "SSH" ] && echo "$_client $_vifb $_ipv4" >> ${QTMP}/control_netmap
+
 	# Echo option. Return epair-b ; it's the external interface for the jail.
 	[ "$_ec" ] && echo "$_vifb"
 	return 0
@@ -1651,13 +1654,16 @@ cleanup_vm() {
 
 		if [ -n "$_norun" ] ; then
 			ifconfig "$_tap" destroy 2> /dev/null
+			sed -i '' -E "/$_tap/d" ${QTMP}/control_netmap
 		else
 			# Trying to prevent searching in all jails, by guessing where tap is
 			_tapjail=$(get_info -e _CLIENTS "$_VM")
 			[ -z "$_tapjail" ] && _tapjail=$(get_jail_parameter -deqsz GATEWAY ${_VM})
 
 			# Remove the tap
-			remove_tap "$_tap" "$_tapjail" && ifconfig "$_tap" destroy
+			remove_tap "$_tap" "$_tapjail" \
+				&& ifconfig "$_tap" destroy \
+				&& sed -i '' -E "/$_tap/d" ${QTMP}/control_netmap
 		fi
 	done
 
@@ -1916,7 +1922,7 @@ finish_vm_connections() {
 		connect_client_to_gateway -di "$_ipv4" "$_VM" "$_gateway" > /dev/null
 	fi
 
-	# If VM isnt a gateway, this will return 0 
+	# If VM isnt a gateway, this will return 0
 	connect_gateway_to_clients "$_VM"
 	return 0
 }
