@@ -1,16 +1,11 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-
-qb-autosnap
-	- Make sure that it never snapshots a running VM 
-
 qb_ssh
 	- Needs modified. FreeBSD should really be it's own run script like in 0bsdvm
 
 # After SSH, scp, 0control, and the startstop issues are all hammered out, make another system backup 
 
 # CONTROL JAIL
-	0bsdvm needs to have a daemon for continually checking/attmepting dhclient on vtnet0 
 	add permanent checks to prevent any changes to control via normal qb-commands
 
 qb-copy
@@ -69,7 +64,10 @@ Take another hack at the recording device problems
 QMAP - New PARAM - CONNECT, that establishes a connection to a specified jail/VM
 
 
-### SPECIFIC SCRIPTS
+### SPECIFIC SCRIPTS OR FUNCTIONS
+
+reclone_zroot
+	- All that complication should simply be "is the ROOTENV on or off? Do the diff if off, otherwise fallback to presnap if off"
 
 You can probably bring seclvl=3 for gateways now. Also I dont think gateway require restarts anymore on qb-edit
 
@@ -159,6 +157,11 @@ Expand install options
 
 /qubsd/0base installer needs to create the /rw/ folder, or appjails based on it, won't mount properly
 I think I need to touch /etc/fstab with header so disps work? Or something like that
+
+0net
+	- /usr/local/etc/: dhcpd.0control.conf and dhcpd.0net.conf copied. Both are critical to base system functionality 
+	- jail's individual rc.conf can select for it. 
+	- Need to create /tmp/quBSD for control jails
 
 0serv and 0serv-template need integrated	
 	- www and usr diretories are quite large. Script integration:
