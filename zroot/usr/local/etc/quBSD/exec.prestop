@@ -1,31 +1,59 @@
 #!/bin/sh
-
 # Cleanly remove and destroy epairs before shutdown
 
-# Script variables
-JAIL="$1"
-echo "Stopping $JAIL. $(date "+%Y-%m-%d_%H:%M")" >> /var/log/quBSD.log
+. /usr/local/lib/quBSD/quBSD.sh
 
-TAPS=$(jexec -l -U root $JAIL ifconfig -g tap)
-EPAIRS=$(jexec -l -U root $JAIL ifconfig -g epair)
+get_script_variables() {
+	JAIL="$1"
+	NETMAP="${QTMP}/control_netmap"
+	TAPS=$(jexec -l -U root $JAIL ifconfig -g tap)
+	EPAIRS=$(jexec -l -U root $JAIL ifconfig -g epair)
+	LOCKF="${QTMP}/.lock.control_netmap"
+}
 
-# Remove all taps from jail
-for _tap in $TAPS; do
-	ifconfig $_tap -vnet $JAIL
-	ifconfig $_tap down
-done
+remove_interfaces() {
+	for _tap in $TAPS; do
+		ifconfig $_tap -vnet $JAIL
+		ifconfig $_tap down
+		sed -i '' -E "/${_tap}/d" $NETMAP
+	done
 
-# Remove all epairs from jail
-for _epair in $EPAIRS ; do
-	ifconfig $_epair -vnet $JAIL
-	ifconfig $_epair destroy
-done
+	for _epair in $EPAIRS ; do
+		ifconfig $_epair -vnet $JAIL
+		ifconfig $_epair destroy
+		sed -i '' -E "/${_epair%?}b/d" $NETMAP
+	done
+}
 
-# Must remove pefs mounts to avoid umount errors as jail is stopped
-qb-pefs -u $JAIL | tee -a $QBLOG
+lock_netmap() {
+	local _start=$(date +%-s)
+	while ! mkdir "$LOCKF" 2>/dev/null ; do
+		sleep 0.1
+		[ "$(date +%-s)" -gt "$(( _start + 5 ))" ] && break
+	done
+}
 
-# Prevents error for wg-quick changing resolv.conf
-chflags -R noschg ${M_ZUSR}/${JAIL}/etc/resolv.conf 2> /dev/null
+main() {
+	echo "Stopping $JAIL. $(date "+%Y-%m-%d_%H:%M")" >> /var/log/quBSD.log
 
-# Exit success regardless of pefs command, to continue jail shutdown
-exit 0
+	# lock file required, since sed doesn't get queued by kernel like echo "" >>
+	lock_netmap
+	remove_interfaces
+	rm -r $LOCKF
+
+	# Must remove pefs mounts to avoid umount errors as jail is stopped
+	qb-pefs -u $JAIL | tee -a $QBLOG
+
+	# Prevents error for wg-quick changing resolv.conf
+	chflags -R noschg ${M_ZUSR}/${JAIL}/etc/resolv.conf 2> /dev/null
+
+	# Exit success regardless of pefs command, to continue jail shutdown
+	exit 0
+}
+
+get_global_variables
+
+get_script_variables "$@"
+
+main
+
