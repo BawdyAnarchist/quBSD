@@ -29,6 +29,9 @@ preparation_actions() {
 
 	# Double check to unmount any parts of <jail> before destroy/recreating the dataset
 	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
+
+	# Make sure the /rw/ directory exists on the ROOTENV. Create if not
+	[ -d "${M_QROOT}/${ROOTENV}/rw" ] || mkdir -p "${M_QROOT}/${ROOTENV}/rw"
 }
 
 main() {
