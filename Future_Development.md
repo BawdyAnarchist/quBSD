@@ -3,16 +3,14 @@
 qb_ssh
 	- Needs modified. FreeBSD should really be it's own run script like in 0bsdvm
 
+qb-ivpn
+	- should not be in 0net, which has become significantly more generalized now
+	- should only go in the respective vpn /rw/usr/local/bin/qb-ivpn
+
+dhcpd files should also be in their respective rw spots, not in 0net
+
 # After SSH, scp, 0control, and the startstop issues are all hammered out, make another system backup 
 
-# CONTROL JAIL
-	add permanent checks to prevent any changes to control via normal qb-commands
-
-qb-copy
-	- Library functions b/c qb-connect will also integrate
-	- will use /media as the default copy locations between any two jail/VM combos
-	- Can specify copy location as well
-	- automatically brings up the SSH connection if necessary, then brings it down
 
 # Finish VM setup
 
