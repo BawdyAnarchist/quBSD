@@ -572,7 +572,7 @@ connect_client_to_gateway() {
 	fi fi
 
 	# Add the jail and vif to a tracking file
-	[ "$_type" = "SSH" ] && echo "$_client $_vifb $_ipv4" >> ${QTMP}/control_netmap
+	[ "$_type" = "SSH" ] && echo "$_client $_vifb ${_ipv4%%/*}" >> ${QTMP}/control_netmap
 
 	# Echo option. Return epair-b ; it's the external interface for the jail.
 	[ "$_ec" ] && echo "$_vifb"
