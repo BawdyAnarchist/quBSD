@@ -1,0 +1,118 @@
+#!/bin/sh
+
+get_msg() {
+	while getopts eEm:u opts ; do case $opts in
+		e) local _exit="exit 0" ;;
+		E) local _exit="exit 1" ;;
+		m) local _message="$OPTARG" ;;
+		u) local _usage="true" ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
+
+	case $_message in
+		_e1) cat << ENDOFMSG
+ERROR: At least 3 positional parameters are required:
+       <FROM jail/VM>  <FILE>  <TO jail/VM>
+ENDOFMSG
+		;;
+		_e2) cat << ENDOFMSG
+ERROR: Couldn't find IP mapping for < $1 >
+ENDOFMSG
+		;;
+		_e3) cat << ENDOFMSG
+ERROR: Couldn't establish connection to < $1 > via < $2 >
+ENDOFMSG
+		;;
+		_e4) cat << ENDOFMSG
+ERROR: Couldn't find < $1 > on < $2 >
+ENDOFMSG
+		;;
+	esac
+
+	[ $_usage ] && usage
+	eval $_exit	:
+}
+
+usage() { cat << ENDOFUSAGE
+
+qb-copy: Copies a file from one jail/VM, to another.
+Usage: qb-copy <FROM> <FILE> <TO>
+       qb-copy <FROM> <FILE> <TO> <LOCATION>
+
+  <FROM>/<TO>
+    Use the jail or VM name of the source/destination
+  <FILE>
+    Can be the /full/path (with leading slash), OR
+    will search for <FILE> in the source jail/VM $HOME
+  <LOCATION>
+    If blank, the destination HOME directory is used
+
+ENDOFUSAGE
+}
+
+get_options() {
+	while getopts h opts ; do case $opts in
+		h) get_msg -eu ;;
+		*) exit 1 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
+
+	NETMAP="/tmp/quBSD/control_netmap"
+	FROM="$1"  ;  FILE="$2"  ;  TO="$3"  ;  LOC="$4"
+
+	# Ensure the minimum necessary positional parameters were passed
+	{ [ -z "$FROM" ] || [ -z "$FILE" ] || [ -z "$TO" ] ;} && get_msg -Eum "_e1"
+}
+
+get_ips() {
+	# Pull the IP addresses from NETMAP
+	FIP=$(sed -En "s/${FROM}.* ([^[:blank:]]+\$)/\1/p" $NETMAP) 
+	TIP=$(sed -En "s/${TO}.* ([^[:blank:]]+\$)/\1/p" $NETMAP) 
+
+	# Error if not present
+	[ -z "$FIP" ] && get_msg -Em "_e2" "$FROM"
+	[ -z "$TIP" ] && get_msg -Em "_e2" "$TO"
+
+	# Make sure the connections are valid
+#	ssh -q root@$FIP ':' > /dev/null 2>&1 || get_msg -Em "_e3" "$FROM" "$FIP"
+#	ssh -q root@$TIP ':' > /dev/null 2>&1 || get_msg -Em "_e3" "$TO" "$TIP"
+}
+
+transform_fromfile() {
+	# Without a leading /slash, assume the primary user's $HOME (from the remote machine)
+	if [ -n "${FILE##/*}" ] ; then
+		_fileprfx=$(ssh -q root@${FIP} \
+				"cat /etc/passwd" | awk -F: '($3 >= 1000) && ($7 !~ /nologin$/) {print $6; exit}')
+		FILE="${_fileprfx}/${FILE}"
+	fi
+
+	# Check the existence of FILE
+	ssh -q root@${FIP} "[ -e \"$FILE\" ]" || get_msg -Em "_e4" "$FILE" "$FROM"
+}
+
+transform_tofile() {
+	# If $4 wasnt provided, use the primary user's $HOME directory (in the remote machine)
+	if [ -z "$LOC" ] || [ -n "${LOC##/*}" ] ; then
+		_locprfx=$(ssh -q root@${TIP} \
+				"cat /etc/passwd" | awk -F: '($3 >= 1000) && ($7 !~ /nologin$/) {print $6; exit}')
+		LOC="${_locprfx}/${LOC}"
+	fi	
+
+	# Tricky: We now must determine if LOC was a directory, or a new filename
+	ssh -q root@${TIP} "[ -d \"${LOC}\" ]" && NEWFILE="${LOC}/${FILE##*/}" || NEWFILE="$LOC"
+}
+
+main() {
+	# Get/verify IP addresses for FROM / TO hosts 
+	get_ips
+
+	# File transformations seek to fill-in-the-blanks, if a full path wasnt provided.
+	# In which case, we assume the primary remote user's home directory. 
+	transform_fromfile
+	transform_tofile
+
+	# Perform the transfer
+	ssh -q root@${FIP} "cat $FILE" | ssh -q root@${TIP} "cat > $NEWFILE"
+}
+
+get_options "$@"
+
+main
