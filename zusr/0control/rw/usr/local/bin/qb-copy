@@ -46,6 +46,9 @@ Usage: qb-copy <FROM> <FILE> <TO>
   <LOCATION>
     If blank, the destination HOME directory is used
 
+  !NOTE! File owner/permissions are preserved, except 
+    when destination location is inside the $HOME dir. 
+
 ENDOFUSAGE
 }
 
@@ -85,19 +88,20 @@ transform_fromfile() {
 	fi
 
 	# Check the existence of FILE
-	ssh -q root@${FIP} "[ -e \"$FILE\" ]" || get_msg -Em "_e4" "$FILE" "$FROM"
+	_lsfile=$(ssh -q root@${FIP} "ls -ld \"$FILE\"" 2>&1) || get_msg -Em "_e4" "$FILE" "$FROM"
 }
 
 transform_tofile() {
+	# Need the passwd of destination to make decisions about ownership
+	_pwd=$(ssh -q root@${TIP} "cat /etc/passwd")
+	_user=$(echo "$_pwd" | awk -F: '($3 >= 1000) && ($7 !~ /nologin$/) {print $3; exit}')
+	_usrprfx=$(echo "$_pwd" | awk -v user="$_user" -F: '($3 == user) {print $6}')
+
 	# If $4 wasnt provided, use the primary user's $HOME directory (in the remote machine)
-	if [ -z "$LOC" ] || [ -n "${LOC##/*}" ] ; then
-		_locprfx=$(ssh -q root@${TIP} \
-				"cat /etc/passwd" | awk -F: '($3 >= 1000) && ($7 !~ /nologin$/) {print $6; exit}')
-		LOC="${_locprfx}/${LOC}"
-	fi	
+	{ [ -z "$LOC" ] || [ -n "${LOC##/*}" ] ;} && LOC="${_usrprfx}/${LOC}"
 
 	# Tricky: We now must determine if LOC was a directory, or a new filename
-	ssh -q root@${TIP} "[ -d \"${LOC}\" ]" && NEWFILE="${LOC}/${FILE##*/}" || NEWFILE="$LOC"
+	ssh -q root@${TIP} "[ -d \"${LOC}\" ]" && LOC="${LOC}/$(basename $FILE)"
 }
 
 main() {
@@ -110,7 +114,11 @@ main() {
 	transform_tofile
 
 	# Perform the transfer
-	ssh -q root@${FIP} "cat $FILE" | ssh -q root@${TIP} "cat > $NEWFILE"
+	ssh -q root@${FIP} "tar cpf - -C $(dirname $FILE) $(basename $FILE)" \
+			| ssh -q root@${TIP} "tar xpf - -C $(dirname $LOC)"
+
+	# If we assumed $HOME, ensure user ownership is correct (1000 vs 1001 on various nix)
+	[ -z "${LOC##"${_usrprfx}"*}" ] && ssh -q root@${TIP} "chown ${_user}:${_user} $LOC"
 }
 
 get_options "$@"

@@ -1,16 +1,6 @@
 ##### VIRTUAL MACHINE INTEGRATION
 
-qb_ssh
-	- Needs modified. FreeBSD should really be it's own run script like in 0bsdvm
-
-qb-ivpn
-	- should not be in 0net, which has become significantly more generalized now
-	- should only go in the respective vpn /rw/usr/local/bin/qb-ivpn
-
-dhcpd files should also be in their respective rw spots, not in 0net
-
 # After SSH, scp, 0control, and the startstop issues are all hammered out, make another system backup 
-
 
 # Finish VM setup
 
@@ -28,6 +18,9 @@ Ubuntu - zusr dataset integration; user profiles
 USBVM 
 	- Create a proper unprivileged user with devd.conf and automounts     
 	- Auto remove password from unprivleged usbvm user     
+
+qb_ssh
+	- Needs modified. FreeBSD should really be it's own run script like in 0bsdvm
 
 
 ### UPGRADES
@@ -72,6 +65,7 @@ You can probably bring seclvl=3 for gateways now. Also I dont think gateway requ
 qb-stop
 	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
 	- monitor_vm_stop is probably outdated now since `wait` commands are being used. Needs reviewed 
+	- Still needs fine tuning, as it's hanging somehow during _stop
 
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
