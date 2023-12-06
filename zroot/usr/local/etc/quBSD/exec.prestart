@@ -2,21 +2,20 @@
 
 . /usr/local/lib/quBSD/quBSD.sh
 
+#ln_dirs=$(echo "$ln_files" | sed "s#\(.*\)/.*#\1#" | sed '/^$/d' | uniq)
 main() {
 	JAIL="$1"
 
 	# class was already retrieved/check in exec.prepare. Don't check again [-sq]
 	get_jail_parameter -dqs CLASS "$JAIL" || exit 1
 
-	# /rw/ nullfs mounts are best symlinked from within the cloned appjail's root 
+	# /rw/ nullfs mounts are best symlinked from within the cloned appjail's root
 	if [ "$CLASS" != "rootjail" ] ; then
-        	chroot ${M_QROOT}/${JAIL} /bin/sh <<"EOT"
-                ln_files=$(find "/rw" -type f | sed "s:/rw::")
-                if [ -n "$ln_files" ] ; then
-			ln_dirs=$(echo "$ln_files" | sed "s#\(.*\)/.*#\1#" | sed '/^$/d' | uniq)
-                        echo "$ln_dirs" | xargs mkdir -p 
-                        echo "$ln_files" | xargs -I@ ln -sf /rw@ @
-                fi
+		chroot ${M_QROOT}/${JAIL} /bin/sh <<"EOT"
+			for _file in $(find "/rw" -type f | sed "s:/rw::") ; do
+					[ -d "$(dirname $_file)" ] || mkdir -p $(dirname $_file)
+					ln -sf /rw/${_file} $_file
+			done
 EOT
 	fi
 }
