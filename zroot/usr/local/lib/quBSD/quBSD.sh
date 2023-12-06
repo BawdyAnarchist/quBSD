@@ -1832,8 +1832,11 @@ EOF
 	# Invoke the trap function for VM cleanup, in case of any errors after modifying host/trackers
 	trap "cleanup_vm -n $_VM ; exit 0" INT TERM HUP QUIT
 
-	# Add 1 to _taps for the SSH tap. _cycle helps resolve the _vif tag
-	_taps=$(( _taps + 1 ))  ;  _cycle=0
+	# Default _taps should be 0. Add a tap for the control jail, and another if there's a gateway 
+	_taps=$(( _taps + 1 ))
+	[ -n "$_gateway" ] && [ ! "$_gateway" = "none" ] && _taps=$(( _taps + 1 ))
+
+	_cycle=0
 	while [ "$_taps" -gt 0 ] ; do
 
 		# Create tap, make sure it's down, increment slot
@@ -1946,7 +1949,8 @@ exec_vm_coordinator() {
 	start_jail -q $_control
 
 	# Pulls variables for the VM, and assembles them into bhyve line options
-	! prep_bhyve_options $_qs $_tmux "$_VM" && [ -z "$_norun" ] && get_msg "_cj33"
+	! prep_bhyve_options $_qs $_tmux "$_VM" && [ -z "$_norun" ] \
+			&& get_msg "_cj33" >> $QBLOG && return 1
 
 	# If norun, echo the bhyve start command, cleanup the taps/files, and return 0
 	if [ -n "$_norun" ] ; then
