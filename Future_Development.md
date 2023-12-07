@@ -1,16 +1,3 @@
-### VM INTEGRATION
-
-# System backup - then upgrade everything to FreeBSD 14 
-
-Ubuntu 
-	- expand volume & update
-	- zusr dataset integration; user profiles
-
-Document expand procedures
-
-qb_ssh
-	- Needs modified. FreeBSD should really be it's own run script like in 0bsdvm
-
 
 ### UPGRADES
 
@@ -32,7 +19,7 @@ pwd
 	- To get around the pw -V problem, you could put /usr/local/bin/pw wrapper
 
 Host as Unprivileged user     
-	- All jails will have an epair to an offline *Control Jail*      
+	- doas commands allowed by unprivileged user
 	- Unprivileged user on host will pass jails SSH commands via Control Jail     
 	- Control jail pf will block all, except port 22 between host and jails     
 
@@ -41,7 +28,6 @@ NICVM - Linux VM so that it can use all the wireless protocols.
 
 Take another hack at the recording device problems
 
-QMAP - New PARAM - CONNECT, that establishes a connection to a specified jail/VM
 
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
@@ -49,7 +35,7 @@ QMAP - New PARAM - CONNECT, that establishes a connection to a specified jail/VM
 reclone_zroot
 	- All that complication should simply be "is the ROOTENV on or off? Do the diff if off, otherwise fallback to presnap if off"
 
-You can probably bring seclvl=3 for gateways now. Also I dont think gateway require restarts anymore on qb-edit
+You can probably bring seclvl=3 for gateways now.
 
 qb-connect
 	- I feel like it should be looked over, but then again, maybe not. Control jail seems to handle much of what's needed.
@@ -58,6 +44,9 @@ qb-pci
 	- summary of PCI devices relevant to user
 	- USB, NIC, maybe others
 	- Show what was is currently passthrough'd
+
+qb_ssh
+	- Probably can remove the FreeBSD parts of it. Maybe the Net/Open ones as well 
 
 qb-stop
 	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
@@ -91,8 +80,12 @@ qb-backup (already created in $ubin)
 qb-stat - Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
 
 
-
 ### GENERAL / BEST PRACTICES / CLEANUP
+
+dispVM
+	- Add new class and boot practices
+	- vm-rc.local should use its IP address to get it's hostname from 0control ftp server
+		- This will require creating a new file in /usr/home/ftp/<IPaddr> on 0control
 
 The test for exec.created modifying wg0, pf, and dhcp, should be if they're included/enabled in the jail's rc script
 
