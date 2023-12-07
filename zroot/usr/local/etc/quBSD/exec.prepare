@@ -29,9 +29,14 @@ preparation_actions() {
 
 	# Double check to unmount any parts of <jail> before destroy/recreating the dataset
 	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
+}
 
-	# Make sure the /rw/ directory exists on the ROOTENV. Create if not
-	[ -d "${M_QROOT}/${ROOTENV}/rw" ] || mkdir -p "${M_QROOT}/${ROOTENV}/rw"
+create_fstab_directories() {
+	# Use the JAIL's fstab to create the directories necessary for mountpoints
+	_DIRS=$(tail -n +2 ${M_ZUSR}/${JAIL}/rw/etc/fstab | awk '{print $2}')
+	for _dir in $_DIRS ; do
+		[ -d "$_dir" ] || mkdir -p $_dir > /dev/null 2>&1
+	done
 }
 
 main() {
@@ -52,6 +57,8 @@ main() {
 			chk_valid_zfs "${U_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE" || exit 1
 		;;
 	esac
+
+	create_fstab_directories
 
 	return 0
 }
