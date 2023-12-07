@@ -44,7 +44,7 @@ checks_and_variables() {
 
 rename_common() {
 	# Stop all jails before renaming. Rename should not happen if stops fails
-	qb-stop -w "$JAIL $_RESTARTS" || get_msg_rename "_3" "exit_1"
+	qb-stop "$JAIL $_RESTARTS" > /dev/null 2>&1 || get_msg_rename "_3" "exit_1"
 
 	# Modify qmap. Roojails should update their own rootjail to self
 	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}  /g" $QMAP
@@ -53,11 +53,11 @@ rename_common() {
 	# Rename associated zfs datasets
 	chk_valid_zfs ${U_ZFS}/${JAIL} \
 			&& zfs rename -f ${U_ZFS}/${JAIL} ${U_ZFS}/${NEWNAME} \
-			&& zfs inherit mountpoint ${U_ZFS}/${NEWNAME}
+			&& ! chk_isvm $NEWNAME && zfs inherit mountpoint ${U_ZFS}/${NEWNAME}
 
 	chk_valid_zfs ${R_ZFS}/${JAIL} \
 			&& zfs rename -f ${R_ZFS}/${JAIL} ${R_ZFS}/${NEWNAME} \
-			&& zfs inherit mountpoint ${R_ZFS}/${NEWNAME}
+			&& ! chk_isvm $NEWNAME && zfs inherit mountpoint ${R_ZFS}/${NEWNAME}
 }
 
 rename_jail() {
