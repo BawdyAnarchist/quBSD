@@ -1657,7 +1657,7 @@ cleanup_vm() {
 			sed -i '' -E "/$_tap/d" ${QTMP}/control_netmap
 		else
 			# Trying to prevent searching in all jails, by guessing where tap is
-			_tapjail=$(get_info -e _CLIENTS "$_VM")
+			_tapjail="$_clients"
 			[ -z "$_tapjail" ] && _tapjail=$(get_jail_parameter -deqsz GATEWAY ${_VM})
 
 			# Remove the tap
@@ -1704,6 +1704,7 @@ prep_bhyve_options() {
 	_VM="$1"
 	_cpuset=$(get_jail_parameter -de CPUSET "$_VM")        || return 1
 	_gateway=$(get_jail_parameter -dez GATEWAY "$_VM")     || return 1
+	_clients=$(get_info -e _CLIENTS "$_VM")
 	_control=$(get_jail_parameter -de  CONTROL "$_VM")     || return 1
 	_ipv4=$(get_jail_parameter -derz IPV4 "$_VM")          || return 1
 	_memsize=$(get_jail_parameter -de MEMSIZE "$_VM")      || return 1
@@ -1832,9 +1833,12 @@ EOF
 	# Invoke the trap function for VM cleanup, in case of any errors after modifying host/trackers
 	trap "cleanup_vm -n $_VM ; exit 0" INT TERM HUP QUIT
 
-	# Default _taps should be 0. Add a tap for the control jail, and another if there's a gateway 
+	# Default number of taps is 0. Add 1 for the control jail SSH connection
 	_taps=$(( _taps + 1 ))
+	# Also, for every gateway or client the VM touches, it needs another tap 
 	[ -n "$_gateway" ] && [ ! "$_gateway" = "none" ] && _taps=$(( _taps + 1 ))
+	[ -n "$_clients" ] && [ ! "$_clients" = "none" ] \
+			&& _taps=$(( _taps + $(echo $_clients | wc -w) ))
 
 	_cycle=0
 	while [ "$_taps" -gt 0 ] ; do
