@@ -1,0 +1,93 @@
+#!/bin/sh
+
+# THIS SCRIPT IS EXECUTED AFTER STARTUP, TO IMPLEMENT VM SPECIFIC CONFIGURATIONS.
+# THIS IS NECESSARY, SINCE ALL VMs ARE MERELY CLONES OF THEIR ROOTENV
+
+define_variables() {
+  # Add a unique hostname
+  _HOSTNAME="hostname"
+  # vtnet0 is always allocated to the control jail 
+  _CONTROLIF="vtnet0"
+  # If the VM has a gateway, then vtnet1 will DHCP to that gateway 
+  _GWIF="vtnet1"
+
+  # ADDITIONAL USERS CAN BE CREATED
+  #_USERS="<username1> <username2>"
+
+  # Additional network interface to the external internet
+  #_EXTIF=""
+}
+
+hostname_and_users() {
+  # Change the hostname. This is standard for all VMs
+  [ -n "$_HOSTNAME" ] && hostname $_HOSTNAME
+
+  for _user in $_USERS ; do
+    pw useradd -n $_user -md /vmusr/home/${_user} -s /bin/csh
+  done
+
+  # SSH key copy to $HOME is necessary for control jail access 
+  for _user in $(awk -F: '($3 >= 1000) && ($7 !~ /nologin$/) {print $3 "_" $6}' /etc/passwd) ; do
+    # Extract UID and HOME using parameter expansion
+    _uid="${_user%_*}"  ;  _home="${_user##*_}"
+
+    # Create the .ssh directory with proper permissions, then copy authkeys
+    [ ! -d "${_home}/.ssh" ] && mkdir -p ${_home}/.ssh
+    cp -a /root/.ssh/authorized_keys ${_home}/.ssh
+    chmod 700 ${_home}/.ssh
+    chown -R "$_uid":"$_uid" ${_home}/.ssh
+  done
+}
+
+copy_rw_files() {
+  for _file in $(find "/vmusr/rw" -type f | sed "s:/rw::") ; do
+    [ -d "$(dirname $_file)" ] || mkdir -p $(dirname $_file)
+    ln -sf /vmusr/rw/${_file} $_file
+  done
+}
+
+configure_network() {
+  # ADD VM CUSTOM NETWORK CONNECTIONS HERE
+
+  # INTIF first, so that default route goes there
+  $(ifconfig $_GWIF > /dev/null 2>&1) && dhclient $_GWIF
+  dhclient $_CONTROLIF
+}
+
+start_services() {
+  # Be sure to use "one"start, since none of these can go in the usual /etc/rc.conf
+  # service <module> onestart
+}
+
+apply_hardening() {
+  # Highest level hardening measures. Set these appropriately for your usecase
+  chflags -R schg /bin /sbin /boot /etc /lib /libexec /usr/bin /usr/home /usr/lib /usr/lib32 /usr/libdata /usr/libexec /usr/ports /usr/sbin /usr/src /usr/local/bin /usr/local/lib /usr/local/lib32 /usr/local/libdata /usr/local/libexec /usr/local/man /usr/local/sbin > /dev/null 2>&1
+
+  sysctl kern.securelevel 3
+}
+
+main() {
+# UNCOMMENT AND MODIFY AS NECESSARY
+
+  # Hostname, usernames, and interface designation 
+  define_variables
+
+  # A persistent user is kept under /vmusr/home/user. More can be added via define_variables
+  hostname_and_users
+
+  # Put custom system files in /vmusr/rw, and they'll be linked. If no files, this is skipped
+  copy_rw_files
+
+  # Automatic for control jail and gateway. Only change if you need additional network configs 
+  configure_network
+
+  # Custom services for the VM. You will need to manually add these
+  #start_services 
+
+  # Hardening options. Turned off by default, but recommend setting at an appropriate level
+  #apply_hardening &
+}
+
+main
+
+

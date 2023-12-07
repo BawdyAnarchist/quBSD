@@ -10,7 +10,7 @@ modify_rc() {
 }
 
 modify_dhclient() {
-  # Modify dhclient to retry lost connections more quickly, then bring up control jail connection
+  # Modify dhclient to retry lost connections more quickly, then bring up control jail connection 
 
   cat << ENDOFCONF->> /etc/dhclient.conf
 
@@ -20,7 +20,7 @@ modify_dhclient() {
 	timeout 30;
 	retry 30;
 	initial-interval 30;
-	# Select the most recently offered lease
+	# Select the most recently offered lease 
 	select-timeout 1;
 ENDOFCONF
 
@@ -53,7 +53,7 @@ main() {
   modify_rc
   modify_dhclient
   handle_users
-  manage_ssh
+  manage_ssh 
 }
 
 main
