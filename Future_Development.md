@@ -1,23 +1,12 @@
-##### VIRTUAL MACHINE INTEGRATION
+### VM INTEGRATION
 
-# After SSH, scp, 0control, and the startstop issues are all hammered out, make another system backup 
+# System backup - then upgrade everything to FreeBSD 14 
 
-# Finish VM setup
+Ubuntu 
+	- expand volume & update
+	- zusr dataset integration; user profiles
 
-qb-connect
-	- VM integration: jail/VM connections, specifically SSH preparation for files copy
-	- Inside VMs - qb-copy <file> ... which sends to the ssh-jail, or copies from it
-
-qb-pci
-	- summary of PCI devices relevant to user
-	- USB, NIC, maybe others
-	- Show what was is currently passthrough'd
-
-Ubuntu - zusr dataset integration; user profiles
-
-USBVM 
-	- Create a proper unprivileged user with devd.conf and automounts     
-	- Auto remove password from unprivleged usbvm user     
+Document expand procedures
 
 qb_ssh
 	- Needs modified. FreeBSD should really be it's own run script like in 0bsdvm
@@ -61,6 +50,14 @@ reclone_zroot
 	- All that complication should simply be "is the ROOTENV on or off? Do the diff if off, otherwise fallback to presnap if off"
 
 You can probably bring seclvl=3 for gateways now. Also I dont think gateway require restarts anymore on qb-edit
+
+qb-connect
+	- I feel like it should be looked over, but then again, maybe not. Control jail seems to handle much of what's needed.
+
+qb-pci
+	- summary of PCI devices relevant to user
+	- USB, NIC, maybe others
+	- Show what was is currently passthrough'd
 
 qb-stop
 	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
