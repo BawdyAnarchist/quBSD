@@ -200,25 +200,12 @@ s/(devfs_ruleset).*/\1=\"${VALUE}\";/
 
 handle_restarts() {
 	# Logic could be written to change running jails, but simpler just to restart.
-	case $PARAM in
 
-		CPUSET|MAXMEM|MTU|ROOTENV|SCHG|SECLVL|TEMPLATE)
-			chk_isrunning $JAIL && _restart1="$JAIL"
-		;;
-		IPV4|GATEWAY)
-			_gateway=$(get_jail_parameter -deqs GATEWAY $JAIL)
-
-			# If jail is running it needs restarted
-			if chk_isrunning $JAIL ; then
-				_restart1="$JAIL" ; _restart2="$_gateway"
-			else
-				chk_isrunning $_gateway && _restart2="$_gateway"
-			fi
-		;;
-	esac
+	echo "$PARAM" | grep -Eqs "CPUSET|MAXMEM|MTU|ROOTENV|SCHG|SECLVL|TEMPLATE|IPV4|GATEWAY" \
+		&&	chk_isrunning $JAIL && _restart1="$JAIL"
 
 	# If there are no jails to restart, exit
-	[ -z "$_restart1" ] && [ -z "$_restart2" ] && exit 0
+	[ -z "$_restart1" ] && exit 0
 
 	# If QUIET tagged, only continue if user specified a restart
 	[ -n "$QUIET" ] && [ -z "$RESTART" ] && exit 0
@@ -229,9 +216,7 @@ handle_restarts() {
 	fi
 
 	# Restart jails (otherwise, would've already exited)
-	for _jail in $_restart2 $_restart1 ; do
-		[ "$_jail" = "none" ] || restart_jail "$_jail"
-	done
+	[ "$_jail" = "none" ] || restart_jail "$_jail"
 }
 
 main() {
