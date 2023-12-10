@@ -33,7 +33,8 @@ preparation_actions() {
 
 create_fstab_directories() {
 	# Use the JAIL's fstab to create the directories necessary for mountpoints
-	_DIRS=$(tail -n +2 ${M_ZUSR}/${JAIL}/rw/etc/fstab | awk '{print $2}')
+	_DIRS=$(tail -n +2 ${M_ZUSR}/${JAIL}/rw/etc/fstab | awk '!/^[[:blank:]]*#/{print $2}')
+
 	for _dir in $_DIRS ; do
 		[ -d "$_dir" ] || mkdir -p $_dir > /dev/null 2>&1
 	done
