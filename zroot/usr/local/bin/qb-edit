@@ -61,8 +61,13 @@ checks() {
 
 		# All other PARAMs must be checked for validity, and determine if new line is needed
 		elif echo "$FILT_PARAMS" | grep -Eqs "$PARAM" ; then
+			# If there was no OLDVALUE, add a new line. However, if VALUE is equal to the default,
+			# then we'll delete the line and rely on the default. EXCEPT for CLASS and ROOTENV.
+			# For safety reasons, jails/VMs should always specify this, even if equal to default. 
+
 			[ -z "$OLDVALUE" ] && ACTION="add"
-			[ "$VALUE" = "$DEFAULT" ] && ACTION="revert_to_default"
+			[ "$VALUE" = "$DEFAULT" ] && [ ! "$PARAM" = "CLASS" ] \
+				&& [ ! "$PARAM" = "ROOTENV" ] && ACTION="revert_to_default"
 
 		elif echo "$NON_QMAP" | grep -Eqs "$PARAM" ; then
 			ACTION="none"
