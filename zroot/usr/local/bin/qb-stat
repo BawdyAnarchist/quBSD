@@ -85,8 +85,8 @@ get_jails_loop() {
 	case "${_jail}_${class}" in
 		serv-*)       sub="2" ;;
 		net-*)        sub="3" ;;
-		[[:digit:]]*app*)       sub="4" ;;
-		[[:digit:]]*root*)      sub="5" ;;
+		[[:digit:]]*app*)  sub="4" ;;
+		[[:digit:]]*root*) sub="5" ;;
 		host*|*cjail) sub="6" ;;
 		*)		        sub="1" ;;
 	esac
