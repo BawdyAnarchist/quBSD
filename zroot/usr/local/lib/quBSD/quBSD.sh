@@ -489,6 +489,42 @@ remove_tap() {
 	return 1
 }
 
+copy_control_keys() {
+	# Ensures that the latest ssh pubkey for the control jail is copied to client jail
+	# In the case of a restart of the control jail, use [-f] to make sure flags are restored
+
+	getopts f _opts && local _flags="true" && shift
+	local _control="$1"
+	local _client="$2"
+
+	# Lift flags for edits, create the .ssh directory if not there, and copy the files
+	chflags -R noschg ${M_QROOT}/${_client}/root
+	[ ! -d "${M_QROOT}/${_client}/root/.ssh" ] && mkdir ${M_QROOT}/${_client}/root/.ssh
+	cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub ${M_QROOT}/${_client}/root/.ssh/authorized_keys
+
+	# Change ownership and permissions of all files, then bring up flags
+	chmod 700 ${M_QROOT}/${_client}/root/.ssh
+	chmod 600 ${M_QROOT}/${_client}/root/.ssh/authorized_keys
+	chflags -R schg ${M_QROOT}/${_client}/root/.ssh
+
+	# Repeat all the same steps if there is an unprivileged user
+	if [ -d "${M_ZUSR}/${_client}/usr/home/${_client}" ] ; then
+
+		chflags -R noschg ${M_ZUSR}/${_client}/usr/home/${_client}
+		[ ! -d "${M_ZUSR}/${_client}/usr/home/${_client}/.ssh" ] \
+			&& mkdir ${M_ZUSR}/${_client}/usr/home/${_client}/.ssh
+		cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub \
+			${M_ZUSR}/${_client}/usr/home/${_client}/.ssh/authorized_keys
+
+		chmod 700 ${M_ZUSR}/${_client}/usr/home/${_client}/.ssh
+		chmod 600 ${M_ZUSR}/${_client}/usr/home/${_client}/.ssh/authorized_keys
+		chown 1001:1001 ${M_ZUSR}/${_client}/usr/home/${_client}/.ssh/authorized_keys
+		chflags -R schg ${M_ZUSR}/${_client}/usr/home/${_client}/.ssh
+	fi
+
+	[ "$_flags" ] && qb-flags -r $_client &
+}
+
 connect_client_to_gateway() {
 	# When a jail/VM is started, this connects to its gateway
 	# GLOBAL VARIABLES must have been assigned already: $GATEWAY ; $IPV4 ; $MTU
@@ -591,8 +627,10 @@ connect_gateway_to_clients() {
 	# All onjails connect to 0control
 	if [ "$CLASS" = "cjail" ] ; then
 		for _client in $(get_info -e _ONJAILS | grep -v "$_gateway") ; do
-			[ "$(get_jail_parameter $_q -de CONTROL $_client)" = "$_gateway" ] \
-					&& connect_client_to_gateway -c $_q "$_client" "$_gateway"
+			if [ "$(get_jail_parameter $_q -de CONTROL $_client)" = "$_gateway" ] ; then
+				connect_client_to_gateway -c $_q "$_client" "$_gateway"
+				! chk_isvm $_client && copy_control_keys -f $_gateway $_client
+			fi
 		done
 	fi
 
@@ -1835,7 +1873,7 @@ EOF
 
 	# Default number of taps is 0. Add 1 for the control jail SSH connection
 	_taps=$(( _taps + 1 ))
-	# Also, for every gateway or client the VM touches, it needs another tap 
+	# Also, for every gateway or client the VM touches, it needs another tap
 	[ -n "$_gateway" ] && [ ! "$_gateway" = "none" ] && _taps=$(( _taps + 1 ))
 	[ -n "$_clients" ] && [ ! "$_clients" = "none" ] \
 			&& _taps=$(( _taps + $(echo $_clients | wc -w) ))
@@ -1969,7 +2007,7 @@ exec_vm_coordinator() {
 	# Monitor to make sure that the bhyve command started running, then return 0
 	_count=0 ; sleep .5
 	while ! { pgrep -xfq "bhyve: $_VM" \
-				|| pgrep -fl "bhyve" | grep -Eqs "^[[:digit:]]+ .* $_VM[[:blank:]]*\$" ;} ; do
+				|| pgrep -fl "bhyve" | grep -Eqs "^[[:digit:]]+ .* ${_VM}[[:blank:]]*\$" ;} ; do
 		sleep .5 ; _count=$(( _count + 1 ))
 		[ "$_count" -ge 6 ] && get_msg get_msg "_cj31" "$_VM" && return 1
 	done
