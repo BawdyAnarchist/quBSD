@@ -35,11 +35,6 @@ Take another hack at the recording device problems
 reclone_zroot
 	- All that complication should simply be "is the ROOTENV on or off? Do the diff if off, otherwise fallback to presnap if off"
 
-You can probably bring seclvl=3 for gateways now.
-
-qb-connect
-	- I feel like it should be looked over, but then again, maybe not. Control jail seems to handle much of what's needed.
-
 qb-pci
 	- summary of PCI devices relevant to user
 	- USB, NIC, maybe others
@@ -138,12 +133,17 @@ Expand install options
 	Can select to merge zroot and zusr with other existing dataset/mount     
 
 /qubsd/0base installer needs to create the /rw/ folder, or appjails based on it, won't mount properly
-I think I need to touch /etc/fstab with header so disps work? Or something like that
+	Also touch /etc/fstab with header so disps work. (for all jails actually)
+
+0base
+	zfs create zroot/qubsd/0base
+	tar -C /qubsd/0base -xvf /usr/freebsd-dist/base.txz
+	head -1 /etc/fstab > /qubsd/0base/etc/fstab	
 
 0net
-	- /usr/local/etc/: dhcpd.0control.conf and dhcpd.0net.conf copied. Both are critical to base system functionality 
-	- jail's individual rc.conf can select for it. 
-	- Need to create /tmp/quBSD for control jails
+	- pkg install isc-dhcp44-server bind918 wireguard-tools vim jq
+	- copy .cshrc and .vim*
+	- change /rc.d/wireguard to remove the kldunload
 
 0serv and 0serv-template need integrated	
 	- www and usr diretories are quite large. Script integration:
@@ -158,7 +158,7 @@ devfs.rules
 	- Maybe the file should be added to the get_global_variables assignments library
 
 net-jails
-	pkg install isc-dhcp44-server bind918 wireguard wireguard-go jq
+	pkg install isc-dhcp44-server bind918 wireguard-tools jq vim
 	- Check that pf conf is updated with required dhcp port, and the simplified version
 
 R_ZFS and U_ZFS ; and mountpoints changed. Less cumbersome, more straightforward
@@ -169,6 +169,10 @@ VMs integration
 quBSD.conf removed. Everything now in jailmap.conf
 
 Should make the $qubsd/zroot/0net 0gui 0vms and everything files here for specific stuff like rc.conf
+
+loader.conf needs if_wg_load="YES"
+
+
 
 ### Control Jail
 # KEYGEN
@@ -192,4 +196,7 @@ Should make the $qubsd/zroot/0net 0gui 0vms and everything files here for specif
 # 0bsdvm needs to have a daemon for continually checking/attmepting dhclient on vtnet0 
 
 
-
+# NOTES FROM RE-INSTALL
+	make sure that zroot/qubsd is mounted at /qubsd and not /zroot/qubsd
+	
+	pf.ko wasnt loaded ..?
