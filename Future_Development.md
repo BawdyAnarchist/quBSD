@@ -1,4 +1,17 @@
 
+Change usr/home/ to simply /home. Double check that's the new standard.
+	- BSD VMs will need their shit fixed too probably
+	- create new backup
+
+Weekly snaps arent happening, because when they're taken, they happen to have no diff from the previous snap.
+	- Thus, diff compare should probably only happen for like-timeframe references. Or easier, only short tf snaps diff-compare 
+
+copy files/folders isnt honoring the destination pw user ID
+
+Integrate X11
+	- Need a GUIjail now with an autoconnection (can use disp3 for now)
+	- qubsd ipv4 convention will need a new class 
+
 ### UPGRADES
 
 ZFS Encrypted Jails
@@ -74,13 +87,17 @@ qb-backup (already created in $ubin)
 
 qb-stat - Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
 
+qb-create - for rootjails, should edit the rc.conf hostname
+
+qb-i3-launch - Intelligent resizing of display depending on dpi or xrandr resolution
+
 
 ### GENERAL / BEST PRACTICES / CLEANUP
 
 dispVM
 	- Add new class and boot practices
 	- vm-rc.local should use its IP address to get it's hostname from 0control ftp server
-		- This will require creating a new file in /usr/home/ftp/<IPaddr> on 0control
+		- This will require creating a new file in /home/ftp/<IPaddr> on 0control
 
 The test for exec.created modifying wg0, pf, and dhcp, should be if they're included/enabled in the jail's rc script
 
@@ -108,8 +125,6 @@ Generalize net-firewall
 	- chk_isqubsd_ipv4 - define_ipv4_convention - discover_open_ipv4
 
 Crons - No crons running. Probably something long term security that should be integrated and automated.
-
-Intelligent resizing of fonts depending on dpi or xrandr resolution
 
 ntpd - ntpd only runs during qb-hostnet. Needs a more "correct" solution. Maybe rolled into the/a control jail
 
@@ -177,19 +192,19 @@ loader.conf needs if_wg_load="YES"
 ### Control Jail
 # KEYGEN
 	- cp -a group master.passwd passwd pwd.db spwd.db from 0net to /zusr/0control/rw/etc/
-	- mkdir -p /zusr/0control/usr/home/0control
-	- chown -R 1001:1001 /zusr/0control/usr/home/0control
-	- mkdir -p /zusr/0control/usr/home/ftpd
-	- chown -R 1002:1002 /zusr/0control/usr/home/ftpd
-	- chmod 755 /zusr/0control/usr/home/ftpd
+	- mkdir -p /zusr/0control/home/0control
+	- chown -R 1001:1001 /zusr/0control/home/0control
+	- mkdir -p /zusr/0control/home/ftpd
+	- chown -R 1002:1002 /zusr/0control/home/ftpd
+	- chmod 755 /zusr/0control/home/ftpd
 	- mkdir -p /zusr/0control/rw/root/.ssh
 	- chmod 700 /zusr/0control/rw/root/.ssh
-	- pw -V /zusr/0control/rw/etc useradd -n 0control -u 1001 -d /usr/home/0control -s /bin/csh
-	- pw -V /zusr/0control/rw/etc useradd -n ftpd -u 1002 -d /usr/home/ftpd -s /bin/sbin/nologin
+	- pw -V /zusr/0control/rw/etc useradd -n 0control -u 1001 -d /home/0control -s /bin/csh
+	- pw -V /zusr/0control/rw/etc useradd -n ftpd -u 1002 -d /home/ftpd -s /bin/sbin/nologin
 	- ssh-keygen -t rsa -b 4096 -N "" -f /zusr/0control/rw/root/.ssh/id_rsa
-	- cp -a /zusr/0control/rw/root/.ssh/id_rsa.pub /zusr/0control/usr/home/ftpd
-	- cp -a qb_ssh script to /usr/home/ftpd 
-	- chmod 755 /zusr/0control/usr/home/ftpd/*
+	- cp -a /zusr/0control/rw/root/.ssh/id_rsa.pub /zusr/0control/home/ftpd
+	- cp -a qb_ssh script to /home/ftpd 
+	- chmod 755 /zusr/0control/home/ftpd/*
 	
 # rootjails need copy of 0control pubkey	
 # SSHD in all rootjails 

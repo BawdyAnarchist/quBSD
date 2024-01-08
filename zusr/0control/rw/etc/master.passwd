@@ -28,5 +28,5 @@ hast:*:845:845::0:0:HAST unprivileged user:/var/empty:/usr/sbin/nologin
 tests:*:977:977::0:0:Unprivileged user for tests:/nonexistent:/usr/sbin/nologin
 nobody:*:65534:65534::0:0:Unprivileged user:/nonexistent:/usr/sbin/nologin
 dhcpd:*:136:136::0:0:ISC DHCP daemon:/nonexistent:/usr/sbin/nologin
-0control:*:1001:1001::0:0:User &:/usr/home/0control:/bin/csh
-ftp:*:1002:14::0:0:User &:/usr/home/ftp:/usr/sbin/nologin
+0control:*:1001:1001::0:0:User &:/home/0control:/bin/csh
+ftp:*:1002:14::0:0:User &:/home/ftp:/usr/sbin/nologin

@@ -146,7 +146,7 @@ datasets_prepare() {
 		printf "%b" "\n\nSnapshots have been take of the following:\n" | tee -a $qlog
 		zfs snapshot "${sys_root}/ROOT/default@quBSD_${date}_${tyme}"  >> $qlog 2>&1
 		zfs snapshot "${sys_root}/usr@quBSD_${date}_${tyme}"  		>> $qlog 2>&1
-		zfs snapshot "${sys_root}/usr/home@quBSD_${date}_${tyme}"   	>> $qlog 2>&1
+		zfs snapshot "${sys_root}/home@quBSD_${date}_${tyme}"   	>> $qlog 2>&1
 		zfs list -t snapshot | grep '@quBSD' | tee -a $qlog
 	fi
 
@@ -548,7 +548,7 @@ rootjails_installation() {
 	chroot ${m_jails}/0base/ /usr/sbin/pkg update
 
 	mkdir ${m_jails}/0base/rw  
-	mkdir ${m_jails}/0base/usr/home
+	mkdir ${m_jails}/0base/home
 	cat /etc/fstab | head -1 > ${m_jails}/0base/etc/fstab
 	head -8 ${m_zusr}/0gui-template/rw/etc/rc.conf > ${m_jails}/0base/etc/rc.conf
 
@@ -646,7 +646,7 @@ rootjails_packages() {
 
 	# Gui jails need the .X11-unix , and home directories in order to nullfs the mount later
 	mkdir ${m_jails}/0gui/tmp/.X11-unix
-	mkdir ${m_jails}/0gui/usr/home
+	mkdir ${m_jails}/0gui/home
 
 	# New tyme to make sure that the new snapshot is different from send/recv  
 	tyme=$(date +%H%M)

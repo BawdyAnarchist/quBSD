@@ -1,7 +1,7 @@
 # Device		     	Mountpoint					FStype	Options	Dump	Pass#
 
 m_zusr/dispjail/rw/     	m_jails/dispjail/rw/			nullfs	rw		0	0	
-m_zusr/dispjail/home/ 	m_jails/dispjail/usr/home/		nullfs 	rw		0	0
+m_zusr/dispjail/home/ 	m_jails/dispjail/home/		nullfs 	rw		0	0
 /tmp/.X11-unix	   		m_jails/dispjail/tmp/.X11-unix	nullfs	rw		0	0
 
 # MOUNTS FOR LINUX JAILS. LIMITED SUCCESS WITH USING LINUX COMPAT INSIDE OF JAIL 

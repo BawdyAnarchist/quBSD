@@ -84,7 +84,7 @@ checks_master() {
 	checks_zopts
 
 	# One more check for new install rootVM, to ensure there's a way to connect to it
-	[ "$INSTALL" ] && [ "$VNCRES" = "none" ] && [ "$TMUX" = "false" ] \
+	[ "$INSTALL" ] && [ "$VNC" = "none" ] && [ "$TMUX" = "false" ] && [ "$X11FWD" = "false" ] \
 															&& get_msg_create "_w4" >> $_TMP_WARN
 }
 
@@ -426,12 +426,12 @@ change_datasets() {
 				
 			# Handle control jail keys
 			CONTROL=$(sed -En "s/.* CONTROL[[:blank:]]+//p" $_TMP_PARAMS)
-			[ ! -d "${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}/.ssh" ] \
-				&& mkdir -p ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}/.ssh
-			chmod 700 ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}/.ssh
-			chown -R 1001:1001 ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}/.ssh
+			[ ! -d "${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL}/.ssh" ] \
+				&& mkdir -p ${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL}/.ssh
+			chmod 700 ${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL}/.ssh
+			chown -R 1001:1001 ${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL}/.ssh
 			cp -a ${M_ZUSR}/${CONTROL}/rw/root/.ssh/id_rsa.pub \
-					${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}/.ssh/authorized_keys
+					${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL}/.ssh/authorized_keys
 		;;
 
 		empty) # Create the empty dataset/volume
@@ -462,16 +462,16 @@ change_datasets() {
 
 	# If a special pw user file was copied over, it needs to be modified.
 	if pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usershow 1001 >> /dev/null 2>&1 ; then
-		[ -e ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL} ] \
-													|| mkdir -p ${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL}
+		[ -e ${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL} ] \
+													|| mkdir -p ${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL}
 		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usermod 1001 -l $NEWJAIL
 		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ groupmod 1001 -l $NEWJAIL
-		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usermod 1001 -d /usr/home/${NEWJAIL}  >> /dev/null 2>&1
+		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usermod 1001 -d /home/${NEWJAIL}  >> /dev/null 2>&1
 	fi
 
 	# home directory must be renamed (if it exists)
-	mv ${M_ZUSR}/${NEWJAIL}/usr/home/${TEMPLATE} \
-													${M_ZUSR}/${NEWJAIL}/usr/home/${NEWJAIL} > /dev/null 2>&1
+	mv ${M_ZUSR}/${NEWJAIL}/home/${TEMPLATE} \
+													${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL} > /dev/null 2>&1
 }
 
 change_jconf() {

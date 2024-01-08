@@ -54,9 +54,9 @@ The rest of this file will reference "/zusr" for brevity.
 
 Each jail has its own dataset under zusr, with at most, 2 sub-directories:
 
-	/zusr/<jailname>/home/ gets nullfs mounted at:  /jails/<jailname>/usr/home
+	/zusr/<jailname>/home/ gets nullfs mounted at:  /jails/<jailname>/home
 
-		From inside a running jail, this appears like a standard /usr/home/ directory.
+		From inside a running jail, this appears like a standard /home/ directory.
 		User 1001 with <username> and <groupname> , are identical to the zfs <jailname>
 
 	/zusr/<jailname>/rw/ gets nullfs mounted at:  /jails/<jailname>/rw

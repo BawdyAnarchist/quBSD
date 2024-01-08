@@ -29,7 +29,7 @@ ENDOFCONF
 }
 
 handle_users() {
-  pw useradd -n user -md /usr/home/user -s /bin/csh
+  pw useradd -n user -md /home/user -s /bin/csh
 }
 
 manage_ssh() {
@@ -38,7 +38,7 @@ manage_ssh() {
   chmod 700 /root/.ssh
   fetch -o /root/.ssh/authorized_keys ftp://0control.qubsd.local/id_rsa.pub
   chmod 600 /root/.ssh/authorized_keys
-  cp -a /root/.ssh /usr/home/user/
+  cp -a /root/.ssh /home/user/
 
   # Modify sshd, enable, and restart sshd
   sed -i '' -E 's/^#(PermitRootLogin).*/\1 yes/' /etc/ssh/sshd_config

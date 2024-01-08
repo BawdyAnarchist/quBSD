@@ -21,7 +21,7 @@ get_options() {
 	JAIL="$1"
 
 	# Default directory if not defined by user
-	U_FOLDER="${U_FOLDER:=${M_ZUSR}/${JAIL}/usr/home/${JAIL}/crypt}"
+	U_FOLDER="${U_FOLDER:=${M_ZUSR}/${JAIL}/home/${JAIL}/crypt}"
 }
 
 checks() {

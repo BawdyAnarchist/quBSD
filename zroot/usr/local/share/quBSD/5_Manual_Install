@@ -163,7 +163,7 @@ I've made some significant modifications to the installer and scripts since writ
 
   # nullfs mounts push zusr data to clean snapshots, under the directories /rw and /home 
     	mkdir /jails/0base/rw
-	mkdir /jails/0base/usr/home
+	mkdir /jails/0base/home
 
   # jail will throw errors if it doesn't see an fstab (due to the way jail.conf is set up)
 	cat /etc/fstab | head -1 > /jails/0base/etc/fstab
@@ -395,7 +395,7 @@ put a bunch of them into other complex scripts.
 		The gui jails need pw user data here
 		pw -V /zusr/<jailname>/rw/etc usershow -a
 			-V option redirects pw to a different /etc (kinda like a chroot)
-			The username MUST be same name as the jail (and /usr/home directory)
+			The username MUST be same name as the jail (and /home directory)
 			If you clone or zfs send you MUST change the pw data for non net-jails
 	/zusr/<jailname>/rw/etc/rc.conf 
 		You should have a specific rc.conf for each jail, even if it's just boiler plate

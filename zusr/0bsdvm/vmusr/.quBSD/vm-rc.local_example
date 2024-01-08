@@ -61,7 +61,7 @@ start_services() {
 
 apply_hardening() {
   # Highest level hardening measures. Set these appropriately for your usecase
-  chflags -R schg /bin /sbin /boot /etc /lib /libexec /usr/bin /usr/home /usr/lib /usr/lib32 /usr/libdata /usr/libexec /usr/ports /usr/sbin /usr/src /usr/local/bin /usr/local/lib /usr/local/lib32 /usr/local/libdata /usr/local/libexec /usr/local/man /usr/local/sbin > /dev/null 2>&1
+  chflags -R schg /bin /sbin /boot /etc /lib /libexec /usr/bin /home /usr/lib /usr/lib32 /usr/libdata /usr/libexec /usr/ports /usr/sbin /usr/src /usr/local/bin /usr/local/lib /usr/local/lib32 /usr/local/libdata /usr/local/libexec /usr/local/man /usr/local/sbin > /dev/null 2>&1
 
   sysctl kern.securelevel 3
 }

@@ -63,7 +63,7 @@ Usage: qb-pefs [-h] [-c|-m|-u] [-d <directory>] <jailname>
    -d: (d)irectory: Target for the specified action 
        <directory> must be inside /zusr/<jail>/usr/ 
        If not specified, default directory is:
-          ${M_ZUSR}/<jail>/usr/home/<jail>/crypt
+          ${M_ZUSR}/<jail>/home/<jail>/crypt
    -h: (h)elp.  Outputs this help message
    -m: (m)mount an existing pefs directory.  
    -u: (u)nmount: umount (re-encrypts the data). 

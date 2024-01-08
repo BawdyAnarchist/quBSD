@@ -157,7 +157,7 @@ get_parameter_lists() {
 	# List out normal parameters which can be checked (vs BHYVE_CUSTM)
 	COMN_PARAMS="AUTOSTART AUTOSNAP CLASS CONTROL CPUSET GATEWAY IPV4 MTU NO_DESTROY ROOTENV"
 	JAIL_PARAMS="MAXMEM SCHG SECLVL"
-	VM_PARAMS="BHYVEOPTS MEMSIZE TAPS TMUX VCPUS VNCRES WIREMEM"
+	VM_PARAMS="BHYVEOPTS MEMSIZE TAPS TMUX VCPUS VNC WIREMEM X11"
 	MULT_LN_PARAMS="BHYVE_CUSTM PPT"
 	ALL_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE $VM_PARAMS $MULT_LN_PARAMS"
 	NON_QMAP="DEVFS_RULE"
@@ -282,14 +282,17 @@ get_info() {
 			done
 		;;
 		_XID)    # X11 window ID of the current active window
-			_value=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //")
+			_value=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //") 
 		;;
 		_XJAIL)  # Gets the jailname of the active window. Converts $HOSTNAME to: "host"
 			_xid=$(get_info -e _XID)
-			[ "$_xid" = "0x0" ] && _value=host \
-					|| _value=$(xprop -id $(get_info -e _XID) WM_CLIENT_MACHINE \
-							| sed "s/WM_CLIENT_MACHINE(STRING) = \"//" | sed "s/.$//" \
-							| sed "s/$(hostname)/host/g") || _value="host"
+			if [ "$_xid" = "0x0" ] || echo $_xid | grep -qs "not found" ; then 
+				_value=host
+			else
+				_value=$(xprop -id $(get_info -e _XID) WM_CLIENT_MACHINE \
+						| sed "s/WM_CLIENT_MACHINE(STRING) = \"//" | sed "s/.$//" \
+						| sed "s/$(hostname)/host/") || _value="host"
+			fi
 		;;
 		_XNAME)  # Gets the name of the active window
 			_value=$(xprop -id $(get_info -e _XID) WM_NAME _NET_WM_NAME WM_CLASS)
@@ -508,18 +511,19 @@ copy_control_keys() {
 	chflags -R schg ${M_QROOT}/${_client}/root/.ssh
 
 	# Repeat all the same steps if there is an unprivileged user
-	if [ -d "${M_ZUSR}/${_client}/usr/home/${_client}" ] ; then
+	if [ -d "${M_QROOT}/${_client}/home/${_client}" ] ; then
 
-		chflags -R noschg ${M_ZUSR}/${_client}/usr/home/${_client}
-		[ ! -d "${M_ZUSR}/${_client}/usr/home/${_client}/.ssh" ] \
-			&& mkdir ${M_ZUSR}/${_client}/usr/home/${_client}/.ssh
+		chflags -R noschg ${M_QROOT}/${_client}/home/${_client}
+		[ ! -d "${M_QROOT}/${_client}/home/${_client}/.ssh" ] \
+			&& mkdir ${M_QROOT}/${_client}/home/${_client}/.ssh
+		chflags -R noschg ${M_QROOT}/${_client}/home/${_client}/.ssh
 		cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub \
-			${M_ZUSR}/${_client}/usr/home/${_client}/.ssh/authorized_keys
+			${M_QROOT}/${_client}/home/${_client}/.ssh/authorized_keys
 
-		chmod 700 ${M_ZUSR}/${_client}/usr/home/${_client}/.ssh
-		chmod 600 ${M_ZUSR}/${_client}/usr/home/${_client}/.ssh/authorized_keys
-		chown 1001:1001 ${M_ZUSR}/${_client}/usr/home/${_client}/.ssh/authorized_keys
-		chflags -R schg ${M_ZUSR}/${_client}/usr/home/${_client}/.ssh
+		chmod 700 ${M_QROOT}/${_client}/home/${_client}/.ssh
+		chmod 600 ${M_QROOT}/${_client}/home/${_client}/.ssh/authorized_keys
+		chown -R 1001:1001 ${M_QROOT}/${_client}/home/${_client}/.ssh
+		chflags -R schg ${M_QROOT}/${_client}/home/${_client}/.ssh
 	fi
 
 	[ "$_flags" ] && qb-flags -r $_client &
@@ -731,7 +735,7 @@ reclone_zroot() {
 		# Drop the flags for etc directory and add the user for the jailname
 		chflags -R noschg ${M_QROOT}/${_jail}/etc/
 		pw -V ${M_QROOT}/${_jail}/etc/ \
-				useradd -n $_jail -u 1001 -d /usr/home/${_jail} -s /bin/csh 2>&1
+				useradd -n $_jail -u 1001 -d /home/${_jail} -s /bin/csh 2>&1
 	fi
 	return 0
 }
@@ -777,13 +781,13 @@ reclone_zusr() {
 
 	# Drop the flags for etc directory and add the user for the jailname
 	[ -e "${M_ZUSR}/${_jail}/rw" ] && chflags -R noschg ${M_ZUSR}/${_jail}/rw
-	[ -e "${M_ZUSR}/${_jail}/usr/home/${_template}" ] \
-			&& chflags noschg ${M_ZUSR}/${_jail}/usr/home/${_template}
+	[ -e "${M_ZUSR}/${_jail}/home/${_template}" ] \
+			&& chflags noschg ${M_ZUSR}/${_jail}/home/${_template}
 	# Replace the <template> jailname in fstab with the new <jail>
 	sed -i '' -e "s/${_template}/${_jail}/g" ${M_ZUSR}/${_jail}/rw/etc/fstab > /dev/null 2>&1
 
 	# Rename directories and mounts with dispjail name
-	mv ${M_ZUSR}/${_jail}/usr/home/${_template} ${M_ZUSR}/${_jail}/usr/home/${_jail} > /dev/null 2>&1
+	mv ${M_ZUSR}/${_jail}/home/${_template} ${M_ZUSR}/${_jail}/home/${_jail} > /dev/null 2>&1
 
 	return 0
 }
@@ -1532,7 +1536,7 @@ chk_valid_vcpus() {
 	return 0
 }
 
-chk_valid_vncres() {
+chk_valid_vnc() {
 	# Make sure that the resolution is supported by bhyve
 
 	getopts q _opts && local _q='-q' && shift
@@ -1540,6 +1544,8 @@ chk_valid_vncres() {
 	_value="$1"
 
 	case $_value in
+		# If value was provided as "true" then assign the default resolution.
+		true) _value=1920x1080 ; return 0 ;;
 		none|640x480|800x600|1024x768|1920x1080) return 0 ;;
 		'') get_msg $_q "_0" "VNC viewer resolution" && return 1 ;;
 		*) get_msg $_q "_je6" "VNC viewer resolution" && return 1 ;;
@@ -1550,6 +1556,12 @@ chk_valid_wiremem() {
 	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 	chk_truefalse $_q "$1" "WIREMEM"
+}
+
+chk_valid_x11() {
+	getopts q _opts && local _q='-q' && shift
+	[ "$1" = "--" ] && shift
+	chk_truefalse $_q "$1" "X11FWD"
 }
 
 
@@ -1751,10 +1763,10 @@ prep_bhyve_options() {
 	_rootenv=$(get_jail_parameter -e ROOTENV "$_VM")       || return 1
 	_taps=$(get_jail_parameter -de TAPS "$_VM")            || return 1
 	_vcpus=$(get_jail_parameter -de VCPUS "$_VM")          || return 1
-	_vncres=$(get_jail_parameter -dez VNCRES "$_VM")       || return 1
+	_vncres=$(get_jail_parameter -dez VNC "$_VM")          || return 1
+	_x11=$(get_jail_parameter -dez X11 "$_VM")             || return 1
 	_ppt=$(get_jail_parameter -dexz PPT "$_VM")            || return 1
 	_tmux=$(get_jail_parameter -dez TMUX "$_VM")           || return 1
-
 	# UEFI bootrom
 	_BOOT="-l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI.fd"
 
@@ -1877,6 +1889,8 @@ EOF
 	[ -n "$_gateway" ] && [ ! "$_gateway" = "none" ] && _taps=$(( _taps + 1 ))
 	[ -n "$_clients" ] && [ ! "$_clients" = "none" ] \
 			&& _taps=$(( _taps + $(echo $_clients | wc -w) ))
+	# Add another tap if X11FWD is true
+	[ "$_x11" = "true" ] && _taps=$(( _taps + 1 ))
 
 	_cycle=0
 	while [ "$_taps" -gt 0 ] ; do
@@ -1892,7 +1906,8 @@ EOF
 		case "$_cycle" in
 			0) echo "$_tap SSH" >> "${QTMP}/vmtaps_${_VM}"  ;;
 			1) echo "$_tap NET" >> "${QTMP}/vmtaps_${_VM}"  ;;
-			*) echo "$_tap EXTRA_${_cycle}" >> "${QTMP}/vmtaps_${_VM}"  ;;
+			2) echo "$_tap X11" >> "${QTMP}/vmtaps_${_VM}"  ;;
+			3) echo "$_tap EXTRA_${_cycle}" >> "${QTMP}/vmtaps_${_VM}"  ;;
 		esac
 		_cycle=$(( _cycle + 1 ))
 	done

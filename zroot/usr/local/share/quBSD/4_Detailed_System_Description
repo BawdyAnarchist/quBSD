@@ -157,10 +157,10 @@ Each jail has a dataset at zusr/ for persistent files, with at most 2 sub-direct
 	/zusr/<jailname>/rw/
 
 /home
-	/zusr/<jailname>/home/ gets nullfs mounted at:  /jails/<jailname>/usr/home
+	/zusr/<jailname>/home/ gets nullfs mounted at:  /jails/<jailname>/home
 	This is done after an appjail is destroyed/recloned, during jail startup.
 
-	From inside a running jail, this appears like a standard /usr/home/ directory.
+	From inside a running jail, this appears like a standard /home/ directory.
 	The <username> and <groupname> for a jail, are identical to the zfs <jailname> 
 
 /rw

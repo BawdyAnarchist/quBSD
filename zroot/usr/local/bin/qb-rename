@@ -73,12 +73,12 @@ rename_jail() {
 		&& sed -i '' -E "s/${JAIL}/${NEWNAME}/g" ${M_ZUSR}/${NEWNAME}/rw/etc/fstab
 
 	# Change home directory if present
-	[ -e ${M_ZUSR}/${NEWNAME}/usr/home/${JAIL} ] \
-		&& mv ${M_ZUSR}/${NEWNAME}/usr/home/${JAIL} ${M_ZUSR}/${NEWNAME}/usr/home/${NEWNAME}
+	[ -e ${M_ZUSR}/${NEWNAME}/home/${JAIL} ] \
+		&& mv ${M_ZUSR}/${NEWNAME}/home/${JAIL} ${M_ZUSR}/${NEWNAME}/home/${NEWNAME}
 
 	# Jails don't necessarily have custom pw; but modify if so
 	pw -V ${M_ZUSR}/${NEWNAME}/rw/etc/ usermod -n ${JAIL} -l ${NEWNAME} -d \
-															/usr/home/${NEWNAME} > /dev/null 2>&1
+															/home/${NEWNAME} > /dev/null 2>&1
 }
 
 update_dependencies() {

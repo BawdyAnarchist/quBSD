@@ -531,7 +531,7 @@ files and gaining a permanent hold inside the jail.
           /usr/lib /usr/libexec /usr/sbin /usr/local/bin
           ... and other select /usr files.
 
-          However, /usr/home , /usr/etc/ , and any directories
+          However, /home , /usr/etc/ , and any directories
           inside of /zusr/<jail>/usr/ , are skipped.
 
    all  - All directories and files, including those in /usr,

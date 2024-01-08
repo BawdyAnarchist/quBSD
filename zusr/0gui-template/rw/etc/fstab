@@ -1,4 +1,4 @@
 # Device                       Mountpoint                          FStype   Options Dump Pass#
 /zusr/0gui-template/rw/        /jails/0gui-template/rw/            nullfs   rw      0    0	
-/zusr/0gui-template/usr/home/  /jails/0gui-template/usr/home/      nullfs   rw      0    0
+/zusr/0gui-template/home/  /jails/0gui-template/home/      nullfs   rw      0    0
 /tmp/.X11-unix                 /jails/0gui-template/tmp/.X11-unix  nullfs   rw      0    0
