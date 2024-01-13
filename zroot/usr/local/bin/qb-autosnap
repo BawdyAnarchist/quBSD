@@ -153,22 +153,31 @@ update_stale_clones() {
 }
 
 thin_old_snapshots() {
-	# Assemble datasets in zroot tagged with ttl
-	_snaplist=$(zfs list -Hrt snapshot -o name,qubsd:destroy-date \
-											| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
+	# All zroot / zusr datasets
+	ZLIST=$(zfs list -rH -o name ${R_ZFS%%/*} ; zfs list -rH -o name ${U_ZFS})
 
-	for _snap in $_snaplist ; do
-		_snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
+	for _dataset in $ZLIST ; do
+		_snaplist=$(zfs list -Hrt snapshot -o name,qubsd:destroy-date $_dataset \
+								| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
 
-		# If dataset is still in use; `zfs destroy` without [-rRf], will fail to /dev/null
-		[ "$_snap_dd" -lt "$DATE_UNIX" ] && zfs destroy $_snap > /dev/null 2>&1
+		# Prevent snapshot clutter. If prev snap has 0B written and destroty-date sooner than
+		# newest snap, and the newest snap also wrote 0B; then prev snap can be destroyed
+		_snap0=$(echo "$_snaplist" | tail -1)
+		_snap1=$(echo "$_snaplist" | sed '$ d' | tail -1)
+		_dd0=$(zfs list -H -o qubsd:destroy-date $_snap0)
+		_dd1=$(zfs list -H -o qubsd:destroy-date $_snap1)
+		_writ0=$(zfs list -H -o written $_snap0)
+		_writ1=$(zfs list -H -o written $_snap1)
 
-		# Check dataset exists, last command might've deleted it
-		chk_valid_zfs "$_snap" && _snap_used=$(zfs list -Ho used $_snap)
+		[ "$_dd0" -ge "$_dd1" ] && [ "$_writ0" = "0" ] && [ "$_writ1" = "0" ] \
+			&& zfs destroy $_snap1 && _snaplist=$(echo "$_snaplist" | grep -v $_snap1)
 
-		# Destroy 0B snaps, except the one that was just created, (tagged with $SNAPNAME (date))
-		[ "$_snap_used" = "0B" ] && [ -n "${_snap##*"$SNAPNAME"}" ] \
-																	&& zfs destroy $_snap > /dev/null 2>&1
+		# Trim all snapshots past their destroy-date
+		for _snap in $_snaplist ; do
+			_snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
+			# If dataset is still in use; `zfs destroy` without [-rRf], will fail to /dev/null
+			[ "$_snap_dd" -lt "$DATE_UNIX" ] && zfs destroy $_snap > /dev/null 2>&1
+		done
 	done
 }
 
