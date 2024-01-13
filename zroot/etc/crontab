@@ -23,9 +23,9 @@ PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 1,31	0-5	*	*	*	root	adjkerntz -a
 #
 # quBSD automatic snapshot tool for selected datasets. 
-15,30,45  *     *    *    *    root qb-autosnap -dst 60m
-0         *     *    *    *    root qb-autosnap -dst 12H 
-1         2     *    *    *    root qb-autosnap -st 7D 
-1         14    *    *    *    root qb-autosnap -st 2D 
-1         5     *    *    1    root qb-autosnap -st 6W 
+20,40     *     *    *    *    root qb-autosnap -dst 60m
+0         *     *    *    *    root qb-autosnap -dst 11H 
+2         4     *    *    *    root qb-autosnap -st 7D 
+2         16    *    *    *    root qb-autosnap -st 2D 
+5         4     *    *    1    root qb-autosnap -st 6W 
 10        *     *    *    *    root qb-hostnet -c
