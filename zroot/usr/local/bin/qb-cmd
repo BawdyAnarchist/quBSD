@@ -40,10 +40,10 @@ connect_vm_session() {
 
 	# Pull the qmap parameters for VM attachment
 	get_jail_parameter -d TMUX $JAIL
-	get_jail_parameter -d VNCRES $JAIL
+	get_jail_parameter -d VNC $JAIL
 
 	# Handle the vnc viewer port
-	if [ ! "$VNCRES" = "none" ] ; then
+	if [ ! "$VNC" = "none" ] ; then
 		# Sometimes it can take 5-15 secs for a VM to launch (if ppt is bad). Wait
 		_count=0
 		while ! _vmpid=$(pgrep -fx "bhyve: $JAIL") ; do
@@ -77,7 +77,7 @@ main() {
 	# Start the jail/VM if off
 	if ! chk_isrunning $JAIL ; then
 		# Verbose prints the bhyve command, if NORUN, will exit
-		[ "$_VERBOSE" ] && get_msg_cmd "_3" "_cont" && start_jail -nq $JAIL && eval "$_NORUN"
+		[ "$_VERBOSE" ] && get_msg_cmd "_3" "_cont" && start_jail -n $JAIL && eval "$_NORUN"
 
 		! qb-start "$JAIL" && get_msg_cmd "_1" "exit_1"
 	fi
