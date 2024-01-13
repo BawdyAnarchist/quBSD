@@ -12,7 +12,7 @@ modify_rc() {
 modify_dhclient() {
   # Modify dhclient to retry lost connections more quickly, then bring up control jail connection 
 
-  cat << ENDOFCONF->> /etc/dhclient.conf
+  cat <<-ENDOFCONF >> /etc/dhclient.conf
 
 	# quBSD dhclient.conf for VMs
 
