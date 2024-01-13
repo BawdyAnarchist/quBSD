@@ -79,7 +79,7 @@
 # chk_valid_tmux       - tmux for terminal access to FreeBSD jails. true/false
 # chk_valid_template   - Must be any valid jail
 # chk_valid_vcpus      - Must be an integer less than cpuset -g
-# chk_valid_vncres     - Must be one of few valid resolutions allowed by bhyve
+# chk_valid_vnc        - Must be one of few valid resolutions allowed by bhyve
 # chk_valid_vif        - Virtual Intf (vif) is valid
 # chk_valid_wiremem    - Must be true/false
 
@@ -1546,7 +1546,7 @@ chk_valid_vnc() {
 	case $_value in
 		# If value was provided as "true" then assign the default resolution.
 		true) _value=1920x1080 ; return 0 ;;
-		none|640x480|800x600|1024x768|1920x1080) return 0 ;;
+		none|false|640x480|800x600|1024x768|1920x1080) return 0 ;;
 		'') get_msg $_q "_0" "VNC viewer resolution" && return 1 ;;
 		*) get_msg $_q "_je6" "VNC viewer resolution" && return 1 ;;
 	esac
