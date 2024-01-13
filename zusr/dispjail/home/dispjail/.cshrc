@@ -6,13 +6,15 @@
 # more examples available at /usr/share/examples/csh/
 #
 
-alias h		history 25
-alias j		jobs -l
-alias ls		ls -1IG
+alias h        history 25
+alias j        jobs -l
+alias ls       ls -1IG
 alias lsc      ls -CIG
-alias lsa      ls -1AG
-alias lsac     ls -CAG
-alias vi		vim
+alias lsa      ls -1AGI 
+alias lsac     ls -CAGI 
+alias lsr      ls -CGIR
+alias lsar     ls -CAGIR
+alias vi       vim
 alias firefox 	firefox --no-remote
 
 # These are normally set through /etc/login.conf.  You may override them here
