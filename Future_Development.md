@@ -1,20 +1,22 @@
 
-Change usr/home/ to simply /home. Double check that's the new standard.
-	- BSD VMs will need their shit fixed too probably
-	- create new backup
-
-Weekly snaps arent happening, because when they're taken, they happen to have no diff from the previous snap.
-	- Thus, diff compare should probably only happen for like-timeframe references. Or easier, only short tf snaps diff-compare 
-
 copy files/folders isnt honoring the destination pw user ID
+
+reclone_zroot
+	- All that complication should simply be "is the ROOTENV on or off? Do the diff if off, otherwise fallback to presnap if off"
+	- For VMs, the old snapshot should be deleted
 
 Integrate X11
 	- Need a GUIjail now with an autoconnection (can use disp3 for now)
 	- qubsd ipv4 convention will need a new class 
 
-### UPGRADES
-
 ZFS Encrypted Jails
+	- zfs load-key unload-key
+	- new PARAM encrypt
+	- qb-create will need adjusted
+	- qb-encrypt will probably be needed
+
+
+### UPGRADES
 
 Tor and I2P Jails
 
@@ -45,8 +47,8 @@ Take another hack at the recording device problems
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
 
-reclone_zroot
-	- All that complication should simply be "is the ROOTENV on or off? Do the diff if off, otherwise fallback to presnap if off"
+quBSD.sh
+	- chflags -R schg ${M_QROOT}/${_client}/root/.ssh also changes 0net when started, which affects ln -s of keys for 0control 
 
 qb-pci
 	- summary of PCI devices relevant to user
@@ -74,7 +76,6 @@ Error messages are a bit disorganized now. Need to have useful higher function m
 
 qb-list [-e] (evaluate) option to check jail-param combos for validity.
 
-
 qb-help - overhaul to act like a manpage. Replacing /usr/local/share/quBSD
 	- Each PARAM should have verbose message
 
@@ -87,12 +88,18 @@ qb-backup (already created in $ubin)
 
 qb-stat - Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
 
-qb-create - for rootjails, should edit the rc.conf hostname
+qb-create
+	- for rootjails, should edit the rc.conf hostname
+	- checking qubsdmap.conf should only check the jailnames, not all columns (0bsdvm failure on the basis of being USED, but no actual lines)
+	- somehow it fucked up my /etc/jail.conf.  Maybe coz the jail params already existed?? IDK
 
 qb-i3-launch - Intelligent resizing of display depending on dpi or xrandr resolution
 
 
-### GENERAL / BEST PRACTICES / CLEANUP
+### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP
+
+Networking is still dicey. Hit and miss. Sometimes works, other times doesnt.
+	- Might need to write daemons for dhclient and dhcpd servers
 
 dispVM
 	- Add new class and boot practices
@@ -134,6 +141,8 @@ I think `jail` caches fstab before completion of exec.prepare which edits it. Ne
 
 
 ##### qubsd installer #######
+
+kldload pf is required (in addition to others)
 
 /etc/devfs.rules - I probably have the mixer being added, but jails don't need it.
 	- qb-autosnap 
@@ -215,3 +224,12 @@ loader.conf needs if_wg_load="YES"
 	make sure that zroot/qubsd is mounted at /qubsd and not /zroot/qubsd
 	
 	pf.ko wasnt loaded ..?
+
+
+### 0bsdvm Steps
+/boot/loader
+	autoboot_delay="2"
+
+zpool import -f vmusr
+
+c84ddda8e8a1c6e4a9943091fb2f9dc77931a43a0b55ca7894fd9287bd222c2b  qb-vmconf
