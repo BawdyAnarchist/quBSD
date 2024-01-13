@@ -1,0 +1,297 @@
+#!/bin/sh
+
+get_msg() {
+	# Action to take after message
+	while getopts e _opts ; do case $_opts in
+		e) ACTION="exit_1" ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 ))
+
+	local MESSAGE="$1"
+
+	case "$MESSAGE" in 
+		_e1) cat << ENDOFMSG
+
+ERROR: Unable to detect distro. Exiting. 
+ENDOFMSG
+		;;
+		_e2) cat << ENDOFMSG
+
+ERROR: Unable to create /root/.ssh/
+       Exiting.
+ENDOFMSG
+		;;
+		_e3) cat << ENDOFMSG
+	
+ERROR: Unable to download the SSH pubkey from 0control at:
+       ftp://0control.qubsd.local/id_rsa.pub
+ENDOFMSG
+		;;
+		_e4) cat << ENDOFMSG
+	
+ERROR: Couldn't find a valid command by which to
+       fetch the SSH pubkey from 0control. Exiting.
+ENDOFMSG
+		;;
+		_e5) cat << ENDOFMSG
+	
+ERROR: No known package manager found. Exiting.
+ENDOFMSG
+		;;
+		_e6) cat << ENDOFMSG
+	
+ERROR: sshd service script not found for Slackware. Exiting.
+ENDOFMSG
+		;;
+		_e7) cat << ENDOFMSG
+	
+ERROR: No recognized init system found for $OS. Exiting.
+ENDOFMSG
+		;;
+		_e8) cat << ENDOFMSG
+	
+ERROR: No SSH service file found for $OS. Exiting.
+ENDOFMSG
+		;;
+		_e9) cat << ENDOFMSG
+	
+ERROR: Unsupported init system for $OS. Exiting.
+ENDOFMSG
+		;;
+		_e10) cat << ENDOFMSG
+	
+ERROR: Failed to install openssh-server to $OS. Exiting
+ENDOFMSG
+		;;
+		_e11) cat << ENDOFMSG
+	
+ERROR: Failed to start openssh-server. Exiting. 
+ENDOFMSG
+		;;
+		_m1) cat << ENDOFMSG
+quBSD: Detected OS: $OS 
+ENDOFMSG
+		;;
+		_m2) cat << ENDOFMSG
+quBSD: Copied SSH pubkey from 0control to:
+   $_authkeys	
+	${_USERS}
+ENDOFMSG
+		;;
+		_m3) cat << ENDOFMSG
+
+quBSD: SUCCSSFULLY INSTALLED:  openssh-server
+ENDOFMSG
+		;;
+		_m4) cat << ENDOFMSG
+quBSD: Modified /etc/ssh/sshd_config ,
+quBSD: Original saved at /etc/ssh/sshd_config.bak
+ENDOFMSG
+		;;
+		_m5) cat << ENDOFMSG
+
+quBSD: SSH SERVER SETUP COMPLETE FOR $OS
+
+ENDOFMSG
+		;;
+esac
+
+	case $ACTION in
+		exit_1) exit 1 ;;
+		*) : ;;
+	esac
+}
+
+detect_distro() {
+	# Detect OS
+	if [ -f /etc/os-release ] ; then
+		. /etc/os-release
+		OS=$NAME
+	elif [ -f /etc/alpine-release ] ; then
+		OS="Alpine Linux"
+   elif [ "$(uname -s)" = "FreeBSD" ] ; then
+		OS="FreeBSD"
+	elif [ "$(uname -s)" = "OpenBSD" ] ; then
+		OS="OpenBSD"
+	elif [ "$(uname -s)" = "NetBSD" ] ; then
+		OS="NetBSD"
+	else
+		get_msg -e "_e1" 
+	fi
+}
+
+copy_pubkeys() {
+	# Create the root directory and set permissions
+	[ ! -d "/root/.ssh" ] && ! mkdir -p /root/.ssh > /dev/null 2>&1 && get_msg -e "_e2" 
+	chmod 700 /root/.ssh
+	_authkeys="/root/.ssh/authorized_keys"
+
+	case "$OS" in
+		NetBSD|OpenBSD)
+			ftp -o - ftp://0control.qubsd.local/id_rsa.pub >> ${_authkeys} || get_msg -e "_e3"
+			;;
+		FreeBSD)
+			fetch -o - ftp://0control.qubsd.local/id_rsa.pub >> ${_authkeys} || get_msg -e "_e3"
+			;;
+		*) # Linux
+			if command -v wget > /dev/null 2>&1; then
+				wget -qO - ftp://0control.qubsd.local/id_rsa.pub >> ${_authkeys} || get_msg -e "_e3"
+			elif command -v curl > /dev/null 2>&1; then
+				curl -s ftp://0control.qubsd.local/id_rsa.pub >> ${_authkeys} || get_msg -e "_e3"
+			elif command -v scurl-download > /dev/null 2>&1; then
+				scurl-download ftp://0control.qubsd.local/id_rsa.pub -o - >> ${_authkeys} \
+																									|| get_msg -e "_e3"
+			else
+				get_msg -e "_e4"
+			fi ;;
+	esac
+
+	# Set permissions on authkeys file
+	[ -e "$_authkeys" ] && chmod 600 ${_authkeys}
+
+	# Find all normal users and their $HOME, based on UID>=1000 and isnt a 'nologin'
+	for _user in $(awk -F: '($3 >= 1000) && ($7 !~ /nologin$/) {print $3 "_" $6}' /etc/passwd) ; do
+		# Extract UID and HOME using parameter expansion
+		_uid="${_user%_*}"  ;  _home="${_user##*_}"
+		_USERS=$(printf "%b" "${_USERS}\n${_home}/.ssh/authorized_keys")
+
+		# Create the .ssh directory with proper permissions, then copy authkeys 
+		[ ! -d "${_home}/.ssh" ] && ! mkdir -p ${_home}/.ssh > /dev/null 2>&1 && get_msg -e "_e2"
+		chmod 700 ${_home}/.ssh
+		cp -a $_authkeys ${_home}/.ssh
+		chown -R "$_uid":"$_uid" ${_home}/.ssh
+	done
+}
+
+install_openssh() {
+	# Detect package manager, and install openSSH based on that 
+	if command -v apt-get 		> /dev/null 2>&1; then
+		apt-get update
+		apt-get install -y openssh-server || return1
+	elif command -v dnf 			> /dev/null 2>&1; then
+		dnf install -y openssh-server || return1
+	elif command -v yum 			> /dev/null 2>&1; then
+		yum install -y openssh-server || return1
+	elif command -v pacman		> /dev/null 2>&1; then
+		pacman -Sy --noconfirm openssh || return1
+	elif command -v apk 			> /dev/null 2>&1; then
+		apk add openssh || return1
+	elif command -v zypper 		> /dev/null 2>&1; then
+		zypper install -y openssh || return1
+	elif command -v emerge 		> /dev/null 2>&1; then
+		emerge --ask net-misc/openssh || return1
+	elif command -v slackpkg 	> /dev/null 2>&1; then
+		slackpkg install openssh || return1
+	elif command -v eopkg 		> /dev/null 2>&1; then
+		eopkg install openssh-server || return1
+	elif command -v xbps-install > /dev/null 2>&1; then
+		xbps-install -Su || return 1
+		xbps-install -y openssh || return 1
+	else
+		get_msg -e "_e5"
+	fi
+}
+
+modify_sshd_config() {
+	# Make a backup of the default sshd_config
+	cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+
+	# Set PermitRootLogin to yes
+	sed -Ei 's/^#(PermitRootLogin).*/\1 yes/' /etc/ssh/sshd_config
+	sed -Ei 's/^(PermitRootLogin).*/\1 yes/' /etc/ssh/sshd_config
+
+	# Ensure Password authentication is 'no'
+	sed -Ei 's/^#(PasswordAuthentication).*/\1 no/' /etc/ssh/sshd_config
+	sed -Ei 's/^(PasswordAuthentication).*/\1 no/' /etc/ssh/sshd_config
+}
+
+start_ssh() {
+	# Start sshd service based on OS and init system.
+	case "$OS" in
+		"Void Linux")
+			ln -s /etc/sv/sshd /var/service/
+			;;
+		"Slackware")
+			if [ -f /etc/rc.d/rc.sshd ]; then
+				# Ensure the service is enabled at boot
+				if grep -q '^#.*\/etc\/rc\.d\/rc\.sshd' /etc/rc.d/rc.local; then
+					sed -i '/^#.*\/etc\/rc\.d\/rc\.sshd/s/^#//' /etc/rc.d/rc.local
+				elif ! grep -q '\/etc\/rc\.d\/rc\.sshd' /etc/rc.d/rc.local; then
+					echo '/etc/rc.d/rc.sshd' >> /etc/rc.d/rc.local
+				fi
+				# Make the script executable and start the service
+				chmod +x /etc/rc.d/rc.sshd
+				/etc/rc.d/rc.sshd start
+			else
+				get_msg -e "_e6"
+			fi ;;
+
+		"NetBSD")
+			# Check if an sshd entry exists in /etc/rc.conf, modify it, or add a new one
+			if grep -q '^sshd=' /etc/rc.conf; then
+				sed -i '' 's/^sshd=.*/sshd=YES/' /etc/rc.conf
+			else
+				echo 'sshd=YES' >> /etc/rc.conf
+			fi
+			# Start the sshd
+			/etc/rc.d/sshd start
+			;;
+		"Devuan"|"Artix Linux")
+			if command -v s6-rc >/dev/null 2>&1; then
+				s6-rc -u change sshd
+			elif command -v runit >/dev/null 2>&1; then
+				ln -s /etc/sv/sshd /run/runit/service/
+				sv up sshd
+			elif command -v sysv-rc-conf >/dev/null 2>&1; then
+				sysv-rc-conf sshd on
+				/etc/init.d/sshd start
+			else
+				get_msg -e "_e7"
+			fi
+			;;
+		*)
+			if command -v systemctl >/dev/null 2>&1; then
+				if systemctl list-unit-files --full -all | grep -q '^ssh.service'; then
+					systemctl enable --now ssh
+				elif systemctl list-unit-files --full -all | grep -q '^sshd.service'; then
+					systemctl enable --now sshd
+				else
+					get_msg -e "_e8"
+				fi
+			elif command -v rc-update >/dev/null 2>&1; then
+				rc-update add sshd default
+				rc-service sshd start
+			elif command -v rcctl >/dev/null 2>&1; then
+				rcctl enable sshd
+				rcctl start sshd
+			elif command -v service >/dev/null 2>&1; then
+				command -v sysrc && sysrc sshd_enable=YES	
+				service sshd start || service ssh start
+			else
+				get_msg -e "_e9"
+			fi
+			;;
+	esac
+}
+
+main() {
+
+	# Detect distro	
+	detect_distro && get_msg "_m1"
+
+	# scp the id_rsa.pub
+	copy_pubkeys && get_msg "_m2"
+
+	install_openssh && get_msg "_m3" || get_msg -e "_10"
+
+	# This will need changed
+	modify_sshd_config && get_msg "_m4"
+
+	# Bring up SSH
+	if start_ssh ; then
+		get_msg "_m5" 
+	else
+		get_msg -e "_e11"
+	fi
+}
+
+main
