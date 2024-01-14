@@ -73,10 +73,6 @@ get_ips() {
 	# Error if not present
 	[ -z "$FIP" ] && get_msg -Em "_e2" "$FROM"
 	[ -z "$TIP" ] && get_msg -Em "_e2" "$TO"
-
-	# Make sure the connections are valid
-#	ssh -q root@$FIP ':' > /dev/null 2>&1 || get_msg -Em "_e3" "$FROM" "$FIP"
-#	ssh -q root@$TIP ':' > /dev/null 2>&1 || get_msg -Em "_e3" "$TO" "$TIP"
 }
 
 transform_fromfile() {
@@ -118,7 +114,7 @@ main() {
 			| ssh -q root@${TIP} "tar xpf - -C $(dirname $LOC)"
 
 	# If we assumed $HOME, ensure user ownership is correct (1000 vs 1001 on various nix)
-	[ -z "${LOC##"${_usrprfx}"*}" ] && ssh -q root@${TIP} "chown ${_user}:${_user} $LOC"
+	[ -z "${LOC##"${_usrprfx}"*}" ] && ssh -q root@${TIP} "chown -R ${_user}:${_user} $LOC"
 }
 
 get_options "$@"
