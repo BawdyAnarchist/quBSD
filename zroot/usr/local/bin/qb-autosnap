@@ -157,26 +157,35 @@ thin_old_snapshots() {
 	ZLIST=$(zfs list -rH -o name ${R_ZFS%%/*} ; zfs list -rH -o name ${U_ZFS})
 
 	for _dataset in $ZLIST ; do
-		_snaplist=$(zfs list -Hrt snapshot -o name,qubsd:destroy-date $_dataset \
+		_snaplist=$(zfs list -Ht snapshot -o name,qubsd:destroy-date $_dataset \
 								| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
 
 		# Prevent snapshot clutter. If prev snap has 0B written and destroty-date sooner than
 		# newest snap, and the newest snap also wrote 0B; then prev snap can be destroyed
 		_snap0=$(echo "$_snaplist" | tail -1)
-		_snap1=$(echo "$_snaplist" | sed '$ d' | tail -1)
-		_dd0=$(zfs list -H -o qubsd:destroy-date $_snap0)
-		_dd1=$(zfs list -H -o qubsd:destroy-date $_snap1)
-		_writ0=$(zfs list -H -o written $_snap0)
-		_writ1=$(zfs list -H -o written $_snap1)
+		[ -n "$_snap0" ] \
+			&& _dd0=$(zfs list -H -o qubsd:destroy-date $_snap0) \
+			&&	_writ0=$(zfs list -H -o written $_snap0)
 
-		[ "$_dd0" -ge "$_dd1" ] && [ "$_writ0" = "0" ] && [ "$_writ1" = "0" ] \
-			&& zfs destroy $_snap1 && _snaplist=$(echo "$_snaplist" | grep -v $_snap1)
+		_snaplist_temp=$(echo "$_snaplist" | sed '$ d')
+		_snap1=$(echo "$_snaplist_temp" | tail -1)
+		[ -n "$_snap1" ] \
+			&& _dd1=$(zfs list -H -o qubsd:destroy-date $_snap1) \
+			&&	_writ1=$(zfs list -H -o written $_snap1)
+
+		while [ -n "$_snap1" ] && [ "$_dd0" -ge "$_dd1" ] && [ "${_writ0}${_writ1}" = "00" ] ; do 
+			zfs destroy $_snap1 > /dev/null 2>&1 \
+					&& _snaplist_temp=$(echo "$_snaplist_temp" | sed '$d') || break
+			_snap1=$(echo "$_snaplist_temp" | tail -1)
+			_dd1=$(zfs list -H -o qubsd:destroy-date $_snap1 2>&1) || break
+			_writ1=$(zfs list -H -o written $_snap1 2>&1) || break
+		done
 
 		# Trim all snapshots past their destroy-date
 		for _snap in $_snaplist ; do
-			_snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap)
 			# If dataset is still in use; `zfs destroy` without [-rRf], will fail to /dev/null
-			[ "$_snap_dd" -lt "$DATE_UNIX" ] && zfs destroy $_snap > /dev/null 2>&1
+			_snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap 2>&1) \
+				&& [ "$_snap_dd" -le "$DATE_UNIX" ] && echo zfs destroy $_snap > /dev/null 2>&1
 		done
 	done
 }
