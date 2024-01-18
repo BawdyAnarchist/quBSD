@@ -185,7 +185,7 @@ thin_old_snapshots() {
 		for _snap in $_snaplist ; do
 			# If dataset is still in use; `zfs destroy` without [-rRf], will fail to /dev/null
 			_snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap 2>&1) \
-				&& [ "$_snap_dd" -le "$DATE_UNIX" ] && echo zfs destroy $_snap > /dev/null 2>&1
+				&& [ "$_snap_dd" -le "$DATE_UNIX" ] && zfs destroy $_snap > /dev/null 2>&1
 		done
 	done
 }
