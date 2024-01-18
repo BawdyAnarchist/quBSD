@@ -1,9 +1,5 @@
 
-copy files/folders isnt honoring the destination pw user ID
-
-reclone_zroot
-	- All that complication should simply be "is the ROOTENV on or off? Do the diff if off, otherwise fallback to presnap if off"
-	- For VMs, the old snapshot should be deleted
+0gui had a weird start error related to MTU and chk_integer
 
 Integrate X11
 	- Need a GUIjail now with an autoconnection (can use disp3 for now)
@@ -14,7 +10,6 @@ ZFS Encrypted Jails
 	- new PARAM encrypt
 	- qb-create will need adjusted
 	- qb-encrypt will probably be needed
-
 
 ### UPGRADES
 
