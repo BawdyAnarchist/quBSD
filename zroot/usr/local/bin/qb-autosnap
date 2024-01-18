@@ -115,18 +115,19 @@ new_snapshots() {
 	calculate_variables
 
 	# Datasets tagged with qubsd:autosnap.
-	ZLIST=$(zfs list -rH -o name,qubsd:autosnap \
+	ZLIST=$(zfs list -rH -o name,qubsd:autosnap ${R_ZFS%%/*} ${U_ZFS} \
 								| grep -E "[[:blank:]]+true\$" | awk '{print $1}')
 
 	for _dataset in $ZLIST ; do
-		# If the dataset is a zroot dataset (thus a ROOTENV), only snap if not running
-		{ [ -z "${_dataset##"${R_ZFS}*"}" ] && chk_isrunning "${_dataset##*/}" ;} \
-			|| zfs snapshot \
-					-o qubsd:autocreated=yes \
-					-o qubsd:autosnap="-" \
-					-o qubsd:time-to-live="$TTL" \
-					-o qubsd:destroy-date="$_ddate_unix" \
-					"${_dataset}@${SNAPNAME}"
+		# If the dataset is a zroot dataset (a ROOTENV), skip the snapshot if it's running
+		{ [ -z "${_dataset##${R_ZFS}*}" ] && chk_isrunning "${_dataset##*/}" ;} && continue
+		
+		zfs snapshot \
+			-o qubsd:autocreated=yes \
+			-o qubsd:autosnap="-" \
+			-o qubsd:time-to-live="$TTL" \
+			-o qubsd:destroy-date="$_ddate_unix" \
+			"${_dataset}@${SNAPNAME}"
 	done
 }
 
@@ -141,7 +142,7 @@ update_stale_clones() {
 			_origin=$(zfs list -Ho origin $_clone)
 			_newsnap=$(zfs list -t snapshot -o name ${_origin%%@*} | tail -1)
 			zfs destroy $_clone
-			zfs clone -o qubsd:autosnap='false' "$_newsnap"  $_clone
+			zfs clone -o qubsd:autosnap='false' "$_newsnap" $_clone
 		fi
 	done
 
