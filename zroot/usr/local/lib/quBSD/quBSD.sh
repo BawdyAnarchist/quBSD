@@ -926,10 +926,14 @@ chk_integer() {
 	# from caller, for error message. Assumes that integers have been provided by the caller.
 
 	while getopts g:G:l:L:qv: opts ; do case $opts in
-			g) local _g="$OPTARG" ; _msg="greater than or equal to" ;;
-			G) local _G="$OPTARG" ; _msg="greater than" ;;
-			l) local _l="$OPTARG" ; _msg="less than or equal to" ;;
-			L) local _L="$OPTARG" ; _msg="less than" ;;
+			g) local _g="$OPTARG" ; _msg="greater than or equal to"
+				! echo "${_g}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1 ;;
+			G) local _G="$OPTARG" ; _msg="greater than"
+				! echo "${_G}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1 ;;
+			l) local _l="$OPTARG" ; _msg="less than or equal to"
+				! echo "${_l}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1 ;;
+			L) local _L="$OPTARG" ; _msg="less than"
+				! echo "${_L}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1 ;;
 			v) local _var="$OPTARG" ;;
 			q) local _q='-q' ;;
 			*) get_msg "_1" ; return 1 ;;
@@ -938,7 +942,6 @@ chk_integer() {
 
 	# Check that it's an integer
 	! echo "$_value" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1
-	! echo "${_g}${_G}${_l}${_L}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1
 
 	# Check each option one by one
 	[ "$_g" ] && ! [ "$_value" -ge "$_g" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_g" && return 1
