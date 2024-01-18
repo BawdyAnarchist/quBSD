@@ -84,7 +84,7 @@ checks_master() {
 	checks_zopts
 
 	# One more check for new install rootVM, to ensure there's a way to connect to it
-	[ "$INSTALL" ] && [ "$VNC" = "none" ] && [ "$TMUX" = "false" ] && [ "$X11FWD" = "false" ] \
+	[ "$INSTALL" ] && [ "$VNC" = "false" ] && [ "$TMUX" = "false" ] && [ "$X11FWD" = "false" ] \
 															&& get_msg_create "_w4" >> $_TMP_WARN
 }
 
