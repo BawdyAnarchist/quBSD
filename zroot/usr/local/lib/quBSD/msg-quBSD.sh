@@ -333,10 +333,10 @@ ENDOFMSG
 	;;
 	_jo1) cat << ENDOFMSG
 
-ERROR: < $_value > needs a ROOTENV clone; however, there are
-       no existing clones, and the rootjail at: < $_passvar >
-       is either being updated, or installing pkgs. New clone
-       shouldn't be taken until these operations are complete.
+ERROR: < $_value > needs a ROOTENV clone. However, its
+       ROOTENV < $_passvar > has no existing snapshots,
+       and is curently running. Running ROOTENVs should
+       not be snapshot/cloned until turned off. 
 
 ENDOFMSG
 	;;

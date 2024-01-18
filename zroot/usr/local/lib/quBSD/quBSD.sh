@@ -666,7 +666,6 @@ connect_gateway_to_clients() {
 reclone_zroot() {
 	# Destroys the existing _rootenv clone of <_jail>, and replaces it
 	# Detects changes since the last snapshot, creates a new snapshot if necessary,
-	# and destroys old snapshots when no longer needed.
 
 	# Quiet option
 	getopts q _opts && local _qz='-q' && shift
@@ -674,63 +673,66 @@ reclone_zroot() {
 
 	# Variables definitions
 	_jail="$1"
-	_jailzfs="${R_ZFS}/${_jail}"
+		[ -z "${_jail}" ] && get_msg $_qz "_0" "Jail" && return 1
 	_rootenv="$2"
+		[ -z "${_rootenv}" ] && get_msg $_qz "_0" "ROOTENV" && return 1
+	_jailzfs="${R_ZFS}/${_jail}"
 	_rootzfs="${R_ZFS}/${_rootenv}"
 
-	_date=$(date +%s)
-	_ttl=$(( _date + 30 ))
-	_newsnap="${_rootzfs}@${_date}"
-
-	_presnap=$(zfs list -t snapshot -Ho name ${_rootzfs} | tail -1)
-
 	# Check that the _jail being destroyed/cloned has an origin (is a clone).
-	chk_valid_zfs "$_jailzfs" && [ "$(zfs list -Ho origin "${R_ZFS}/${_jail}")" = "-" ] \
+	chk_valid_zfs "$_jailzfs" && [ "$(zfs list -Ho origin $_jailzfs)" = "-" ] \
 		&& get_msg $_qz "_jo0" "$_jail" && return 1
 
-	# `zfs diff` creates a momentary snapshot, which can interfere with snapshot selection
-	while [ -z "${_presnap##*@zfs-diff*}" ] ; do
-		sleep .1
-		_presnap=$(zfs list -t snapshot -Ho name ${_rootzfs} | tail -1)
-	done
+	# Switch between whether or not ROOTENV is running.
+	if chk_isrunning ${_rootenv} ; then
+		# For safety, running ROOTENV snapshot should be taken from before it was started 
 
-	# Determine if there are any updates or pkg installations taking place inside the jail
-	if pgrep -qf "/usr/sbin/freebsd-update -b ${M_QROOT}/${_rootenv}" \
-		|| pgrep -qj "$_rootenv" -qf '/usr/sbin/freebsd-update' > /dev/null 2>&1 \
-		|| pgrep -qj "$_rootenv" 'pkg' > /dev/null 2>&1
-	then
-		local _busy="true"
-	fi
-
-	# If there's a pre existing snapshot, there's always a fallback for the reclone operation
-	# Exclude vm, coz zfs volmode=dev cant be analyzed with zfs diff
-	if ! chk_isvm "$_jail" && [ "$_presnap" ] ; then
-
-		# Check for differences between pre existing snapshot, and current state of jail
-		if [ "$(zfs diff "$_presnap" "$_rootzfs")" ] ; then
-			# There are differences and the jail is busy. Fallback on pre-existing snapshot
-			[ "$_busy" ] && _newsnap="$_presnap"
+		# Get epoch date of ROOTENV pid, and ROOTENV snapshots 
+		if chk_isvm ${_rootenv} ; then
+			_jlsdate=$(ps -o lstart -p $(pgrep -f "bhyve: $_rootenv") | tail -1 \
+								| xargs -I@ date -j -f "%a %b %d %T %Y" @ +"%s")
 		else
-			# There have been no updates since the last snapshot. Use the pre existing snapshot
-			_newsnap="$_presnap"
+			_jlsdate=$(ps -o lstart -J $(jls -j $_rootenv jid) | tail -1 \
+								| xargs -I@ date -j -f "%a %b %d %T %Y" @ +"%s")
 		fi
-	else
-		# There is no pre existing snapshot, and the rootjail is busy. Must error.
-		[ "$_busy" ] && get_msg "_jo1" "$_jail" "$_rootenv" && return 1
-	fi
+		_rootsnaps=$(zfs list -t snapshot -Ho name $_rootzfs)
+		_snapdate=$(echo "$_rootsnaps" | tail -1 | xargs -I@ zfs list -Ho creation @ \
+											| xargs -I@ date -j -f "%a %b %d %H:%M %Y" @ +"%s")
 
-	# If they're equal, then the valid/current snapshot already exists. Otherwise, make one.
-	if [ ! "$_newsnap" = "$_presnap" ] ; then
-		# Clone and set zfs params so snapshot will get auto deleted later.
-		zfs snapshot -o qubsd:destroy-date="$_ttl" \
-	 					 -o qubsd:autosnap='-' \
+		# Cycle from most-to-least recent, until a snapshot older than the running ROOTENV pid is found
+		while chk_integer -q -g $_jlsdate $(( _snapdate + 59 )) ; do
+			_rootsnaps=$(echo "$_rootsnaps" | sed '$ d')	
+			[ -n "$_rootsnaps" ] \
+				&& _snapdate=$(echo "$_rootsnaps" | tail -1 | xargs -I@ zfs list -Ho creation @ \
+													| xargs -I@ date -j -f "%a %b %d %H:%M %Y" @ +"%s")
+		done	
+
+		# If no _rootsnap older than the rootenv pid was found, return error
+		_rootsnap=$(echo "$_rootsnaps" | tail -1) 
+		[ -z "$_rootsnap" ] && get_msg $_qz "_jo1" "$_jail" "$_rootenv" && return 1
+
+	else
+		# If ROOTENV is off, make sure that _jail is getting the most recent version of ROOTENV 
+
+		# Pull most recent snap, and then create new snapshot for comparison 
+		_date=$(date +%s)
+		_newsnap="${_rootzfs}@${_date}"
+		_rootsnap=$(zfs list -t snapshot -Ho name $_rootzfs | tail -1)
+		zfs snapshot -o qubsd:destroy-date=$(( _date + 30 )) \
+ 						 -o qubsd:autosnap='-' \
 						 -o qubsd:autocreated="yes" "${_newsnap}"
+	
+		# Use zfsprop 'written' to detect any new data. Destroy _newsnap if it has no new data. 
+		{ [ ! "$(zfs list -Ho written $_newsnap)" = "0" ] || [ -z "$_rootsnap" ] ;} \
+			&& _rootsnap="$_newsnap" \
+			|| zfs destroy $_newsnap
 	fi
 
    # Destroy the dataset and reclone it
 	zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1
-	zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs}
+	zfs clone -o qubsd:autosnap='false' "${_rootsnap}" ${_jailzfs}
 
+	# Jails need to usermod for unique user.
 	if ! chk_isvm "$_jail" ; then
 		# Drop the flags for etc directory and add the user for the jailname
 		chflags -R noschg ${M_QROOT}/${_jail}/etc/
@@ -936,6 +938,7 @@ chk_integer() {
 
 	# Check that it's an integer
 	! echo "$_value" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1
+	! echo "${_g}${_G}${_l}${_L}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1
 
 	# Check each option one by one
 	[ "$_g" ] && ! [ "$_value" -ge "$_g" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_g" && return 1
