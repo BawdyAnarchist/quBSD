@@ -43,7 +43,7 @@ connect_vm_session() {
 	get_jail_parameter -d VNC $JAIL
 
 	# Handle the vnc viewer port
-	if [ ! "$VNC" = "none" ] ; then
+	if [ ! "$VNC" = "false" ] ; then
 		# Sometimes it can take 5-15 secs for a VM to launch (if ppt is bad). Wait
 		_count=0
 		while ! _vmpid=$(pgrep -fx "bhyve: $JAIL") ; do
