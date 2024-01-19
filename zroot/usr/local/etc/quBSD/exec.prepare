@@ -13,7 +13,7 @@ get_parameters() {
 	get_jail_parameter -d GATEWAY "$JAIL"  ||  exit 1
 	get_jail_parameter -d CONTROL "$JAIL"  ||  exit 1
 
-	# Find any remaining mounts for the jail
+	# Get all mounts related to the root mount: /qubsd/JAIL 
 	JMOUNT=$(mount | grep -Eo "${M_QROOT}/${JAIL}/[^[:blank:]]+")
 }
 
@@ -29,15 +29,22 @@ preparation_actions() {
 
 	# Double check to unmount any parts of <jail> before destroy/recreating the dataset
 	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
+
+	# Make sure the zusr dataset is mounted. [-l load-key] for encrypted datasets 
+	[ ! "$(zfs list -Ho mounted ${U_ZFS}/${JAIL})" = "yes" ] \
+		&& zfs mount -l ${U_ZFS}/${JAIL}
 }
 
-create_fstab_directories() {
+handle_fstab() {
 	# Use the JAIL's fstab to create the directories necessary for mountpoints
 	_DIRS=$(tail -n +2 ${M_ZUSR}/${JAIL}/rw/etc/fstab | awk '!/^[[:blank:]]*#/{print $2}')
 
 	for _dir in $_DIRS ; do
 		[ -d "$_dir" ] || mkdir -p $_dir > /dev/null 2>&1
 	done
+
+	# Manually mount, caz `jail` expects any fstab in jail.conf to exist, before exec.prepare
+	mount -aF ${M_ZUSR}/${JAIL}/rw/etc/fstab
 }
 
 main() {
@@ -59,7 +66,7 @@ main() {
 		;;
 	esac
 
-	create_fstab_directories
+	handle_fstab	
 
 	return 0
 }

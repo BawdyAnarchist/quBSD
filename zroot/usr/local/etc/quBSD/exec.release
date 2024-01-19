@@ -8,13 +8,14 @@ get_parameters() {
 	# Get jail parameters.
 	get_jail_parameter CLASS   "$JAIL" ||  exit 1
 	get_jail_parameter ROOTENV "$JAIL" ||  exit 1
-
-	# Find any remaining mounts for the jail
-	JMOUNT=$(mount | egrep -o "${M_QROOT}/${JAIL}/[^[:blank:]]+")
 }
 
 main() {
-	# Just in case there were any mounts missed
+	# Manual umount. fstab cant be referenced in jail.conf, since might be inside encrypt dataset 
+	umount -aF ${M_ZUSR}/${JAIL}/rw/etc/fstab
+
+	# Search for any lingering mounts, and remove them as well
+	JMOUNT=$(mount | egrep -o "${M_QROOT}/${JAIL}/[^[:blank:]]+")
 	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
 
 	case $CLASS in
@@ -34,6 +35,10 @@ main() {
 
 	# Flags come down after stopping.
 	[ -e ${M_ZUSR}/${JAIL} ] && chflags -R noschg ${M_ZUSR}/${JAIL}
+
+	# Re-encrypt the dataset, if applicable	
+	[ ! "$(zfs list -Ho encryption ${U_ZFS}/${JAIL})" = "off" ] \
+		&& zfs umount -u ${U_ZFS}/${JAIL}
 
 	return 0
 }
