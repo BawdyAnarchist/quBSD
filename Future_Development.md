@@ -1,15 +1,17 @@
 
-0gui had a weird start error related to MTU and chk_integer
+ZFS Encrypted Jails
+	- qb-create will need adjusted
+		zfs create -o encryption=on -o keyformat=passphrase -o pbkdf2iters=1000000 -o canmount=noauto zusr/<dataset>
+	- qb-crypt will probably be needed
+		- Add encryption to dataset 
+		- Remove encryption from 
+		- lock a dataset
+		- unlock a dataset
+		- combine with pefs?
 
 Integrate X11
 	- Need a GUIjail now with an autoconnection (can use disp3 for now)
 	- qubsd ipv4 convention will need a new class 
-
-ZFS Encrypted Jails
-	- zfs load-key unload-key
-	- new PARAM encrypt
-	- qb-create will need adjusted
-	- qb-encrypt will probably be needed
 
 ### UPGRADES
 
@@ -33,7 +35,7 @@ Host as Unprivileged user
 	- Unprivileged user on host will pass jails SSH commands via Control Jail     
 	- Control jail pf will block all, except port 22 between host and jails     
 
-NICVM - Linux VM so that it can use all the wireless protocols.
+NICVM - Linux VM (probably alpine) so that it can use all the wireless protocols.
      - Someone made a post about this in FreeBSD
 
 Take another hack at the recording device problems
@@ -95,6 +97,7 @@ qb-i3-launch - Intelligent resizing of display depending on dpi or xrandr resolu
 
 Networking is still dicey. Hit and miss. Sometimes works, other times doesnt.
 	- Might need to write daemons for dhclient and dhcpd servers
+	- I notice it comes up fine if all jails have already started before startx (and qb-start -a). Maybe it's double running qb-start -a that's the problem)
 
 dispVM
 	- Add new class and boot practices
@@ -108,8 +111,6 @@ GENERAL GUIDELINES, and maybe later double checks
 	- Try to use more redirects, tee's, and also try the 'wait' command for scripts that appear to hang (but are actually finished).
 	- PARAMETERS should be CAPS when refering to the generic PARAM; lowercase when refering to a specific value
 	- [test] { command ;} grouping. Can save alot of space and simplify the get_msg constructions
-	- while getopts <opts> opts ; do case $opts in
-	  esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 	- Double check on things that are positional items vs if they should be options 
 
 Cycle all scripts through shellcheck again. 
