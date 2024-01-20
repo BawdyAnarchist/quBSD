@@ -167,10 +167,18 @@ main() {
 	_STARTS=$(echo "$_CLIMBED" | awk 'NR == 1 || $2 > max { max = $2 } END { print max }')
 
 	# Some jails might be encrypted. They need to decrypted now, before waterfall 
+	# Determine if user is in interactive shell, or if popup for password is needed. 
+	tty | grep -qS 'ttyv' && pgrep -qx Xorg && _popup="true"
+
 	for _jail in $_FULLIST ; do 
 	   # Locked datasets will not be mounted. Catchall command  
-		! chk_isvm $_jail && [ ! "$(zfs list -Ho mounted ${U_ZFS}/${_jail})" = "yes" ] \
-			&& zfs mount -l ${U_ZFS}/${_jail}
+		if ! chk_isvm $_jail && [ ! "$(zfs list -Ho mounted ${U_ZFS}/${_jail})" = "yes" ] ; then
+			if [ "$_popup" ] ; then 
+				xterm -e csh -c "/bin/csh -c 'zfs mount -l ${U_ZFS}/${_jail}'"
+			else
+				zfs mount -l ${U_ZFS}/${_jail}
+			fi
+		fi
 	done
 
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
