@@ -166,19 +166,22 @@ main() {
 	_FULLIST=$(echo "$_FULLIST" | sort | uniq)
 	_STARTS=$(echo "$_CLIMBED" | awk 'NR == 1 || $2 > max { max = $2 } END { print max }')
 
-	# Some jails might be encrypted. They need to decrypted now, before waterfall 
+	# Some jails/VMs might be encrypted. They need to decrypted now, before waterfall 
 	# Determine if user is in interactive shell, or if popup for password is needed. 
 	tty | grep -qS 'ttyv' && pgrep -qx Xorg && _popup="true"
 
 	for _jail in $_FULLIST ; do 
-	   # Locked datasets will not be mounted. Catchall command  
-		if ! chk_isvm $_jail && [ ! "$(zfs list -Ho mounted ${U_ZFS}/${_jail})" = "yes" ] ; then
+	   # Load key if necessary, with popup switch 
+		if [ "$(zfs list -Ho keystatus ${U_ZFS}/${_jail})" = "unavailable" ] ; then
 			if [ "$_popup" ] ; then 
-				xterm -e csh -c "/bin/csh -c 'zfs mount -l ${U_ZFS}/${_jail}'"
+				xterm -e csh -c "/bin/csh -c 'zfs load-key ${U_ZFS}/${_jail}'"
 			else
-				zfs mount -l ${U_ZFS}/${_jail}
+				zfs load-key ${U_ZFS}/${_jail}
 			fi
 		fi
+
+		# Volumes do not get mounted 
+		[ "$(zfs list -Ho type ${U_ZFS}/${_jail})" = "filesystem" ] && zfs mount ${U_ZFS}/${_jail}
 	done
 
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
