@@ -1,13 +1,8 @@
 
-ZFS Encrypted Jails
-	- qb-create will need adjusted
-		zfs create -o encryption=on -o keyformat=passphrase -o pbkdf2iters=1000000 -o canmount=noauto zusr/<dataset>
-	- qb-crypt will probably be needed
-		- Add encryption to dataset 
-		- Remove encryption from 
-		- lock a dataset
-		- unlock a dataset
-		- combine with pefs?
+qb-create
+	- for rootjails, should edit the rc.conf hostname
+	- checking qubsdmap.conf should only check the jailnames, not all columns (0bsdvm failure on the basis of being USED, but no actual lines)
+	- somehow it fucked up my /etc/jail.conf.  Maybe coz the jail params already existed?? IDK
 
 Integrate X11
 	- Need a GUIjail now with an autoconnection (can use disp3 for now)
@@ -85,10 +80,6 @@ qb-backup (already created in $ubin)
 
 qb-stat - Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
 
-qb-create
-	- for rootjails, should edit the rc.conf hostname
-	- checking qubsdmap.conf should only check the jailnames, not all columns (0bsdvm failure on the basis of being USED, but no actual lines)
-	- somehow it fucked up my /etc/jail.conf.  Maybe coz the jail params already existed?? IDK
 
 qb-i3-launch - Intelligent resizing of display depending on dpi or xrandr resolution
 
