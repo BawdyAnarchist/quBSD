@@ -1769,7 +1769,7 @@ prep_bhyve_options() {
 	_rootenv=$(get_jail_parameter -e ROOTENV "$_VM")       || return 1
 	_taps=$(get_jail_parameter -de TAPS "$_VM")            || return 1
 	_vcpus=$(get_jail_parameter -de VCPUS "$_VM")          || return 1
-	_vncres=$(get_jail_parameter -dez VNC "$_VM")          || return 1
+	_vnc=$(get_jail_parameter -dez VNC "$_VM")             || return 1
 	_x11=$(get_jail_parameter -dez X11 "$_VM")             || return 1
 	_ppt=$(get_jail_parameter -dexz PPT "$_VM")            || return 1
 	_tmux=$(get_jail_parameter -dez TMUX "$_VM")           || return 1
@@ -1863,11 +1863,11 @@ EOF
 	fi
 
 	# Assign VNC FBUF options
-	if [ "$_vncres" ] && [ ! "$_vncres" = "none" ] ; then
+	if [ "$_vnc" ] && [ ! "$_vnc" = "false" ] ; then
 
 		# Define height/width from the QMAP entry
-		_w=$(echo "$_vncres" | grep -Eo "^[[:digit:]]+")
-		_h=$(echo "$_vncres" | grep -Eo "[[:digit:]]+\$")
+		_w=$(echo "$_vnc" | grep -Eo "^[[:digit:]]+")
+		_h=$(echo "$_vnc" | grep -Eo "[[:digit:]]+\$")
 
 		# Find all sockets in use, and define starting socket to search
 		_socks=$(sockstat -P tcp | awk '{print $6}' | grep -Eo ":[[:digit:]]+")
