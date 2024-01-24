@@ -10,9 +10,12 @@ get_options() {
 	_PARAMS="CLASS ROOTENV"
 
 	# CLASS, ROOTENV, and TEMPLATE are important enough to merit their own options
-	while getopts c:eGhi:p:r:t:v:yz:Z _opts ; do case $_opts in
+	while getopts c:eEGhi:p:r:t:v:yz:Z _opts ; do case $_opts in
 		c) CLASS="$OPTARG" ;;
 		e) get_msg_create "_examples" "exit_0" ;;
+		E) _ZCRYPT="-o encryption=on -o keyformat=passphrase -o pbkdf2iters=1000000"
+			_ZCRYPT2="$_ZCRYPT -o keylocation=file:///${QTMP}/qb-create_tempkey" 
+			;; 
 		G) GUIDED="true" ;;
 		h) get_msg_create "none" "usage_0" ;;
 		i) INSTALL="$OPTARG" ;;
@@ -138,12 +141,12 @@ checks_jailVM_congruency() {
 		done
 	fi
 
-	# Vital parameters must either be all jails
+	# Vital parameters must either be all jails ...
 	if ! chk_isvm -c "$CLASS" ; then
 		chk_isvm -c "$root_cl" && get_msg_create "_e2" "exit_1"
 		[ ! "$TEMPLATE" = "none" ] && chk_isvm -c "${temp_cl}" && get_msg_create "_e2" "exit_1"
 
-	# Or vital parameters must be all VMs
+	# ... or vital parameters must be all VMs
 	elif chk_isvm -c "$CLASS" ; then
 		! chk_isvm -c "${root_cl}" && get_msg_create "_e2" "exit_1"
 		[ ! "$TEMPLATE" = "none" ] && ! chk_isvm -c "${temp_cl}" && get_msg_create "_e2" "exit_1"
@@ -249,27 +252,36 @@ assign_datasets() {
 
 		rootjail_)  # rootjails require [-t <template>]
 			get_msg_create "_e6" "exit_1"
-		;;
-
-		app*_|app*_root*|app*_app*|app*_disp*)
+			;;
+		appjail_|appjail_rootjail|appjail_appjail|appjail_dispjail)
 			# [-Z] is only for creating rootjails, not appjails from rootjails
 	     	[ "$R_ZOPT" ] && get_msg_create "_e7" "exit_1"
 
 			# If no template for zusr, try to find one.
-			( [ -z "$temp_cl" ] || [ -z "${temp_cl##root*}" ] ) && TEMPLATE="${ROOTENV}-template"
+			{ [ -z "$temp_cl" ] || [ -z "${temp_cl##root*}" ] ;} && TEMPLATE="${ROOTENV}-template"
 
 			R_ZPARENT="${R_ZFS}/${ROOTENV}"
 			U_ZPARENT="${U_ZFS}/${TEMPLATE}"
 
-			# Handle missing zusr dataset. For VMs, minimum block device size that zfs allows, is 80M
+			# Handle missing zusr dataset
+			! chk_valid_zfs "$U_ZPARENT" && U_ZOPT="empty" && get_msg_create "_w6" >> $_TMP_WARN
+			;;
+
+		appVM_|appVM_rootVM|appVM_appVM|appVM_dispVM)
+			# [-Z] is only for creating rootjails, not appjails from rootjails
+	     	[ "$R_ZOPT" ] && get_msg_create "_e7" "exit_1"
+
+			# If no template for zusr, try to find one.
+			[ -z "$TEMPLATE" ] && TEMPLATE="${ROOTENV}"
+
+			R_ZPARENT="${R_ZFS}/${ROOTENV}"
+			U_ZPARENT="${U_ZFS}/${TEMPLATE}"
+
+			# Handle missing zusr dataset. For VMs, min block device size that zfs allows, is 80M
 			if ! chk_valid_zfs "$U_ZPARENT" ; then
 				U_ZOPT="empty"
-				if chk_isvm -c "$CLASS" ; then
-					[ -z "$VOLSIZE" ] && VOLSIZE="80M"
-					get_msg_create "_w7" >> $_TMP_WARN
-				else
-					get_msg_create "_w6" >> $_TMP_WARN
-				fi
+				[ -z "$VOLSIZE" ] && VOLSIZE="80M"
+				get_msg_create "_w7" >> $_TMP_WARN
 			fi
 		;;
 
@@ -366,6 +378,8 @@ confirm_creation() {
 		disp*) get_msg_create "_w1_3" "_cont" ;;
 	esac
 
+	[ "$_ZCRYPT" ] && get_msg_create "_w1_5" "_cont"
+
 	# Show the final result of jail parameters
 	get_msg_create "_w3" "_cont"
 
@@ -385,15 +399,15 @@ confirm_creation() {
 change_datasets() {
 	# The AUTOSNAP value is needed for the new datasets
 	AUTOSNAP=$(sed -En "s/.* AUTOSNAP[[:blank:]]+//p" $_TMP_PARAMS)
+	_ASNAP="-o qubsd:autosnap=$AUTOSNAP"
 
 	# ZROOT changes: Only a new ROOTENV is duplicated. Everything else is cloned.
 	if [ -z "${CLASS##rootVM}" ] ; then
 		# Create the empty dataset
-		zfs create -V ${VOLSIZE} -o volmode=dev -o qubsd:autosnap="$AUTOSNAP" \
-																			"${R_ZPARENT}" && return 0
+		zfs create -V ${VOLSIZE} -o volmode=dev $_ASANP ${R_ZPARENT} && return 0
 	elif [ -z "${CLASS##rootjail}" ] ; then
 		echo ''
-		zfs send -vP "$R_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${R_ZFS}/${NEWJAIL}"
+		zfs send -vP "$R_SNAP" | zfs recv -v $_ASNAP ${R_ZFS}/${NEWJAIL}
 	else
 		reclone_zroot "$NEWJAIL" "$ROOTENV"
 	fi
@@ -405,7 +419,23 @@ change_datasets() {
 
 		dupl) # Full duplication of zfs data to new dataset
 			echo ''
-			zfs send -vP "$U_SNAP" | zfs recv -vo qubsd:autosnap="$AUTOSNAP" "${U_ZFS}/${NEWJAIL}"
+
+			chk_isvm -c $CLASS || _MOUNTS="-o mountpoint=${M_ZUSR}/${NEWJAIL} -o canmount=noauto"
+			if [ "$_ZCRYPT2" ] && [ ! "$(zfs list -Ho encryption $U_ZPARENT)" = "yes" ]  ; then
+				# The parent dataset is unencrypted, and being sent to an encrypted dataset
+
+				# Cant input password, due to stdin alread in use. Use keyfile, then change
+				dd if=/dev/urandom of=${QTMP}/qb-create_tempkey bs=32 count=1 > /dev/null 2>&1
+
+				zfs send -v $U_SNAP | zfs recv $_ASNAP $_MOUNTS $_ZCRYPT2 ${U_ZFS}/${NEWJAIL}
+
+				zfs change-key -o keylocation=prompt ${U_ZFS}/${NEWJAIL}
+				rm $QTMP/qb-create_tempkey
+			else
+				zfs send -wvP "$U_SNAP" | zfs recv $_ASNAP $_MOUNTPOINT ${U_ZFS}/${NEWJAIL}
+			fi
+
+			# VMs with zfs volumes dont get any file-level modifications later in this function
 			chk_isvm -c "$CLASS" && echo success && return 0
 		;;
 
@@ -415,8 +445,14 @@ change_datasets() {
 		;;
 
 		dirs)
-			# Create the empty dataset
-			zfs create -o qubsd:autosnap="$AUTOSNAP" "${U_ZFS}/${NEWJAIL}"
+			if [ "$_ZCRYPT1" ] ; then
+				# Create the new encrypted dataset, and mount it
+				zfs create $_ASNAP $_ZCRYPT1 ${U_ZFS}/${NEWJAIL}
+				zfs mount -l "${U_ZFS}/${NEWJAIL}"
+			else
+				# Create the empty dataset
+				zfs create $_ASNAP ${U_ZFS}/${NEWJAIL}
+			fi
 
 			# Create the directory mapping of the template
 			for _dir in $(find "${M_ZUSR}/${TEMPLATE}" -type d) ; do
@@ -435,16 +471,16 @@ change_datasets() {
 		;;
 
 		empty) # Create the empty dataset/volume
-			if chk_isvm -c "$CLASS" ; then
-				zfs create -V ${VOLSIZE} -o volmode=dev -o qubsd:autosnap="$AUTOSNAP" \
-																			"${U_ZFS}/${NEWJAIL}" && return 0
-			else
-				zfs create -o qubsd:autosnap="$AUTOSNAP" "${U_ZFS}/${NEWJAIL}"
-			fi
+			# If VM, create a volume instead
+			chk_isvm -c "$CLASS" && _VOLmod="-V ${VOLSIZE} -o volmode=dev"
+			zfs create $_ASNAP $_VOLmod $_ZCRYPT1 ${U_ZFS}/${NEWJAIL}
+
+			# VMs with zfs volumes dont get any file-level modifications later in this function
+			[ "$_VOLmod" ] && return 0
 		;;
 	esac
 
-	# Jail types that don't need the edits below, have already exited the function.
+	# Jail types (or VMs) that don't need the edits below, have already exited the function.
 	# Make sure flags are down for rw/etc directory
 	chflags -R noschg ${M_ZUSR}/${NEWJAIL}/rw/etc > /dev/null 2>&1
 
@@ -613,6 +649,12 @@ cleanup_finished() {
 	[ "$R_SNAP" ] && zfs destroy $R_SNAP > /dev/null 2>&1
 	[ "$U_SNAP" ] && zfs destroy $U_SNAP > /dev/null 2>&1
 
+	if [ "$_ZCRYPT" ] && [ "$_exit" = "0" ] ; then
+		get_msg_create "_w2" "_cont"
+		zfs umount "${U_ZFS}/${NEWJAIL}" > /dev/null 2>&1
+		zfs unload-key "${U_ZFS}/${NEWJAIL}" > /dev/null 2>&1
+	fi
+
 	# Helps to standardize having a newline if program is ctrl-c stopped
 	echo ''
 
@@ -656,7 +698,7 @@ main() {
 	launch_install &
 
 	# Give VM a moment for the VM to launch, then delete the special qmap line, and exit
-	sleep 3
+	sleep 10
 	sed -i '' -E "\@^${NEWJAIL}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+-s #,ahci-cd,${INSTALL}@d" $QMAP
 }
 

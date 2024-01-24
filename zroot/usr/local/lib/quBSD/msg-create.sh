@@ -171,6 +171,16 @@ New rootVM will consume: $VOLSIZE
 Installed to new dataset: ${R_ZPARENT}
 ENDOFMSG
 	;;
+	_w1_5) cat << ENDOFMSG
+${U_ZFS}/${NEWJAIL} WILL BE ENCRYPTED (password input later)
+ENDOFMSG
+	;;
+	_w2) cat << ENDOFMSG
+ALERT: ${U_ZFS}/${NEWJAIL} will be unmounted and locked for
+       security. If you need access, either start
+       the jail/VM, or manually unlock and mount it.
+ENDOFMSG
+	;;
 	_w3) cat << ENDOFMSG
 
 UNIQUE PARAMETERS TO BE ADDED:
@@ -624,6 +634,7 @@ Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>]
        <dirs>  Jail only. Copy <template> empty directories, no files.
        <empty> Jail/VM. Create empty dataset/block device on $U_ZFS
                If VM, must specify [-v], and it will be unformatted.
+   -E: (E)ncrypt. Encrypt the new ${U_ZFS} dataset.
    -Z: (Z)rootopt: Creates a new ROOTENV with an independent on-disk
        dataset, from snapshot of:  ${R_ZFS}/<template>
 
