@@ -17,15 +17,20 @@ get_parameters() {
 	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter -d MTU "$JAIL"
 
 	J_ZUSR="${M_ZUSR}/${JAIL}"
-	DHCPD="${J_ZUSR}/rw/usr/local/etc/dhcpd.0net.conf"
+	JRC="${J_ZUSR}/rw/etc/rc.conf" 
+	JWG="${J_ZUSR}/rw/usr/local/etc/wireguard/wg0.conf"
 }
 
 modify_dhcpd() {
 
+	DHCPD=$(sed -En 's#dhcpd_conf="(.*)\"#\1#p' $JRC)
+
+	[ -e "$DHCPD" ] || return 0
+
 	# If wireguard is enabled, DNS should come from wg0.conf. Otherwise, use /etc/resolv.conf
-	if grep -Eq 'wireguard_enable="YES"' "${J_ZUSR}/rw/etc/rc.conf" ; then
-		_DNS=$(sed -En "s/^DNS.*=[[:blank:]]*([0-9]+.*[0-9]+)[[:blank:]]*\$/\1;/p" \
-												"${J_ZUSR}/rw/usr/local/etc/wireguard/wg0.conf")
+	if grep -Eq 'wireguard_enable="YES"' $JRC ; then
+		_DNS=$(sed -En "s/^DNS.*=[[:blank:]]*([0-9]+.*[0-9]+)[[:blank:]]*\$/\1;/p" $JWG)
+												
 	else
 		# Get the DNS entries from resolv.conf, and use those for the dhcpd server
 		_DNS=$(sed -En "s/^nameserver (.*[0-9]+)[[:blank:]]*\$/\1,/p" \
@@ -34,17 +39,16 @@ modify_dhcpd() {
 	fi
 
 	# Modify dhcpd with new DNS
-	[ -n "$_DNS" ] && sed -i '' -E "s/(option domain-name-servers ).*/\1${_DNS}/g" \
-														"${J_ZUSR}/rw/usr/local/etc/dhcpd.conf"
+	[ -n "$_DNS" ] && sed -i '' -E "s/(option domain-name-servers ).*/\1${_DNS}/g" $DHCPD
+
 	# Set MTU in the config file
-	[ -n "$MTU" ] && sed -i '' -E "s/(option interface-mtu ).*/\1${MTU};/g" \
-														"$DHCPD"
+	[ -n "$MTU" ] && sed -i '' -E "s/(option interface-mtu ).*/\1${MTU};/g" "$DHCPD"
 }
 
 modify_files() {
 
 	# Numerous variables need to be modified for pf.conf
-	if [ -e "$JPF" ] ; then
+	if grep -Eqs 'pf_enable="YES"' $JRC && [ -e "$JPF" ] ; then
 
 		# For gateways that serve other gateways, get all the WGPORTS of those gateways
 		assemble_wgports
@@ -65,8 +69,8 @@ modify_files() {
 	fi
 
 	# Make sure the MTU matches qmap
-	[ "$MTU" ] && [ -e "${J_ZUSR}/${WG0CONF}" ] \
-						&& sed -i '' -E "s/^MTU.*/MTU = ${MTU}/" ${J_ZUSR}/${WG0CONF}
+	[ "$MTU" ] && [ -e "$JWG" ] \
+						&& sed -i '' -E "s/^MTU.*/MTU = ${MTU}/" $JWG
 
 	# SSHD needs to be configured so the control jail can access 
 	if [ "$CONTROL" ] && [ ! "$CONTROL" = "none" ] ; then
@@ -100,8 +104,8 @@ resource_control() {
 }
 
 main() {
-	# If there's a dhcpd.conf in the jail, then modify it
-	[ -e "$DHCP" ] && modify_dhcpd
+	# If dhcpd is enabled, then modify the config with MTU and DNS
+	grep -Eq 'dhcpd_enable="YES"' $JRC && modify_dhcpd
 
 	if [ ! "$CLASS" = "cjail" ] ; then
 		# Connect JAIL to 0control SSH
