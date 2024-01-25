@@ -4,7 +4,7 @@
 
 get_options() {
 	while getopts hrt: opts ; do case $opts in
-		h) get_msg_dpi "none" "usage_0" ;;
+		h) msg_dpi -eu ;;
 		r) DPI_START=96 ; REV_TIME=0 ; revert_dpi ;;
 		t) REV_TIME="$OPTARG" ;;
 		*) exit 1 ;;
@@ -24,13 +24,13 @@ get_options() {
 
 checks() {
 	# DPI less that 0.5 is too low
-	echo "$DPI_IN < 0.3" | bc | grep -qs 1 && get_msg_dpi "_1" "exit 1"
+	echo "$DPI_IN < 0.3" | bc | grep -qs 1 && msg_dpi -Em _1
 
 	# DPI between 4 and 29 is too high to be a scaled entry; too low to be raw
-	echo "$DPI_IN > 4 && $DPI_IN < 29" | bc | grep -qs 1 && get_msg_dpi "_2" "exit 1"
+	echo "$DPI_IN > 4 && $DPI_IN < 29" | bc | grep -qs 1 && msg_dpi -Em _2
 
 	# DPI above 384 (4x96) is too high for an automated script
-	echo "$DPI_IN > 384" | bc | grep -qs 1 && get_msg_dpi "_3" "exit 1"
+	echo "$DPI_IN > 384" | bc | grep -qs 1 && msg_dpi -Em _3
 }
 
 main() {

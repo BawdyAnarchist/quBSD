@@ -39,7 +39,7 @@ main() {
 	else
 	# Then start jail and read command in the new terminal
 
-		start_jail "$JAIL" || get_msg_floatcmd "none" "exit_1"
+		start_jail "$JAIL" || msg_floatcmd "none" "exit_1"
 
 		printf "%b" "Enter Command for $JAIL. Popup will close automatically" \
 					   "\n${_USER}@${JAIL} # "

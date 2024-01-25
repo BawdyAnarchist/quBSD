@@ -2,17 +2,15 @@
 
 # Seamless handling of seclvl and chflags requires straddling host and <jail>
 # A single script simplifies the UX frontend, but adds complexity in the script backend.
-# To help simplify, get_msg_ivpn and usage functions, are integrated into the script.
+# To help simplify, msg_ivpn and usage functions, are integrated into the script.
 
-get_msg_ivpn() {
-	# _message determines which feedback message to call.
-	# Just call "none" in the case you want no message to match.
-	# _action is optional, and can be used to exit and/or show usage
-
-	local _message
-	local _action
-	_message="$1"
-	_action="$2"
+msg_ivpn() {
+	while getopts eEm:u _opts ; do case $_opts in
+		e) local _exit="exit 0" ;;
+		E) local _exit="exit 1" ;;
+		m) local _message="$OPTARG" ;;
+		u) local _usage="true" ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	case "$_message" in
 	_1) cat << ENDOFMSG
@@ -92,13 +90,8 @@ ENDOFMSG
 
 	esac
 
-	case $_action in
-		usage_0) usage ; exit 0 ;;
-		usage_1) usage ; exit 1 ;;
-		exit_0)  exit 0 ;;
-		exit_1)  exit 1 ;;
-		*) : ;;
-	esac
+	[ $_usage ] && usage
+	eval $_exit :
 }
 
 usage(){ cat << ENDOFUSAGE
@@ -122,7 +115,7 @@ ENDOFUSAGE
 
 get_options() {
 	while getopts hlp:x opts ; do case $opts in
-    	h) get_msg_ivpn "none" "usage_0" ;;
+    	h) msg_ivpn -eu ;;
 		l) LIST="true" ;;
 		p) PORT="$OPTARG" ;;
 		x) CALLED="true" ;;
@@ -165,13 +158,13 @@ define_variables() {
 	# Define PORT
 	PORT="${PORT:=$(sed -nE "s/Endpoint.*://p" ${PATHMOD}/${WG0CONF})}"
 
-	[ "$PORT" -gt 0 ] && [ "$PORT" -le 65535 ] || get_msg_ivpn "_1" "usage_1"
+	[ "$PORT" -gt 0 ] && [ "$PORT" -le 65535 ] || msg_ivpn -Eum _1
 }
 
 handle_if_off() {
 
 	# Jail must be valid
-	chk_valid_jail "$JAIL" || get_msg_ivpn "none" "usage_1"
+	chk_valid_jail "$JAIL" || msg_ivpn -Eu
 
 	# Will restore original SECLVL later on, after applying ivpn changes
 	SEC_orig=$(sed -En "s/^${JAIL}[[:blank:]]+seclvl[[:blank:]]+//p" $QMAP)
@@ -183,13 +176,13 @@ handle_if_off() {
 		qb-edit -fq $JAIL SECLVL -1
 	fi
 
-	start_jail "$JAIL" || get_msg_ivpn "_1" "exit_1"
+	start_jail "$JAIL" || msg_ivpn -Em _1
 }
 
 fetch_connection() {
 
 	# Print info message while fetching latest data
-	get_msg_ivpn "_4"
+	msg_ivpn -m _4
 
 	# Ping to ensure that connection exists first
 	if eval $_CMDMOD ping -Qot 6 1.1.1.1  > /dev/null 2>&1
@@ -206,7 +199,7 @@ EOF
 		fi
 	else
 		# Ping was unsuccessful, pull most recently saved file
-		get_msg_ivpn "_4_2"
+		msg_ivpn -m _4_2
 		eval $_CMDMOD jq . ${CURRENT}
 	fi
 }
@@ -236,18 +229,18 @@ update_api() {
 # Fetch API if ping is successful
 	if ping -Qot 6 1.1.1.1  > /dev/null 2>&1 ; then
 
-		get_msg_ivpn "_4"
+		msg_ivpn -m _4
 
-		fetch -qT 10 -o - "$_GET_CURRENT"  > $CURRENT || get_msg_ivpn "_5"
-		fetch -qT 10 -o - "$_GET_SERVERS"  > $SERVERS || get_msg_ivpn "_5"
-		fetch -qT 10 -o - "$_GET_SRV_IPS"  > $SRV_IPS || get_msg_ivpn "_5"
+		fetch -qT 10 -o - "$_GET_CURRENT"  > $CURRENT || msg_ivpn -m _5
+		fetch -qT 10 -o - "$_GET_SERVERS"  > $SERVERS || msg_ivpn -m _5
+		fetch -qT 10 -o - "$_GET_SRV_IPS"  > $SRV_IPS || msg_ivpn -m _5
 
 		cat $CURRENT | jq
-		get_msg_ivpn "_4_1"
+		msg_ivpn -m _4_1
 		read wait ; clear
 	else
 
-		get_msg_ivpn "_3"
+		msg_ivpn -m _3
 		read wait ; clear
 	fi
 }
@@ -256,7 +249,7 @@ national() {
 	countries=$(jq '[.servers[] | .country] | unique' $SERVERS \
 			| sed 1d | sed '$d' | nl)
 
-	get_msg_ivpn "_7" ; read _c ; clear
+	msg_ivpn -m _7 ; read _c ; clear
 
 	country=$(echo "$countries" | sed -n ${_c}p \
 			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed "s/[^[:alnum:]]*$//")
@@ -266,7 +259,7 @@ town() {
 	cities=$(jq --arg COUNTRY "$country" \
 			'[.servers[] | select(.country==$COUNTRY) | .city] | unique' $SERVERS | sed 1d | sed '$d' | nl)
 
-	get_msg_ivpn "_8" ; read _i ; clear
+	msg_ivpn -m _8 ; read _i ; clear
 
 	city=$(echo "$cities" | sed -n ${_i}p \
 			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed "s/[^[:alnum:]]*$//")
@@ -279,7 +272,7 @@ server() {
 	_servers=$(jq --arg CITY "$city" \
 			'[.servers[] | select(.city==$CITY) | .wg_public_key]' $SERVERS | sed 1d | sed '$d' | nl)
 
-	get_msg_ivpn "_9" ; read _e ; clear
+	msg_ivpn -m _9 ; read _e ; clear
 
 	publickey=$(echo "$_servers" | sed -n ${_e}p \
 			| sed "s/^[[:blank:]]*[[:alnum:]]*[[:blank:]]*.//" | sed 's/\".*$//')
@@ -338,7 +331,7 @@ main() {
 
 			# Flags can't be lowered from inside jail. Send error	and exit.
 			true_true_*|true_false_3)
-				get_msg_ivpn "_2" "exit_1"
+				msg_ivpn -Em _2
 			;;
 			# Flags lowered from host. Restart required for network changes.
 			false_true_3|false_false_3)

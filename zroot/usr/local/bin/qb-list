@@ -7,7 +7,7 @@ get_options() {
 	while getopts ahj:lp:szZ opts ; do
 		case $opts in
 			a) _zparams="qubsd:autosnap" ; ZLIST="t" ;;
-			h) get_msg_list "none" "usage_0" ;;
+			h) msg_list -eu ;;
 			j) JAIL="${OPTARG}" ;;
 			l) LIST="t" ;;
 			p) PARAM="${OPTARG}" ;;
@@ -54,7 +54,7 @@ check_and_adjust() {
 			grep -Eqs "^${POS1}[[:blank:]]+" $QMAP && JAIL="$POS1"
 
 			# If jail=param (and not 'none'), then it's ambiguous what the user wanted
-			[ ! "$JAIL" = "none" ] && [ "$PARAM" = "$JAIL" ] && get_msg_list "_2" "usage_1"
+			[ ! "$JAIL" = "none" ] && [ "$PARAM" = "$JAIL" ] && msg_list -Eum _2
 
 			# If both are 'none', then continue, assuming POS1 as JAIL (could be zfs present)
 			[ "$JAIL" = "none" ] && [ "$PARAM" = "none" ] && JAIL="$POS1"
@@ -180,7 +180,7 @@ print_results() {
 
 	[ "$_ZRESULT" ] && echo -e "${_ZRESULT}\n" | column -t
 
-	[ -z "$_RESULT" ] && [ -z "$_ZRESULT" ] && get_msg_list "_6"
+	[ -z "$_RESULT" ] && [ -z "$_ZRESULT" ] && msg_list -m _6
 }
 
 get_global_variables

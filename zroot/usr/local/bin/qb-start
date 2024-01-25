@@ -12,11 +12,11 @@
 get_options() {
 	while getopts aAeE:hf:t: opts ; do case $opts in
 		a) _SOURCE="auto" ;;
-		A) [ "$_SOURCE" ]  && get_msg_start "_e1" "usage_1" || _SOURCE="all" ;;
+		A) [ "$_SOURCE" ]  && msg_start -Eum _e1 || _SOURCE="all" ;;
 		e) _EXCLUDE="true" ;;
-		E) [ "$_EXCLUDE" ] && get_msg_start "_e2" "usage_1" || _EXFILE="$OPTARG" ;;
-		f) [ "$_SOURCE" ]  && get_msg_start "_e1" "usage_1" || _SOURCE="$OPTARG" ;;
-		h) get_msg_start "none" "usage_0" ;;
+		E) [ "$_EXCLUDE" ] && msg_start -Eum _e2 || _EXFILE="$OPTARG" ;;
+		f) [ "$_SOURCE" ]  && msg_start -Eum _e1 || _SOURCE="$OPTARG" ;;
+		h) msg_start -eu ;;
 		t) _TIMEOUT="$OPTARG" ;;
 		*) exit 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
@@ -33,12 +33,12 @@ get_options() {
 checks() {
 	# Check validity of TIMEOUT
 	[ "$_TIMEOUT" ] && ! chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
-																		&& get_msg_start "_e5" "exit_1"
+																		&& msg_start -Em _e5
 	# Trap function
 	trap "cleanup_trapped" INT HUP TERM QUIT EXIT
 
 	# Ping check if qb-start may continue, get placed in queue, or exit if timeout happens
-	monitor_startstop -p || get_msg_start "_e0" "exit_1"
+	monitor_startstop -p || msg_start -Em _e0
 }
 
 echo_grep() {
@@ -51,7 +51,7 @@ climb_hierarchy() {
 	# hierarchy path is resolved recursively, and as it unwinds at the end, _starts are tallied
 
 	# Prevent infinite loop. Unlikely to be 10 gateways; more likely circular reference
-	[ "$_depth" -gt 10 ] && get_msg_start "_e3" "exit_1"
+	[ "$_depth" -gt 10 ] && msg_start -Em _e3
 	_depth=$(( _depth + 1 ))
 
 	# JAIL gateway path was already handled. Skip further checks.
@@ -104,7 +104,7 @@ begin_waterfall() {
 	_JAILS="$1"
 	for _JAIL in $_JAILS; do
 		# Only continue the waterfall if jail started successfully
-		start_jail -q "$_JAIL" 2>&1 || get_msg_start "_e4" "exit_1"
+		start_jail -q "$_JAIL" 2>&1 || msg_start -Em _e4
 
 		# Determine ENDPOINTS and SUBGATEWAYS (reset the values for each waterfall recursion)
 		_SUBGATEWAYS='' ; _ENDPOINTS=''
@@ -202,7 +202,7 @@ main() {
 	done
 
 	# STARTS keeps track of the number of hierchy levels. If 0, there was nothing to start
-	[ "$_STARTS" = 0 ] && get_msg_start "_m2"
+	[ "$_STARTS" = 0 ] && msg_start -m _m2
 
 	# User specified timeout, or use 5 seconds for every hierarchy level
 	monitor_startstop "${_TIMEOUT:=$(( _STARTS * 10))}" &
@@ -210,7 +210,7 @@ main() {
 
 	# Wait for starts to finish. If TIMEOUT, monitor_startstop will kill -15 this script
 	ps -p $_WF_PIDS > /dev/null 2>&1 && wait $_WF_PIDS
-	get_msg_start "_m1"
+	msg_start -m _m1
 
 	# Remove /tmp files and kill monitoring process
 	cleanup_trapped

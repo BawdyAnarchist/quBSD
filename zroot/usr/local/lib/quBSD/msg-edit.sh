@@ -1,24 +1,24 @@
 #!/bin/sh
 
 get_msg_edit() {
-
-	# Positional parameters
-   local _message="$1"
-   local _pass_cmd="$2"
-	local _msg2="$3"
+	while getopts eEm:M:u opts ; do case $opts in
+		e) local _exit="exit 0" ;;
+		E) local _exit="exit 1" ;;
+		m) local _message="$OPTARG" ;;
+		M) local _message2="$OPTARG" ;;
+		u) local _usage="true" ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# FORCE overrides
 	if [ -n "$FORCE" ] ; then
 		# Do not exit the script on errors
-		_pass_cmd="none"
-		_msg2="none"
+		unset _exit ; unset _message2
 		# The only message that should be shown, is the result.
-		[ ! "$_message" = "_8" ] && _message="none"
+		[ ! "$_message" = "_8" ] && unset _message
 	fi
 
 	# QUIET will skip over messages
 	[ -z "$QUIET" ] && case "$_message" in
-
 		_0) cat << ENDOFMSG
 
 ENDOFMSG
@@ -92,7 +92,7 @@ echo -e "Would you like to change this to auto? (Y/n): \c"
 	esac
 
 	# Secondary message - informs about the [-f] option
-	[ -z "$QUIET" ] && case $_msg2 in
+	[ -z "$QUIET" ] && case $_message2 in
 		_f) cat << ENDOFMSG
 
 Run again with [-f] to force modification.
@@ -102,22 +102,8 @@ ENDOFMSG
 		;;
 	esac
 
-
-	case $_pass_cmd in
-		usage_0)
-				[ -z "$QUIET" ] && usage
-				exit 0 ;;
-
-		usage_1)
-				[ -z "$QUIET" ] && usage
-				exit 1 ;;
-
-		exit_0) exit 0 ;;
-
-		exit_1) exit 1 ;;
-
-		*) : ;;
-	esac
+	[ $_usage ] && [ -z "$QUIET" ] && usage
+	eval $_exit :
 }
 
 usage() { cat << ENDOFUSAGE

@@ -6,7 +6,7 @@
 get_options() {
 	while getopts h opts ; do
 		case $opts in
-			h) get_msg_destroy "none" "usage_0" ;;
+			h) msg_destroy -eu ;; 
 			*) exit 1 ;;
 		esac
 	done
@@ -19,7 +19,7 @@ get_options() {
 define_variables() {
 
 	# No jail provided
-	[ -z "$JAIL" ] && get_msg_destroy "_3" "usage_1"
+	[ -z "$JAIL" ] && msg_destroy -Eum _3
 
 	# Important parameters for checks
 	get_jail_parameter -q CLASS "$JAIL"
@@ -46,28 +46,28 @@ define_variables() {
 checks() {
 
 	# no_destroy protection flag still active
-	[ "$NO_DESTROY" = "true" ] && get_msg_destroy "_2" "usage_1"
+	[ "$NO_DESTROY" = "true" ] && msg_destroy -Eum _2
 
 	# Extra reminder that they're destorying a rootjail
-	[ -z "${CLASS##root*}" ] && [ -n "$CLASS" ] && get_msg_destroy "_4"
+	[ -z "${CLASS##root*}" ] && [ -n "$CLASS" ] && msg_destroy -m _4
 
 	# Message on datasets depends on if there's any dataset to destroy
 	if [ -z "${zrootDestroy}${zusrDestroy}" ] ; then
-		get_msg_destroy "_5_1"
+		msg_destroy -m _5_1
 
 	else
 		# Print the datasets and amount of data to be destroyed
-		get_msg_destroy "_5"
-		[ -n "$zrootDestroy" ] && get_msg_destroy "_6"
-		[ -n "$zusrDestroy" ] && get_msg_destroy "_7"
+		msg_destroy -m _5
+		[ -n "$zrootDestroy" ] && msg_destroy -m _6
+		[ -n "$zusrDestroy" ] && msg_destroy -m _7
 
 		# Solicit user response
-		get_msg_destroy "_8"
+		msg_destroy -m _8
 		severe="severe"
 	fi
 
 	# "severe" requires a full `yes' to be typed
-	get_user_response $severe || get_msg_destroy "_1" "exit_0"
+	get_user_response $severe || msg_destroy -em _1
 }
 
 main() {

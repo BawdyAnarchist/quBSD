@@ -1,22 +1,15 @@
 #!/bin/sh
 
-get_msg_help() {
-	local _message="$1"
+msg_help() {
+	while getopts eEm:u _opts ; do case $_opts in
+		e) local _exit="exit 0" ;;
+		E) local _exit="exit 1" ;;
+		m) local _message="$OPTARG" ;;
+		u) local _usage="true" ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	case "$_message" in
-	help_msg) cat << ENDOFMSG
-
-qb-help: Quick help for quBSD scripts
-
-Usage: qb-help list|show > Shows all scripts
-       qb-help params|parameters > Shows all quBSD.conf parameters
-       qb-help -h > shows this help message
-
-NOTE:  Some commands/parameters apply to both jails and VMs. Others
-       apply only to one or the other.  <jail/VM> | <jail> | <VM>
-ENDOFMSG
-	;;
-	list_scripts) cat << ENDOFMSG
+	_list_scripts) cat << ENDOFMSG
 
 qb-autosnap: Tool to automate the creation, management, and thinning
              of ZFS snapshots. Works in combination with /etc/crontab.
@@ -51,7 +44,7 @@ qb-stop:     Stop <jails/VMs> in parallel. You MUST use this for parallel
              stops or you WILL have errors. Dont use custom scripts.
 ENDOFMSG
 	;;
-	params) cat << ENDOFMSG
+	_params) cat << ENDOFMSG
 
 PARAMETERS SAVED AT /usr/local/etc/quBSD/qubsdmap.conf
 To see default values, run:  qb-list #default
@@ -101,4 +94,20 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	esac
+
+	[ $_usage ] && usage
+	eval $_exit :
+}
+
+usage() { cat << ENDOFMSG
+
+qb-help: Quick help for quBSD scripts
+
+Usage: qb-help list|show > Shows all scripts
+       qb-help params|parameters > Shows all quBSD.conf parameters
+       qb-help -h > shows this help message
+
+NOTE:  Some commands/parameters apply to both jails and VMs. Others
+       apply only to one or the other.  <jail/VM> | <jail> | <VM>
+ENDOFMSG
 }

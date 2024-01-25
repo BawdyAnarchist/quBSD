@@ -5,9 +5,9 @@
 
 get_options() {
 	while getopts f:Fht: opts ; do case $opts in
-		f) FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
+		f) FILE="${OPTARG}" || msg_launch -Eum _1 ;;
 		F) FORCE="true" ;;
-		h) get_msg_i3_launch "none" "usage_0" ;;
+		h) msg_launch -eu ;;
 		t) _TIMEOUT="${OPTARG}" ;;
 		*) exit 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
@@ -16,7 +16,7 @@ get_options() {
 parse_config() {
 	# Check TIMEOUT, if it was specified
 	[ "$_TIMEOUT" ] && { chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
-									&& _TIMEOUT="-t $_TIMEOUT" || get_msg_i3_launch "_2" "exit_1" ;}
+									&& _TIMEOUT="-t $_TIMEOUT" || msg_launch -Em _2 ;}
 
 	# Assign default file if one wasn't optioned
 	FILE="${FILE:=${HOME}/.config/i3/i3launch.conf}"
@@ -39,13 +39,13 @@ qb_start_jails() {
 
 	# Create a popup so user can monitor jail starts, then remove it later
 	xterm -fs 12 -e csh -c 'i3-msg floating enable , resize set height 1000 ; qb-stat' &
-	_pid_stat=$(echo $!)
+	_pid_stat="$!"
 
 	# Remove host and NO_WINDOW lines, and save to tmp file
 	grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}' | uniq > $JAILS
 
 	# Turn on any jails not started
-	qb-start -f $JAILS $_TIMEOUT > /dev/null 2>&1 || get_msg_i3_launch
+	qb-start -f $JAILS $_TIMEOUT > /dev/null 2>&1 || msg_launch -Em _3
 
 	# Remove the temporary monitoring popup
 	kill -15 $_pid_stat

@@ -7,9 +7,9 @@ get_options() {
 	while getopts cdht:u opts ; do case $opts in
 		c) cron_down ; exit 0 ;;
 		d) _CMD="down" ;;
-		h) get_msg_hostnet "none" "usage_0" ;;
+		h) msg_hostnet -eu ;;
 		t) TIMEOUT="$OPTARG" ;;
-		u) [ -z "$_CMD" ] && _CMD="up" || get_msg_hostnet "_1" "usage_1" ;;
+		u) [ -z "$_CMD" ] && _CMD="up" || msg_hostnet -Eum _1 ;;
 		*) exit 1 ;;
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
@@ -19,7 +19,7 @@ get_options() {
 
 get_parameters() {
 	# Did not specify an action
-	[ -z "$_CMD" ] && get_msg_hostnet "_2" "usage_1"
+	[ -z "$_CMD" ] && msg_hostnet -Eum _2
 
 	# Check validity of timeout provided
 	chk_integer -g 0 -v "[-t <timeout>]" -- $TIMEOUT
@@ -52,7 +52,7 @@ cron_down() {
 
 revert_connection() {
 	# User opted out of the <timeout> feature
-	[ "$TIMEOUT" -eq 0 ] && get_msg_hostnet "_7" "exit_0"
+	[ "$TIMEOUT" -eq 0 ] && msg_hostnet -em _7
 
 	# Wait the prescribed time
 	sleep $TIMEOUT
@@ -79,7 +79,7 @@ main() {
 	if [ "$_CMD" = "up" ] ; then
 
 		# start_jail command handles most error messages
-		start_jail "$GATEWAY" ||  get_msg_hostnet "_3" "exit_1"
+		start_jail "$GATEWAY" ||  msg_hostnet -Em _3
 
 		_VIF=$(connect_client_to_gateway -ei "$IPV4" "host" "$GATEWAY")
 

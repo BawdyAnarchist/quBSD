@@ -6,11 +6,11 @@
 get_options() {
 	while getopts cdhi:l opts ; do case $opts in
 		c) _CMD="create" ;;
-		d) [ -z "$_CMD" ] && _CMD="destroy" || get_msg_connect "_1" "usage_1" ;;
-		h) get_msg_connect "none" "usage_0" ;;
+		d) [ -z "$_CMD" ] && _CMD="destroy" || msg_connect -Eum _1 ;;
+		h) msg_connect -eu ;;
 		i) IPV4="$OPTARG" ;;
-		l) [ -z "$_CMD" ] && _CMD="list" || get_msg_connect "_1" "usage_1" ;;
-		*) get_msg "_1" && get_msg_connect "none" "usage_1" ;;
+		l) [ -z "$_CMD" ] && _CMD="list" || msg_connect -Eum _1 ;;
+		*) get_msg "_1" && msg_connect -Eu ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Define script variables
@@ -20,12 +20,12 @@ get_options() {
 
 checks() {
 	# Must specify a _CMD
-	[ -z "$_CMD" ] && get_msg_connect "_0" "usage_1"
+	[ -z "$_CMD" ] && msg_connect -Eum _0
 
 	case "$_CMD" in
 		create)
 			# JAIL must be running, but gateway can be started later
-			chk_isrunning "$JAIL" "return 1" || get_msg_connect "_2" "usage_1"
+			chk_isrunning "$JAIL" "return 1" || msg_connect -Eum _2
 
 			# IP checks
 			if [ -n "$IPV4" ] ; then
@@ -41,14 +41,14 @@ checks() {
 			fi
 
 			# Check the pf status and security levels
-		   check_security || get_msg_connect "_4" "exit_1"
+		   check_security || msg_connect -Em _4
 		;;
 		destroy)
 			# JAIL and GATEWAY must be running (helps prevent accidents)
-			chk_isrunning "$JAIL" "return 1" || get_msg_connect "_2" "usage_1"
+			chk_isrunning "$JAIL" "return 1" || msg_connect -Eum _2
 
 			[ -n "$GATEWAY" ] && ! chk_isrunning "$GATEWAY" \
-					&& get_msg_connect "_3" "usage_1"
+					&& msg_connect -Eum _3
 		;;
 	esac
 }
@@ -137,14 +137,14 @@ list_output() {
 	if [ -n "$JAIL" ] ; then
 
 		# Show the interfaces on JAIL
-		get_msg_connect "_5"
+		msg_connect -m _5
 
 		# Show all other jails that connect to JAIL
-		[ -n "$_jail_eps" ] && get_msg_connect "_6"
+		[ -n "$_jail_eps" ] && msg_connect -m _6
 	else
 
 		# List all existing connections for all running jails
-		get_msg_connect "_7"
+		msg_connect -m _7
 	fi
 }
 

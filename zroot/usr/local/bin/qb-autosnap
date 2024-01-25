@@ -6,12 +6,12 @@
 get_options() {
 	while getopts ':dhl:st:' opts ; do case $opts in
 		d) 	DESTROY=true ;;
-		h) 	get_msg_autosnap "none" "usage_0" ;;
+		h) 	msg_autosnap -eu ;;
 		l) 	LIST=${OPTARG} ;;
 		s) 	SNAPSHOT=true ;;
 		t) 	TTL="${OPTARG}" ;;
 		:) 	LIST="all" ;;
-		\?)   get_msg_autosnap "_2" "usage_1"
+		\?)   msg_autosnap -Eum _2
 	esac done  ;  shift $(( OPTIND - 1 ))
 
 	DATE_UNIX=$(date +%s)
@@ -24,8 +24,8 @@ checks() {
 
 	# Ensure that <_INT><_UNITS> is an integer and proper time unit
 	if [ -n "$TTL" ] ; then
-		! chk_integer -q -g 0 -- "$_INT" && get_msg_autosnap "_1" "usage_1"
-		! echo "$_UNITS" | grep -Eq "m|H|D|W|Y" && get_msg_autosnap "_1" "usage_1"
+		! chk_integer -q -g 0 -- "$_INT" && msg_autosnap -Eum _1
+		! echo "$_UNITS" | grep -Eq "m|H|D|W|Y" && msg_autosnap -Eum _1
 	fi
 }
 
@@ -120,7 +120,7 @@ new_snapshots() {
 
 	for _dataset in $ZLIST ; do
 		# If the dataset is a zroot dataset (a ROOTENV), skip the snapshot if it's running
-		{ [ -z "${_dataset##${R_ZFS}*}" ] && chk_isrunning "${_dataset##*/}" ;} && continue
+		{ [ -z "${_dataset##"${R_ZFS}"*}" ] && chk_isrunning "${_dataset##*/}" ;} && continue
 		
 		zfs snapshot \
 			-o qubsd:autocreated=yes \

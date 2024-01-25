@@ -5,7 +5,7 @@
 
 get_options() {
 	while getopts hinr opts ; do case $opts in
-		h) get_msg_ephm "none" "usage_0" ;;
+		h) msg_ephm -eu ;;
 		i) _i3wm="true" ;;
 		n) _NEWWIND="xterm -e" ;;
 		r) _USER="root" ;;
@@ -31,7 +31,7 @@ parse_jail_vars() {
 
 	# Unless already specified, set JAIL to the active window, and check valid
 	JAIL="${JAIL:=$_XJAIL}"
-	chk_valid_jail "$JAIL" || get_msg_ephm "none" "usage_1"
+	chk_valid_jail "$JAIL" || msg_ephm -Eum _2
 
 	# Make name visually easy to identify. Cycle to find available name if in use
 	NEWJAIL="EPHM-${JAIL}"  ;  _cycle=0

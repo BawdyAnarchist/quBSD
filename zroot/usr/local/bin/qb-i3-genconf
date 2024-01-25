@@ -4,9 +4,9 @@
 
 get_options() {
    while getopts c:f:h opts ; do case $opts in
-		d) [ -e "$OPTARG" ] && CONF="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
-		f) [ -e "$OPTARG" ] && FILE="${OPTARG}" || get_msg_i3_launch "_1" "usage_1" ;;
-		h) get_msg_i3_genconf "none" "usage_0" ;;
+		d) [ -e "$OPTARG" ] && CONF="${OPTARG}" || msg_genconf -Eum _1 "$CONF" ;;
+		f) [ -e "$OPTARG" ] && FILE="${OPTARG}" ||  msg_genconf -Eum _1 "$FILE" ;;
+		h) msg_genconf -eu ;; 
 		r) RELOAD="false" ;;
 		*) exit 1 ;;
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
@@ -121,24 +121,24 @@ test_new_config() {
    if i3 -C -c $NEWCONF; then
 		# If successful, copy to new config and reload unless otherwise indicated
 		cp $NEWCONF $CONF
-		get_msg_i3_genconf "_6"
+		msg_genconf -m _6
 
 		if [ "$RELOAD" = "false" ] ; then
-			get_msg_i3_genconf "_7"
+			msg_genconf -m _7
 		else
-			i3-msg reload > /dev/null 2>&1 && get_msg_i3_genconf "_8" || get_msg_i3_genconf "_9"
+			i3-msg reload > /dev/null 2>&1 && msg_genconf -m _8 || msg_genconf -m _9
 		fi
 
 	else
 		# If failue, copy failed config for examination; and show error message
 		cp $NEWCONF ${HOME}/.config/i3/config_attempted
-		get_msg_i3_genconf "_10"
+		msg_genconf -m _10
 	fi
 }
 
 generate_mode() {
 	# Print the mode opening line to the config
-	get_msg_i3_genconf "_3"  > $_TMP
+	msg_genconf -m _3  > $_TMP
 
 	_cycle=1
 	for _loop in $LOOP ; do
@@ -146,13 +146,13 @@ generate_mode() {
 		define_mode_variables
 
 		# Make sure it's not already there, and then add new bindsym
-		grep -q "bindsym $_sym" $_TMP || get_msg_i3_genconf "_4" "$_sym" "$_action" >> $_TMP
+		grep -q "bindsym $_sym" $_TMP || msg_genconf -m _4 "$_sym" "$_action" >> $_TMP
 
 	_cycle=$(( _cycle + 1 ))
 	done
 
 	# Escape/Return and close mode (print to config)
-	get_msg_i3_genconf "_5" >> $_TMP
+	msg_genconf -m _5 >> $_TMP
 
 	# Remove any duplicates created, and push to the main i3 config
 	uniq $_TMP >> $NEWCONF
@@ -161,7 +161,7 @@ generate_mode() {
 main() {
 	# Delete old lines from conf ; and add new header
 	sed -i '' -e '/I3GEN AUTO GENERATED MODES/,$d' $NEWCONF
-	get_msg_i3_genconf "_2" >> $NEWCONF
+	msg_genconf -m _2 >> $NEWCONF
 
 	generate_first_mode
 

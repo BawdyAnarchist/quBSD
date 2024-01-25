@@ -5,12 +5,12 @@
 
 get_options() {
    while getopts hmpv:w: opts ; do case $opts in
-		h) get_msg_record "none" "usage_0" ;;
+		h) msg_record -eu ;;
 		m) _DEVICES="virtual_oss" ;;
 		w) _DEVICES="webcamd $_DEVICES" ; JAIL="$OPTARG" ;;
 		v) _VOL="$OPTARG"  ;;
 		p) PURGE="true" ; _DEVICES="webcamd virtual_oss" ;;
-		/?) get_msg_record "_1" "exit_1" ;;
+		/?) msg_record -Em _1 ;;
 		*) exit 1 ;;
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 }
@@ -18,11 +18,11 @@ get_options() {
 checks() {
 	# Ensure the volume was 0-100 inclusive
 	if [ -n "$_VOL" ] ; then
-		echo "$_VOL" | grep -Eq "^([1-9][0-9]|100)$" || get_msg_record "_2" "exit_1"
+		echo "$_VOL" | grep -Eq "^([1-9][0-9]|100)$" || msg_record -Em _2
 	fi
 
 	if [ -n "$JAIL" ] ; then
-		chk_isrunning $JAIL || get_msg_record "_3" "exit_1"
+		chk_isrunning $JAIL || msg_record -Em _3
 		UNHIDE=$(grep "devfsrules_qubsd_webcamd" /etc/devfs.rules | grep -Eo "[[:digit:]]")
 		HIDE=$(grep "devfsrules_guijail" /etc/devfs.rules | grep -Eo "[[:digit:]]")
 	fi
@@ -82,7 +82,7 @@ toggle_service() {
 
 main() {
 
-	if [ -z "$_DEVICES" ] & [ -n "$_VOL" ] ; then
+	if [ -z "$_DEVICES" ] && [ -n "$_VOL" ] ; then
 		# In this case, the only thing to do is change the microphone input value
 		adjust_mic
 

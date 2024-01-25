@@ -4,7 +4,7 @@
 
 get_options() {
 	while getopts hvp: opts ; do case $opts in
-		h) get_msg_help "help_msg" ; exit 0 ;;
+		h) msg_help -eu ;;
 		p) PARAM="$OPTARG" ; shift ;;
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
@@ -13,12 +13,12 @@ get_options() {
 
 main() {
 	case $ACTION in
-		list|show|scripts|commands) get_msg_help "list_scripts" ;;
+		list|show|scripts|commands) msg_help -m _list_scripts ;;
 
 		param|params|PARAM|PARAMS|parameter|parameters|PARAMETER|PARAMETERS)
-				[ "$VERBOSE" ] && get_msg_help "verb_params" || get_msg_help "params" ;;
+				[ "$VERBOSE" ] && msg_help -m _verb_params || msg_help -m _params ;;
 
-		'') get_msg_help "help_msg" ;;
+		'') msg_help "help_msg" ;;
 	esac
 }
 

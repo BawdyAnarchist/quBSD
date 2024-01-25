@@ -1,9 +1,12 @@
 #!/bin/sh
 
-get_msg_list() {
-
-   local _message="$1"
-   local _pass_cmd="$2"
+msg_list() {
+	while getopts eEm:u _opts ; do case $_opts in
+		e) local _exit="exit 0" ;;
+		E) local _exit="exit 1" ;;
+		m) local _message="$OPTARG" ;;
+		u) local _usage="true" ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	case "$_message" in
 	_1) cat << ENDOFMSG
@@ -42,13 +45,8 @@ ENDOFMSG
 	;;
 	esac
 
-	case $_pass_cmd in
-		usage_0) usage ; exit 0 ;;
-		usage_1) usage ; exit 1 ;;
-		exit_0)  exit 0 ;;
-		exit_1)  exit 1 ;;
-		*) : ;;
-	esac
+	[ $_usage ] && usage
+	eval $_exit :
 }
 
 usage() { cat << ENDOFUSAGE

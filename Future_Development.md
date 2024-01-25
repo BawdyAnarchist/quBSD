@@ -1,21 +1,31 @@
 
-launch of 0bsdvm takes a long time. Not sure why
+Error messages are a bit disorganized now. Need to have useful higher function messages
+	- Change the exit action to an option command instead of postional
+	- Change the message selection to an OPTARG. Two messages -m and -M   
+	- All positinals are for related variables only. Reference them with $1, $2, $3, etc
+	- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
+	- Default should be top level basic messages. -q quiets all, and -v drills down to deeper messages
+	- Might need a -F force option.
+	- Beef up the log file, and make reference to it in error messages
 
-quBSD.sh
-	- chflags -R schg ${M_QROOT}/${_client}/root/.ssh also changes 0net when started, which affects ln -s of keys for 0control 
+qb-stop
+	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
+	- monitor_vm_stop is probably outdated now since `wait` commands are being used. Needs reviewed 
+	- Still needs fine tuning, as it's hanging somehow during _stop
 
-Integrate X11
-	- Need a GUIjail now with an autoconnection (can use disp3 for now)
-	- qubsd ipv4 convention will need a new class 
 
 ### UPGRADES
 
 Tor and I2P Jails
 
+Integrate X11
+	- Need a GUIjail now with an autoconnection (can use disp3 for now)
+	- qubsd ipv4 convention will need a new class 
+
 GUI SECURITY
 	- Test Wayland in separate tty
 	- Test Xpra, Xauth and try to isolate xhost 
-	Xephyr - Unfortunately I'm not sure this is a real solution. Everything still shares the unix socket
+	- Xephyr - Unfortunately I'm not sure this is a real solution. Everything still shares the unix socket
 		- Might not matter, but if I keep it, some ideas:
 			- the qb-xephyr command into qb-cmd -X, including VMs. Make sure works with -n as well.
 			- Integrate an "X" option for qb-ephm as well.
@@ -38,11 +48,6 @@ Take another hack at the recording device problems
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
 
-qb-stop
-	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
-	- monitor_vm_stop is probably outdated now since `wait` commands are being used. Needs reviewed 
-	- Still needs fine tuning, as it's hanging somehow during _stop
-
 qb-help - overhaul to act like a manpage. Replacing /usr/local/share/quBSD
 	- Each PARAM should have verbose message
 
@@ -50,15 +55,6 @@ qb_ssh
 	- Probably can remove the FreeBSD parts of it. Maybe the Net/Open ones as well 
 
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
-
-Error messages are a bit disorganized now. Need to have useful higher function messages
-	- Change the exit action to an option command instead of postional
-	- Change the message selection to an OPTARG. Two messages -m and -M   
-	- All positinals are for related variables only. Reference them with $1, $2, $3, etc
-	- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
-	- Default should be top level basic messages. -q quiets all, and -v drills down to deeper messages
-	- Might need a -F force option.
-	- Beef up the log file, and make reference to it in error messages
 
 qb-pci
 	- summary of PCI devices relevant to user

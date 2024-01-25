@@ -7,7 +7,7 @@ get_options() {
 	while getopts dfhqr opts ; do case $opts in
 		d) ACTION="delete" ;;
 		f) FORCE="true" ; _q='-q' ;;
-		h) get_msg_edit "none" "usage_0" ;;
+		h) msg_edit -eu ;; 
 		q) QUIET="true" ; _q='-q' ;;
 		r) RESTART="true" ;;
 		*) exit 1 ;;
@@ -41,19 +41,19 @@ checks() {
 
 	if [ "$ACTION" = "delete" ] ; then
 		# Make sure that at JAIL and PARAM exist
-		[ -n "$JAIL" ] && [ -n "$PARAM" ] || get_msg_edit "_1" "usage_1"
+		[ -n "$JAIL" ] && [ -n "$PARAM" ] || msg_edit -Eum _1
 
 		# Make sure at least one line exists to delete
 		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QMAP \
-				|| get_msg_edit "_4" "exit_1"
+				|| msg_edit -Em _4
 
 	else
 		# Need all 3 parameters
-		[ -z "$JAIL" -o -z "$PARAM" -o -z "$VALUE" ] && get_msg_edit "_1" "usage_1"
+		[ -z "$JAIL" -o -z "$PARAM" -o -z "$VALUE" ] && msg_edit -Eum _1
 
 		# Error if proposed entry already exists
 		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}[[:blank:]]*\$" $QMAP \
-																			&& get_msg_edit "_2" "exit_0"
+																			&& msg_edit -em _2
 
 		# Multi-line parameters receive a new line
 		if echo "$MULT_LN_PARAMS" | grep -Eqs "$PARAM" ; then
@@ -77,7 +77,7 @@ checks() {
 
 		# Otherwise, PARAM was not found to be valid for the jail/VM
 		else
-			get_msg_edit "_3" "exit_1"
+			msg_edit -Em _3
 		fi
 
 		# BHYVE_CUSTM is special, but everything else can test for chk_valid_param
@@ -90,23 +90,23 @@ checks() {
 	case $PARAM in
 
 		# Should not be changing class, unless you really know what you're doing
-		CLASS) get_msg_edit "_5" "exit_1" "_f" ;;
+		CLASS) msg_edit -Em _5 -M _f ;;
 
 		# Warn about changing ROOTENV
-		ROOTENV) get_msg_edit "_6" "warn" ;;
+		ROOTENV) msg_edit -m _6 ;;
 
 		GATEWAY)
 				get_jail_parameter -dqs IPV4 "$JAIL"
 
 				# Offer to change IPV4 from 'none' to 'auto', if gateway is valid
 				if [ ! "$VALUE" = "none" ] && [ "$IPV4" = "none" ] ; then
-					get_msg_edit "_10"
+					msg_edit -m _10
 					get_user_response && _IPAUTO="true"
 				fi
 		;;
 		IPV4)
 				# Extra check for quBSD IPV4 convention.
-				chk_isqubsd_ipv4 $_q "$VALUE" "$JAIL" || get_msg_edit "none" "exit_1" "_f"
+				chk_isqubsd_ipv4 $_q "$VALUE" "$JAIL" || msg_edit -EM _f
 		;;
 	esac
 }
@@ -216,7 +216,7 @@ handle_restarts() {
 	[ -n "$QUIET" ] && [ -z "$RESTART" ] && exit 0
 
 	if [ -z "$QUIET" ] ; then
-		get_msg_edit "_7"
+		msg_edit -m _7
 		get_user_response || return 0
 	fi
 
@@ -235,9 +235,9 @@ main() {
 
 	# Print the new value
 	case $ACTION in
-		delete) get_msg_edit "_8_1"  ;;
-		revert_to_default) get_msg_edit "_8_2"  ;;
-		*) get_msg_edit "_8"  ;;
+		delete) msg_edit -m _8_1  ;;
+		revert_to_default) msg_edit -m _8_2  ;;
+		*) msg_edit -m _8  ;;
 	esac
 
 	handle_restarts
