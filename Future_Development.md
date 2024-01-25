@@ -1,8 +1,8 @@
 
-qb-create
-	- for rootjails, should edit the rc.conf hostname
-	- checking qubsdmap.conf should only check the jailnames, not all columns (0bsdvm failure on the basis of being USED, but no actual lines)
-	- somehow it fucked up my /etc/jail.conf.  Maybe coz the jail params already existed?? IDK
+launch of 0bsdvm takes a long time. Not sure why
+
+quBSD.sh
+	- chflags -R schg ${M_QROOT}/${_client}/root/.ssh also changes 0net when started, which affects ln -s of keys for 0control 
 
 Integrate X11
 	- Need a GUIjail now with an autoconnection (can use disp3 for now)
@@ -36,24 +36,18 @@ NICVM - Linux VM (probably alpine) so that it can use all the wireless protocols
 Take another hack at the recording device problems
 
 
-
 ### SPECIFIC SCRIPTS OR FUNCTIONS
-
-quBSD.sh
-	- chflags -R schg ${M_QROOT}/${_client}/root/.ssh also changes 0net when started, which affects ln -s of keys for 0control 
-
-qb-pci
-	- summary of PCI devices relevant to user
-	- USB, NIC, maybe others
-	- Show what was is currently passthrough'd
-
-qb_ssh
-	- Probably can remove the FreeBSD parts of it. Maybe the Net/Open ones as well 
 
 qb-stop
 	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
 	- monitor_vm_stop is probably outdated now since `wait` commands are being used. Needs reviewed 
 	- Still needs fine tuning, as it's hanging somehow during _stop
+
+qb-help - overhaul to act like a manpage. Replacing /usr/local/share/quBSD
+	- Each PARAM should have verbose message
+
+qb_ssh
+	- Probably can remove the FreeBSD parts of it. Maybe the Net/Open ones as well 
 
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
@@ -66,10 +60,12 @@ Error messages are a bit disorganized now. Need to have useful higher function m
 	- Might need a -F force option.
 	- Beef up the log file, and make reference to it in error messages
 
-qb-list [-e] (evaluate) option to check jail-param combos for validity.
+qb-pci
+	- summary of PCI devices relevant to user
+	- USB, NIC, maybe others
+	- Show what was is currently passthrough'd
 
-qb-help - overhaul to act like a manpage. Replacing /usr/local/share/quBSD
-	- Each PARAM should have verbose message
+qb-list [-e] (evaluate) option to check jail-param combos for validity.
 
 qb-ephm - Clone from zroot too. Tricky, because of "reclone_zroot" operation in exec.prepare 
 
@@ -80,8 +76,8 @@ qb-backup (already created in $ubin)
 
 qb-stat - Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
 
-
-qb-i3-launch - Intelligent resizing of display depending on dpi or xrandr resolution
+qb-create
+	- It needs further and more extensive testing 
 
 
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP
@@ -94,8 +90,6 @@ dispVM
 	- Add new class and boot practices
 	- vm-rc.local should use its IP address to get it's hostname from 0control ftp server
 		- This will require creating a new file in /home/ftp/<IPaddr> on 0control
-
-The test for exec.created modifying wg0, pf, and dhcp, should be if they're included/enabled in the jail's rc script
 
 GENERAL GUIDELINES, and maybe later double checks
 	- Attempt to make scripts more robust and account for user error, when it makes sense to do so.
