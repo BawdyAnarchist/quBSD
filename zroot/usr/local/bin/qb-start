@@ -180,8 +180,10 @@ main() {
 			fi
 		fi
 
-		# Volumes do not get mounted 
-		[ "$(zfs list -Ho type ${U_ZFS}/${_jail})" = "filesystem" ] && zfs mount ${U_ZFS}/${_jail}
+		# Volumes do not get mounted
+		[ "$(zfs list -Ho type ${U_ZFS}/${_jail})" = "filesystem" ] \
+			&& [ "$(zfs list -Ho mounted ${U_ZFS}/${_jail})" = "no" ] \
+			&& zfs mount ${U_ZFS}/${_jail}
 	done
 
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
