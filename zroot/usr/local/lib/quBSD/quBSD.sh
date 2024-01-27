@@ -864,7 +864,7 @@ monitor_vm_stop() {
 	local _count=1
 
 	# Get message about waiting
-	get_msg $_qms -m _e52 "$_jail" "$_timeout"
+	get_msg $_qms -m _m6 "$_jail" "$_timeout"
 
 	# Check for when VM shuts down.
 	while [ "$_count" -le "$_timeout" ] ; do

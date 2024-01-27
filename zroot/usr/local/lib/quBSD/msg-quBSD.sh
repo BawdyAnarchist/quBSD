@@ -278,8 +278,7 @@ ERROR: ${2##*bin/} failed to ${2##*qb-} all jails/VMs
 ENDOFMSG
 	;;
 	_e52) cat << ENDOFMSG
-
-Waiting for < $1 > to stop. Timeout in < $2 seconds >
+UNUSED_UNUSED
 ENDOFMSG
 	;;
 	_e53) cat << ENDOFMSG
@@ -391,6 +390,11 @@ ENDOFMSG
 
 ALERT: Another instance of qb-start or qb-stop is running.
        Will wait for < $1 secs > before aborting.
+ENDOFMSG
+	;;
+	_m6) cat << ENDOFMSG
+
+Waiting for < $1 > to stop. Timeout in < $2 seconds >
 ENDOFMSG
 	;;
 	esac
