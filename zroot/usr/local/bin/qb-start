@@ -85,6 +85,22 @@ climb_hierarchy() {
 	_CLIMBED=$(echo "$_CLIMBED" | sed -E "s/^(${_JAIL})\$/\1 ${_starts}/")
 }
 
+encryption_and_mounts(){
+   # Load key if necessary, with popup switch 
+	if [ "$(zfs list -Ho keystatus ${U_ZFS}/${_jail})" = "unavailable" ] ; then
+		if [ "$_POPUP" ] ; then 
+			xterm -e csh -c "/bin/csh -c 'zfs load-key ${U_ZFS}/${_jail}'"
+		else
+			zfs load-key ${U_ZFS}/${_jail}
+		fi
+	fi
+
+	# Volumes do not get mounted
+	[ "$(zfs list -Ho type ${U_ZFS}/${_jail})" = "filesystem" ] \
+		&& [ "$(zfs list -Ho mounted ${U_ZFS}/${_jail})" = "no" ] \
+		&& zfs mount ${U_ZFS}/${_jail}
+}
+
 determine_ips() {
 	# Map IPs in serial, write to TMP
 	for _jail in $_FULLIST ; do
@@ -167,23 +183,9 @@ main() {
 	_STARTS=$(echo "$_CLIMBED" | awk 'NR == 1 || $2 > max { max = $2 } END { print max }')
 
 	# Some jails/VMs might be encrypted. They need to decrypted now, before waterfall 
-	# Determine if user is in interactive shell, or if popup for password is needed. 
-	tty | grep -qS 'ttyv' && pgrep -qx Xorg && _popup="true"
-
+	get_info _POPUP	
 	for _jail in $_FULLIST ; do 
-	   # Load key if necessary, with popup switch 
-		if [ "$(zfs list -Ho keystatus ${U_ZFS}/${_jail})" = "unavailable" ] ; then
-			if [ "$_popup" ] ; then 
-				xterm -e csh -c "/bin/csh -c 'zfs load-key ${U_ZFS}/${_jail}'"
-			else
-				zfs load-key ${U_ZFS}/${_jail}
-			fi
-		fi
-
-		# Volumes do not get mounted
-		[ "$(zfs list -Ho type ${U_ZFS}/${_jail})" = "filesystem" ] \
-			&& [ "$(zfs list -Ho mounted ${U_ZFS}/${_jail})" = "no" ] \
-			&& zfs mount ${U_ZFS}/${_jail}
+		encryption_and_mounts
 	done
 
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
