@@ -420,7 +420,7 @@ stop_jail() {
 
 		if chk_isvm "$_jail" ; then
 			if [ -z "$_force" ] ; then
-				bhyvectl --vm="$_jail" --force-poweroff
+				pkill -15 -f "bhyve: $_jail"	
 			else
 				bhyvectl --vm="$_jail" --destroy
 			fi
