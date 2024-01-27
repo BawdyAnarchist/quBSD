@@ -108,7 +108,7 @@
 ########################################################################################
 
 # Source error messages for library functions
-. /usr/local/lib/quBSD/msg-quBSD2.sh
+. /usr/local/lib/quBSD/msg-quBSD.sh
 
 get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
@@ -270,20 +270,23 @@ get_info() {
 	case $_info in
 		_CLIENTS)  # All _clients listed in QMAP, which depend on _jail as a gateway
 			_value=$(sed -nE "s/[[:blank:]]+GATEWAY[[:blank:]]+${_jail}//p" $QMAP)
-		;;
+			;;
 		_ONJAILS)  # All jails/VMs that are currently running
 			_value=$(jls | sed "1 d" | awk '{print $2}' ; \
 						pgrep -fl 'bhyve: ' | sed -E "s/.*[[:blank:]]([^[:blank:]]+)\$/\1/")
-		;;
+			;;
+		_POPUP) # Determine if user is in interactive shell, or if popup is possible for inputs
+			tty | grep -qS 'ttyv' && pgrep -qx Xorg && _value="true"
+			;;
 		_USED_IPS) # List of ifconfig inet addresses for all running jails/VMs
 			for _onjail in $(jls | sed "1 d" | awk '{print $2}') ; do
 				_intfs=$(jexec -l -U root "$_onjail" ifconfig -a inet | grep -Eo "inet [^[:blank:]]+")
 				_value=$(printf "%b" "$_value" "\n" "$_intfs")
 			done
-		;;
+			;;
 		_XID)    # X11 window ID of the current active window
 			_value=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //") 
-		;;
+			;;
 		_XJAIL)  # Gets the jailname of the active window. Converts $HOSTNAME to: "host"
 			_xid=$(get_info -e _XID)
 			if [ "$_xid" = "0x0" ] || echo $_xid | grep -qs "not found" ; then 
@@ -293,13 +296,13 @@ get_info() {
 						| sed "s/WM_CLIENT_MACHINE(STRING) = \"//" | sed "s/.$//" \
 						| sed "s/$(hostname)/host/") || _value="host"
 			fi
-		;;
+			;;
 		_XNAME)  # Gets the name of the active window
 			_value=$(xprop -id $(get_info -e _XID) WM_NAME _NET_WM_NAME WM_CLASS)
-		;;
+			;;
 		_XPID)   # Gets the PID of the active window.
 			_value=$(xprop -id $(get_info -e _XID) _NET_WM_PID | grep -Eo "[[:alnum:]]+$")
-		;;
+			;;
 	esac
 
 	# If null, return failure immediately
