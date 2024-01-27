@@ -1,8 +1,5 @@
 
 Error messages are a bit disorganized now. Need to have useful higher function messages
-	- Change the exit action to an option command instead of postional
-	- Change the message selection to an OPTARG. Two messages -m and -M   
-	- All positinals are for related variables only. Reference them with $1, $2, $3, etc
 	- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
 	- Default should be top level basic messages. -q quiets all, and -v drills down to deeper messages
 	- Might need a -F force option.
