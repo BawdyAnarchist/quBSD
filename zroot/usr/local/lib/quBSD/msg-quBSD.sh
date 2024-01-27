@@ -6,107 +6,363 @@ get_msg() {
 	# $3 : _passvar is a supplementary parameter to aid message specificity.
 
    # Quiet option finally resolves. Will return 0 to caller immediately
-	local _q ; local _opts
-	getopts q _opts && return 0
-	shift $(( OPTIND - 1 ))
-
-	local _message="$1"
-	local _value="$2"
-	local _passvar="$3"
-	local _passvar2="$4"
+	while getopts m:q opts ; do case $opts in
+		m) local _message="$OPTARG" ;;
+		q) local _q ; return 0 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	case "$_message" in
+	_e2) cat << ENDOFMSG
 
-	_0) cat << ENDOFMSG
-
-ERROR: Missing argument. Must specify a < $_value >
-
+ERROR: < $1 > is missing a < $2 > in qubsdmap.conf
 ENDOFMSG
 	;;
-	_1) cat << ENDOFMSG
+	_e3) cat << ENDOFMSG
 
-ERROR: Invalid option for a /usr/local/lib/quBSD/quBSD.sh function
-
+ERROR: < $1 > is an invalid < $2 >
 ENDOFMSG
 	;;
-	_cj1) cat << ENDOFMSG
+	_e4) cat << ENDOFMSG
 
-ERROR: < $_value > is missing a < $_passvar > in qubsdmap.conf
+ERROR: < $1 > is missing from /etc/jail.conf
 ENDOFMSG
 	;;
-	_cj2) cat << ENDOFMSG
+	_e5) cat << ENDOFMSG
 
-ERROR: < $_value > is an invalid < $_passvar >
+ERROR: < $1 > has no ZFS dataset at: < $2 >
 ENDOFMSG
 	;;
-	_cj3) cat << ENDOFMSG
+	_e6) cat << ENDOFMSG
 
-ERROR: < $_value > is missing from /etc/jail.conf
-ENDOFMSG
-	;;
-	_cj4) cat << ENDOFMSG
-
-ERROR: < $_value > has no ZFS dataset at: < $_passvar >
-ENDOFMSG
-	;;
-	_cj5) cat << ENDOFMSG
-
-ERROR: < $_value > is a dispjail. Requires a valid template.
+ERROR: < $1 > is a dispjail. Requires a valid template.
        Missing < template > in qubsdmap.conf
 ENDOFMSG
 	;;
-	_cj5_1) cat << ENDOFMSG
+	_e6_1) cat << ENDOFMSG
 
 ERROR: Dispjail templates cannot be dispjails themselves.
 ENDOFMSG
 	;;
-	_cj6) cat << ENDOFMSG
+	_e7) cat << ENDOFMSG
 
-ERROR: < $_value > is a dispjail, which depends on a valid
+ERROR: < $1 > is a dispjail, which depends on a valid
        template jail. However, the indicated template jail:
-       < $_passvar > is invalid, as per the errors above.
+       < $2 > is invalid, as per the errors above.
 ENDOFMSG
 	;;
-	_cj7) cat << ENDOFMSG
+	_e8) cat << ENDOFMSG
 
-ERROR: < $_value > is invalid. Must be a single digit integer.
-ENDOFMSG
-	;;
-	_cj7_1) cat << ENDOFMSG
-
-ERROR: < $_value > is a ROOTENV. For security reasons,
+ERROR: < $1 > is a ROOTENV. For security reasons,
        it should never be used as a gateway.
 
 ENDOFMSG
 	;;
-	_cj7_2) cat << ENDOFMSG
+	_e9) cat << ENDOFMSG
 
-ALERT: < net-firewall > should usually have a gateway,
-         a connection point to the outside internet.
+ERROR: ${0##*/}: Failed to retreive a valid value for < $1 >
 ENDOFMSG
 	;;
-	_cj9) cat << ENDOFMSG
+	_e10) cat << ENDOFMSG
 
-ALERT: < $_passvar > is the gateway jail for all external
-         network traffic. Setting IP to < $_value > will
-         prevent all traffic to outside networks (internet).
+ERROR: Invalid IPv4. Use CIDR notation, <auto>, or <none>.
 ENDOFMSG
 	;;
-	_cj10) cat << ENDOFMSG
+	_e11) cat << ENDOFMSG
 
-WARNING: Invalid IPv4. Use CIDR notation, <auto>, or <none>.
+ERROR: Invalid option for a /usr/local/lib/quBSD/quBSD.sh function
 ENDOFMSG
 	;;
-	_cj11) cat << ENDOFMSG
+	_e12) cat << ENDOFMSG
 
-WARNING: < $_value > Overlaps with an IP already in use.
+ERROR: Missing argument. Must specify a < $1 >
+ENDOFMSG
+	;;
+	_e13) cat << ENDOFMSG
+
+ERROR: < $1 > was not found in qubsdmap.conf, and
+       < $2 > was blank in qmap. Manually edit
+       $2 in /usr/local/etc/quBSD/qubsdmap.conf
+ENDOFMSG
+	;;
+	_e14) cat << ENDOFMSG
+UNUSED_UNUSED
+ENDOFMSG
+	;;
+	_e15) cat << ENDOFMSG
+
+ERROR: Proposed jailname < $1 > is disallowed.
+
+ENDOFMSG
+	;;
+	_e15_1) cat << ENDOFMSG
+
+ERROR: Proposed jailname < $1 > is already in use
+       for at least one of the following:  jail.conf,
+       qubsdmap.conf, or has a zfs dataset under quBSD.
+
+Use \`qb-destroy' to remove any lingering pieces of a jail
+
+ENDOFMSG
+	;;
+	_e15_2) cat << ENDOFMSG
+
+ERROR: Proposed names must start and end with alpha-numeric.
+       It may contain non-consecutive \`-' or \`_'
+       (dash or underscore), but no other special characters.
+
+ENDOFMSG
+	;;
+	_e16) cat << ENDOFMSG
+
+ERROR: < $1 > needs to be designated as a
+       < $2 > in qubsdmap.conf
+ENDOFMSG
+	;;
+	_e17) cat << ENDOFMSG
+UNUSED_UNUSED
+ENDOFMSG
+	;;
+	_e18) cat << ENDOFMSG
+
+ERROR: < $1 > Must be <true or false>
+ENDOFMSG
+	;;
+	_e19) cat << ENDOFMSG
+
+ERROR: VCPUS must be less than or equal to the number
+       of physical cores on host < $2 > ; AND
+       less than or equal to the bhyve limit of 16.
+ENDOFMSG
+	;;
+	_e20) cat << ENDOFMSG
+
+ERROR: RAM allocation < $1 > should be less than the
+       host's available RAM < $2 bytes >
+ENDOFMSG
+	;;
+	_e21) cat << ENDOFMSG
+
+ERROR: \`none' is not permitted for VM memsize
+ENDOFMSG
+	;;
+	_e22) cat << ENDOFMSG
+
+ERROR: PCI device < $1 > doesn't exist on the host machine.
+ENDOFMSG
+	;;
+	_e23) cat << ENDOFMSG
+
+ERROR: PCI device < $1 > exists on host, but isn't
+       designated as ppt. Check that it's in /boot/loader.conf
+       and reboot host. Note: In loader.conf, use the form:
+       pptdevs="$2"
+ENDOFMSG
+	;;
+	_e24) cat << ENDOFMSG
+
+ERROR: Cant access PCI device < $1 >
+       Likely attached to another VM.
+ENDOFMSG
+	;;
+	_e25) cat << ENDOFMSG
+
+ERROR: Was unable to re-attach PCI device < $1 >
+       after detaching (to probe if it was busy or not).
+ENDOFMSG
+	;;
+	_e26) cat << ENDOFMSG
+
+ERROR: PCI device < $1 > is not attached.
+       Attempted to attach with devctl, but failed.
+ENDOFMSG
+	;;
+	_e34) cat << ENDOFMSG
+UNUSED_UNUSED
+ENDOFMSG
+	;;
+	_e35) cat << ENDOFMSG
+UNUSED_UNUSED
+ENDOFMSG
+	;;
+	_e29) cat << ENDOFMSG
+
+ERROR: < $1 > Contains an invalid argument for bhyve.
+       The only permissible bhyve options here, are those
+       which require no additiona args:  AaCDeHhPSuWwxY
+       !note! - do not include the '-'
+ENDOFMSG
+	;;
+	_e30) cat << ENDOFMSG
+
+ERROR: < $1 > contains a duplicate character.
+ENDOFMSG
+	;;
+	_e31) cat << ENDOFMSG
+
+ERROR: VM < $1 > failed to launch
+ENDOFMSG
+	;;
+	_e32) cat << ENDOFMSG
+quBSD msg: VM < $1 > has ended
+ENDOFMSG
+	;;
+	_e33) cat << ENDOFMSG
+
+ERROR: Tried to launch < $1 > but there were
+       errors while assembling VM parameters.
+ENDOFMSG
+	;;
+	_e40) cat << ENDOFMSG
+${0##*/} is starting < $1 >
+ENDOFMSG
+	;;
+	_e41) cat << ENDOFMSG
+
+ERROR: < $1 > could not be started. For more
+       information, see log at: /var/log/quBSD.log
+ENDOFMSG
+	;;
+	_e42) cat << ENDOFMSG
+${0##*/} is shutting down < $1 >
+ENDOFMSG
+	;;
+	_e43) cat << ENDOFMSG
+ENDOFMSG
+	;;
+	_e44) cat << ENDOFMSG
+UNUSED_UNUSED
+ENDOFMSG
+	;;
+	_e45) cat << ENDOFMSG
+UNUSED_UNUSED
+ENDOFMSG
+	;;
+	_e46) cat << ENDOFMSG
+
+ERROR: Failed to find open IP for < $1 >
+
+       It's permissible to use the same IP twice; but ensure that
+       jails with the same IP aren't connected to the same gateway.
+ENDOFMSG
+	;;
+	_e47) cat << ENDOFMSG
+
+ERROR: Parameter < $1 > for < $2 >
+       had a null value in $QBDIR/qubsdmap.conf
+
+ENDOFMSG
+	;;
+	_e48) cat << ENDOFMSG
+
+ERROR: < $1 > is not a clone (has no zfs origin).
+       Likely is a ROOTENV.
+ENDOFMSG
+	;;
+	_e49) cat << ENDOFMSG
+
+ERROR: < $1 > needs a ROOTENV clone. However, its
+       ROOTENV < $2 > has no existing snapshots,
+       and is curently running. Running ROOTENVs should
+       not be snapshot/cloned until turned off. 
+
+ENDOFMSG
+	;;
+	_e50) cat << ENDOFMSG
+UNUSED_UNUSED
+ENDOFMSG
+	;;
+	_e51) cat << ENDOFMSG
+
+ERROR: ${2##*bin/} failed to ${2##*qb-} all jails/VMs
+       within the allotted timeout of < $2 secs >.
+ENDOFMSG
+	;;
+	_e52) cat << ENDOFMSG
+
+Waiting for < $1 > to stop. Timeout in < $2 seconds >
+ENDOFMSG
+	;;
+	_e53) cat << ENDOFMSG
+
+ERROR: No jails to start. Please specify [-a|-A|-f <file>],
+or < jail list > at the end of the command.
+ENDOFMSG
+	;;
+	_e54) cat << ENDOFMSG
+
+ERROR: [-e] can only be used with [-a|-A|-f <file>], because
+the positional params are assumed to be jail starts.
+ENDOFMSG
+	;;
+	_e55) cat << ENDOFMSG
+
+ERROR: The file < $_SOURCE > doesn't exist.
+ENDOFMSG
+	;;
+	_e56) cat << ENDOFMSG
+
+ERROR: [-e] should come with a < jail list > as positional
+parameters at the end of the command.
+ENDOFMSG
+	;;
+	_e57) cat << ENDOFMSG
+
+ERROR: The file < $_EXFILE > doesn't exist.
+ENDOFMSG
+	;;
+	_e58) cat << ENDOFMSG
+
+ERROR: Valid bhyve resolutions for VNC viewer are as follows:
+       640x480 | 800x600 | 1024x768 | 1920x1080
+ENDOFMSG
+	;;
+	_e59) cat << ENDOFMSG
+
+ERROR: $1 must be an integer
+ENDOFMSG
+	;;
+	_e60) cat << ENDOFMSG
+
+ERROR: $1 Should be $2 < $3 >
+ENDOFMSG
+	;;
+	_w1) cat << ENDOFMSG
+
+WARNING: < $1 > Overlaps with an IP already in use.
          The same IP can be used twice; but ensure that jails
          with the same IP aren't connected to the same gateway.
 ENDOFMSG
 	;;
-	_cj12) cat << ENDOFMSG
+	_w2) cat << ENDOFMSG
+UNUSED_UNUSED
+ENDOFMSG
+	;;
+	_w3) cat << ENDOFMSG
 
-ALERT: < $_value > diverges from quBSD convention.
+WARNING: < $1 > had to be forcibly stopped. Recommend double
+         checking mounts with: mount | grep $1
+         For details see quBSD log:  /var/log/quBSD.log
+ENDOFMSG
+	;;
+	_w4) cat << ENDOFMSG
+
+WARNING: < $1 > could not be stopped. Forcible stop failed.
+         Recommend running the following commands:
+				jail -R $1
+				mount | grep $1
+         For more info, see: /var/log/quBSD.log
+ENDOFMSG
+	;;
+	_m1) cat << ENDOFMSG
+
+ALERT: < $2 > is the gateway jail for all external
+         network traffic. Setting IP to < $1 > will
+         prevent all traffic to outside networks (internet).
+ENDOFMSG
+	;;
+	_m2) cat << ENDOFMSG
+
+ALERT: < $1 > diverges from quBSD convention.
        See table below for typical assignments.
 JAIL              GATEWAY        IPv4 Range
 net-firewall      nicvm          External Router Dependent
@@ -118,293 +374,24 @@ usbvm             variable       10.88.88.1/30
 < adhoc created by qb-connect >  10.99.x.2/30
 ENDOFMSG
 	;;
-	_cj13) cat << ENDOFMSG
+	_m3) cat << ENDOFMSG
 
-ALERT: < $_passvar > is a < net- > jail, which typically
+ALERT: < $2 > is a < net- > jail, which typically
          pass external traffic for client jails. Setting IP
-         to < $_value > will prevent < $_passvar > and its
+         to < $1 > will prevent < $2 > and its
          clients from reaching the outside internet.
 ENDOFMSG
 	;;
-	_cj14) cat << ENDOFMSG
+	_m4) cat << ENDOFMSG
 
-ALERT: Assigning IP to < $_passvar > which has no gateway.
+ALERT: Assigning IP to < $2 > which has no gateway.
 ENDOFMSG
 	;;
-	_cj15) cat << ENDOFMSG
-
-ERROR: Proposed jailname < $_value > is disallowed.
-
-ENDOFMSG
-	;;
-	_cj15_1) cat << ENDOFMSG
-
-ERROR: Proposed jailname < $_value > is already in use
-       for at least one of the following:  jail.conf,
-       qubsdmap.conf, or has a zfs dataset under quBSD.
-
-Use \`qb-destroy' to remove any lingering pieces of a jail
-
-ENDOFMSG
-	;;
-	_cj15_2) cat << ENDOFMSG
-
-ERROR: Proposed names must start and end with alpha-numeric.
-       It may contain non-consecutive \`-' or \`_'
-       (dash or underscore), but no other special characters.
-
-ENDOFMSG
-	;;
-	_cj16) cat << ENDOFMSG
-
-ERROR: < $_value > needs to be designated as a
-       < $_passvar > in qubsdmap.conf
-ENDOFMSG
-	;;
-	_cj17) cat << ENDOFMSG
-
-ALERT: < $_value > for jail:< $_jail > was not found in
-         qubsdmap.conf. #default was applied instead.
-ENDOFMSG
-	;;
-	_cj17_1) cat << ENDOFMSG
-
-WARNING: < $_value > was not found in qubsdmap.conf, and
-         < $_passvar > was blank in qmap. Manually edit
-         $_passvar in /usr/local/etc/quBSD/qubsdmap.conf
-ENDOFMSG
-	;;
-	_cj18) cat << ENDOFMSG
-
-ALERT: MTU is outside of sanity bounds (1200 to 1600)
-ENDOFMSG
-	;;
-	_cj18_1) cat << ENDOFMSG
-
-ERROR: < $_passvar >: < $_value > is invalid. Must be a number.
-ENDOFMSG
-	;;
-	_cj19) cat << ENDOFMSG
-
-ERROR: < $_value > Must be <true or false>
-ENDOFMSG
-	;;
-	_cj20) cat << ENDOFMSG
-
-ERROR: VCPUS must be less than or equal to the number
-       of physical cores on host < $_passvar > ; AND
-       less than or equal to the bhyve limit of 16.
-ENDOFMSG
-	;;
-	_cj21) cat << ENDOFMSG
-
-ERROR: RAM allocation < $_value > should be less than the
-       host's available RAM < $_passvar bytes >
-ENDOFMSG
-	;;
-	_cj21_1) cat << ENDOFMSG
-
-ERROR: \`none' is not permitted for VM memsize
-ENDOFMSG
-	;;
-	_cj22) cat << ENDOFMSG
-
-ERROR: PCI device < $_value > doesn't exist on the host machine.
-ENDOFMSG
-	;;
-	_cj23) cat << ENDOFMSG
-
-ERROR: PCI device < $_value > exists on host, but isn't
-       designated as ppt. Check that it's in /boot/loader.conf
-       and reboot host. Note: In loader.conf, use the form:
-       pptdevs="$_passvar"
-ENDOFMSG
-	;;
-	_cj24) cat << ENDOFMSG
-
-ERROR: Cant access PCI device < $_value >
-       Likely attached to another VM.
-ENDOFMSG
-	;;
-	_cj25) cat << ENDOFMSG
-
-ERROR: Was unable to re-attach PCI device < $_value >
-       after detaching (to probe if it was busy or not).
-ENDOFMSG
-	;;
-	_cj26) cat << ENDOFMSG
-
-ERROR: PCI device < $_value > is not attached.
-       Attempted to attach with devctl, but failed.
-ENDOFMSG
-	;;
-	_cj27) cat << ENDOFMSG
-
-ERROR: Waiting for < $_vif > to appear on host in order to
-       connect < $_value > to its gateway, but timed out.
-ENDOFMSG
-	;;
-	_cj28) cat << ENDOFMSG
-
-ERROR: < $_value > attempts to use too many bhyve slots.
-ENDOFMSG
-	;;
-	_cj29) cat << ENDOFMSG
-
-ERROR: < $_value > Contains an invalid argument for bhyve.
-       The only permissible bhyve options here, are those
-       which require no additiona args:  AaCDeHhPSuWwxY
-       !note! - do not include the '-'
-ENDOFMSG
-	;;
-	_cj30) cat << ENDOFMSG
-
-ERROR: < $_value > contains a duplicate character.
-ENDOFMSG
-	;;
-	_cj31) cat << ENDOFMSG
-
-ERROR: VM < $_value > failed to launch
-ENDOFMSG
-	;;
-	_cj32) cat << ENDOFMSG
-quBSD msg: VM < $_value > has ended
-ENDOFMSG
-	;;
-	_cj33) cat << ENDOFMSG
-
-ERROR: Tried to launch < $_value > but there were
-       errors while assembling VM parameters.
-ENDOFMSG
-	;;
-	_jf1) cat << ENDOFMSG
-${0##*/} is starting < $_value >
-ENDOFMSG
-	;;
-	_jf2) cat << ENDOFMSG
-
-ERROR: < $_value > could not be started. For more
-       information, see log at: /var/log/quBSD.log
-ENDOFMSG
-	;;
-	_jf3) cat << ENDOFMSG
-${0##*/} is shutting down < $_value >
-ENDOFMSG
-	;;
-	_jf4) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_jf5) cat << ENDOFMSG
-
-WARNING: < $_value > had to be forcibly stopped. Recommend double
-         checking mounts with: mount | grep $_value
-         For details see quBSD log:  /var/log/quBSD.log
-ENDOFMSG
-	;;
-	_jf6) cat << ENDOFMSG
-
-WARNING: < $_value > could not be stopped. Forcible stop failed.
-         Recommend running the following commands:
-				jail -R $_value
-				mount | grep $_value
-         For more info, see: /var/log/quBSD.log
-ENDOFMSG
-	;;
-	_jf7) cat << ENDOFMSG
-
-ERROR: Failed to find open IP for < $_value >
-
-       It's permissible to use the same IP twice; but ensure that
-       jails with the same IP aren't connected to the same gateway.
-ENDOFMSG
-	;;
-	_jf8) cat << ENDOFMSG
-
-ERROR: Parameter < $_value > for < $_passvar >
-       had a null value in $QBDIR/qubsdmap.conf
-
-ENDOFMSG
-	;;
-	_jo0) cat << ENDOFMSG
-
-ERROR: < $_value > is not a clone (has no zfs origin).
-       Likely is a ROOTENV.
-ENDOFMSG
-	;;
-	_jo1) cat << ENDOFMSG
-
-ERROR: < $_value > needs a ROOTENV clone. However, its
-       ROOTENV < $_passvar > has no existing snapshots,
-       and is curently running. Running ROOTENVs should
-       not be snapshot/cloned until turned off. 
-
-ENDOFMSG
-	;;
-	_jo2) cat << ENDOFMSG
+	_m5) cat << ENDOFMSG
 
 ALERT: Another instance of qb-start or qb-stop is running.
-       Will wait for < $_value secs > before aborting.
+       Will wait for < $1 secs > before aborting.
 ENDOFMSG
 	;;
-	_jo3) cat << ENDOFMSG
-
-ERROR: ${_value##*bin/} failed to ${_value##*qb-} all jails/VMs
-       within the allotted timeout of < $_passvar secs >.
-ENDOFMSG
-	;;
-	_jo4) cat << ENDOFMSG
-
-Waiting for < $_value > to stop. Timeout in < $_passvar seconds >
-ENDOFMSG
-	;;
-	_je1) cat << ENDOFMSG
-
-ERROR: No jails to start. Please specify [-a|-A|-f <file>],
-or < jail list > at the end of the command.
-ENDOFMSG
-	;;
-	_je2) cat << ENDOFMSG
-
-ERROR: [-e] can only be used with [-a|-A|-f <file>], because
-the positional params are assumed to be jail starts.
-ENDOFMSG
-	;;
-	_je3) cat << ENDOFMSG
-
-ERROR: The file < $_SOURCE > doesn't exist.
-ENDOFMSG
-	;;
-	_je4) cat << ENDOFMSG
-
-ERROR: [-e] should come with a < jail list > as positional
-parameters at the end of the command.
-ENDOFMSG
-	;;
-	_je5) cat << ENDOFMSG
-
-ERROR: The file < $_EXFILE > doesn't exist.
-ENDOFMSG
-	;;
-	_je6) cat << ENDOFMSG
-
-ERROR: Valid bhyve resolutions for VNC viewer are as follows:
-       640x480 | 800x600 | 1024x768 | 1920x1080
-ENDOFMSG
-	;;
-	_je7) cat << ENDOFMSG
-
-ERROR: $_value must be an integer
-ENDOFMSG
-	;;
-	_je8) cat << ENDOFMSG
-
-ERROR: $_value Should be $_passvar < $_passvar2 >
-ENDOFMSG
-	;;
-
 	esac
 }
-
-
-
-

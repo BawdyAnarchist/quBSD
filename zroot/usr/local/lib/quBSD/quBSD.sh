@@ -6,7 +6,7 @@
 # Global variables, jail/quBSD parameters, sanity checks, messages, networking.
 # Functions embed many sanity checks, but also call other functions to assist.
 # Messages are sourced from a separate script, as a function. They have the form:
-#   get_msg <$_q> <_msg_ident> <_pass_variable1> <_pass_variable2>
+#   get_msg <$_q> -m <_msg_ident> <_pass_variable1> <_pass_variable2>
 #     <$_q> (q)uiet option.
 #        -note- /bin/sh passes local vars to new functions called within functions.
 #               thus to prevent inadvertently passing [-q], important funcitons
@@ -108,7 +108,7 @@
 ########################################################################################
 
 # Source error messages for library functions
-. /usr/local/lib/quBSD/msg-quBSD.sh
+. /usr/local/lib/quBSD/msg-quBSD2.sh
 
 get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
@@ -220,7 +220,7 @@ get_jail_parameter() {
 			s) _sp="true" ;;
 			x) _xp="-x" ;;
 			z) _zp="true" ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Positional and function variables
@@ -228,8 +228,8 @@ get_jail_parameter() {
 	local _jail="$2"   ; local _value=''
 
 	# Either jail or param weren't provided
-	[ -z "$_jail" ] && get_msg $_qp "_0" "jail" && eval $_sp return 1
-	[ -z "$_param" ] && get_msg $_qp "_0" "parameter" && eval $_sp return 1
+	[ -z "$_jail" ] && get_msg $_qp -m _e0 "jail" && eval $_sp return 1
+	[ -z "$_param" ] && get_msg $_qp -m _e0 "parameter" && eval $_sp return 1
 
 	# Get the <_value> from QMAP.
 	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
@@ -241,7 +241,7 @@ get_jail_parameter() {
 	# If still blank, check for -z or -s options. Otherwise err message and return 1
 	if [ -z "$_value" ] ; then
 		[ "$_zp" ] && return 0  ;  [ "$_sp" ] && return 0
-		get_msg $_qp "_cj17_1" "$_param" "$_value" && return 1
+		get_msg $_qp -m _w2 "$_param" "$_value" && return 1
 	fi
 
 	# If -s was provided, checks are skipped by this eval
@@ -262,7 +262,7 @@ get_info() {
 
 	while getopts e opts ; do case $opts in
 			e) local _ei="-e" ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	local _info="$1"  ;  local _jail="$2"  ;  local _value=''
@@ -323,10 +323,10 @@ compile_jlist() {
 	case "${_SOURCE}" in
 		'')
 			# If both SOURCE and POSPARAMS are empty, there is no JLIST.
-			[ -z "$_POSPARAMS" ] && get_msg "_je1" "usage_1" || _JLIST="$_POSPARAMS"
+			[ -z "$_POSPARAMS" ] && get_msg -m _e53 || _JLIST="$_POSPARAMS"
 
 			# If there was no SOURCE, then [-e] makes the positional params ambiguous
-			[ "$_EXCLUDE" ] && get_msg "_je2" "usage_1"
+			[ "$_EXCLUDE" ] && get_msg -m _e54
 		;;
 
 		auto)
@@ -342,18 +342,18 @@ compile_jlist() {
 		?*)
 			# Only possibility remaining is [-f]. Check it exists, and assign JLIST
 			[ -e "$_SOURCE" ] && _JLIST=$(tr -s '[:space:]' '\n' < "$_SOURCE" | uniq) \
-					|| get_msg "_je3" "usage_1"
+					|| get_msg -m _e55
 		;;
 	esac
 
 	# If [-e], then the exclude list is just the JLIST, but error if null.
-	[ "$_EXCLUDE" ] && _EXLIST="$_POSPARAMS" && [ -z "$_EXLIST" ] && get_msg "_je4" "usage_1"
+	[ "$_EXCLUDE" ] && _EXLIST="$_POSPARAMS" && [ -z "$_EXLIST" ] && get_msg -m _e56
 
 	# If [-E], make sure the file exists, and if so, make it the exclude list
 	if [ "$_EXFILE" ] ; then
 
 		[ -e "$_EXFILE" ] && _EXLIST=$(tr -s '[:space:]' '\n' < "$_EXFILE")	\
-			|| get_msg "_je5" "usage_1"
+			|| get_msg -m _e57
 	fi
 
 	# Remove any jail on EXLIST, from the JLIST
@@ -380,7 +380,7 @@ start_jail() {
 
 	local _jail="$1"
 	[ "$_jail" = "none" ] && return 0
-	[ -z "$_jail" ] && get_msg $_qs "_0" "jail" && return 1
+	[ -z "$_jail" ] && get_msg $_qs -m _e0 "jail" && return 1
 
 	# Check to see if _jail is already running
 	if	! chk_isrunning "$_jail" ; then
@@ -388,13 +388,13 @@ start_jail() {
 		if chk_valid_jail $_qs "$_jail" ; then
 
 			# If checks were good, log start attempt, then start jail or VM
-			get_msg "_jf1" "$_jail" | tee -a $QBLOG
+			get_msg -m _e40 "$_jail" | tee -a $QBLOG
 
 			if chk_isvm "$_jail" ; then
 				eval exec_vm_coordinator $_norun $_qs $_jail $_quiet
 			else
 				[ "$_norun" ] && return 0
-				jail -vc "$_jail"  >> $QBLOG 2>&1  ||  get_msg $_qs "_jf2" "$_jail"
+				jail -vc "$_jail"  >> $QBLOG 2>&1  ||  get_msg $_qs -m _e41 "$_jail"
 	fi fi fi
 	return 0
 }
@@ -407,16 +407,16 @@ stop_jail() {
 			q) local _qj="-q" ;;
 			t) local _timeout="-t $OPTARG" ;;
 			w) local _wait="true" ;;
-			*) get_msg "_1" ;;
+			*) get_msg -m _e1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	local _jail="$1"
-	[ -z "$_jail" ] && get_msg $_qj "_0" "jail" && return 1
+	[ -z "$_jail" ] && get_msg $_qj -m _e0 "jail" && return 1
 
 	# Check that the jail is on
 	if chk_isrunning "$_jail" ; then
 		# Log stop attempt, then switch by VM or jail
-		get_msg "_jf3" "$_jail" | tee -a $QBLOG
+		get_msg -m _e42 "$_jail" | tee -a $QBLOG
 
 		if chk_isvm "$_jail" ; then
 			if [ -z "$_force" ] ; then
@@ -436,10 +436,10 @@ stop_jail() {
 				[ -e "${M_ZUSR}/${JAIL}/rw/etc/fstab" ] \
 									&& umount -aF "${M_ZUSR}/${JAIL}/rw/etc/fstab" > /dev/null 2>&1
 				# Notify about failure to remove normally
-				get_msg "_jf6" "$_jail" | tee -a $QBLOG
+				get_msg -m _w4 "$_jail" | tee -a $QBLOG
 			else
 				# Print warning about failure to forcibly remove jail
-				get_msg $_qj "_jf5" "$_jail"
+				get_msg $_qj -m _w3 "$_jail"
 				return 1
 	fi fi fi
 	return 0
@@ -452,12 +452,12 @@ restart_jail() {
 	while getopts hq opts ; do case $opts in
 			h) local _hold="true" ;;
 			q) local _qr="-q" ;;
-			*) get_msg "_1" ;;
+			*) get_msg -m _e1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Positional parameters / check
 	local _jail="$1"
-	[ -z "$_jail" ] && get_msg $_qr "_0" "jail"  && return 1
+	[ -z "$_jail" ] && get_msg $_qr -m _e0 "jail"  && return 1
 
 	# If the jail was off, and the hold flag was given, don't start it.
 	! chk_isrunning "$_jail" && [ "$_hold" ] && return 0
@@ -544,7 +544,7 @@ connect_client_to_gateway() {
 			m) _mtu="$OPTARG" ;;
 			n) _named_restart="true" ;;
 			q) _q='-q' ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Pos params, default MTU, and _type
@@ -626,7 +626,7 @@ connect_gateway_to_clients() {
 	[ "$1" = "--" ] && shift
 
 	local _gateway="$1"
-	[ -z "$_gateway" ] && get_msg $_q "_0" "Jail/VM" && return 1
+	[ -z "$_gateway" ] && get_msg $_q -m _e0 "Jail/VM" && return 1
 
 	# All onjails connect to 0control
 	if [ "$CLASS" = "cjail" ] ; then
@@ -673,15 +673,15 @@ reclone_zroot() {
 
 	# Variables definitions
 	_jail="$1"
-		[ -z "${_jail}" ] && get_msg $_qz "_0" "Jail" && return 1
+		[ -z "${_jail}" ] && get_msg $_qz -m _e0 "Jail" && return 1
 	_rootenv="$2"
-		[ -z "${_rootenv}" ] && get_msg $_qz "_0" "ROOTENV" && return 1
+		[ -z "${_rootenv}" ] && get_msg $_qz -m _e0 "ROOTENV" && return 1
 	_jailzfs="${R_ZFS}/${_jail}"
 	_rootzfs="${R_ZFS}/${_rootenv}"
 
 	# Check that the _jail being destroyed/cloned has an origin (is a clone).
 	chk_valid_zfs "$_jailzfs" && [ "$(zfs list -Ho origin $_jailzfs)" = "-" ] \
-		&& get_msg $_qz "_jo0" "$_jail" && return 1
+		&& get_msg $_qz -m _e48 "$_jail" && return 1
 
 	# Switch between whether or not ROOTENV is running.
 	if chk_isrunning ${_rootenv} ; then
@@ -709,7 +709,7 @@ reclone_zroot() {
 
 		# If no _rootsnap older than the rootenv pid was found, return error
 		_rootsnap=$(echo "$_rootsnaps" | tail -1) 
-		[ -z "$_rootsnap" ] && get_msg $_qz "_jo1" "$_jail" "$_rootenv" && return 1
+		[ -z "$_rootsnap" ] && get_msg $_qz -m _e49 "$_jail" "$_rootenv" && return 1
 
 	else
 		# If ROOTENV is off, make sure that _jail is getting the most recent version of ROOTENV 
@@ -817,7 +817,7 @@ monitor_startstop() {
 		fi
 
 		# Timeout has passed, kill qb-start/stop and cleanup files
-		get_msg "_jo3" "$0" "$_TIMEOUT"
+		get_msg -m _e51 "$0" "$_TIMEOUT"
 		kill -15 --	-$$
 	fi
 
@@ -840,7 +840,7 @@ monitor_startstop() {
 		done
 
 		# Inform the user of the new _timeout, waiting for jails/VMs to start/stop before proceding
-		get_msg "_jo2" "$_timeout"
+		get_msg -m _m5 "$_timeout"
 
 		# Wait for primary qb-start/stop to either complete, or timeout
 		while [ "$(cat $_TMP_TIME 2>&1)" -gt 0 ] 2>&1 ; do
@@ -864,7 +864,7 @@ monitor_vm_stop() {
 	local _count=1
 
 	# Get message about waiting
-	get_msg $_qms "_jo4" "$_jail" "$_timeout"
+	get_msg $_qms -m _e52 "$_jail" "$_timeout"
 
 	# Check for when VM shuts down.
 	while [ "$_count" -le "$_timeout" ] ; do
@@ -913,11 +913,11 @@ chk_truefalse() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"  ;  local _param="$2"
-	[ -z "$_value" ] && get_msg $_qf "_0" "$_param" && return 1
+	[ -z "$_value" ] && get_msg $_qf -m _e0 "$_param" && return 1
 
 	# Must be either true or false.
 	[ ! "$_value" = "true" ] && [ ! "$_value" = "false" ] \
-			&& get_msg $_qf "_cj19" "$_param" && return 1
+			&& get_msg $_qf -m _e18 "$_param" && return 1
 	return 0
 }
 
@@ -927,27 +927,27 @@ chk_integer() {
 
 	while getopts g:G:l:L:qv: opts ; do case $opts in
 			g) local _g="$OPTARG" ; _msg="greater than or equal to"
-				! echo "${_g}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1 ;;
+				! echo "${_g}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q -m _e59 "$_var" && return 1 ;;
 			G) local _G="$OPTARG" ; _msg="greater than"
-				! echo "${_G}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1 ;;
+				! echo "${_G}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q -m _e59 "$_var" && return 1 ;;
 			l) local _l="$OPTARG" ; _msg="less than or equal to"
-				! echo "${_l}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1 ;;
+				! echo "${_l}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q -m _e59 "$_var" && return 1 ;;
 			L) local _L="$OPTARG" ; _msg="less than"
-				! echo "${_L}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1 ;;
+				! echo "${_L}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q -m _e59 "$_var" && return 1 ;;
 			v) local _var="$OPTARG" ;;
 			q) local _q='-q' ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 	_value="$1"
 
 	# Check that it's an integer
-	! echo "$_value" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q "_je7" "$_var" && return 1
+	! echo "$_value" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q -m _e59 "$_var" && return 1
 
 	# Check each option one by one
-	[ "$_g" ] && ! [ "$_value" -ge "$_g" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_g" && return 1
-	[ "$_G" ] && ! [ "$_value" -gt "$_G" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_G" && return 1
-	[ "$_l" ] && ! [ "$_value" -le "$_l" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_l" && return 1
-	[ "$_L" ] && ! [ "$_value" -lt "$_L" ] && get_msg $_q "_je8" "$_var" "$_msg" "$_L" && return 1
+	[ "$_g" ] && ! [ "$_value" -ge "$_g" ] && get_msg $_q -m _e60 "$_var" "$_msg" "$_g" && return 1
+	[ "$_G" ] && ! [ "$_value" -gt "$_G" ] && get_msg $_q -m _e60 "$_var" "$_msg" "$_G" && return 1
+	[ "$_l" ] && ! [ "$_value" -le "$_l" ] && get_msg $_q -m _e60 "$_var" "$_msg" "$_l" && return 1
+	[ "$_L" ] && ! [ "$_value" -lt "$_L" ] && get_msg $_q -m _e60 "$_var" "$_msg" "$_L" && return 1
 	return 0
 }
 
@@ -974,22 +974,22 @@ chk_avail_jailname() {
 
 	# Positional parmeters
 	local _jail="$1"
-	[ -z "$_jail" ] && get_msg $_qa "_0" "new jail name" && return 1
+	[ -z "$_jail" ] && get_msg $_qa -m _e0 "new jail name" && return 1
 
 	# Checks that proposed jailname isn't 'none' or 'qubsd' or starts with '#'
 	echo "$_jail" | grep -Eqi "^(none|qubsd)\$" \
-			&& get_msg $_qa "_cj15" "$_jail" && return 1
+			&& get_msg $_qa -m _e15 "$_jail" && return 1
 
 	# Jail must start with :alnum: and afterwards, have only _ or - as special chars
 	! echo "$_jail" | grep -E -- '^[[:alnum:]]([-_[:alnum:]])*[[:alnum:]]$' \
-			| grep -Eqv '(--|-_|_-|__)' && get_msg $_qa "_cj15_2" "$_jail" && return 1
+			| grep -Eqv '(--|-_|_-|__)' && get_msg $_qa -m _e15_2 "$_jail" && return 1
 
    # Checks that proposed jailname doesn't exist or partially exist
 	if chk_valid_zfs "${R_ZFS}/$_jail" || \
 		chk_valid_zfs "${U_ZFS}/$_jail"  || \
 		grep -Eq "^${_jail}[[:blank:]]+" $QMAP || \
 		grep -Eq "^${_jail}[[:blank:]]*\{" $JCONF ; then
-		get_msg $_qa "_cj15_1" "$_jail" && return 1
+		get_msg $_qa -m _e15_1 "$_jail" && return 1
 	fi
 }
 
@@ -1012,12 +1012,12 @@ chk_valid_jail() {
 	while getopts c:q opts ; do case $opts in
 			c) _class="$OPTARG" ;;
 			q) _qv='-q' ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	# Positional parmeters and function specific variables.
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_qv "_0" "jail" && return 1
+	[ -z "$_value" ] && get_msg $_qv -m _e0 "jail" && return 1
 
 	# Must have class in QMAP. Used later to find the correct zfs dataset
 	_class="${_class:=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)}"
@@ -1026,17 +1026,17 @@ chk_valid_jail() {
 	case $_class in
 		"")
 			# Empty, no class exists in QMAP
-			get_msg $_qv "_cj1" "$_value" "class" && return 1
+			get_msg $_qv -m _e2 "$_value" "class" && return 1
 		;;
 		rootjail)
 			# Rootjail's zroot dataset should have no origin (not a clone)
 			! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
-					| grep -Eq '^-$'  && get_msg $_qv "_cj4" "$_value" "$R_ZFS" && return 1
+					| grep -Eq '^-$'  && get_msg $_qv -m _e5 "$_value" "$R_ZFS" && return 1
 		;;
 		appjail|cjail)
 			# Appjails require a dataset at quBSD/zusr
 			! chk_valid_zfs ${U_ZFS}/${_value}\
-					&& get_msg $_qv "_cj4" "$_value" "$U_ZFS" && return 1
+					&& get_msg $_qv -m _e5 "$_value" "$U_ZFS" && return 1
 		;;
 		dispjail)
 
@@ -1045,28 +1045,28 @@ chk_valid_jail() {
 					"s/^${_value}[[:blank:]]+TEMPLATE[[:blank:]]+//p" $QMAP)
 
 			# First ensure that it's not blank
-			[ -z "$_template" ] && get_msg $_qv "_cj5" "$_value" && return 1
+			[ -z "$_template" ] && get_msg $_qv -m _e6 "$_value" && return 1
 
 			local _class_of_temp=$(sed -nE \
 				"s/^${_template}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 
 			# Dispjails can only reference appjails.
 			[ "$_class_of_temp" = "dispjail" ] \
-					&& get_msg $_qv "_cj5_1" "$_value" "$_template" && return 1
+					&& get_msg $_qv -m _e6_1 "$_value" "$_template" && return 1
 
 			# Ensure that the template being referenced is valid
 			! chk_valid_jail $_qv -c "$_class_of_temp" "$_template" \
-					&& get_msg $_qv "_cj6" "$_value" "$_template" && return 1
+					&& get_msg $_qv -m _e7 "$_value" "$_template" && return 1
 		;;
 		rootVM)
 			# VM zroot dataset should have no origin (not a clone)
 			! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
-					| grep -Eq '^-$'  && get_msg $_qv "_cj4" "$_value" "$R_ZFS" && return 1
+					| grep -Eq '^-$'  && get_msg $_qv -m _e5 "$_value" "$R_ZFS" && return 1
 		;;
 		*VM)
 		;;
 		# Any other class is invalid
-		*) get_msg $_qv "_cj2" "$_class" "CLASS"  && return 1
+		*) get_msg $_qv -m _e3 "$_class" "CLASS"  && return 1
 		;;
 	esac
 
@@ -1075,16 +1075,16 @@ chk_valid_jail() {
 		*jail)
 			# Must have a designated rootjail in QMAP
 			! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $QMAP \
-					&& get_msg $_qv "_cj1" "$_value" "ROOTENV" && return 1
+					&& get_msg $_qv -m _e2 "$_value" "ROOTENV" && return 1
 
 			# Must have an entry in JCONF
 			! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
-					&& get_msg $_qv "_cj3" && return 1
+					&& get_msg $_qv -m _e4 && return 1
 		;;
 		*VM)
 			# Must have a designated rootVM in QMAP
 			! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $QMAP \
-					&& get_msg $_qv "_cj1" "$_value" "ROOTENV" && return 1
+					&& get_msg $_qv -m _e2 "$_value" "ROOTENV" && return 1
 		;;
 	esac
 
@@ -1117,11 +1117,11 @@ chk_valid_bhyveopts() {
 
 	# Only bhyve opts with no argument
 	! echo "$_value" | grep -Eqs '^[AaCDeHhPSuWwxY]+$' \
-			&& get_msg $_q "_cj29" "$_value" && return 1
+			&& get_msg $_q -m _e29 "$_value" && return 1
 
 	# No duplicate characters
 	[ "$(echo "$_value" | fold -w1 | sort | uniq -d | wc -l)" -gt 0 ] \
-			&& get_msg $_q "_cj30" "$_value" && return 1
+			&& get_msg $_q -m _e30 "$_value" && return 1
 	return 0
 }
 
@@ -1132,20 +1132,20 @@ chk_valid_class() {
 
 	# Valid inputs are: appjail | rootjail | cjail | dispjail | appVM | rootVM
 	case $_value in
-		'') get_msg $_q "_0" "CLASS" && return 1 ;;
+		'') get_msg $_q -m _e0 "CLASS" && return 1 ;;
 		appjail|dispjail|rootjail|cjail|rootVM|appVM) return 0 ;;
-		*) get_msg $_q "_cj2" "$_value" "CLASS" && return 1 ;;
+		*) get_msg $_q -m _e3 "$_value" "CLASS" && return 1 ;;
 	esac
 }
 
 chk_valid_cpuset() {
 	while getopts q opts ; do case $opts in
 			q) local _q="-q" ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "CPUSET" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e0 "CPUSET" && return 1
 	[ "$_value" = "none" ] && return 0
 
 	# Get the list of CPUs on the system, and edit for searching
@@ -1153,7 +1153,7 @@ chk_valid_cpuset() {
 
 	# Test for negative numbers and dashes in the wrong place
 	echo "$_value" | grep -Eq "(,,+|--+|,-|-,|,[[:blank:]]*-|^[^[:digit:]])" \
-			&& get_msg $_q "_cj2" "$_value" "CPUSET" && return 1
+			&& get_msg $_q -m _e3 "$_value" "CPUSET" && return 1
 
 	# Remove `-' and `,' to check that all numbers are valid CPU numbers
 	_cpuset_mod=$(echo $_value | sed -E "s/(,|-)/ /g")
@@ -1161,7 +1161,7 @@ chk_valid_cpuset() {
 	for _cpu in $_cpuset_mod ; do
 		# Every number is followed by a comma except the last one
 		! echo $_validcpuset | grep -Eq "${_cpu},|${_cpu}\$" \
-			&& get_msg $_q "_cj2" "$_value" "CPUSET" && return 1
+			&& get_msg $_q -m _e3 "$_value" "CPUSET" && return 1
 	done
 	return 0
 }
@@ -1183,10 +1183,10 @@ chk_valid_devfs_rule() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "devfs_ruleset" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e0 "devfs_ruleset" && return 1
 
 	! grep -Eqs -- "=${_value}\]\$|\[devfsrules.*${_value}\]\$" /etc/devfs.rules \
-			&& get_msg $_q "_cj2" "$_value" "DEVFS_RULE" && return 1
+			&& get_msg $_q -m _e3 "$_value" "DEVFS_RULE" && return 1
 	return 0
 }
 
@@ -1202,7 +1202,7 @@ chk_valid_gateway() {
 
 	# Class of gateway should never be a ROOTENV
 	if [ "$_class_gw" = "rootjail" ] || [ "$_class_gw" = "rootVM" ] ; then
-		get_msg $_q "_cj7_1" "$_gw" && return 1
+		get_msg $_q -m _e8 "$_gw" && return 1
 	else
 		# Check that gateway is a valid jail.
  		chk_valid_jail $_q -c "$_class_gw" "$_gw" || return 1
@@ -1220,14 +1220,14 @@ chk_valid_ipv4() {
 		q) local _q="-q" ;;
 		r) local _rp="-r" ;;
 		x) local _xp="-x" ;;
-		*) get_msg "_1" ; return 1 ;;
+		*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# !! _value is not local here, it might get reassigned !!
 	_value="$1"  ;  local _jail="$2"
 
 	case $_value in
-		'') get_msg $_q "_0" "IPV4" && return 1 ;;
+		'') get_msg $_q -m _e0 "IPV4" && return 1 ;;
 		none|DHCP) return 0 ;;
 		auto) [ "$_rp" ] && { _value=$(assign_ipv4_auto -et NET "$_jail") && return 0 ;} || return 1
 			;;
@@ -1262,11 +1262,11 @@ chk_valid_ipv4() {
 			:
 		else
 			# Error message, is invalid IPv4
-			get_msg $_q "_cj10" "$_value" && return 1
+			get_msg $_q -m _e10 "$_value" && return 1
 		fi
 	else
 		# Error message, is invalid IPv4
-		get_msg $_q "_cj10" "$_value" && return 1
+		get_msg $_q -m _e10 "$_value" && return 1
 	fi
 
 	[ -n "$_xp" ] && chk_isqubsd_ipv4 $_q "$_value" "$_jail"
@@ -1281,7 +1281,7 @@ chk_isqubsd_ipv4() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"  ;  local _jail="$2"
-	[ -z "$_value" ] && get_msg $_q "_0" "IPV4"
+	[ -z "$_value" ] && get_msg $_q -m _e0 "IPV4"
 
 	# $_a0 - $_a4 vars are needed later. Check that they're all here, or get them.
 	echo "${_a0}#${_a1}#${_a2}#${_a3}#${_a4}" | grep -q "##" \
@@ -1293,13 +1293,13 @@ chk_isqubsd_ipv4() {
 	# Check the net-jails for IP values of none
 	case ${_value}_${_jail} in
 		none_net-firewall)  # IPV4 `none' with net-firewall shouldn't really happen
-			get_msg $_q "_cj9" "$_value" "$_jail" && return 1
+			get_msg $_q -m _m1 "$_value" "$_jail" && return 1
 		;;
 		*_net-firewall)  # net-firewall has external connection. No convention to judge
 			return 0
 		;;
 		none_net-*)  # `none' shouldn't really happen with net-jails either
-			get_msg $_q "_cj13" "$_value" "$_jail" && return 1
+			get_msg $_q -m _m3 "$_value" "$_jail" && return 1
 		;;
 		none_*|auto_*)  # All other jails, `none' is fine. No checks required
 			return 0
@@ -1309,16 +1309,16 @@ chk_isqubsd_ipv4() {
 	# Compare against QMAP, and _USED_IPS.
 	if grep -v "^$_jail" $QMAP | grep -qs "$_value" \
 			|| get_info -e _USED_IPS | grep -qs "${_value%/*}" ; then
-		get_msg $_q "_cj11" "$_value" "$_jail" && return 1
+		get_msg $_q -m _w1 "$_value" "$_jail" && return 1
 	fi
 
 	# NOTE:  $a2 and $ip2 are missing, because these are the variable positions
 	! [ "$_a0.$_a1.$_a3/$_a4" = "$_ip0.$_ip1.$_ip3/$_subnet" ] \
-			&& get_msg $_q "_cj12" "$_value" "$_jail" && return 1
+			&& get_msg $_q -m _m2 "$_value" "$_jail" && return 1
 
 	# Assigning IP to jail that has no gateway
 	[ "$(get_jail_parameter -deqs GATEWAY "$_jail")" = "none" ] \
-			&& get_msg $_q "_cj14" "$_value" "$_jail" \
+			&& get_msg $_q -m _m4 "$_value" "$_jail" \
 			&& return 1
 
 	return 0
@@ -1329,12 +1329,12 @@ chk_valid_maxmem() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "MAXMEM" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e0 "MAXMEM" && return 1
 	[ "$_value" = "none" ] && return 0
 
 	# Per man 8 rctl, user can assign units: G|g|M|m|K|k
    ! echo "$_value" | grep -Eqs "^[[:digit:]]+(G|g|M|m|K|k)\$" \
-			&& get_msg $_q "_cj2" "$_value" "MAXMEM" && return 1
+			&& get_msg $_q -m _e3 "$_value" "MAXMEM" && return 1
 
 	# Set values as numbers without units
 	_bytes=$(echo $_value | sed -nE "s/.\$//p")
@@ -1348,7 +1348,7 @@ chk_valid_maxmem() {
 	esac
 
 	# Compare values, error if user input exceeds availabl RAM
-	[ "$_bytes" -ge "$_sysmem" ] && get_msg $_q "_cj21" "$_value" "$_sysmem" && return 1
+	[ "$_bytes" -ge "$_sysmem" ] && get_msg $_q -m _e20 "$_value" "$_sysmem" && return 1
 
 	return 0
 }
@@ -1358,7 +1358,7 @@ chk_valid_memsize() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ "$_value" = "none" ] && get_msg "_cj21_1" && return 1
+	[ "$_value" = "none" ] && get_msg -m _e21 && return 1
 
 	# It's the exact same program/routine. Different QMAP params to be technically specific.
 	chk_valid_maxmem $_q "$1" || return 1
@@ -1386,11 +1386,11 @@ chk_valid_ppt() {
 	while getopts qx opts ; do case $opts in
 			q) local _q="-q" ;;
 			x) local _xtra="true" ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	_value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "PPT (passthru)" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e0 "PPT (passthru)" && return 1
 	[ "$_value" = "none" ] && return 0
 
 	# Get list of pci devices on the machine
@@ -1407,26 +1407,26 @@ chk_valid_ppt() {
 		_pcidev=$(echo "$_pciline" | grep -Eo "pci.*${_val2}")
 
 		# PCI device doesnt exist on the machine
-		[ -z "$_pciline" ] && get_msg $_q "_cj22" "$_val" "PPT" && return 1
+		[ -z "$_pciline" ] && get_msg $_q -m _e22 "$_val" "PPT" && return 1
 
 		# Extra set of checks for the PCI device, if it's about to be attached to a VM
 		if [ "$_xtra" ] ; then
 
 			# If the pci device is detached, try to attach it.
 			[ -z "${_pciline##none*}" ] && ! devctl attach "$_pcidev" && _attached="true" \
-					&& get_msg "_cj26" "$_pciline" && return 1
+					&& get_msg -m _e26 "$_pciline" && return 1
 
 			# Make sure the PCI device is designated for passthrough
-			[ -n "${_pciline##ppt*}" ] && get_msg $_q "_cj23" "$_val" "$_passvar" && return 1
+			[ -n "${_pciline##ppt*}" ] && get_msg $_q -m _e23 "$_val" "$_passvar" && return 1
 
 			# If the device was attached and is ppt, there's no need for dettach/attach test
 			if [ -z "$_attached" ] ; then
 
 				# Check if the PCI device is busy, and would thus cause an error
-				! devctl detach "$_pcidev" && get_msg $_q "_cj24" "$_val" && return 1
+				! devctl detach "$_pcidev" && get_msg $_q -m _e24 "$_val" && return 1
 
 				# Re-attach PCI, or error if unable
-				! devctl attach "$_pcidev" && get_msg $_q "_cj25" && return 1
+				! devctl attach "$_pcidev" && get_msg $_q -m _e25 && return 1
 			fi
 		fi
 	done
@@ -1438,23 +1438,23 @@ chk_valid_rootenv() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "CLASS" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e0 "CLASS" && return 1
 
 	# Must be designated as the appropriate corresponding CLASS in QMAP
 	local _class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 	if chk_isvm "$_value" ; then
-		[ ! "$_class" = "rootVM" ] && get_msg $_q "_cj16" "$_value" "rootVM" && return 1
+		[ ! "$_class" = "rootVM" ] && get_msg $_q -m _e16 "$_value" "rootVM" && return 1
 	else
-		[ ! "$_class" = "rootjail" ] && get_msg $_q "_cj16" "$_value" "rootjail" && return 1
+		[ ! "$_class" = "rootjail" ] && get_msg $_q -m _e16 "$_value" "rootjail" && return 1
 
 		# Must have an entry in JCONF
 		! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
-				&& get_msg $_q "_cj3" && return 1
+				&& get_msg $_q -m _e4 && return 1
 	fi
 
 	# Rootjails require a dataset at zroot/quBSD/jails
 	! chk_valid_zfs ${R_ZFS}/${_value} \
-			&& get_msg $_q "_cj4" "$_value" "$R_ZFS" && return 1
+			&& get_msg $_q -m _e5 "$_value" "$R_ZFS" && return 1
 
 	return 0
 }
@@ -1464,12 +1464,12 @@ chk_valid_seclvl() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "SECLVL" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e0 "SECLVL" && return 1
 	[ "$_value" = "none" ] && return 0
 
 	# If SECLVL is not a number
 	echo "$_value" | ! grep -Eq -- '^(-1|-0|0|1|2|3)$' \
-			&& get_msg $_q "_cj2" "$_value" "SECLVL" && return 1
+			&& get_msg $_q -m _e3 "$_value" "SECLVL" && return 1
 
 	return 0
 }
@@ -1481,7 +1481,7 @@ chk_valid_taps() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "VIF" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e0 "VIF" && return 1
 
 	# Make sure that it's an integer
 	for _val in $_value ; do
@@ -1504,9 +1504,9 @@ chk_valid_schg() {
 
 	# Valid inputs are: none | sys | all
 	case $_value in
-		'') get_msg $_q "_0" "SCHG" && return 1 ;;
+		'') get_msg $_q -m _e0 "SCHG" && return 1 ;;
 		none|sys|all) return 0 ;;
-		*) get_msg $_q "_cj2" "$_value" "SCHG"  ;  return 1
+		*) get_msg $_q -m _e3 "$_value" "SCHG"  ;  return 1
 	esac
 }
 
@@ -1525,7 +1525,7 @@ chk_valid_vcpus() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q "_0" "VCPUS" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e0 "VCPUS" && return 1
 
 	# Get the number of CPUs on the system
 	_syscpus=$(cpuset -g | head -1 | grep -oE "[^[:blank:]]+\$")
@@ -1536,7 +1536,7 @@ chk_valid_vcpus() {
 
 	# Ensure that vpcus doesnt exceed the number of system cpus or bhyve limits
 	if [ "$_value" -gt "$_syscpus" ] || [ "$_value" -gt 16 ] ; then
-		get_msg $_q "_cj20" "$_value" "$_syscpus" && return 1
+		get_msg $_q -m _e19 "$_value" "$_syscpus" && return 1
 	fi
 
 	return 0
@@ -1553,8 +1553,8 @@ chk_valid_vnc() {
 		# If value was provided as "true" then assign the default resolution.
 		true) _value=1920x1080 ; return 0 ;;
 		none|false|640x480|800x600|1024x768|1920x1080) return 0 ;;
-		'') get_msg $_q "_0" "VNC viewer resolution" && return 1 ;;
-		*) get_msg $_q "_je6" "VNC viewer resolution" && return 1 ;;
+		'') get_msg $_q -m _e0 "VNC viewer resolution" && return 1 ;;
+		*) get_msg $_q -m _e58 "VNC viewer resolution" && return 1 ;;
 	esac
 }
 
@@ -1584,7 +1584,7 @@ define_ipv4_convention() {
 
 	while getopts t: opts ; do case $opts in
 			t) local _type="$OPTARG" ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	local _client="$1"
@@ -1618,7 +1618,7 @@ discover_open_ipv4() {
 	while getopts qt: opts ; do case $opts in
 			q) _qi="-q" ;;
 			t) local _type="$OPTARG" ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	local _client="$1"  ;  local _ip_test
@@ -1648,7 +1648,7 @@ discover_open_ipv4() {
 			# Failure to find IP in the quBSD conventional range
 			if [ $_ip2 -gt 255 ] ; then
 				_pass_var="${_ip0}.${_ip1}.x.${_ip3}"
-				get_msg $_qi "_jf7" "$_client"
+				get_msg $_qi -m _e46 "$_client"
 				return 1
 			fi
 		else
@@ -1665,7 +1665,7 @@ assign_ipv4_auto() {
 	while getopts et: opts ; do case $opts in
 			e) _echo="true" ;;
 			t) local _type="$OPTARG" ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	local _client="$1"  ;  _gateway="$2"  ;  local _ipv4=
@@ -1703,7 +1703,7 @@ cleanup_vm() {
 
 	# Positional variables
 	local _VM="$1"  ;  local _rootenv="$2"
-	[ -z "$_VM" ] && get_msg $_qcv "_0" && return 1
+	[ -z "$_VM" ] && get_msg $_qcv -m _e0 && return 1
 
 	# Bring all recorded taps back to host, and destroy
 	for _tap in $(sed -E 's/ .*$//' "${QTMP}/vmtaps_${_VM}" 2> /dev/null) ; do
@@ -1734,7 +1734,7 @@ cleanup_vm() {
 
 	# Pull _rootenv in case it wasn't provided
 	[ -z "$_rootenv" ] && ! _rootenv=$(get_jail_parameter -e ROOTENV $_VM) \
-		&& get_msg $_qcv "_cj32" "$_VM" && return 1
+		&& get_msg $_qcv -m _e32 "$_VM" && return 1
 
 	# Destroy the dataset
 	reclone_zroot -q "$_VM" "$_rootenv"
@@ -1743,7 +1743,7 @@ cleanup_vm() {
 	rm "${QTMP}/qb-bhyve_${_VM}" 2> /dev/null
 
 	# If called with [-x] send an exit message and run exit 0
-	[ -n "$_exit" ] && get_msg "_cj32" "$_VM" && exit 0
+	[ -n "$_exit" ] && get_msg -m _e38 "$_VM" && exit 0
 	return 0
 }
 
@@ -1753,7 +1753,7 @@ prep_bhyve_options() {
 
 	while getopts q opts ; do case $opts in
 			q) local _qs="-q" ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Get simple QMAP variables
@@ -1977,7 +1977,7 @@ finish_vm_connections() {
 	_count=0
 	while ! pgrep -xfq "bhyve: $_VM" ; do
 		sleep 1 ; _count=$(( _count + 1 ))
-		[ "$_count" -ge 15 ] && get_msg get_msg "_cj31" "$_VM" && return 1
+		[ "$_count" -ge 15 ] && get_msg -m _e31 "$_VM" && return 1
 	done
 
 	# Connect control jail
@@ -2000,7 +2000,7 @@ exec_vm_coordinator() {
 			n) local _norun="-n" ;;
 			q) local _qs="-q" ; _quiet='/dev/null 2>&1'   ;;
 			t) local _tmux="-t"  ;;
-			*) get_msg "_1" ; return 1 ;;
+			*) get_msg -m _e1 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	_VM="$1"
@@ -2013,7 +2013,7 @@ exec_vm_coordinator() {
 
 	# Pulls variables for the VM, and assembles them into bhyve line options
 	! prep_bhyve_options $_qs $_tmux "$_VM" && [ -z "$_norun" ] \
-			&& get_msg "_cj33" >> $QBLOG && return 1
+			&& get_msg -m _e39 >> $QBLOG && return 1
 
 	# If norun, echo the bhyve start command, cleanup the taps/files, and return 0
 	if [ -n "$_norun" ] ; then
@@ -2030,7 +2030,7 @@ exec_vm_coordinator() {
 	while ! { pgrep -xfq "bhyve: $_VM" \
 				|| pgrep -fl "bhyve" | grep -Eqs "^[[:digit:]]+ .* ${_VM}[[:blank:]]*\$" ;} ; do
 		sleep .5 ; _count=$(( _count + 1 ))
-		[ "$_count" -ge 6 ] && get_msg get_msg "_cj31" "$_VM" && return 1
+		[ "$_count" -ge 6 ] && get_msg -m _e31 "$_VM" && return 1
 	done
 
 	finish_vm_connections &
