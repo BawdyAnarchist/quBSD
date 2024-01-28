@@ -1,6 +1,6 @@
 #!/bin/sh
 
-get_msg_edit() {
+msg_edit() {
 	while getopts eEm:M:u opts ; do case $opts in
 		e) local _exit="exit 0" ;;
 		E) local _exit="exit 1" ;;
