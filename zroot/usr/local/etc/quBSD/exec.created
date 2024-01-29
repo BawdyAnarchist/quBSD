@@ -75,7 +75,7 @@ modify_files() {
 	# SSHD needs to be configured so the control jail can access 
 	if [ "$CONTROL" ] && [ ! "$CONTROL" = "none" ] ; then
 		sed -i '' -E 's/#*(PermitRootLogin).*/\1 yes/' ${M_QROOT}/${JAIL}/etc/ssh/sshd_config
-		chroot ${M_QROOT}/${JAIL} sysrc sshd_enable="YES"
+		sysrc -f ${M_QROOT}/${JAIL}/rw/etc/rc.conf sshd_enable="YES"
 	fi
 }
 
