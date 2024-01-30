@@ -1,19 +1,18 @@
 
+I2P Jails
+Backs up after Tor/I2P jails
+
 Error messages are a bit disorganized now. Need to have useful higher function messages
 	- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
 	- Default should be top level basic messages. -q quiets all, and -v drills down to deeper messages
 	- Might need a -F force option.
 	- Beef up the log file, and make reference to it in error messages
-
-qb-stop
-	- Detect settings if the VM has PPT, and warn to stop internally. Popup warn if necessary.
-	- monitor_vm_stop is probably outdated now since `wait` commands are being used. Needs reviewed 
-	- Still needs fine tuning, as it's hanging somehow during _stop
+	NOTES ON MSG PROBLEM AREAS
+		qb-cmd "all jails have started, but" ... It happens in alot of places it shouldnt. Should chk_isvm
+		qb-cmd that has no user, only root, the -r is not a helpful command
 
 
 ### UPGRADES
-
-Tor and I2P Jails
 
 Integrate X11
 	- Need a GUIjail now with an autoconnection (can use disp3 for now)
@@ -45,6 +44,9 @@ Take another hack at the recording device problems
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
 
+qb-create
+	- It needs further and more extensive testing 
+
 qb-help - overhaul to act like a manpage. Replacing /usr/local/share/quBSD
 	- Each PARAM should have verbose message
 
@@ -69,8 +71,6 @@ qb-backup (already created in $ubin)
 
 qb-stat - Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
 
-qb-create
-	- It needs further and more extensive testing 
 
 
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP

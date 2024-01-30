@@ -1,0 +1,24 @@
+# quBSD Tor gateway torrc
+
+# Set a log. Notices only
+Log info file /var/log/tor/info.log
+Log notice file /var/log/tor/notice.log
+Log warn file /var/log/tor/warn.log
+Log err file /var/log/tor/err.log
+
+# Reroute all DNS queries to Tor DNS
+DNSPort 5353
+
+# Reroute all HTTP and HTTPS traffic through Tor circuits
+TransPort 9040
+
+# Non Tor aware software can access hidden services via standard DNS. 
+AutomapHostsOnResolve 1
+
+# This IP network is completely internal to Tor daemon, for rerouting
+VirtualAddrNetworkIPv4 10.172.0.0/12 
+
+# Using a Bridge can slow down network performance. Do not use by default
+#ClientTransportPlugin obfs4 exec /usr/local/bin/obfs4proxy
+#UseBridges 1
+#Bridge obfs4 [IP:Port] [Fingerprint] cert=[Certified] iat-mode=0
