@@ -1,35 +1,107 @@
 #!/bin/sh
 
-zfs_sendrecv() {
-cat << EOF
-# Initial send
-zfs send -R zroot/0testjails@Nov04_ | zfs recv -o qubsd:autosnap="-" -F ztestbackup/0testjails
-zfs send -R zdata/testjails@Nov04_ | zfs recv -o qubsd:autosnap="-" -F ztestbackup/testjails
+. /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-backup.sh
 
-# Incremental
-zfs send -R -i zroot/0testjails@Nov04_ zroot/0testjails@Nov04_ | zfs recv ztestbackup/0testjails
-zfs send -R -i zdata/testjails@Nov04_ zdata/testjails@Nov04_ | zfs recv ztestbackup/testjails
+get_options() {
+	while getopts aAhf:Fnz: _opts ; do case $_opts in
+		a) MODE="auto" || msg_backup -Eum "_e" ;; 
+		A) [ -z "$MODE" ] && MODE="all" || msg_backup -Eum "_e" ;;
+		h) msg_backup -eu ;; 
+		f) { [ -z "$MODE" ] && MODE="file" && FILE="$OPTARG" ;} || msg_backup -Eum "_e" ;;
+		F) FORCE='-F' ;;
+		n) NORUN="true" ;;
+		z) ZBAK="$OPTARG" ;;
+		*) msg_backup -Eum "_e" ;;
+	esac ; done ; shift $(( OPTIND - 1 ))
 
-# Incremental multi-step (this have a intermediary increment in between
-zfs send -R -I @Nov04_01:41 zroot/0testjails@Nov04_01:46 | zfs recv ztestbackup/0testjails
-zfs send -R -I @Nov04_01:41 zdata/testjails@Nov04_01:46 | zfs recv ztestbackup/testjails
-
-EOF
+	DATE=$(date +%b%d)
+	DATASETS="$@"
+	[ "$MODE" ] && [ "$DATASETS" ] && msg_backup -Eum "_e"
 }
 
-zfs_sendrecv
+check_zbackup() {
+	# [-z] is mandatory
+	[ -z "$ZBAK" ] && msg_backup -Eum "_e" 
+
+	# Make sure dataset exists
+	! chk_valid_zfs "$ZBAK" && msg_backup -Eum "_e"
+
+	# Set the backup to include the DATE 
+	ZBAK="${ZBAK}/${DATE}"
+
+	# Create the new dataset if it doesnt exist 
+	! chk_valid_zfs "$ZBAK" && zfs create "${ZBAK}"
+}
+
+parse_datasets() {
+	# Determine the datasets to back up
+	case $MODE in
+		auto) # Backup datasets selected as "auto" in QMAP
+			;;
+		all)  # Backup all datasets under zroot/qubsd and zusr
+			;;
+		file) # Use a file as source for which datasets to backup
+			;;
+		*) # Assume positionals were given. If not, then error 
+			[ -z "$DATASETS" ] && msg_backup -Eum "_e"
+			;;
+	esac
+}
+
+check_datasets() {
+	for _dataset in $DATASETS ; do
+		! chk_valid_zfs "$_dataset" && msg_backup -Em "_e" 
+
+		if chk_isrunning ${_dataset##*/} ; then 
+			get_jail_parameter CLASS ${_dataset##*/}
+			[ -z "${CLASS##root*}" ] && _ONROOTS=$(printf %b "$_dataset\n$_ONROOTS") 
+		fi
+	done
+
+	# Warn turning off jails/VMs before backups 
+	[ "$_ONROOTS" ] && msg_backup -m "_w" && ! get_user_response && msg_backup -em "_m" 
+}
+
+execute_backup() {
+	for _dataset in $DATASETS ; do		
+		# Check for mountpoint, then modify mountpoint 
+		_mount=$(zfs list -Ho mountpoint $_dataset)
+		[ "$_mount" = "-" ] && _MOUNT="" || MOUNT="-o mountpoint=/${ZBAK}/${_dataset}"
+		_snap="${_dataset}@BAK"
+		zfs snapshot $_snap 
+
+		if [ "$NORUN" ] ; then
+			echo zfs send -vw $_snap
+			echo zfs recv $FORCE -u -o qubsd:autosnap=- $MOUNT ${ZBAK}/${_dataset}
+		else	
+			echo TEMPECHO: zfs send $_snap | zfs recv -Fuv -o qubsd:autosnap=- $MOUNT ${_ZBAK}/${_dataset}
+		fi
+
+		zfs destroy $_snap
+	done
+}
+
+main() {
+	# Check user selected backup dataset
+	check_zbackup
+
+	# Get all datasets for backup
+ 	parse_datasets
+
+	# Checks - validity, on/off status, with warning for rootENVs
+	check_datasets
+
+	# Execute backup
+	execute_backup
+}
+
+get_global_variables
+
+get_options "$@"
+
+main
 
 
-## To make this work
-# Dont forget to make a zfs custom prop column for backup location
-# You'll need to read from the backup pool, for last snapshot
-# If it doesn't exist, make it
-# And now on second thought, the -R option is probably no good. Caz new datasets
-# But if it does exist, you need to grab the last snap on the backup, the most recent on the source
-# Use the incremental -I, to avoid any real problems
 
-# eventually I have the fantasy that I'll script this into an ssh location.
-
-# Here's a YT video that might help you alot. He does incremental streams over ssh, and compression, speed, etc
-# https://www.youtube.com/watch?v=NHM2T0uxkUM
 
