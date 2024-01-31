@@ -69,7 +69,7 @@ calculate_variables() {
 sync_from_qmap() {
 
 	# Get list of all jails with an AUTOSNAP setting in QMAP
-	_jlist=$(qb-list -p AUTOSNAP | grep -E "(true|false)" | awk '{print $1}')
+	_jlist=$(/usr/local/bin/qb-list -Hp AUTOSNAP | grep -E "(true|false)" | awk '{print $1}')
 	for _jail in $_jlist ; do
 
 		# Pull the value of the AUTOSNAP, and conform datasets to QMAP
