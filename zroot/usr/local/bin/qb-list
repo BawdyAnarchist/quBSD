@@ -4,10 +4,11 @@
 . /usr/local/lib/quBSD/msg-list.sh
 
 get_options() {
-	while getopts ahj:lp:szZ opts ; do
+	while getopts ahHj:lp:szZ opts ; do
 		case $opts in
 			a) _zparams="qubsd:autosnap" ; ZLIST="t" ;;
 			h) msg_list -eu ;;
+			H) NOHEAD="-H" ;;
 			j) JAIL="${OPTARG}" ;;
 			l) LIST="t" ;;
 			p) PARAM="${OPTARG}" ;;
@@ -126,8 +127,8 @@ get_zresult() {
 	# Switches between full zfs list of system, and just for jail (if set)
 	[ "$JAIL" = "none" ] && _jail='' || _jail="/$JAIL"
 
-	_ZRESULT=$(zfs list -r $_snaps ${_zparams%,} "${R_ZFS}${_jail}" 2>/dev/null; \
-					zfs list -r $_snaps ${_zparams%,} "${U_ZFS}${_jail}" 2>/dev/null)
+	_ZRESULT=$(zfs list -r $NOHEAD $_snaps ${_zparams%,} "${R_ZFS}${_jail}" 2>/dev/null; \
+					zfs list -r $NOHEAD $_snaps ${_zparams%,} "${U_ZFS}${_jail}" 2>/dev/null)
 
 	[ -z "$_ZRESULT" ] && _ZRESULT="NO ZFS DATASETS WERE FOUND"
 }
@@ -167,12 +168,16 @@ supplement_results() {
 print_results() {
 
 	if [ "$_RESULT" ] && [ -z "$ZONLY" ] ; then
-		_RESULT=$(echo -e "CONTAINER   PARAMETER   VALUE\n${_RESULT}" | column -t)
+
+		# Accout for [-H]
+		[ "$NOHEAD" ] && _RESULT=$(echo -e "${_RESULT}" | column -t) \
+			|| _RESULT=$(echo -e "CONTAINER   PARAMETER   VALUE\n${_RESULT}" | column -t)
+
 		# Eliminate the extra space that can happen for BHYVE_CUSTM after the column -t
 		_RESULT=$(echo "$_RESULT" | sed -E \
 		's/^([^[:blank:]]+[[:blank:]]+[^[:blank:]]+[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /')
 
-		echo ''
+		[ -z "$NOHEAD" ] && echo ''
 		echo "$_RESULT" | grep "CONTAINER"
 		echo "$_RESULT" | grep -Ev "^(#default|CONTAINER)"
 		echo "$_RESULT" | grep "#default"
