@@ -27,8 +27,11 @@ cleanup_files() {
 	rm /tmp/quBSD > /dev/null 2>&1
 	mkdir /tmp/quBSD > /dev/null 2>&1
 
-	# Remove the quBSD log
-	rm /var/log/quBSD.log > /dev/null 2>&1
+	# Empty the contents of the quBSD log directory
+	rm $(dirname $QBLOG)/* > /dev/null 2>&1
+	
+	# Make sure the directory exists
+	mkdir -p $(dirname $QBLOG) > /dev/null 2>&1
 }
 
 cleanup_disps() {

@@ -22,7 +22,7 @@ ENDOFMSG
 	_3) cat << ENDOFMSG
 
 ERROR: Tunnel < $JAIL > failed to start.
-       For more info, see: /var/log/quBSD.log
+       For more info, see: $QBLOG 
 ENDOFMSG
 	;;
 	_6) cat << ENDOFMSG

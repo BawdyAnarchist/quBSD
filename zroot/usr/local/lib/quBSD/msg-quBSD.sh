@@ -219,7 +219,7 @@ ENDOFMSG
 	_e41) cat << ENDOFMSG
 
 ERROR: < $1 > could not be started. For more
-       information, see log at: /var/log/quBSD.log
+       information, see log at: $QBLOG 
 ENDOFMSG
 	;;
 	_e42) cat << ENDOFMSG
@@ -340,7 +340,7 @@ ENDOFMSG
 
 WARNING: < $1 > had to be forcibly stopped. Recommend double
          checking mounts with: mount | grep $1
-         For details see quBSD log:  /var/log/quBSD.log
+         For details see log at: $QBLOG 
 ENDOFMSG
 	;;
 	_w4) cat << ENDOFMSG
@@ -349,7 +349,7 @@ WARNING: < $1 > could not be stopped. Forcible stop failed.
          Recommend running the following commands:
 				jail -R $1
 				mount | grep $1
-         For more info, see: /var/log/quBSD.log
+         For more info, see log at: $QBLOG 
 ENDOFMSG
 	;;
 	_m1) cat << ENDOFMSG
@@ -395,6 +395,11 @@ ENDOFMSG
 	_m6) cat << ENDOFMSG
 
 Waiting for < $1 > to stop. Timeout in < $2 seconds >
+ENDOFMSG
+	;;
+	_m6) cat << ENDOFMSG
+
+EXITED $0
 ENDOFMSG
 	;;
 	esac

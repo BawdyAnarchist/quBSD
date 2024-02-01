@@ -12,7 +12,7 @@ msg_cmd() {
 	_1) cat << ENDOFMSG
 
 ERROR: < $JAIL > Failed to start.
-       For details, see: /var/log/quBSD.log
+       For details, see: $QBLOG 
 ENDOFMSG
 	;;
 	_2) cat << ENDOFMSG

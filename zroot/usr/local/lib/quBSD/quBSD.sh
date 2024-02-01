@@ -117,7 +117,7 @@ get_global_variables() {
 	JCONF="/etc/jail.conf"
 	QBDIR="/usr/local/etc/quBSD"
 	QMAP="${QBDIR}/qubsdmap.conf"
-	QBLOG="/var/log/quBSD.log"
+	QBLOG="/var/log/quBSD/quBSD.log"
 	QTMP="/tmp/quBSD"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
