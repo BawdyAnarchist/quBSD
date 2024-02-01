@@ -231,10 +231,10 @@ check_valid_volsize() {
 	_avail=$(zfs list -pHo available zusr)
 
 	case $VOLSIZE in
-		*T|*t) _vol=$(echo "scale=0 ; $_vol * 1000000000000" | bc | grep -Eo "^[[:digit:]]+") ;;
-		*G|*g) _vol=$(echo "scale=0 ; $_vol * 1000000000" | bc | grep -Eo "^[[:digit:]]+") ;;
-		*M|*m) _vol=$(echo "scale=0 ; $_vol * 1000000" | bc | grep -Eo "^[[:digit:]]+") ;;
-		*K|*k) _vol=$(echo "scale=0 ; $_vol * 1000" | bc | grep -Eo "^[[:digit:]]+") ;;
+		*T|*t) _vol=$(echo "scale=0 ; $_vol * 1024^4" | bc | grep -Eo "^[[:digit:]]+") ;;
+		*G|*g) _vol=$(echo "scale=0 ; $_vol * 1024^3" | bc | grep -Eo "^[[:digit:]]+") ;;
+		*M|*m) _vol=$(echo "scale=0 ; $_vol * 1024^2" | bc | grep -Eo "^[[:digit:]]+") ;;
+		*K|*k) _vol=$(echo "scale=0 ; $_vol * 1024^1" | bc | grep -Eo "^[[:digit:]]+") ;;
 	esac
 
 	# Check the values, and exit if bad
