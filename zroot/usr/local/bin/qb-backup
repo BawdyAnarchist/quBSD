@@ -4,28 +4,30 @@
 . /usr/local/lib/quBSD/msg-backup.sh
 
 get_options() {
-	while getopts aAhf:Fnz: _opts ; do case $_opts in
-		a) MODE="auto" || msg_backup -Eum "_e" ;; 
-		A) [ -z "$MODE" ] && MODE="all" || msg_backup -Eum "_e" ;;
+	while getopts aAhf:FnRz: _opts ; do case $_opts in
+		a) MODE="auto" ;;
+		A) [ -z "$MODE" ] && MODE="all" || msg_backup -Eum "_e2" ;;
 		h) msg_backup -eu ;; 
-		f) { [ -z "$MODE" ] && MODE="file" && FILE="$OPTARG" ;} || msg_backup -Eum "_e" ;;
+		f) { [ -z "$MODE" ] && MODE="file" && FILE="$OPTARG" ;} || msg_backup -Eum "_e2" ;;
 		F) FORCE='-F' ;;
 		n) NORUN="true" ;;
+		R) REPL='-R' ; RECR='-r' ;;
 		z) ZBAK="$OPTARG" ;;
-		*) msg_backup -Eum "_e" ;;
+		*) msg_backup -Eum "_e1" ;;
 	esac ; done ; shift $(( OPTIND - 1 ))
 
 	DATE=$(date +%b%d)
 	DATASETS="$@"
-	[ "$MODE" ] && [ "$DATASETS" ] && msg_backup -Eum "_e"
+	SNAPNAME='@qbBAK'
+	[ "$MODE" ] && [ "$DATASETS" ] && msg_backup -Eum "_e3"
 }
 
 check_zbackup() {
 	# [-z] is mandatory
-	[ -z "$ZBAK" ] && msg_backup -Eum "_e" 
+	[ -z "$ZBAK" ] && msg_backup -Eum "_e4" 
 
 	# Make sure dataset exists
-	! chk_valid_zfs "$ZBAK" && msg_backup -Eum "_e"
+	! chk_valid_zfs "$ZBAK" && msg_backup -Eum "_e5"
 
 	# Set the backup to include the DATE 
 	ZBAK="${ZBAK}/${DATE}"
@@ -34,65 +36,136 @@ check_zbackup() {
 	! chk_valid_zfs "$ZBAK" && zfs create "${ZBAK}"
 }
 
-parse_datasets() {
-	# Determine the datasets to back up
+determine_datasets() {
 	case $MODE in
 		auto) # Backup datasets selected as "auto" in QMAP
+			_JAILS=$(qb-list -Hp BACKUP | grep -Ev "^#" | awk '/.*true$/{print $1}') 
+			for _jail in $_JAILS ; do
+				[ -z "$DATASETS" ] && DATASETS=$(qb-list -HZ $_jail | awk '{print $1}') \
+					|| DATASETS=$(echo "$DATASETS" ; qb-list -HZ $_jail | awk '{print $1}')
+			done
 			;;
 		all)  # Backup all datasets under zroot/qubsd and zusr
+			DATASETS=$(echo -e "$R_ZFS\n$U_ZFS")
+			REPL='-R' ; RECR='-r'
 			;;
 		file) # Use a file as source for which datasets to backup
+			[ -s "$FILE" ] && DATASETS=$(cat $FILE) || msg_backup -Eum "_e6"
 			;;
 		*) # Assume positionals were given. If not, then error 
-			[ -z "$DATASETS" ] && msg_backup -Eum "_e"
+			[ -z "$DATASETS" ] && msg_backup -Eum "_e7"
 			;;
 	esac
+
+	# Sort DATASETS
+	DATASETS=$(echo "$DATASETS" | sort)
+
+	# If it's the case that [-R] was given, and root/qubsd or zusr parents are present,
+	# then it's not necessary to send each set one by one
+	[ "$REPL" ] && echo "$DATASETS" | grep -Eqs "^${R_ZFS}\$" \
+		&& DATASETS=$(echo ${R_ZFS} ; echo "$DATASETS" | grep -Ev "^${R_ZFS}")
+	[ "$REPL" ] && echo "$DATASETS" | grep -Eqs "^${U_ZFS}\$" \
+		&& DATASETS=$(echo ${U_ZFS} ; echo "$DATASETS" | grep -Ev "^${U_ZFS}")
 }
 
 check_datasets() {
 	for _dataset in $DATASETS ; do
-		! chk_valid_zfs "$_dataset" && msg_backup -Em "_e" 
+		# MODE "auto|all" derived datasets directly from ZFS. Pos params and FILE need checked
+		[ ! "$MODE" = "auto" ] && [ ! "$MODE" = "all" ] \
+			&& ! chk_valid_zfs "$_dataset" && _BADSETS=$(echo "$_BADSETS" ; echo "$_dataset")
 
+		# Datasets with an origin (cloned), in quBSD, do not need to be backed up. Remove them
+		[ ! "$(zfs list -Ho origin $_dataset)" = "-" ] \
+			&& DATASETS=$(echo "$DATASETS" | sed "\~$_dataset~d") \
+			&& _origRM="true"
+
+		# Running ROOTENVS should not be backed up. Other jails, maybe (warn).
 		if chk_isrunning ${_dataset##*/} ; then 
 			get_jail_parameter CLASS ${_dataset##*/}
-			[ -z "${CLASS##root*}" ] && _ONROOTS=$(printf %b "$_dataset\n$_ONROOTS") 
+			[ -z "${CLASS##root*}" ] && _ONROOTS=$(printf %b "$_dataset\n$_ONROOTS") \
+				|| _ONJAILS="true"
 		fi
 	done
+	# If there were invalid datasets present, show them to the user 
+	[ "$_BADSETS" ] && msg_backup -Em "_e8" 
+}
+
+cleanup_oldsnaps(){
+	# We must be careful here. `snapshot -r <PARENT>` could've created many recursive snaps
+	for _dataset in ${R_ZFS} ${U_ZFS} ; do
+		zfs list -Hrt snapshot -o name $_dataset | grep "$SNAPNAME" | xargs -I@ zfs destroy @
+	done
+}
+
+calculate_size() {
+	# Creating the snapshots is the most straightforward way to estimate the send sizes. 
+	_SIZE=0
+	trap "cleanup_oldsnaps" INT TERM HUP QUIT EXIT
+	for _dataset in $DATASETS ; do
+		_snap="${_dataset}${SNAPNAME}"
+		_SNAPS=$(echo -e "$_SNAPS\n$_snap")
+		[ "$(zfs list -Ho origin $_dataset)" = "-" ] && zfs snapshot $RECR $_snap 
+
+		# Get zfs estimated size of snapshot to be sent.
+		_size=$(zfs send -nwv $REPL $_snap | tail -1 | grep -Eo '[^[:blank:]]+$')
+		_rawsize=$(zfs send -nwP $REPL $_snap | tail -1 | grep -Eo "[[:digit:]]+")
+		_PRINTSETS=$(echo -e "$_PRINTSETS\n$_size  $_dataset")
+		_SIZE=$(echo "scale=0 ; $_rawsize + $_SIZE" | bc)
+	done	
+
+	# Convert back to human friendly units
+	_K=1024 ; _M=$(echo "1024^2" | bc) ; _G=$(echo "1024^3" | bc) ; _T=$(echo "1024^4" | bc)
+	if      [ $_SIZE -gt $_T ] ; then _SIZE="$(echo "scale=2 ; $_SIZE / $_T" | bc)T"
+		elif [ $_SIZE -gt $_G ] ; then _SIZE="$(echo "scale=2 ; $_SIZE / $_G" | bc)G"
+		elif [ $_SIZE -gt $_M ] ; then _SIZE="$(echo "scale=2 ; $_SIZE / $_M" | bc)M"
+		elif [ $_SIZE -gt $_K ] ; then _SIZE="$(echo "scale=2 ; $_SIZE / $_K" | bc)K"
+		else _SIZE="${_SIZE}B"
+	fi
+}
+
+final_confirmation() {
+	# Full list of datasets to be backed up
+	msg_backup -m "_m1"
+	msg_backup -m "_m2"
 
 	# Warn turning off jails/VMs before backups 
-	[ "$_ONROOTS" ] && msg_backup -m "_w" && ! get_user_response && msg_backup -em "_m" 
+	[ "$_ONJAILS" ] && msg_backup -m "_w1"
+
+	# Final confirmation
+	msg_backup -m "_m3" 
+	! get_user_response && msg_backup -em "_m4" 
 }
 
 execute_backup() {
+
+	# Perform the backup
 	for _dataset in $DATASETS ; do		
 		# Check for mountpoint, then modify mountpoint 
 		_mount=$(zfs list -Ho mountpoint $_dataset)
 		[ "$_mount" = "-" ] && _MOUNT="" || MOUNT="-o mountpoint=/${ZBAK}/${_dataset}"
-		_snap="${_dataset}@BAK"
-		zfs snapshot $_snap 
 
 		if [ "$NORUN" ] ; then
-			echo zfs send -vw $_snap
-			echo zfs recv $FORCE -u -o qubsd:autosnap=- $MOUNT ${ZBAK}/${_dataset}
+			echo zfs send -vw $REPL $_snap
+			echo zfs recv $FORCE -uo qubsd:autosnap=- $MOUNT ${ZBAK}/${_dataset}
 		else	
-			echo TEMPECHO: zfs send $_snap | zfs recv -Fuv -o qubsd:autosnap=- $MOUNT ${_ZBAK}/${_dataset}
+			echo TEMPECHO: zfs send -wv $REPL $_snap #| zfs recv $FORCE -uo qubsd:autosnap=- $MOUNT ${_ZBAK}/${_dataset}
 		fi
-
-		zfs destroy $_snap
 	done
 }
 
 main() {
-	# Check user selected backup dataset
+	# Make sure that any previously used qb-backup snapshots are removed, to prevent errors
+	cleanup_oldsnaps		
+
+	# Checks, preparation, message assembly 
 	check_zbackup
-
-	# Get all datasets for backup
- 	parse_datasets
-
-	# Checks - validity, on/off status, with warning for rootENVs
+ 	determine_datasets
 	check_datasets
+	calculate_size
 
-	# Execute backup
+	# Send warnings/messages, get user confirmation, execute
+	final_confirmation	
+exit 0
 	execute_backup
 }
 
