@@ -142,7 +142,7 @@ get_zresult() {
 	_ZRESULT=$(zfs list -r $NOHEAD $_snaps ${_zparams%,} "${R_ZFS}${_jail}" 2>/dev/null; \
 					zfs list -r $NOHEAD $_snaps ${_zparams%,} "${U_ZFS}${_jail}" 2>/dev/null)
 
-	[ -z "$_ZRESULT" ] && _ZRESULT="NO ZFS DATASETS WERE FOUND"
+	[ -z "$_ZRESULT" ] && [ -z "$NOHEAD" ] && _ZRESULT="NO ZFS DATASETS WERE FOUND"
 }
 
 get_devfs_result() {
@@ -197,7 +197,7 @@ print_results() {
 
 	[ "$_ZRESULT" ] && echo -e "${_ZRESULT}\n" | column -t
 
-	[ -z "$_RESULT" ] && [ -z "$_ZRESULT" ] && msg_list -m _6
+	[ -z "$_RESULT" ] && [ -z "$NOHEAD" ] && [ -z "$_ZRESULT" ] && msg_list -m _6
 }
 
 get_global_variables
