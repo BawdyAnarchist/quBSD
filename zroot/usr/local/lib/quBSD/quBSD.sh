@@ -155,7 +155,7 @@ get_parameter_lists() {
 	getopts n _opts && local _nc="true" && shift
 
 	# List out normal parameters which can be checked (vs BHYVE_CUSTM)
-	COMN_PARAMS="AUTOSTART AUTOSNAP CLASS CONTROL CPUSET GATEWAY IPV4 MTU NO_DESTROY ROOTENV"
+	COMN_PARAMS="AUTOSTART AUTOSNAP BACKUP CLASS CONTROL CPUSET GATEWAY IPV4 MTU NO_DESTROY ROOTENV"
 	JAIL_PARAMS="MAXMEM SCHG SECLVL"
 	VM_PARAMS="BHYVEOPTS MEMSIZE TAPS TMUX VCPUS VNC WIREMEM X11"
 	MULT_LN_PARAMS="BHYVE_CUSTM PPT"
@@ -192,7 +192,7 @@ get_user_response() {
 
 	case "$_response" in
 		y|Y|yes|YES) return 0	;;
-
+		exit|quit) get_msg -m "_m6" && exit 0 ;;
 		# Only return success on positive response. All else fail
 		*)	return 1 ;;
 	esac
@@ -1109,6 +1109,12 @@ chk_valid_autosnap() {
 	getopts q _opts && local _q='-q' && shift
 	[ "$1" = "--" ] && shift
 	chk_truefalse $_q "$1" "AUTOSNAP"
+}
+
+chk_valid_backup() {
+	getopts q _opts && local _q='-q' && shift
+	[ "$1" = "--" ] && shift
+	chk_truefalse $_q "$1" "BACKUP"
 }
 
 chk_valid_bhyveopts() {
