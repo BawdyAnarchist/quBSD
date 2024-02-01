@@ -40,13 +40,13 @@ check_and_adjust() {
 	# Script is intended to be robust for the user. This function
 	# merges any positional parameters with -j and -p options, when able.
 
-	case "${JAIL}_${POS1}_${PARAM}_${POS2}" in
+	case "${JAIL}@${POS1}@${PARAM}@${POS2}" in
 
 		# No action. If POS1 wasnt assigned, then POS2 wasnt either
-		none_none_*|*_none_*_*) : ;;
+		none@none@*|*@none@*@*) : ;;
 
 		# In this case, we're nice to the user, and try to figure out if POS1 is JAIL or PARAM
-		none_*_none_none)
+		none@*@none@none)
 
 			# Check if it's a parameter
 			awk '{print $2}' $QMAP | grep -Eqsi "$POS1" && PARAM="$POS1"
@@ -62,10 +62,10 @@ check_and_adjust() {
 		;;
 
 		# Both POS1&2 should be assigned
-		none_*_none_*) JAIL="$POS1" ; PARAM="$POS2" ;;
+		none@*@none@*) JAIL="$POS1" ; PARAM="$POS2" ;;
 
 		# POS1 is clearly JAIL, as -p was assigned. Even if POS2 exists, use the -p <PARAM>
-		none_*_*_*) JAIL="$POS1" ;;
+		none@*@*@*) JAIL="$POS1" ;;
 	esac
 
 	# Convert lower-case entered PARAM to upper, again, in case POS2 replaced it
@@ -77,42 +77,54 @@ get_results() {
 	# Note: While there's some redundancy, it's a more clear/comprehensive solution
 	# Where possible, _$ZLIST_ is set as wildcard, with switch used inside case statement
 
-	case "${LIST}_${ZLIST}_${JAIL}_${PARAM}" in
+	case "${LIST}@${ZLIST}@${JAIL}@${PARAM}" in
 
 		# List all jails (regardless of [-l] given or not)
-		*_f_none_NONE)
+		*@f@none@NONE)
 				_RESULT=$(awk '{print $1}' $QMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
 		;;
 
 		# List all jails and then list their zfs's
-		t_t_none_NONE)
+		t@t@none@NONE)
 				_RESULT=$(awk '{print $1}' $QMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
 				get_zresult
 		;;
 
 		# List all jails zfs's, but dont list the jails as a single named column like last case
-		f_t_none_NONE)
+		f@t@none@NONE)
 				get_zresult
 		;;
 
 		# Show a particular jail
-		*_*_*_NONE)
+		*@*@*@NONE)
 			# Add in devfs if appropriate, and supplement missing values with #defaults
 			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $QMAP)
-			get_devfs_result
-			supplement_results
+			get_devfs_result "$JAIL"
+			supplement_jail
 			[ "$ZLIST" = "t" ] && get_zresult
 		;;
 
 		# Show a particular parameter
-		*_*_none_*)
-			[ "$PARAM" = "DEVFS_RULE" ] && get_devfs_result \
-				|| _RESULT=$(grep -E "^[^[:blank:]]+[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
+		*@*@none@*)
+			_JAILS=$(echo '#default' ; awk '!/^#/{print $1}' $QMAP | uniq)
+			_default=$(\
+				sed -nE "s/#default[[:blank:]]+${PARAM}[[:blank:]]+([^[:blank:]]+)/\1/p" $QMAP)
+			for _jail in $_JAILS ; do
+				if [ "$PARAM" = "DEVFS_RULE" ] ; then
+					get_devfs_result "$_jail" 
+				else 
+					unset _result
+					_result=$(grep -E "^${_jail}[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
+					[ -z "$_result" ] && _result="$_jail  $PARAM  $_default"
+					[ -z "$_RESULT" ] && _RESULT=$(echo "$_result") \
+						|| _RESULT=$(echo "$_RESULT" ; echo "$_result")
+				fi
+			done
 		;;
 
 		# Show a jail/parameter combo
-		*_f_*_*)
-			[ "$PARAM" = "DEVFS_RULE" ] && get_devfs_result \
+		*@f@*@*)
+			[ "$PARAM" = "DEVFS_RULE" ] && get_devfs_result "$JAIL" \
 				|| _RESULT=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
 
 			[ -z "$_RESULT" ] \
@@ -134,8 +146,9 @@ get_zresult() {
 }
 
 get_devfs_result() {
+	local _jail="$1"
 	# Get the rule number from jail.conf (this will just be blank for VMs)
-	_rulenum=$(sed -En "/^${JAIL}(\{|[[:blank:]])/,/^}/p" $JCONF \
+	_rulenum=$(sed -En "/^${_jail}(\{|[[:blank:]])/,/^}/p" $JCONF \
 				| sed -En "s/devfs_ruleset=\"//p" | grep -Eo "[[:digit:]]+")
 
 	# Then get the full name of the rulenumber from devfs.rules
@@ -143,12 +156,11 @@ get_devfs_result() {
 		_rulename=$(sed -En "s/.*devfsrules_(.*=${_rulenum}).*/\1/p" /etc/devfs.rules)
 
 		# Modify result
-		_RESULT=$(echo "$_RESULT" ; echo "$JAIL  DEVFS_RULE  ${_rulename}")
+		_RESULT=$(echo "$_RESULT" ; echo "$_jail  DEVFS_RULE  ${_rulename}")
 	fi
 }
 
-supplement_results() {
-
+supplement_jail() {
 	# Will return globals: CLASS and FILT_PARAMS (which will change for jails vs VMs)
 	get_parameter_lists
 
