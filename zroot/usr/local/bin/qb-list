@@ -79,23 +79,23 @@ get_results() {
 
 	case "${LIST}@${ZLIST}@${JAIL}@${PARAM}" in
 
-		# List all jails (regardless of [-l] given or not)
+		# ALL JAILS 
 		*@f@none@NONE)
 				_RESULT=$(awk '{print $1}' $QMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
 		;;
 
-		# List all jails and then list their zfs's
+		# ALL JAILS + ZFS 
 		t@t@none@NONE)
 				_RESULT=$(awk '{print $1}' $QMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
 				get_zresult
 		;;
 
-		# List all jails zfs's, but dont list the jails as a single named column like last case
+		# ZFS ONLY 
 		f@t@none@NONE)
 				get_zresult
 		;;
 
-		# Show a particular jail
+		# SINGLE JAIL
 		*@*@*@NONE)
 			# Add in devfs if appropriate, and supplement missing values with #defaults
 			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $QMAP)
@@ -104,15 +104,20 @@ get_results() {
 			[ "$ZLIST" = "t" ] && get_zresult
 		;;
 
-		# Show a particular parameter
+		# SINGLE PARAMETER
 		*@*@none@*)
+			# Get list of all jails in QMAP (include #default).
 			_JAILS=$(echo '#default' ; awk '!/^#/{print $1}' $QMAP | uniq)
 			_default=$(\
 				sed -nE "s/#default[[:blank:]]+${PARAM}[[:blank:]]+([^[:blank:]]+)/\1/p" $QMAP)
+
+			# PARAMS set to #default arent enumerated in QMAP. So cant just grep/sed them. 
 			for _jail in $_JAILS ; do
 				if [ "$PARAM" = "DEVFS_RULE" ] ; then
+					# Devfs is not inherently a QMAP, parameter, but we provide the info anyways 
 					get_devfs_result "$_jail" 
 				else 
+					# Reconstruct PARAMS for all jails to include the non-enumerated #default values
 					unset _result
 					_result=$(grep -E "^${_jail}[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
 					[ -z "$_result" ] && _result="$_jail  $PARAM  $_default"
