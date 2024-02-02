@@ -1,11 +1,6 @@
 
-root@quBSD:~ # jail -c 0net
-0net: created
-/usr/sbin/sysrc: cannot create /qubsd/0net/rw/etc/rc.conf: No such file or directory
-
-get_jail_parameter uses _w2, but it's empty
-
 Error messages are a bit disorganized now. Need to have useful higher function messages
+	- Could assign $fn as the function name, and then pass $fn to error message for reporting/logging.
 	- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
 	- Default should be top level basic messages. -q quiets all, and -v drills down to deeper messages
 	- Might need a -F force option.
