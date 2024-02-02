@@ -1,6 +1,12 @@
 
-I2P Jails
-Backs up after Tor/I2P jails
+qb-backup
+	- actually on second thought, pos params arent contradictory to -a|-A|-f
+
+root@quBSD:~ # jail -c 0net
+0net: created
+/usr/sbin/sysrc: cannot create /qubsd/0net/rw/etc/rc.conf: No such file or directory
+
+get_jail_parameter uses _w2, but it's empty
 
 Error messages are a bit disorganized now. Need to have useful higher function messages
 	- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
@@ -14,12 +20,7 @@ Error messages are a bit disorganized now. Need to have useful higher function m
 
 ### UPGRADES
 
-Integrate X11
-	- Need a GUIjail now with an autoconnection (can use disp3 for now)
-	- qubsd ipv4 convention will need a new class 
-
 GUI SECURITY
-	- Test Wayland in separate tty
 	- Test Xpra, Xauth and try to isolate xhost 
 	- Xephyr - Unfortunately I'm not sure this is a real solution. Everything still shares the unix socket
 		- Might not matter, but if I keep it, some ideas:
@@ -41,11 +42,14 @@ NICVM - Linux VM (probably alpine) so that it can use all the wireless protocols
 
 Take another hack at the recording device problems
 
+I2P Gateway
+
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
 
 qb-create
 	- It needs further and more extensive testing 
+	- -z dirs recreated files too, not just directories
 
 qb-help - overhaul to act like a manpage. Replacing /usr/local/share/quBSD
 	- Each PARAM should have verbose message
@@ -61,6 +65,7 @@ qb-pci
 	- Show what was is currently passthrough'd
 
 qb-list [-e] (evaluate) option to check jail-param combos for validity.
+	- devfs_rule not showing well with summoned
 
 qb-ephm - Clone from zroot too. Tricky, because of "reclone_zroot" operation in exec.prepare 
 
