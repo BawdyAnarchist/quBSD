@@ -1,0 +1,3 @@
+# Device          Mountpoint                  FStype   Options Dump Pass#
+/zusr/0gui/rw/    /qubsd/0base-template/rw/   nullfs   rw      0    0	
+/zusr/0gui/home/  /qubsd/0base-template/home/ nullfs   rw      0    0
