@@ -1,7 +1,4 @@
 
-qb-backup
-	- actually on second thought, pos params arent contradictory to -a|-A|-f
-
 root@quBSD:~ # jail -c 0net
 0net: created
 /usr/sbin/sysrc: cannot create /qubsd/0net/rw/etc/rc.conf: No such file or directory
