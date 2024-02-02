@@ -220,7 +220,7 @@ get_jail_parameter() {
 			s) _sp="true" ;;
 			x) _xp="-x" ;;
 			z) _zp="true" ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Positional and function variables
@@ -228,8 +228,8 @@ get_jail_parameter() {
 	local _jail="$2"   ; local _value=''
 
 	# Either jail or param weren't provided
-	[ -z "$_jail" ] && get_msg $_qp -m _e0 "jail" && eval $_sp return 1
-	[ -z "$_param" ] && get_msg $_qp -m _e0 "parameter" && eval $_sp return 1
+	[ -z "$_jail" ] && get_msg $_qp -m _e17 "jail" && eval $_sp return 1
+	[ -z "$_param" ] && get_msg $_qp -m _e17 "parameter" && eval $_sp return 1
 
 	# Get the <_value> from QMAP.
 	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
@@ -241,7 +241,7 @@ get_jail_parameter() {
 	# If still blank, check for -z or -s options. Otherwise err message and return 1
 	if [ -z "$_value" ] ; then
 		[ "$_zp" ] && return 0  ;  [ "$_sp" ] && return 0
-		get_msg $_qp -m _w2 "$_param" "$_value" && return 1
+		get_msg $_qp -m _e13 "$_param" "$_value" && return 1
 	fi
 
 	# If -s was provided, checks are skipped by this eval
@@ -262,7 +262,7 @@ get_info() {
 
 	while getopts e opts ; do case $opts in
 			e) local _ei="-e" ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	local _info="$1"  ;  local _jail="$2"  ;  local _value=''
@@ -383,7 +383,7 @@ start_jail() {
 
 	local _jail="$1"
 	[ "$_jail" = "none" ] && return 0
-	[ -z "$_jail" ] && get_msg $_qs -m _e0 "jail" && return 1
+	[ -z "$_jail" ] && get_msg $_qs -m _e17 "jail" && return 1
 
 	# Check to see if _jail is already running
 	if	! chk_isrunning "$_jail" ; then
@@ -410,11 +410,11 @@ stop_jail() {
 			q) local _qj="-q" ;;
 			t) local _timeout="-t $OPTARG" ;;
 			w) local _wait="true" ;;
-			*) get_msg -m _e1 ;;
+			*) get_msg -m _e14 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	local _jail="$1"
-	[ -z "$_jail" ] && get_msg $_qj -m _e0 "jail" && return 1
+	[ -z "$_jail" ] && get_msg $_qj -m _e17 "jail" && return 1
 
 	# Check that the jail is on
 	if chk_isrunning "$_jail" ; then
@@ -455,12 +455,12 @@ restart_jail() {
 	while getopts hq opts ; do case $opts in
 			h) local _hold="true" ;;
 			q) local _qr="-q" ;;
-			*) get_msg -m _e1 ;;
+			*) get_msg -m _e14 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Positional parameters / check
 	local _jail="$1"
-	[ -z "$_jail" ] && get_msg $_qr -m _e0 "jail"  && return 1
+	[ -z "$_jail" ] && get_msg $_qr -m _e17 "jail"  && return 1
 
 	# If the jail was off, and the hold flag was given, don't start it.
 	! chk_isrunning "$_jail" && [ "$_hold" ] && return 0
@@ -547,7 +547,7 @@ connect_client_to_gateway() {
 			m) _mtu="$OPTARG" ;;
 			n) _named_restart="true" ;;
 			q) _q='-q' ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Pos params, default MTU, and _type
@@ -629,7 +629,7 @@ connect_gateway_to_clients() {
 	[ "$1" = "--" ] && shift
 
 	local _gateway="$1"
-	[ -z "$_gateway" ] && get_msg $_q -m _e0 "Jail/VM" && return 1
+	[ -z "$_gateway" ] && get_msg $_q -m _e17 "Jail/VM" && return 1
 
 	# All onjails connect to 0control
 	if [ "$CLASS" = "cjail" ] ; then
@@ -676,9 +676,9 @@ reclone_zroot() {
 
 	# Variables definitions
 	_jail="$1"
-		[ -z "${_jail}" ] && get_msg $_qz -m _e0 "Jail" && return 1
+		[ -z "${_jail}" ] && get_msg $_qz -m _e17 "Jail" && return 1
 	_rootenv="$2"
-		[ -z "${_rootenv}" ] && get_msg $_qz -m _e0 "ROOTENV" && return 1
+		[ -z "${_rootenv}" ] && get_msg $_qz -m _e17 "ROOTENV" && return 1
 	_jailzfs="${R_ZFS}/${_jail}"
 	_rootzfs="${R_ZFS}/${_rootenv}"
 
@@ -916,7 +916,7 @@ chk_truefalse() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"  ;  local _param="$2"
-	[ -z "$_value" ] && get_msg $_qf -m _e0 "$_param" && return 1
+	[ -z "$_value" ] && get_msg $_qf -m _e17 "$_param" && return 1
 
 	# Must be either true or false.
 	[ ! "$_value" = "true" ] && [ ! "$_value" = "false" ] \
@@ -939,7 +939,7 @@ chk_integer() {
 				! echo "${_L}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q -m _e59 "$_var" && return 1 ;;
 			v) local _var="$OPTARG" ;;
 			q) local _q='-q' ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 	_value="$1"
 
@@ -977,7 +977,7 @@ chk_avail_jailname() {
 
 	# Positional parmeters
 	local _jail="$1"
-	[ -z "$_jail" ] && get_msg $_qa -m _e0 "new jail name" && return 1
+	[ -z "$_jail" ] && get_msg $_qa -m _e17 "new jail name" && return 1
 
 	# Checks that proposed jailname isn't 'none' or 'qubsd' or starts with '#'
 	echo "$_jail" | grep -Eqi "^(none|qubsd)\$" \
@@ -1015,12 +1015,12 @@ chk_valid_jail() {
 	while getopts c:q opts ; do case $opts in
 			c) _class="$OPTARG" ;;
 			q) _qv='-q' ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	# Positional parmeters and function specific variables.
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_qv -m _e0 "jail" && return 1
+	[ -z "$_value" ] && get_msg $_qv -m _e17 "jail" && return 1
 
 	# Must have class in QMAP. Used later to find the correct zfs dataset
 	_class="${_class:=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)}"
@@ -1141,7 +1141,7 @@ chk_valid_class() {
 
 	# Valid inputs are: appjail | rootjail | cjail | dispjail | appVM | rootVM
 	case $_value in
-		'') get_msg $_q -m _e0 "CLASS" && return 1 ;;
+		'') get_msg $_q -m _e17 "CLASS" && return 1 ;;
 		appjail|dispjail|rootjail|cjail|rootVM|appVM) return 0 ;;
 		*) get_msg $_q -m _e3 "$_value" "CLASS" && return 1 ;;
 	esac
@@ -1150,11 +1150,11 @@ chk_valid_class() {
 chk_valid_cpuset() {
 	while getopts q opts ; do case $opts in
 			q) local _q="-q" ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q -m _e0 "CPUSET" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e17 "CPUSET" && return 1
 	[ "$_value" = "none" ] && return 0
 
 	# Get the list of CPUs on the system, and edit for searching
@@ -1192,7 +1192,7 @@ chk_valid_devfs_rule() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q -m _e0 "devfs_ruleset" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e17 "devfs_ruleset" && return 1
 
 	! grep -Eqs -- "=${_value}\]\$|\[devfsrules.*${_value}\]\$" /etc/devfs.rules \
 			&& get_msg $_q -m _e3 "$_value" "DEVFS_RULE" && return 1
@@ -1229,14 +1229,14 @@ chk_valid_ipv4() {
 		q) local _q="-q" ;;
 		r) local _rp="-r" ;;
 		x) local _xp="-x" ;;
-		*) get_msg -m _e1 ; return 1 ;;
+		*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# !! _value is not local here, it might get reassigned !!
 	_value="$1"  ;  local _jail="$2"
 
 	case $_value in
-		'') get_msg $_q -m _e0 "IPV4" && return 1 ;;
+		'') get_msg $_q -m _e17 "IPV4" && return 1 ;;
 		none|DHCP) return 0 ;;
 		auto) [ "$_rp" ] && { _value=$(assign_ipv4_auto -et NET "$_jail") && return 0 ;} || return 1
 			;;
@@ -1290,7 +1290,7 @@ chk_isqubsd_ipv4() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"  ;  local _jail="$2"
-	[ -z "$_value" ] && get_msg $_q -m _e0 "IPV4"
+	[ -z "$_value" ] && get_msg $_q -m _e17 "IPV4"
 
 	# $_a0 - $_a4 vars are needed later. Check that they're all here, or get them.
 	echo "${_a0}#${_a1}#${_a2}#${_a3}#${_a4}" | grep -q "##" \
@@ -1338,7 +1338,7 @@ chk_valid_maxmem() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q -m _e0 "MAXMEM" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e17 "MAXMEM" && return 1
 	[ "$_value" = "none" ] && return 0
 
 	# Per man 8 rctl, user can assign units: G|g|M|m|K|k
@@ -1395,11 +1395,11 @@ chk_valid_ppt() {
 	while getopts qx opts ; do case $opts in
 			q) local _q="-q" ;;
 			x) local _xtra="true" ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	_value="$1"
-	[ -z "$_value" ] && get_msg $_q -m _e0 "PPT (passthru)" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e17 "PPT (passthru)" && return 1
 	[ "$_value" = "none" ] && return 0
 
 	# Get list of pci devices on the machine
@@ -1447,7 +1447,7 @@ chk_valid_rootenv() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q -m _e0 "CLASS" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e17 "CLASS" && return 1
 
 	# Must be designated as the appropriate corresponding CLASS in QMAP
 	local _class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
@@ -1473,7 +1473,7 @@ chk_valid_seclvl() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q -m _e0 "SECLVL" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e17 "SECLVL" && return 1
 	[ "$_value" = "none" ] && return 0
 
 	# If SECLVL is not a number
@@ -1490,7 +1490,7 @@ chk_valid_taps() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q -m _e0 "VIF" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e17 "VIF" && return 1
 
 	# Make sure that it's an integer
 	for _val in $_value ; do
@@ -1513,7 +1513,7 @@ chk_valid_schg() {
 
 	# Valid inputs are: none | sys | all
 	case $_value in
-		'') get_msg $_q -m _e0 "SCHG" && return 1 ;;
+		'') get_msg $_q -m _e17 "SCHG" && return 1 ;;
 		none|sys|all) return 0 ;;
 		*) get_msg $_q -m _e3 "$_value" "SCHG"  ;  return 1
 	esac
@@ -1534,7 +1534,7 @@ chk_valid_vcpus() {
 	[ "$1" = "--" ] && shift
 
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q -m _e0 "VCPUS" && return 1
+	[ -z "$_value" ] && get_msg $_q -m _e17 "VCPUS" && return 1
 
 	# Get the number of CPUs on the system
 	_syscpus=$(cpuset -g | head -1 | grep -oE "[^[:blank:]]+\$")
@@ -1562,7 +1562,7 @@ chk_valid_vnc() {
 		# If value was provided as "true" then assign the default resolution.
 		true) _value=1920x1080 ; return 0 ;;
 		none|false|640x480|800x600|1024x768|1920x1080) return 0 ;;
-		'') get_msg $_q -m _e0 "VNC viewer resolution" && return 1 ;;
+		'') get_msg $_q -m _e17 "VNC viewer resolution" && return 1 ;;
 		*) get_msg $_q -m _e58 "VNC viewer resolution" && return 1 ;;
 	esac
 }
@@ -1593,7 +1593,7 @@ define_ipv4_convention() {
 
 	while getopts t: opts ; do case $opts in
 			t) local _type="$OPTARG" ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	local _client="$1"
@@ -1627,7 +1627,7 @@ discover_open_ipv4() {
 	while getopts qt: opts ; do case $opts in
 			q) _qi="-q" ;;
 			t) local _type="$OPTARG" ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	local _client="$1"  ;  local _ip_test
@@ -1674,7 +1674,7 @@ assign_ipv4_auto() {
 	while getopts et: opts ; do case $opts in
 			e) _echo="true" ;;
 			t) local _type="$OPTARG" ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	local _client="$1"  ;  _gateway="$2"  ;  local _ipv4=
@@ -1712,7 +1712,7 @@ cleanup_vm() {
 
 	# Positional variables
 	local _VM="$1"  ;  local _rootenv="$2"
-	[ -z "$_VM" ] && get_msg $_qcv -m _e0 && return 1
+	[ -z "$_VM" ] && get_msg $_qcv -m _e17 && return 1
 
 	# Bring all recorded taps back to host, and destroy
 	for _tap in $(sed -E 's/ .*$//' "${QTMP}/vmtaps_${_VM}" 2> /dev/null) ; do
@@ -1762,7 +1762,7 @@ prep_bhyve_options() {
 
 	while getopts q opts ; do case $opts in
 			q) local _qs="-q" ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Get simple QMAP variables
@@ -2009,7 +2009,7 @@ exec_vm_coordinator() {
 			n) local _norun="-n" ;;
 			q) local _qs="-q" ; _quiet='/dev/null 2>&1'   ;;
 			t) local _tmux="-t"  ;;
-			*) get_msg -m _e1 ; return 1 ;;
+			*) get_msg -m _e14 ; return 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	_VM="$1"

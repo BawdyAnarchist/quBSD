@@ -79,13 +79,12 @@ ENDOFMSG
 	;;
 	_e13) cat << ENDOFMSG
 
-ERROR: < $1 > was not found in qubsdmap.conf, and
-       < $2 > was blank in qmap. Manually edit
-       $2 in /usr/local/etc/quBSD/qubsdmap.conf
+ERROR: The combination of < $1 > < $2 > was not found in QMAP.
 ENDOFMSG
 	;;
 	_e14) cat << ENDOFMSG
-UNUSED_UNUSED
+
+ERROR: Received an invalid option for a function in /usr/local/lib/quBSD/quBSD.sh
 ENDOFMSG
 	;;
 	_e15) cat << ENDOFMSG
@@ -119,7 +118,9 @@ ERROR: < $1 > needs to be designated as a
 ENDOFMSG
 	;;
 	_e17) cat << ENDOFMSG
-UNUSED_UNUSED
+
+ERROR: Missing argument for function in /usr/local/lib/quBSD/quBSD.sh
+       A < $1 > must be specified for this function.
 ENDOFMSG
 	;;
 	_e18) cat << ENDOFMSG
