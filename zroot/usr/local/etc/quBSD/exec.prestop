@@ -34,7 +34,7 @@ lock_netmap() {
 }
 
 main() {
-	echo "Stopping $JAIL. $(date "+%Y-%m-%d_%H:%M")" >> /var/log/quBSD.log
+	echo "$(date "+%Y-%m-%d_%H:%M") exec.prestop: STOPPING: $JAIL" | tee -a ${QBLOG} ${QBLOG}_$JAIL 
 
 	# lock file required, since sed doesn't get queued by kernel like echo "" >>
 	lock_netmap
