@@ -14,7 +14,7 @@ main() {
 		chroot ${M_QROOT}/${JAIL} /bin/sh <<"EOT"
 			for _file in $(find "/rw" -type f | sed "s:/rw::") ; do
 					[ -d "$(dirname $_file)" ] || mkdir -p $(dirname $_file)
-					ln -sf /rw/${_file} $_file
+					ln -sf /rw${_file} $_file
 			done
 EOT
 	fi
