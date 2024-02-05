@@ -5,12 +5,28 @@ get_msg() {
 	# $2 : _value of the thing that was checked ($1 from the caller)
 	# $3 : _passvar is a supplementary parameter to aid message specificity.
 
+	local _log='' ; local _message=''
+
    # Quiet option finally resolves. Will return 0 to caller immediately
 	while getopts m:q opts ; do case $opts in
+		l) local _log="true" ;;
 		m) local _message="$OPTARG" ;;
-		q) local _q ; return 0 ;;
+		q) local _q="true" ;;
+		r) local = "true" ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
+	# Assign the message to a variable for handling
+	GET_MSG=$(echo "$GET_MSG" ; retreive_msg "$@")
+
+	# If _message was error or warning (_e or _w), then output to the log
+	{ [ -z "${_message##_e*}" ] || [ -z "${_message##_w*}" ] ;} \
+		&& echo -e "$(date "+%Y-%m-%d_%H:%M")  $0  ${_fn}\n${_FN}\n$GET_MSG" >> $QBLOG
+	[ -z "$_q" ] && echo "$GET_MSG"
+
+	unset _log ; unset _message
+}
+
+retreive_msg() {
 	case "$_message" in
 	_e2) cat << ENDOFMSG
 
@@ -85,6 +101,8 @@ ENDOFMSG
 	_e14) cat << ENDOFMSG
 
 ERROR: Received an invalid option for a function in /usr/local/lib/quBSD/quBSD.sh
+       This is likely a bug with quBSD, please report it.
+       For details see: $QBLOG
 ENDOFMSG
 	;;
 	_e15) cat << ENDOFMSG
@@ -119,8 +137,8 @@ ENDOFMSG
 	;;
 	_e17) cat << ENDOFMSG
 
-ERROR: Missing argument for function in /usr/local/lib/quBSD/quBSD.sh
-       A < $1 > must be specified for this function.
+ERROR: quBSD encountered a missing argument where one is required.
+       A < $1 > must be specified
 ENDOFMSG
 	;;
 	_e18) cat << ENDOFMSG
@@ -177,11 +195,11 @@ ERROR: PCI device < $1 > is not attached.
        Attempted to attach with devctl, but failed.
 ENDOFMSG
 	;;
-	_e34) cat << ENDOFMSG
-UNUSED_UNUSED
+	_e27) cat << ENDOFMSG
+There was a problem with the PARAMETER value for < $1 > in QMAP.
 ENDOFMSG
 	;;
-	_e35) cat << ENDOFMSG
+	_e28) cat << ENDOFMSG
 UNUSED_UNUSED
 ENDOFMSG
 	;;
@@ -214,17 +232,17 @@ ERROR: Tried to launch < $1 > but there were
 ENDOFMSG
 	;;
 	_e40) cat << ENDOFMSG
-${0##*/} is starting < $1 >
+UNUSED_UNUSED
 ENDOFMSG
 	;;
 	_e41) cat << ENDOFMSG
 
 ERROR: < $1 > could not be started. For more
-       information, see log at: $QBLOG 
+       information, see log at: $QBLOG
 ENDOFMSG
 	;;
 	_e42) cat << ENDOFMSG
-${0##*/} is shutting down < $1 >
+UNUSED_UNUSED
 ENDOFMSG
 	;;
 	_e43) cat << ENDOFMSG
@@ -264,7 +282,7 @@ ENDOFMSG
 ERROR: < $1 > needs a ROOTENV clone. However, its
        ROOTENV < $2 > has no existing snapshots,
        and is curently running. Running ROOTENVs should
-       not be snapshot/cloned until turned off. 
+       not be snapshot/cloned until turned off.
 
 ENDOFMSG
 	;;
@@ -279,7 +297,7 @@ ERROR: ${2##*bin/} failed to ${2##*qb-} all jails/VMs
 ENDOFMSG
 	;;
 	_e52) cat << ENDOFMSG
-UNUSED_UNUSED
+ERROR: $0 did not find any jails to ${0##*qb-}
 ENDOFMSG
 	;;
 	_e53) cat << ENDOFMSG
@@ -341,7 +359,7 @@ ENDOFMSG
 
 WARNING: < $1 > had to be forcibly stopped. Recommend double
          checking mounts with: mount | grep $1
-         For details see log at: $QBLOG 
+         For details see log at: $QBLOG
 ENDOFMSG
 	;;
 	_w4) cat << ENDOFMSG
@@ -350,7 +368,7 @@ WARNING: < $1 > could not be stopped. Forcible stop failed.
          Recommend running the following commands:
 				jail -R $1
 				mount | grep $1
-         For more info, see log at: $QBLOG 
+         For more info, see log at: $QBLOG
 ENDOFMSG
 	;;
 	_m1) cat << ENDOFMSG
@@ -395,12 +413,20 @@ ENDOFMSG
 	;;
 	_m6) cat << ENDOFMSG
 
+EXITED $0
+ENDOFMSG
+	;;
+	_m7) cat << ENDOFMSG
+
 Waiting for < $1 > to stop. Timeout in < $2 seconds >
 ENDOFMSG
 	;;
-	_m6) cat << ENDOFMSG
-
-EXITED $0
+	_m8) cat << ENDOFMSG
+${0##*/} is starting < $1 >
+ENDOFMSG
+	;;
+	_m9) cat << ENDOFMSG
+${0##*/} is shutting down < $1 >
 ENDOFMSG
 	;;
 	esac
