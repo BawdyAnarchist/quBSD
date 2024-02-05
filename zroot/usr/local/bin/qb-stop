@@ -154,7 +154,7 @@ cleanup_trapped() {
 
 main() {
 	# Returns $_JLIST, from options and positional arguments. Func shared with qb-start.
-	compile_jlist
+	compile_jlist || exit 1
 
 	# If [-F] was passed, force stop each container serially, one at at time
 	[ "$FORCE" ] && force_stop_jlist

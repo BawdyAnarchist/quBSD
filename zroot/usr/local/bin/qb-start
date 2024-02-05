@@ -168,7 +168,7 @@ cleanup_trapped() {
 
 main() {
 	# Returns $_JLIST, from options and positional arguments. Func shared with qb-start.
-	compile_jlist
+	compile_jlist || exit 1
 
 	# Find gateway hierarchy top for each jail. Returns global vars: _CJAILS _HIERTOP _FULLIST
 	for _jlist in $_JLIST ; do
