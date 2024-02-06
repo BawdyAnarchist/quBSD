@@ -214,10 +214,8 @@ main() {
 	ps -p $_WF_PIDS > /dev/null 2>&1 && wait $_WF_PIDS
 	msg_start -m _m1
 
-	# Remove /tmp files and kill monitoring process
-	cleanup_trapped
+	exit 0
 }
-
 
 get_global_variables
 
