@@ -13,6 +13,11 @@ get_options() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 }
 
+trap_func() {
+	rm $CONF $JAILS > /dev/null 2>&1
+	kill -15 $_pid_stat > /dev/null 2>&1
+}
+
 parse_config() {
 	# Check TIMEOUT, if it was specified
 	[ "$_TIMEOUT" ] && { chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
@@ -24,7 +29,7 @@ parse_config() {
 	# Set variable, and trap to remove it on exit
 	CONF=$(mktemp  -t "quBSD/i3-launch.conf")
 	JAILS=$(mktemp -t "quBSD/i3-launch-jails")
-	trap "rm $CONF $JAILS > /dev/null 2>&1 ; exit 0" INT TERM HUP QUIT EXIT
+	trap "trap_func" INT TERM HUP QUIT EXIT
 
 	# Copy the launch config to tmp ($CONF), and remove comments and blank lines
 	cp -a $FILE $CONF
@@ -140,7 +145,6 @@ main() {
 	done
 }
 
-
 get_global_variables
 
 get_options "$@"
@@ -148,4 +152,3 @@ get_options "$@"
 parse_config
 
 main
-
