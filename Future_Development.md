@@ -1,14 +1,21 @@
 
-Error messages are a bit disorganized now. Need to have useful higher function messages
-	- Could assign $fn as the function name, and then pass $fn to error message for reporting/logging.
-	- **Give each jail and VM it's own separate log file under a quBSD directory, for clarity of log messages**
-	- Default should be top level basic messages. -q quiets all, and -v drills down to deeper messages
-	- Might need a -F force option.
-	- Beef up the log file, and make reference to it in error messages
-	NOTES ON MSG PROBLEM AREAS
-		qb-cmd "all jails have started, but" ... It happens in alot of places it shouldnt. Should chk_isvm
-		qb-cmd that has no user, only root, the -r is not a helpful command
+ERROR PLAN
+_QV options throughout (regardless)
+_Track fn -> fn variable. It gets put to the log._
+_return 0 and return 1 should now be an `eval $var` with var reseting the GLOBAL $_FN_
+_Make sure that every function at end (or in middle) will exit with a reset of $_FN_
+	Go through every message and make sure it's clearly descriptive for the end user
+	launch_vm still needs log strategy changed_
+	POPUP error messages based on get_info POPUP and whether it's a situation that might warrant it
 
+NOTES FOR FUTURE FIXING 
+	- reclone_zusr should have checks for the _jail and _template__
+	Think about get_parameter_lists and it's passing of -q or -V (and in geenral its call to get_jail_parameter
+	qb-cmd "all jails have started, but" ... It happens in alot of places it shouldnt. Should chk_isvm
+	qb-cmd that has no user, only root, the -r is not a helpful command
+
+CHANGED
+	chk_isrunning - doesnt need to get_jail_parameter. Just needs a sequential check.
 
 ### UPGRADES
 
@@ -36,15 +43,21 @@ Take another hack at the recording device problems
 
 I2P Gateway
 
+CREATE MANPAGES:  /usr/local/man/man1/qb-scripts
+	- Replaces /share/quBSD
+	- PARAMS should have manpage
+
+dispVM
+	- Add new class and boot practices
+	- vm-rc.local should use its IP address to get it's hostname from 0control ftp server
+		- This will require creating a new file in /home/ftp/<IPaddr> on 0control
+
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
 
 qb-create
 	- It needs further and more extensive testing 
 	- -z dirs recreated files too, not just directories
-
-qb-help - overhaul to act like a manpage. Replacing /usr/local/share/quBSD
-	- Each PARAM should have verbose message
 
 qb_ssh
 	- Probably can remove the FreeBSD parts of it. Maybe the Net/Open ones as well 
@@ -63,8 +76,7 @@ qb-ephm - Clone from zroot too. Tricky, because of "reclone_zroot" operation in 
 
 qb-update - Update rootjails, create snapshots
 
-qb-backup (already created in $ubin)
-	- cron to run on both sides of source and dest, with ssh hostname, to automate backups
+qb-backup - Add ssh option
 
 qb-stat - Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
 
@@ -75,20 +87,6 @@ qb-stat - Change hardcoded to more flexible setup: config file, col selector, RA
 Networking is still dicey. Hit and miss. Sometimes works, other times doesnt.
 	- Might need to write daemons for dhclient and dhcpd servers
 	- I notice it comes up fine if all jails have already started before startx (and qb-start -a). Maybe it's double running qb-start -a that's the problem)
-
-dispVM
-	- Add new class and boot practices
-	- vm-rc.local should use its IP address to get it's hostname from 0control ftp server
-		- This will require creating a new file in /home/ftp/<IPaddr> on 0control
-
-GENERAL GUIDELINES, and maybe later double checks
-	- Attempt to make scripts more robust and account for user error, when it makes sense to do so.
-	- Try to use more redirects, tee's, and also try the 'wait' command for scripts that appear to hang (but are actually finished).
-	- PARAMETERS should be CAPS when refering to the generic PARAM; lowercase when refering to a specific value
-	- [test] { command ;} grouping. Can save alot of space and simplify the get_msg constructions
-	- Double check on things that are positional items vs if they should be options 
-
-Cycle all scripts through shellcheck again. 
 
 zusr fstabs
 	- They're hand jammed, but maybe qb-edit should come with a function for changing the zfs dataset and mounts
@@ -104,7 +102,7 @@ Generalize net-firewall
 
 Crons - No crons running. Probably something long term security that should be integrated and automated.
 
-ntpd - ntpd only runs during qb-hostnet. Needs a more "correct" solution. Maybe rolled into the/a control jail
+ntpd - ntpd only runs during qb-hostnet. Maybe can nullfs mount or devfs? the ntpd database/location to a jail. 
 
 qme-firefox needs fixed (personal note)
 
@@ -203,4 +201,3 @@ loader.conf needs if_wg_load="YES"
 
 zpool import -f vmusr
 
-c84ddda8e8a1c6e4a9943091fb2f9dc77931a43a0b55ca7894fd9287bd222c2b  qb-vmconf
