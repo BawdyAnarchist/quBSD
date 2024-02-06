@@ -16,7 +16,7 @@ get_msg() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Assign the message to a variable for handling
-	GET_MSG=$(echo "$GET_MSG" ; retreive_msg "$@")
+	[ "$GET_MSG" ] && GET_MSG=$(echo "$GET_MSG" ; retreive_msg "$@") || GET_MSG=$(retreive_msg "$@")
 
 	# If _message was error or warning (_e or _w), then output to the log
 	{ [ -z "${_message##_e*}" ] || [ -z "${_message##_w*}" ] ;} \
@@ -24,6 +24,7 @@ get_msg() {
 	[ -z "$_q" ] && echo "$GET_MSG"
 
 	unset _log ; unset _message
+	return 0
 }
 
 retreive_msg() {
@@ -426,7 +427,7 @@ ${0##*/} is starting < $1 >
 ENDOFMSG
 	;;
 	_m9) cat << ENDOFMSG
-${0##*/} is shutting down < $1 >
+${0##*/} is stopping < $1 >
 ENDOFMSG
 	;;
 	esac
