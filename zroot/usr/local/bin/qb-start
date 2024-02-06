@@ -185,7 +185,7 @@ main() {
 	# Some jails/VMs might be encrypted. They need to decrypted now, before waterfall 
 	get_info _POPUP	
 	for _jail in $_FULLIST ; do 
-		encryption_and_mounts
+		chk_valid_zfs "${U_ZFS}/${_jail}" && encryption_and_mounts
 	done
 
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
