@@ -27,24 +27,20 @@ msg_exec() {
 retreive_msg() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
+   Failed to retreive a valid jail parameter from QMAP. 
+   PARAMETER: < $1 > for jail: < $2 >
 ENDOFMSG
 		;;	
-	_2) cat << ENDOFMSG
+	_e2) cat << ENDOFMSG
+   Was unable to clone the ROOTENV: < $2 > for jail: < $1 >
 ENDOFMSG
-		;;	
+	;;	
 	_3) cat << ENDOFMSG
+   Was unable to clone the $U_ZFS TEMPLATE: < $2 > for jail: < $1 >
 ENDOFMSG
-		;;
+	;;
 	esac
 }
 
-usage() { cat << ENDOFUSAGE
 
-qb-
-
-Usage: qb-
-   -h: (h)elp. Outputs this help message.
-
-ENDOFUSAGE
-}
 
