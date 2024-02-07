@@ -1,17 +1,18 @@
 #!/bin/sh
 
 . /usr/local/lib/quBSD/quBSD.sh
+. /usr/local/lib/quBSD/msg-exec.sh
 
 get_parameters() {
 	# Define script variables
 	JAIL="$1"
-	echo "$(date "+%Y-%m-%d_%H:%M") exec.prepare: STARTING: $JAIL" | tee -a $QBLOG ${QBLOG}_$JAIL
+	echo "$(date "+%Y-%m-%d_%H:%M") exec.prepare: STARTING: $JAIL" >> $QBLOG ${QBLOG}_$JAIL
 
 	# Parameters and checks
-	get_jail_parameter CLASS   "$JAIL"  ||  exit 1
-	get_jail_parameter ROOTENV "$JAIL"  ||  exit 1
-	get_jail_parameter -d GATEWAY "$JAIL"  ||  exit 1
-	get_jail_parameter -d CONTROL "$JAIL"  ||  exit 1
+	get_jail_parameter CLASS   "$JAIL"    || msg_exec -Em _e1 "CLASS" "$JAIL"
+	get_jail_parameter ROOTENV "$JAIL"    || msg_exec -Em _e1 "ROOTENV" "$JAIL"
+	get_jail_parameter -d GATEWAY "$JAIL" || msg_exec -Em _e1 "GATEWAY" "$JAIL"
+	get_jail_parameter -d CONTROL "$JAIL" || msg_exec -Em _e1 "CONTROL" "$JAIL"
 
 	# Get all mounts related to the root mount: /qubsd/JAIL 
 	JMOUNT=$(mount | grep -Eo "${M_QROOT}/${JAIL}/[^[:blank:]]+")
@@ -54,15 +55,16 @@ main() {
 	case $CLASS in
 		appjail|cjail)
 			# Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTENV" || exit 1
+			reclone_zroot "$JAIL" "$ROOTENV" || msg_exec -Em _e2 "$JAIL" "$ROOTENV" 
 		;;
 		dispjail)
 			# Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTENV" || exit 1
+			reclone_zroot "$JAIL" "$ROOTENV" || msg_exec -Em _e2 "$JAIL" "$ROOTENV" 
 
 			# Dispjails also reclone the zusr portion from template (if it exists)
-			get_jail_parameter -d TEMPLATE "$JAIL" || exit 1
-			chk_valid_zfs "${U_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE" || exit 1
+			get_jail_parameter -d TEMPLATE "$JAIL" || msg_exec -Em _e1  TEMPLATE "$JAIL"
+			chk_valid_zfs "${U_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE" \
+				|| msg_exec -Em _e3 "$JAIL" "$TEMPLATE" 
 		;;
 	esac
 

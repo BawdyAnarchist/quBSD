@@ -6,12 +6,12 @@ get_parameters() {
 	JAIL="$1"
 
 	# Get parameters. Class was already verified, so skip checks.
-	get_jail_parameter -qs CLASS   "$JAIL"  ||  exit 1
-	get_jail_parameter -dr IPV4    "$JAIL"  ||  exit 1
-	get_jail_parameter -d  GATEWAY "$JAIL"  ||  exit 1
-	get_jail_parameter -d  MAXMEM  "$JAIL"  ||  exit 1
-	get_jail_parameter -d  CPUSET  "$JAIL"  ||  exit 1
-	get_jail_parameter -d  CONTROL "$JAIL"  ||  exit 1
+	get_jail_parameter -qs CLASS   "$JAIL"
+	get_jail_parameter -dr IPV4    "$JAIL" || msg_exec -Em _e1 IPV4    "$JAIL"
+	get_jail_parameter -d  GATEWAY "$JAIL" || msg_exec -Em _e1 GATEWAY "$JAIL"
+	get_jail_parameter -d  MAXMEM  "$JAIL" || msg_exec -Em _e1 MAXMEM  "$JAIL"
+	get_jail_parameter -d  CPUSET  "$JAIL" || msg_exec -Em _e1 CPUSET  "$JAIL"
+	get_jail_parameter -d  CONTROL "$JAIL" || msg_exec -Em _e1 CONTROL "$JAIL"
 
 	# MTU only with valid IP. Quiet messages (MTU is not critical)
 	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter -d MTU "$JAIL"

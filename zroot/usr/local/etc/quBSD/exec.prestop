@@ -34,7 +34,7 @@ lock_netmap() {
 }
 
 main() {
-	echo "$(date "+%Y-%m-%d_%H:%M") exec.prestop: STOPPING: $JAIL" | tee -a ${QBLOG} ${QBLOG}_$JAIL 
+	echo "$(date "+%Y-%m-%d_%H:%M") exec.prestop: STOPPING: $JAIL" > ${QBLOG} ${QBLOG}_$JAIL 
 
 	# lock file required, since sed doesn't get queued by kernel like echo "" >>
 	lock_netmap
@@ -42,7 +42,7 @@ main() {
 	rm -r $LOCKF
 
 	# Must remove pefs mounts to avoid umount errors as jail is stopped
-	qb-pefs -u $JAIL | tee -a $QBLOG
+	qb-pefs -u $JAIL
 
 	# Prevents error for wg-quick changing resolv.conf
 	chflags -R noschg ${M_ZUSR}/${JAIL}/etc/resolv.conf 2> /dev/null
