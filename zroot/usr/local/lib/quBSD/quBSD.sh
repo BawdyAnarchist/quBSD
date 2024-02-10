@@ -152,6 +152,33 @@ get_networking_variables() {
 	fi
 }
 
+get_msg2() {
+	while getopts eEm:quV opts ; do case $opts in
+		e) local _exit="exit 0" ;;
+		E) local _exit="exit 1" ;;
+		m) local _message="$OPTARG" ;;
+		q) local _q="true" ;;
+		u) local _usage="true" ;;
+		V) local _V="true" ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
+
+	case $_message in
+		_m*|_w*) eval "msg_${0##*-} \"$*\"" ;;
+		_e*) # Place final ERROR message into a variable.
+			_ERROR="$(echo "ERROR: ${0##*/}" ; eval "msg_${0##*-} \"$*\"" ; \
+				[ -s "$ERR1" ] && cat $ERR1)"
+			# If exiting due to error, log the date and error message to the log file
+			[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QBLOG
+	esac
+
+	# If -q wasnt specified, print message to the terminal
+	[ -z "$_q" ] && echo "$_ERROR"
+
+	# Evaluate usage and exit code
+	[ $_usage ] && _message="usage" && eval "msg_${0##*-}"
+	eval $_exit :
+}
+
 get_parameter_lists() {
 	# Primarily returns global varibles: CLASS ; ALL_PARAMS ; but also a few others
 	local _fn="get_parameter_lists" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
@@ -180,6 +207,7 @@ get_parameter_lists() {
 			dispVM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS $MULT_LN_PARAMS TEMPLATE" ;;
 			dispjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE" ;;
 			appjail|rootjail|cjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS" ;;
+			*) get_msg -e _e28 && eval $_R1
 		esac
 	fi
 	eval $_R0
@@ -238,8 +266,8 @@ get_jail_parameter() {
 	local _jail="$2"   ; local _value=''
 
 	# Either jail or param weren't provided
-	[ -z "$_jail" ] && get_msg $_qp -m _e17 "jail" && eval "$_sp $_R1"
-	[ -z "$_param" ] && get_msg $_qp -m _e17 "parameter" && eval "$_sp $_R1"
+	[ -z "$_param" ] && get_msg $_qp $_V -m _e1 "PARAMETER and JAIL" && eval "$_sp $_R1"
+	[ -z "$_jail" ] && get_msg $_qp $_V -m _e1 "JAIL" && eval "$_sp $_R1"
 
 	# Get the <_value> from QMAP.
 	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
@@ -252,14 +280,14 @@ get_jail_parameter() {
 	if [ -z "$_value" ] ; then
 		[ "$_zp" ] && eval $_R0
 		[ "$_sp" ] && eval $_R0
-		get_msg $_qp -m _e13 "$_param" "$_value" && eval $_R1
+		get_msg $_qp $_V -m _e2 "$_param" "$_value" && eval $_R1
 	fi
 
 	# If -s was provided, checks are skipped by this eval
 	if ! [ "$_sp" ] ; then
 		# Variable indirection for checks. Escape \" avoids word splitting
 		! eval "chk_valid_${_low_param}" $_qp $_rp $_xp '--' \"$_value\" \"$_jail\" \
-			&& get_msg $_qp -m _e27 "$_jail" && eval $_R1
+			&& get_msg $_qp $_V -m _e3 "$_jail" "$_param" && eval $_R1
 	fi
 
 	# Either echo <value> , or assign global variable (as specified by caller).
@@ -414,15 +442,18 @@ start_jail() {
 		# If not, running, perform prelim checks
 		if chk_valid_jail $_qs "$_jail" ; then
 
-			# If checks were good, log start attempt, then start jail or VM
-			get_msg -m _m8 "$_jail" | tee -a $QBLOG ${QBLOG}_${_jail}
-
+			# Jail or VM
 			if chk_isvm "$_jail" ; then
-				eval exec_vm_coordinator $_norun $_qs $_jail $_quiet
+				eval exec_vm_coordinator $_norun $_qs $_jail $_quiet || eval $_R1
 			else
 				[ "$_norun" ] && return 0
+				get_msg -m _m8 "$_jail" | tee -a $QBLOG ${QBLOG}_${_jail}
 				! jail -vc "$_jail" >> ${QBLOG}_${_jail} && get_msg $_qs -m _e41 "$_jail" && eval $_R1
-	fi fi fi
+			fi
+		else # Jail was invalid
+			return 1
+		fi
+	fi
 	eval $_R0
 }
 
@@ -818,9 +849,10 @@ reclone_zusr() {
 						 -o qubsd:autocreated="yes" "$_newsnap"
 	fi
 
-   # Destroy the dataset and reclone it
-	zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1
-	zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs}
+   # Destroy the dataset and reclone it (only if jail is off).
+	! chk_isrunning "$_jail" \
+		&& zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1 \
+		&& zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs}
 
 	# Drop the flags for etc directory and add the user for the jailname
 	[ -e "${M_ZUSR}/${_jail}/rw" ] && chflags -R noschg ${M_ZUSR}/${_jail}/rw
@@ -1010,7 +1042,7 @@ chk_isvm() {
 	local _fn="chk_isvm" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
 	getopts c _opts && local _class='true' && shift
-	_value="$1"
+	local _value="$1"
 
 	# If -c was passed, then use the $1 as a class, not as a jailname
 	[ "$_class" ] && [ "$_value" ] && [ -z "${_value##*VM}" ] && eval $_R0
@@ -1067,12 +1099,12 @@ chk_valid_zfs() {
 chk_valid_jail() {
 	# Checks that jail has JCONF, QMAP, and corresponding ZFS dataset
 	# Return 0 for passed all checks, return 1 for any failure
-	local _fn="chk_valid_zfs" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+	local _fn="chk_valid_jail" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
-	local _class ; local _template ; local _class_of_temp
+	local _class= ; local _template= ; local _class_of_temp=
 	while getopts c:qV opts ; do case $opts in
 			c) _class="$OPTARG" ;;
-			q) _qv='-q' ;;
+			q) local _qv='-q' ;;
 			V) local _V="-V" ;;
 			*) get_msg -m _e14 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
@@ -1081,73 +1113,62 @@ chk_valid_jail() {
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_qv -m _e17 "jail" && eval $_R1
 
-	# Must have class in QMAP. Used later to find the correct zfs dataset
-	_class="${_class:=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)}"
-	chk_valid_class $_qv "$_class" || eval $_R1
+	# _class is a necessary element of all jails. Use it for pulling datasets
+	[ -z "$_class" ] && _class=$(get_jail_parameter -eqs CLASS $_value)
+
+	# Must have a ROOTENV in QMAP.
+	! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $QMAP \
+		&& get_msg $_qv $_V -m _e2 "$_value" "ROOTENV" \
+		&& get_msg $_qv -m _e1 "$_value" "jail" && eval $_R1
+
+	# Jails must have an entry in JCONF
+	! chk_isvm -c $_class && ! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
+			&& get_msg $_qv -m _e4 "$_value" && get_msg $_qv -m _e1 "$_value" "jail" && eval $_R1
 
 	case $_class in
-		"")
-			# Empty, no class exists in QMAP
-			get_msg $_qv -m _e2 "$_value" "class" && eval $_R1
-		;;
-		rootjail)
-			# Rootjail's zroot dataset should have no origin (not a clone)
-			! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
-					| grep -Eq '^-$'  && get_msg $_qv -m _e5 "$_value" "$R_ZFS" && eval $_R1
-		;;
-		appjail|cjail)
-			# Appjails require a dataset at quBSD/zusr
-			! chk_valid_zfs ${U_ZFS}/${_value}\
-					&& get_msg $_qv -m _e5 "$_value" "$U_ZFS" && eval $_R1
-		;;
-		dispjail)
+		"") # Empty, no class exists in QMAP
+			get_msg $_qv $_V -m _e2 "jail" "$_value" \
+			get_msg $_qv -m _e1 "$_value" "class" && eval $_R1
+			;;
+		rootjail) # Rootjail's zroot dataset should have no origin (not a clone)
+			! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' | grep -Eq '^-$' \
+				 && get_msg $_qv -m _e5 "$_value" "$R_ZFS" \
+				 && get_msg $_qv -m _e1 "$_value" "jail" && eval $_R1
+			;;
+		appjail|cjail) # Appjails require a dataset at quBSD/zusr
+			! chk_valid_zfs ${U_ZFS}/${_value} && get_msg $_qv -m _e5 "$_value" "$U_ZFS" \
+					&& get_msg $_qv -m _e1 "$_value" "$U_ZFS" && eval $_R1
+			;;
+		dispjail) # Verify the dataset of the template for dispjail
+			# Template cant be blank
+			local _template=$(get_jail_parameter -deqs TEMPLATE $_value)
+			[ -z "$_template" ] && get_msg $_qv -m _e2 "$_value" "TEMPLATE" \
+					&& get_msg $_qv -m _e1 "$_value" "jail" && eval $_R1
 
-			# Verify the dataset of the template for dispjail
-			local _template=$(sed -nE \
-					"s/^${_value}[[:blank:]]+TEMPLATE[[:blank:]]+//p" $QMAP)
-
-			# First ensure that it's not blank
-			[ -z "$_template" ] && get_msg $_qv -m _e6 "$_value" && eval $_R1
-
-			local _class_of_temp=$(sed -nE \
-				"s/^${_template}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
-
-			# Dispjails can only reference appjails.
-			[ "$_class_of_temp" = "dispjail" ] \
-					&& get_msg $_qv -m _e6_1 "$_value" "$_template" && eval $_R1
+			# Dispjails can't reference other dispjails
+			local _templ_class=$(sed -nE "s/^${_template}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
+			[ "$_templ_class" = "dispjail" ] \
+					&& get_msg $_qv -m _e6 "$_value" "$_template" && eval $_R1
 
 			# Ensure that the template being referenced is valid
-			! chk_valid_jail $_qv -c "$_class_of_temp" "$_template" \
-					&& get_msg $_qv -m _e7 "$_value" "$_template" && eval $_R1
-		;;
-		rootVM)
-			# VM zroot dataset should have no origin (not a clone)
+			! chk_valid_jail $_qv -c "$_templ_class" "$_template" \
+					&& get_msg $_qv -m _e7 "$_value" "$_template" \
+					&& get_msg $_qv -m _e1 "$_value" "jail" && eval $_R1
+			;;
+		rootVM) # VM zroot dataset should have no origin (not a clone)
 			! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
 					| grep -Eq '^-$'  && get_msg $_qv -m _e5 "$_value" "$R_ZFS" && eval $_R1
-		;;
-		*VM)
-		;;
-		# Any other class is invalid
-		*) get_msg $_qv -m _e3 "$_class" "CLASS"  && eval $_R1
-		;;
+			;;
+		*VM) :
+			;;
+		*) # Any other class is invalid
+			get_msg $_qv -m _e1 "$_class" "CLASS" && get_msg $_qv -m _e1 "$_value" "jail" && eval $_R1
+			;;
 	esac
 
 	# One more case statement for VMs vs jails
 	case $_class in
 		*jail)
-			# Must have a designated rootjail in QMAP
-			! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $QMAP \
-					&& get_msg $_qv -m _e2 "$_value" "ROOTENV" && eval $_R1
-
-			# Must have an entry in JCONF
-			! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
-					&& get_msg $_qv -m _e4 && eval $_R1
-		;;
-		*VM)
-			# Must have a designated rootVM in QMAP
-			! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $QMAP \
-					&& get_msg $_qv -m _e2 "$_value" "ROOTENV" && eval $_R1
-		;;
 	esac
 
 	eval $_R0
@@ -1302,8 +1323,10 @@ chk_valid_gateway() {
 	if [ "$_class_gw" = "rootjail" ] || [ "$_class_gw" = "rootVM" ] ; then
 		get_msg $_q -m _e8 "$_gw" && eval $_R1
 	else
+
 		# Check that gateway is a valid jail.
- 		chk_valid_jail $_q -c "$_class_gw" "$_gw" || eval $_R1
+ 		! chk_valid_jail $_q -c "$_class_gw" "$_gw" && get_msg $_q $_V -m _e1 "$_value" "GATEWAY" \
+			&& eval $_R1
 	fi
 	eval $_R0
 }
@@ -1924,7 +1947,7 @@ prep_bhyve_options() {
 
 	# Get simple QMAP variables
 	_VM="$1"
-	_cpuset=$(get_jail_parameter -de CPUSET "$_VM") || eval $_R1
+	_cpuset=$(get_jail_parameter -de CPUSET "$_VM")        || eval $_R1
 	_gateway=$(get_jail_parameter -dez GATEWAY "$_VM")     || eval $_R1
 	_clients=$(get_info -e _CLIENTS "$_VM")
 	_control=$(get_jail_parameter -de  CONTROL "$_VM")     || eval $_R1
@@ -2178,12 +2201,8 @@ exec_vm_coordinator() {
 	# Ensure that there's nothing lingering from this VM before trying to start it
 	cleanup_vm $_norun $_qs "$_VM"
 
-	# 0control should always be on
-	start_jail -q $_control
-
 	# Pulls variables for the VM, and assembles them into bhyve line options
-	! prep_bhyve_options $_qs $_tmux "$_VM" && [ -z "$_norun" ] \
-			&& get_msg -m _e39 >> $QBLOG && eval $_R1
+	! prep_bhyve_options $_qs $_tmux "$_VM" && eval $_R1
 
 	# If norun, echo the bhyve start command, cleanup the taps/files, and return 0
 	if [ -n "$_norun" ] ; then
@@ -2192,7 +2211,11 @@ exec_vm_coordinator() {
 		eval $_R0
 	fi
 
+	# 0control should always be on
+	start_jail -q $_control
+
 	# Launch VM sent to background, so connections can be made (network, vnc, tmux)
+	get_msg -m _m8 "$_jail" | tee -a $QBLOG ${QBLOG}_${_VM}
 	eval launch_vm $_quiet &
 
 	# Monitor to make sure that the bhyve command started running, then return 0
