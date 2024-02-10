@@ -7,7 +7,7 @@
 
 get_options() {
 	while getopts hnNrtu:vV opts ; do case $opts in
-		h) msg_cmd -eu ;;
+		h) get_msg2 -eu ;;
 		n) _NEWWIND="xterm -e" ;;
 		N) _NORUN="exit 0" ; _VERBOSE="true" ;;
      	r) _USER="root" ;;
@@ -18,6 +18,9 @@ get_options() {
 
 	JAIL="$1" ; shift
 	_CMD="$@"
+	ERR1=$(mktemp -t quBSD/qb_cmd)
+	ERR2=$(mktemp -t quBSD/qb_cmd)
+	trap "rm $ERR1 $ERR2" HUP INT TERM QUIT EXIT
 }
 
 parse_jail_vars() {
@@ -39,8 +42,8 @@ parse_jail_vars() {
 connect_vm_session() {
 
 	# Pull the qmap parameters for VM attachment
-	get_jail_parameter -d TMUX $JAIL
-	get_jail_parameter -d VNC $JAIL
+	get_jail_parameter -d TMUX $JAIL || get_msg2 -Em _e2 TMUX "$JAIL"
+	get_jail_parameter -d VNC  $JAIL || get_msg2 -Em _e2 VNC  "$JAIL"
 
 	# Handle the vnc viewer port
 	if [ ! "$VNC" = "false" ] ; then
@@ -48,8 +51,8 @@ connect_vm_session() {
 		_count=0
 		while ! _vmpid=$(pgrep -fx "bhyve: $JAIL") ; do
 			# Wait 3 secs before message, to avoid unnecesary clutter
-			[ "$_count" = 3 ] && msg_cmd -m _4
-			[ "$_count" -gt 15 ] && msg_cmd -Em _5
+			[ "$_count" = 3 ] && get_msg2 -m _m2
+			[ "$_count" -gt 15 ] && get_msg2 -Em _e3
 			sleep 1 ; _count=$(( _count + 1 ))
 		done
 
@@ -62,33 +65,38 @@ connect_vm_session() {
 	fi
 
 	# Launch TMUX if available
-	[ "$TMUX" = "true" ] && tmux attach -t $JAIL || _nomux="true"
-
-	# Error message for nothing to connect to
-	[ "$_nomux" ] && [ "$_novnc" ] && msg_cmd -Em _2
+	if [ "$TMUX" = "true" ] ; then
+		! tmux attach -t $JAIL && get_msg2 -Em _e4
+	else
+		# Error message for nothing to connect to
+		[ "$_novnc" ] && get_msg2 -Em _e5
+	fi
 }
 
 main() {
 	parse_jail_vars
 
-	# Launch host xterm
+	# Launch host xterm. Replace current shell with new one (exec).
 	[ "$JAIL" = "host" ] && exec xterm
 
-	# Start the jail/VM if off
-	if ! chk_isrunning $JAIL ; then
-		# Verbose prints the bhyve command, if NORUN, will exit
-		[ "$_VERBOSE" ] && msg_cmd -m _3 && start_jail -n $JAIL && eval "$_NORUN"
-
-		! qb-start "$JAIL" && msg_cmd -Em _1
-	fi
-
-	# Either connect the VM, or jexec the command to the jail
+	# Switch for VMs vs jails
 	if chk_isvm "$JAIL" ; then
+		# Either show errors in trying to create the bhyve cmd, or print & exit
+		if [ "$_NORUN" ] ; then
+			get_msg2 -m _m1
+			start_jail -n "$JAIL" || get_msg2 -m _e6
+			exit 0
+		fi
+		! qb-start "$JAIL" && get_msg2 -Em _e1
 		connect_vm_session
 	else
-		[ "$_NORUN" ] && msg_cmd -m _3 \
-			&& echo $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT" \
-			|| eval $_NORUN $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT"
+		if [ "$_NORUN" ] ; then
+			get_msg2 -m _m1
+			echo $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT"
+			exit 0
+		fi
+		! start_jail $JAIL && get_msg2 -Em _e1
+		eval $_NORUN $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT"
 	fi
 }
 

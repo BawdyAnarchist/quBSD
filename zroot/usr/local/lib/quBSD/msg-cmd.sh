@@ -1,50 +1,46 @@
 #!/bin/sh
 
 msg_cmd() {
-	while getopts eEm:u _opts ; do case $_opts in
-		e) local _exit="exit 0" ;;
-		E) local _exit="exit 1" ;;
-		m) local _message="$OPTARG" ;;
-		u) local _usage="true" ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))
-
 	case "$_message" in
-	_1) cat << ENDOFMSG
 
-ERROR: < $JAIL > Failed to start.
-       For details, see: $QBLOG 
+	_e1) cat << ENDOFMSG
+< $JAIL > Failed to start. For details, see:
+$QBLOG  and  ${QBLOG_}$JAIL
 ENDOFMSG
-	;;
-	_2) cat << ENDOFMSG
-
-ERROR: No TMUX or valid vncviewer configuration was found for
-       < $JAIL >. Check VM parameters with:  qb-list $JAIL
+		;;
+	_e2) cat << ENDOFMSG
+Failed to retreive a valid parameter from QMAP.
+PARAMETER: < $1 > for jail: < $2 >
 ENDOFMSG
-	;;
-	_3) cat << ENDOFMSG
-ALERT: The command below is run with /bin/sh. If the current
-       SHELL is different, there will likely be ERRORS if you
-       simply copy/paste the command. Current shell is $SHELL
-
+		;;
+	_e3) cat << ENDOFMSG
+Timeout waiting for vnc FBUF device to appear in sockstat
 ENDOFMSG
-	;;
-	_4) cat << ENDOFMSG
-ALERT: < $JAIL > is tagged with VNCRES, but the FBUF device
-       hasnt been detected yet. Waiting 15 seconds before quitting
+		;;
+	_e4) cat << ENDOFMSG
+tmux tried and failed to connect to < $JAIL >
 ENDOFMSG
-	;;
-	_5) cat << ENDOFMSG
-ERROR: Timeout waiting for vnc FBUF device to appear in sockstat
+		;;
+	_e5) cat << ENDOFMSG
+No TMUX or VNC was found for < $JAIL >
+Check VM parameters with:  qb-list $JAIL
 ENDOFMSG
-	;;
-	esac
-
-	[ $_usage ] && usage
-	eval $_exit :
-}
-
-usage() { cat << ENDOFUSAGE
-
+		;;
+	_e6) cat << ENDOFMSG
+Attempt to produce the bhyve command caused the following errors:
+ENDOFMSG
+		;;
+	_m1) cat << ENDOFMSG
+The following bhyve command would be run:
+ENDOFMSG
+		;;
+	_m2) cat << ENDOFMSG
+ALERT:  $0
+< $JAIL > is tagged for VNC in QMAP, but the FBUF device
+hasnt been detected yet. Waiting 15 seconds before quitting
+ENDOFMSG
+		;;
+	usage) cat << ENDOFUSAGE
 qb-cmd: Runs command in a jail, or connects to VM.
         Jail default is /bin/csh ; VM defaults to
         both tmux and VNC if no option specified.
@@ -66,5 +62,8 @@ Usage: qb-cmd <jail/VM>
        this will print the bhyve command, and launch the VM.
 
 ENDOFUSAGE
+		;;
+	esac
 }
+
 
