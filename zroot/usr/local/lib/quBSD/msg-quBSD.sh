@@ -35,6 +35,21 @@ msg_qubsd() {
    func: $_fn() expected to be passed a $1, but was null
 ENDOFMSG
 		;;
+	_e0_1) cat << ENDOFMSG
+ERROR: There is no $1 PARAMETER in QMAP. Expecting a valid ZFS dataset.
+       This is a global error, as quBSD can't function without this PARAMETER.
+ENDOFMSG
+		;;
+	_e0_2) cat << ENDOFMSG
+ERROR: QMAP PARAMETER $1 is set to: < $2 >, which isnt a valid zfs dataset.
+       This is a global error, as quBSD can't function without this PARAMETER.
+ENDOFMSG
+		;;
+	_e0_3) cat << ENDOFMSG
+ERROR: ZFS dataset < $1 > does not have a valid mountpoint.
+       This is a global error, as quBSD can't function without this mountpoint.
+ENDOFMSG
+		;;
 	_e1) cat << ENDOFMSG
    < $1 > is an invalid $2
 ENDOFMSG
@@ -320,3 +335,21 @@ ENDOFMSG
 	;;
 	esac
 }
+
+msg_exec() {
+	case "$_message" in
+	_e1) cat << ENDOFMSG
+   < $2 > has an invalid $1 in QMAP
+ENDOFMSG
+		;;
+	_e2) cat << ENDOFMSG
+   Was unable to clone ROOTENV: < $2 > for jail: < $1 >
+ENDOFMSG
+		;;
+	_e3) cat << ENDOFMSG
+   Was unable to clone the $U_ZFS TEMPLATE: < $2 > for jail: < $1 >
+ENDOFMSG
+		;;
+esac
+}
+

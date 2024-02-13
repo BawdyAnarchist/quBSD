@@ -166,7 +166,7 @@ get_networking_variables() {
 }
 
 trap_errfiles() {
-	rm $ERR1 $ERR2	
+	rm $ERR1 $ERR2
 }
 
 get_msg2() {
@@ -179,11 +179,16 @@ get_msg2() {
 		V) local _V="true" ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
+	# Using the caller script to generalize message calls. Switch between exec- and qb- scripts.
+	local _call="${0##*/}"
+	[ -z "${_call##exec-*}" ] && local _msg="msg_exec" || _msg="msg_${0##*/qb-}"
+
 	case $_message in
-		_m*|_w*) eval "msg_${0##*-} \"$*\"" ;;
-		_e*) # Place final ERROR message into a variable.
-			_ERROR="$(echo "ERROR: ${0##*/}" ; eval "msg_${0##*-} \"$*\"" ; \
-				[ -s "$ERR1" ] && cat $ERR1)"
+		_m*|_w*) eval "$_msg $@" ;;
+		_e*)
+			# Place final ERROR message into a variable.
+			_ERROR="$(echo "ERROR: $_call" ; eval "$_msg $@" ; [ -s "$ERR1" ] && cat $ERR1)"
+
 			# If exiting due to error, log the date and error message to the log file
 			[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QBLOG
 			;;
@@ -193,7 +198,7 @@ get_msg2() {
 	[ -z "$_q" ] && [ "$_ERROR" ] && echo "$_ERROR"
 
 	# Evaluate usage and exit code
-	[ $_usage ] && _message="usage" && eval "msg_${0##*-}"
+	[ $_usage ] && _message="usage" && eval "$_msg"
 	eval $_exit :
 }
 

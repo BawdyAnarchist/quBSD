@@ -4,8 +4,8 @@
 
 get_options() {
 	JAIL="$1"
-	get_jail_parameter -d SCHG "$JAIL"   || msg_exec -m "_e1" SCHG   "$JAIL"
-	get_jail_parameter -d SECLVL "$JAIL" || msg_exec -m "_e1" SECLVL "$JAIL"
+	get_jail_parameter -d SCHG "$JAIL"   || get_msg2 -m _e
+	get_jail_parameter -d SECLVL "$JAIL" || get_msg2 -m _e
 }
 
 handle_dhcp() {
@@ -49,3 +49,4 @@ handle_dhcp
 
 security_flags
 
+exit 0

@@ -34,7 +34,7 @@ lock_netmap() {
 }
 
 main() {
-	echo "$(date "+%Y-%m-%d_%H:%M") exec-prestop: STOPPING: $JAIL" > ${QBLOG} ${QBLOG}_$JAIL 
+	echo "$(date "+%Y-%m-%d_%H:%M") exec-prestop: STOPPING: $JAIL" > ${QBLOG} ${QBLOG}_$JAIL
 
 	# lock file required, since sed doesn't get queued by kernel like echo "" >>
 	lock_netmap
@@ -46,9 +46,6 @@ main() {
 
 	# Prevents error for wg-quick changing resolv.conf
 	chflags -R noschg ${M_ZUSR}/${JAIL}/etc/resolv.conf 2> /dev/null
-
-	# Exit success regardless of pefs command, to continue jail shutdown
-	exit 0
 }
 
 get_global_variables
@@ -57,3 +54,4 @@ get_script_variables "$@"
 
 main
 
+exit 0

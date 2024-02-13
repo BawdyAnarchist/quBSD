@@ -6,12 +6,12 @@ get_parameters() {
 	JAIL="$1"
 
 	# Get jail parameters.
-	get_jail_parameter CLASS   "$JAIL" ||  exit 1
-	get_jail_parameter ROOTENV "$JAIL" ||  exit 1
+	get_jail_parameter CLASS   "$JAIL" || get_msg2 -Em _e
+	get_jail_parameter ROOTENV "$JAIL" || get_msg2 -Em _e
 }
 
 main() {
-	# Manual umount. fstab cant be referenced in jail.conf, since might be inside encrypt dataset 
+	# Manual umount. fstab cant be referenced in jail.conf, since might be inside encrypt dataset
 	umount -aF ${M_ZUSR}/${JAIL}/rw/etc/fstab
 
 	# Search for any lingering mounts, and remove them as well
@@ -21,22 +21,23 @@ main() {
 	case $CLASS in
 		appjail|cjail)
          # Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTENV"
+			reclone_zroot "$JAIL" "$ROOTENV" || get_msg2 -Em _e2 "$JAIL" "$ROOTENV"
 		;;
 		dispjail)
          # Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTENV"
+			reclone_zroot "$JAIL" "$ROOTENV" || get_msg2 -Em _e2 "$JAIL" "$ROOTENV"
 
 			# Dispjails also reclone the zusr portion from template (if it exists)
-			get_jail_parameter -d TEMPLATE "$JAIL" || exit 1
-			chk_valid_zfs "${U_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE"
+			get_jail_parameter -d TEMPLATE "$JAIL" || get_msg2 -Em _e
+			chk_valid_zfs "${U_ZFS}/${TEMPLATE}" && ! reclone_zusr "$JAIL" "$TEMPLATE" \
+				&& get_msg2 -Em _e3 "$JAIL" "$ROOTENV"
 		;;
 	esac
 
 	# Flags come down after stopping.
 	[ -e ${M_ZUSR}/${JAIL} ] && chflags -R noschg ${M_ZUSR}/${JAIL}
 
-	# Re-encrypt the dataset, if applicable	
+	# Re-encrypt the dataset, if applicable
 	[ ! "$(zfs list -Ho encryption ${U_ZFS}/${JAIL})" = "off" ] \
 		&& zfs umount -u ${U_ZFS}/${JAIL}
 
@@ -49,3 +50,4 @@ get_parameters "$@"
 
 main
 
+exit 0

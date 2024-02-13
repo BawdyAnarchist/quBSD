@@ -6,18 +6,18 @@ get_parameters() {
 	JAIL="$1"
 
 	# Get parameters. Class was already verified, so skip checks.
-	get_jail_parameter -qs CLASS   "$JAIL"
-	get_jail_parameter -dr IPV4    "$JAIL" || msg_exec -Em _e1 IPV4    "$JAIL"
-	get_jail_parameter -d  GATEWAY "$JAIL" || msg_exec -Em _e1 GATEWAY "$JAIL"
-	get_jail_parameter -d  MAXMEM  "$JAIL" || msg_exec -Em _e1 MAXMEM  "$JAIL"
-	get_jail_parameter -d  CPUSET  "$JAIL" || msg_exec -Em _e1 CPUSET  "$JAIL"
-	get_jail_parameter -d  CONTROL "$JAIL" || msg_exec -Em _e1 CONTROL "$JAIL"
+	get_jail_parameter -qs CLASS   "$JAIL" || get_msg2 -Em _e
+	get_jail_parameter -dr IPV4    "$JAIL" || get_msg2 -Em _e
+	get_jail_parameter -d  GATEWAY "$JAIL" || get_msg2 -Em _e
+	get_jail_parameter -d  MAXMEM  "$JAIL" || get_msg2 -Em _e
+	get_jail_parameter -d  CPUSET  "$JAIL" || get_msg2 -Em _e
+	get_jail_parameter -d  CONTROL "$JAIL" || get_msg2 -Em _e
 
 	# MTU only with valid IP. Quiet messages (MTU is not critical)
 	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter -d MTU "$JAIL"
 
 	J_ZUSR="${M_ZUSR}/${JAIL}"
-	JRC="${J_ZUSR}/rw/etc/rc.conf" 
+	JRC="${J_ZUSR}/rw/etc/rc.conf"
 	JWG="${J_ZUSR}/rw/usr/local/etc/wireguard/wg0.conf"
 }
 
@@ -30,7 +30,7 @@ modify_dhcpd() {
 	# If wireguard is enabled, DNS should come from wg0.conf. Otherwise, use /etc/resolv.conf
 	if grep -Eq 'wireguard_enable="YES"' $JRC ; then
 		_DNS=$(sed -En "s/^DNS.*=[[:blank:]]*([0-9]+.*[0-9]+)[[:blank:]]*\$/\1;/p" $JWG)
-												
+
 	else
 		# Get the DNS entries from resolv.conf, and use those for the dhcpd server
 		_DNS=$(sed -En "s/^nameserver (.*[0-9]+)[[:blank:]]*\$/\1,/p" \
@@ -72,7 +72,7 @@ modify_files() {
 	[ "$MTU" ] && [ -e "$JWG" ] \
 						&& sed -i '' -E "s/^MTU.*/MTU = ${MTU}/" $JWG
 
-	# SSHD needs to be configured so the control jail can access 
+	# SSHD needs to be configured so the control jail can access
 	if [ "$CONTROL" ] && [ ! "$CONTROL" = "none" ] ; then
 		sed -i '' -E 's/#*(PermitRootLogin).*/\1 yes/' ${M_QROOT}/${JAIL}/etc/ssh/sshd_config
 		sysrc -f ${M_QROOT}/${JAIL}/rw/etc/rc.conf sshd_enable="YES"
@@ -111,9 +111,9 @@ main() {
 		# Connect JAIL to 0control SSH
 		chk_isrunning "$CONTROL" && connect_client_to_gateway -c "$JAIL" "$CONTROL"
 
-		# Copy the ssh pubkey from control jail to JAIL. Not applicable for rootjails. 
+		# Copy the ssh pubkey from control jail to JAIL. Not applicable for rootjails.
 		chk_isrunning "$CONTROL" && [ ! "$CLASS" = "rootjail" ] \
-			&& copy_control_keys "$CONTROL" "$JAIL" 
+			&& copy_control_keys "$CONTROL" "$JAIL"
 
 		# Connect jail to its gateway, retrieving the VIF assigned
 		chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -ei $IPV4 "$JAIL" "$GATEWAY")
@@ -135,5 +135,5 @@ get_networking_variables
 
 main
 
-
+exit 0
 
