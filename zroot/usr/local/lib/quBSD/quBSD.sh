@@ -127,12 +127,18 @@ get_global_variables() {
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
 	sed -i '' -E 's/[[:blank:]]*$//' $QMAP
-
 	# Get datasets, mountpoints; and define files.
    R_ZFS=$(sed -nE "s:#NONE[[:blank:]]+jails_zfs[[:blank:]]+::p" $QMAP)
    U_ZFS=$(sed -nE "s:#NONE[[:blank:]]+zusr_zfs[[:blank:]]+::p" $QMAP)
+	[ -z "$R_ZFS" ] && get_msg -V -m "_e0_1" "jails_zfs" && exit 1
+	[ -z "$U_ZFS" ] && get_msg -V -m "_e0_1" "zusr_zfs" && exit 1
+	! chk_valid_zfs "$R_ZFS" && get_msg -V -m _e0_2 -- "jails_zfs" "$R_ZFS" && exit 1
+	! chk_valid_zfs "$U_ZFS" && get_msg -V -m _e0_2 -- "zusr_zfs" "$U_ZFS" && exit 1
 	M_QROOT=$(zfs get -H mountpoint $R_ZFS | awk '{print $3}')
 	M_ZUSR=$(zfs get -H mountpoint $U_ZFS | awk '{print $3}')
+	[ "$M_QROOT" = "-" ] && get_msg -V -m _e0_3 "$R_ZFS" && exit 1
+	[ "$M_ZUSR" = "-" ]  && get_msg -V -m _e0_3 "$U_ZFS" && exit 1
+	return 0
 }
 
 get_networking_variables() {
