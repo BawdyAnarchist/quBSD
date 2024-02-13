@@ -41,11 +41,9 @@
 # start_jail          - Performs checks before starting, creates log
 # stop_jail           - Performs checks before starting, creates log
 # restart_jail        - Self explanatory
-# remove_tap          - Removes tap interface from whichever jail it's in
-# connect_client_to_ gateway - Connects a client jail to its gateway
-# connect_gateway_to_clients - Connects a gateway jail to its clients
 # reclone_zroot       - Destroys and reclones jails dependent on ROOTENV
 # reclone_zusr        - Destroy and reclones jails with zusr dependency (dispjails)
+# copy_control_keys   - SSH keys for control jail are copied over to running env.
 # monitor_startstop   - Monitors whether qb-start or qb-stop is still alive
 
 #################################  STATUS  CHECKS  #################################
@@ -84,9 +82,12 @@
 # chk_valid_wiremem    - Must be true/false
 
 ##############################  NETWORKING  FUNCTIONS  #############################
-# define_ipv4_convention - Necessary for implementing quBSD IPv4 conventions
-# discover_open_ipv4     - Finds an unused IP address from the internal network
-# assign_ipv4_auto       - Handles the ip auto assignments when starting jails
+# remove_tap           - Removes tap interface from whichever jail it's in
+# assign_ipv4_auto     - Handles the ip auto assignments when starting jails
+# discover_open_ipv4   - Finds an unused IP address from the internal network
+# define_ipv4_convention  - Necessary for implementing quBSD IPv4 conventions
+# connect_client_to_ gateway - Connects a client jail to its gateway
+# connect_gateway_to_clients - Connects a gateway jail to its clients
 
 ##################################  VM  FUNCTIONS  #################################
 # cleanup_vm           - Cleans up network connections, and dataset after shutdown
@@ -372,11 +373,11 @@ compile_jlist() {
 	case "${_SOURCE}" in
 		'')
 			# If both SOURCE and POSPARAMS are empty, there is no JLIST.
-			[ -z "$_POSPARAMS" ] && get_msg -m _e53 && eval $_R1
+			[ -z "$_POSPARAMS" ] && get_msg -m _e31 && eval $_R1
 			_JLIST="$_POSPARAMS"
 
 			# If there was no SOURCE, then [-e] makes the positional params ambiguous
-			[ "$_EXCLUDE" ] && get_msg -m _e54 && eval $_R1
+			[ "$_EXCLUDE" ] && get_msg -m _e31_1 && eval $_R1
 		;;
 
 		auto)
@@ -392,17 +393,17 @@ compile_jlist() {
 		?*)
 			# Only possibility remaining is [-f]. Check it exists, and assign JLIST
 			[ -e "$_SOURCE" ] && _JLIST=$(tr -s '[:space:]' '\n' < "$_SOURCE" | uniq) \
-					|| { get_msg -m _e55 && eval $_R1 ;}
+					|| { get_msg -m _e31_2 && eval $_R1 ;}
 		;;
 	esac
 
 	# If [-e], then the exclude list is just the JLIST, but error if null.
-	[ "$_EXCLUDE" ] && _EXLIST="$_POSPARAMS" && [ -z "$_EXLIST" ] && get_msg -m _e56 && eval $_R1
+	[ "$_EXCLUDE" ] && _EXLIST="$_POSPARAMS" && [ -z "$_EXLIST" ] && get_msg -m _e31_3 && eval $_R1
 
 	# If [-E], make sure the file exists, and if so, make it the exclude list
 	if [ "$_EXFILE" ] ; then
 		[ -e "$_EXFILE" ] && _EXLIST=$(tr -s '[:space:]' '\n' < "$_EXFILE")	\
-			|| { get_msg -m _e57 && eval $_R1 ;}
+			|| { get_msg -m _e31_4 && eval $_R1 ;}
 	fi
 
 	# Remove any jail on EXLIST, from the JLIST
@@ -410,7 +411,7 @@ compile_jlist() {
 		_JLIST=$(echo "$_JLIST" | grep -Ev "^[[:blank:]]*${_exlist}[[:blank:]]*\$")
 	done
 
-	[ -z "$_JLIST" ] && get_msg -m _e52 && eval $_R1
+	[ -z "$_JLIST" ] && get_msg -m _e31_5 && eval $_R1
 	eval $_R0
 }
 
@@ -443,7 +444,8 @@ start_jail() {
 
 			# Jail or VM
 			if chk_isvm "$_jail" ; then
-				eval exec_vm_coordinator $_norun $_qs $_jail $_quiet || eval $_R1
+				! eval exec_vm_coordinator $_norun $_qs $_jail $_quiet \
+					&& get_msg $_qs -m _e4 "$_jail" && eval $_R1
 			else
 				[ "$_norun" ] && return 0
 				get_msg -m _m1 "$_jail" | tee -a $QBLOG ${QBLOG}_${_jail}
@@ -527,209 +529,6 @@ restart_jail() {
 	eval $_R0
 }
 
-remove_tap() {
-	# If TAP is not already on host, find it and bring it to host
-	# Return 1 on failure, otherwise return 0 (even if tap was already on host)
-
-	# Assign name of tap
-	local _tap="$1"  ;  local _jail="$2"
-
-	# Check if it's already on host
-	ifconfig "$_tap" > /dev/null 2>&1  && ifconfig "$_tap" down && return 0
-
-	# If a specific jail was passed, check that as the first possibility to find/remove tap
-	if [ "$_jail" ] && jexec -l -U root $_jail ifconfig -l | grep -Eqs "$_tap" ; then
-		ifconfig "$_tap" -vnet "$_jail" && ifconfig "$_tap" down && return 0
-	fi
-
-	# If the above fails, then check all jails
-	for _jail in $(get_info -e _ONJAILS) ; do
-		if jexec -l -U root $_jail ifconfig -l | grep -Eqs "$_tap" ; then
-			ifconfig $_tap -vnet $_jail
-			ifconfig $_tap down
-			return 0
-		fi
-	done
-	return 1
-}
-
-copy_control_keys() {
-	# Ensures that the latest ssh pubkey for the control jail is copied to client jail
-	# In the case of a restart of the control jail, use [-f] to make sure flags are restored
-
-	getopts f _opts && local _flags="true" && shift
-	local _control="$1"
-	local _client="$2"
-
-	# Lift flags for edits, create the .ssh directory if not there, and copy the files
-	chflags -R noschg ${M_QROOT}/${_client}/root
-	[ ! -d "${M_QROOT}/${_client}/root/.ssh" ] && mkdir ${M_QROOT}/${_client}/root/.ssh
-	cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub ${M_QROOT}/${_client}/root/.ssh/authorized_keys
-
-	# Change ownership and permissions of all files, then bring up flags
-	chmod 700 ${M_QROOT}/${_client}/root/.ssh
-	chmod 600 ${M_QROOT}/${_client}/root/.ssh/authorized_keys
-	chflags -R schg ${M_QROOT}/${_client}/root/.ssh
-
-	# Repeat all the same steps if there is an unprivileged user
-	if [ -d "${M_QROOT}/${_client}/home/${_client}" ] ; then
-
-		chflags -R noschg ${M_QROOT}/${_client}/home/${_client}
-		[ ! -d "${M_QROOT}/${_client}/home/${_client}/.ssh" ] \
-			&& mkdir ${M_QROOT}/${_client}/home/${_client}/.ssh
-		chflags -R noschg ${M_QROOT}/${_client}/home/${_client}/.ssh
-		cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub \
-			${M_QROOT}/${_client}/home/${_client}/.ssh/authorized_keys
-
-		chmod 700 ${M_QROOT}/${_client}/home/${_client}/.ssh
-		chmod 600 ${M_QROOT}/${_client}/home/${_client}/.ssh/authorized_keys
-		chown -R 1001:1001 ${M_QROOT}/${_client}/home/${_client}/.ssh
-		chflags -R schg ${M_QROOT}/${_client}/home/${_client}/.ssh
-	fi
-
-	[ "$_flags" ] && qb-flags -r $_client &
-	eval $_R0
-}
-
-connect_client_to_gateway() {
-	# When a jail/VM is started, this connects to its gateway
-	# GLOBAL VARIABLES must have been assigned already: $GATEWAY ; $IPV4 ; $MTU
-		# -e (e)cho result  ;  -m (m)tu  ;  -q (q)uiet  ;  -t (t)ype [NET or SSH]
-	local _fn="connect_client_to_gateway" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	local _ipv4=  ;  local _type=  ;  local _ec  ;  local _mtu  ;  local _q
-	local _dhcpd_restart  ;  local _named_restart
-	while getopts cdei:m:nqV opts ; do case $opts in
-			c) _type="SSH" ;;
-			d) _dhcpd_restart="true" ;;
-			e) _ec='true' ;;
-			i) _ipv4="$OPTARG"  ;;
-			m) _mtu="$OPTARG" ;;
-			n) _named_restart="true" ;;
-			q) _q='-q' ;;
-			V) local _V="-V" ;;
-			*) get_msg -m _e9 ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
-
-	# Pos params, default MTU, and _type
-	local _client="$1"  ;  local _gateway="$2"
-	_mtu="${MTU:=$(get_jail_parameter -des MTU $_gateway)}"
-	local _type="${_type:=NET}"
-
-	# If IP wasnt provided, then find an available one
-	[ -z "$_ipv4" ] && local _ipv4=$(assign_ipv4_auto -et "$_type" "$_client" "$_gateway")
-
-	# This function can be called by multiple scripts/functions that dont know which is a VM or jail
-	if chk_isvm "$_client" ; then
-		# Get tap, send to gateway jail, bring up jail connection
-		_vifb=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_client}")
-		ifconfig "$_vifb" vnet "$_gateway"
-		jexec -l -U root $_gateway ifconfig $_vifb inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
-
-		# If flagged, restart dhcpd, so the new IP will be included
-		if [ "$_dhcpd_restart" ] ; then
-			# While loop avoids races/overlaps for potential multiple VM simultaneous starts
-			local _count=0
-			while jexec -l -U root $_gateway pgrep -fq 'isc-dhcpd restart' > /dev/null 2>&1 ; do
-				{ [ "$_count" -le 10 ] && sleep .2 ; _count=$(( _count + 1 )) ;} || eval $_R1
-			done
-			jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
-		fi
-
-		# If flagged, restart dhcpd, so the new IP will be included
-		if [ "$_named_restart" ] ; then
-			# While loop avoids races/overlaps for potential multiple VM simultaneous starts
-			local _count=0
-			while jexec -l -U root $_gateway pgrep -fq 'named restart' > /dev/null 2>&1 ; do
-				{ [ "$_count" -le 10 ] && sleep .2 ; _count=$(( _count + 1 )) ;} || eval $_R1
-			done
-			jexec -l -U root $_gateway service named restart > /dev/null 2>&1
-		fi
-
-	elif chk_isvm "$_gateway" ; then
-		# Get tap and sent to client jail. Should be DHCP, but modify mtu if necessary
-		_vifb=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_gateway}")
-
- 		ifconfig $_vifb vnet $_client
-		[ ! "$_mtu" = "1500" ] && jexec -l -U root $_client ifconfig $_vifb mtu $_mtu up
-
-	else
-		# Create epair and assign _vif variables.
-		local _vif=$(ifconfig epair create)  ;  local _vifb="${_vif%?}b"
-		ifconfig "$_vif" vnet $_gateway
-
-		# If connecting two jails (and not host), send the epair, and assign the command modifier.
-		if [ ! "$_client" = "host" ] ; then
-			ifconfig "${_vifb}" vnet $_client
-			local _cmdmod='jexec -l -U root $_client'
-		fi
-
-		# If there's no IP skip the epair assignments
-		if [ ! "$_ipv4" = "none" ] ; then
-			# Assign the gateway IP
-			jexec -l -U root "$_gateway" \
-							ifconfig "$_vif" inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
-
-			# Assign the client IP and, default route (if not control gateway)
-			eval "$_cmdmod" ifconfig $_vifb inet ${_ipv4} mtu $_mtu up
-			[ "$_type" = "NET" ] && eval "$_cmdmod" route add default "${_ipv4%.*/*}.1" >/dev/null 2>&1
-	fi fi
-
-	# Add the jail and vif to a tracking file
-	[ "$_type" = "SSH" ] && echo "$_client $_vifb ${_ipv4%%/*}" >> ${QTMP}/control_netmap
-
-	# Echo option. Return epair-b ; it's the external interface for the jail.
-	[ "$_ec" ] && echo "$_vifb"
-	eval $_R0
-}
-
-connect_gateway_to_clients() {
-	# If clients were already started, then the gateway needs to reconnect to its clients
-	local _fn="connect_gateway_to_clients" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	while getopts qV _opts ; do case $_opts in
-		q) local _q='-q' ;;
-		V) local _V="-V" ;;
-	esac ; done ; shift $(( OPTIND - 1))
-
-	local _gateway="$1"
-	[ -z "$_gateway" ] && get_msg $_q -m _e0 "Jail/VM" && eval $_R1
-
-	# All onjails connect to 0control
-	if [ "$CLASS" = "cjail" ] ; then
-		for _client in $(get_info -e _ONJAILS | grep -v "$_gateway") ; do
-			if [ "$(get_jail_parameter $_q -de CONTROL $_client)" = "$_gateway" ] ; then
-				connect_client_to_gateway -c $_q "$_client" "$_gateway"
-				! chk_isvm $_client && copy_control_keys -f $_gateway $_client
-			fi
-		done
-	fi
-
-	# Restore connection to CLIENTS one by one
-	for _client in $(get_info -e _CLIENTS "$_gateway") ; do
-		if chk_isrunning "$_client" ; then
-
-			# Get client IP, bring up connection, and save the VIF used
-			_cIP=$(get_jail_parameter -der IPV4 "$_client")
-			_cVIF=$(connect_client_to_gateway -ei "$_cIP" "$_client" "$_gateway")
-
-			# If client is itself a gateway, its pf.conf needs the new epair and IP (cVIF and cIP)
-			_cPF="${M_ZUSR}/${_client}/${PFCONF}"
-			if [ -e "$_cPF" ] ; then
-
-				# Flags down, modify files
-				chflags -R noschg "${M_ZUSR}/${_client}/rw/etc"
-				sed -i '' -e "s@^[[:blank:]]*EXT_IF[[:blank:]]*=.*@\tEXT_IF = \"${_cVIF}\"@" $_cPF
-				sed -i '' -e "s@^[[:blank:]]*JIP[[:blank:]]*=.*@\tJIP = \"${_cIP}\"@"  $_cPF
-
-				# Restart _client pf service. Restore flags with qb-flags -r (we dont know seclvl here)
-				jexec -l -U root "$_client" service pf restart > /dev/null 2>&1
-				qb-flags -r $_client > /dev/null 2>&1 &
-		fi fi
-	done
-	eval $_R0
-}
-
 reclone_zroot() {
 	# Destroys the existing _rootenv clone of <_jail>, and replaces it
 	# Detects changes since the last snapshot, creates a new snapshot if necessary,
@@ -750,7 +549,7 @@ reclone_zroot() {
 
 	# Check that the _jail being destroyed/cloned has an origin (is a clone).
 	chk_valid_zfs "$_jailzfs" && [ "$(zfs list -Ho origin $_jailzfs)" = "-" ] \
-		&& get_msg $_qz -m _e48 "$_jail" && eval $_R1
+		&& get_msg $_qz -m _e32 "$_jail" && eval $_R1
 
 	# Switch between whether or not ROOTENV is running.
 	if chk_isrunning ${_rootenv} ; then
@@ -778,7 +577,7 @@ reclone_zroot() {
 
 		# If no _rootsnap older than the rootenv pid was found, return error
 		_rootsnap=$(echo "$_rootsnaps" | tail -1)
-		[ -z "$_rootsnap" ] && get_msg $_qz -m _e49 "$_jail" "$_rootenv" && eval $_R1
+		[ -z "$_rootsnap" ] && get_msg $_qz -m _e32_1 "$_jail" "$_rootenv" && eval $_R1
 
 	else
 		# If ROOTENV is off, make sure that _jail is getting the most recent version of ROOTENV
@@ -865,6 +664,44 @@ reclone_zusr() {
 	eval $_R0
 }
 
+copy_control_keys() {
+	# Ensures that the latest ssh pubkey for the control jail is copied to client jail
+	# In the case of a restart of the control jail, use [-f] to make sure flags are restored
+
+	getopts f _opts && local _flags="true" && shift
+	local _control="$1"
+	local _client="$2"
+
+	# Lift flags for edits, create the .ssh directory if not there, and copy the files
+	chflags -R noschg ${M_QROOT}/${_client}/root
+	[ ! -d "${M_QROOT}/${_client}/root/.ssh" ] && mkdir ${M_QROOT}/${_client}/root/.ssh
+	cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub ${M_QROOT}/${_client}/root/.ssh/authorized_keys
+
+	# Change ownership and permissions of all files, then bring up flags
+	chmod 700 ${M_QROOT}/${_client}/root/.ssh
+	chmod 600 ${M_QROOT}/${_client}/root/.ssh/authorized_keys
+	chflags -R schg ${M_QROOT}/${_client}/root/.ssh
+
+	# Repeat all the same steps if there is an unprivileged user
+	if [ -d "${M_QROOT}/${_client}/home/${_client}" ] ; then
+
+		chflags -R noschg ${M_QROOT}/${_client}/home/${_client}
+		[ ! -d "${M_QROOT}/${_client}/home/${_client}/.ssh" ] \
+			&& mkdir ${M_QROOT}/${_client}/home/${_client}/.ssh
+		chflags -R noschg ${M_QROOT}/${_client}/home/${_client}/.ssh
+		cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub \
+			${M_QROOT}/${_client}/home/${_client}/.ssh/authorized_keys
+
+		chmod 700 ${M_QROOT}/${_client}/home/${_client}/.ssh
+		chmod 600 ${M_QROOT}/${_client}/home/${_client}/.ssh/authorized_keys
+		chown -R 1001:1001 ${M_QROOT}/${_client}/home/${_client}/.ssh
+		chflags -R schg ${M_QROOT}/${_client}/home/${_client}/.ssh
+	fi
+
+	[ "$_flags" ] && qb-flags -r $_client &
+	eval $_R0
+}
+
 monitor_startstop() {
 	# PING: There's legit cases where consecutive calls to qb-start/stop could happen. [-p] handles
 	# potential races via _tmp_lock; puts the 2nd call into a timeout queue; and any calls after
@@ -893,7 +730,7 @@ monitor_startstop() {
 		fi
 
 		# Timeout has passed, kill qb-start/stop and cleanup files
-		get_msg -m _e51 "$0" "$_TIMEOUT"
+		get_msg -m _e33 "$0" "$_TIMEOUT"
 		kill -15 --	-$$
 	fi
 
@@ -1289,7 +1126,7 @@ chk_valid_control() {
 
 	local _class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 	chk_valid_jail $_qt -c "$_class" "$_value" && eval $_R0
-	get_msg $_qt -m _e1 "$_value" "CONTROL" && eval $_R1 
+	get_msg $_qt -m _e1 "$_value" "CONTROL" && eval $_R1
 }
 
 chk_valid_devfs_rule() {
@@ -1408,7 +1245,7 @@ chk_isqubsd_ipv4() {
 
 	# Otherwise, a value of none, auto, or DHCP are fine
 	{ [ "$_value" = "none" ] || [ "$_value" = "auto" ] || [ "$_value" = "DHCP" ] ;} && eval $_R0
-	
+
 	# Compare against QMAP, and _USED_IPS.
 	{ grep -v "^$_jail" $QMAP | grep -qs "$_value" \
 		|| get_info -e _USED_IPS | grep -qs "${_value%/*}" ;} \
@@ -1527,29 +1364,29 @@ chk_valid_ppt() {
 
 		# PCI device doesnt exist on the machine
 		[ -z "$_pciline" ] && get_msg $_q -m _e22 "$_val" "PPT" \
-			&& get_msg $_q -m _e1 "$_val" "PPT" && eval $_R1 
+			&& get_msg $_q -m _e1 "$_val" "PPT" && eval $_R1
 
 		# Extra set of checks for the PCI device, if it's about to be attached to a VM
 		if [ "$_xtra" ] ; then
 
 			# If the pci device is detached, try to attach it.
 			[ -z "${_pciline##none*}" ] && ! devctl attach "$_pcidev" && _attached="true" \
-					&& get_msg -m _e22_1 "$_pciline" && get_msg $_q -m _e1 "$_val" "PPT" && eval $_R1 
+					&& get_msg -m _e22_1 "$_pciline" && get_msg $_q -m _e1 "$_val" "PPT" && eval $_R1
 
 			# Make sure the PCI device is designated for passthrough
 			[ -n "${_pciline##ppt*}" ] && get_msg $_q -m _e22_2 "$_val" \
-					&& get_msg $_q -m _e1 "$_val" "PPT" && eval $_R1 
+					&& get_msg $_q -m _e1 "$_val" "PPT" && eval $_R1
 
 			# If the device was attached and is ppt, there's no need for dettach/attach test
 			if [ -z "$_attached" ] ; then
 
 				# Check if the PCI device is busy, and would thus cause an error
 				! devctl detach "$_pcidev" && get_msg $_q -m _e22_3 "$_pcidev" \
-					&& get_msg $_q -m _e1 "$_val" "PPT" && eval $_R1 
+					&& get_msg $_q -m _e1 "$_val" "PPT" && eval $_R1
 
 				# Re-attach PCI, or error if unable
 				! devctl attach "$_pcidev" && get_msg $_q -m _e22_1 "$_pcidev" \
-					&& get_msg $_q -m _e1 "$_val" "PPT" && eval $_R1 
+					&& get_msg $_q -m _e1 "$_val" "PPT" && eval $_R1
 			fi
 		fi
 	done
@@ -1567,23 +1404,20 @@ chk_valid_rootenv() {
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q -m _e0 "CLASS" && eval $_R1
 
-	# Must be designated as the appropriate corresponding CLASS in QMAP
+	# Must be designated as a ROOTENV in QMAP
 	local _class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
-	if chk_isvm "$_value" ; then
-		[ ! "$_class" = "rootVM" ] && get_msg $_q -m _e28 "$_value" "rootVM" && eval $_R1
-	else
-		[ ! "$_class" = "rootjail" ] && get_msg $_q -m _e28 "$_value" "rootjail" && eval $_R1
+	case $_class in
+		'') get_msg $_q -m _e2 "$_value" "CLASS"
+			 get_msg $_q -m _e1 "$_value" "ROOTENV" && eval $_R1
+			;;
+		rootjail|rootVM) : ;;
+		*) get_msg $_q -m _e23 "$_class" "CLASS"
+			get_msg $_q -m _e1 "$_value" "ROOTENV" && eval $_R1
+			;;
+	esac
 
-		# Must have an entry in JCONF
-		! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
-				&& get_msg $_q -m _e7 && eval $_R1
-	fi
-
-	# Rootjails require a dataset at zroot/quBSD/jails
-	! chk_valid_zfs ${R_ZFS}/${_value} \
-			&& get_msg $_q -m _e5 "$_value" "$R_ZFS" && eval $_R1
-
-	eval $_R0
+	# Perform all other checks for valid jail.
+	chk_valid_jail $_q $_V -c "$_class" "$_value"
 }
 
 chk_valid_seclvl() {
@@ -1593,13 +1427,14 @@ chk_valid_seclvl() {
 		q) local _q='-q' ;;
 		V) local _V="-V" ;;
 	esac ; done ; shift $(( OPTIND - 1))
+
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q -m _e0 "SECLVL" && eval $_R1
 	[ "$_value" = "none" ] && eval $_R0
 
 	# If SECLVL is not a number
 	echo "$_value" | ! grep -Eq -- '^(-1|-0|0|1|2|3)$' \
-			&& get_msg $_q -m _e3 "$_value" "SECLVL" && eval $_R1
+			&& get_msg $_q -m _e24 "$_value" "SECLVL" && eval $_R1
 
 	eval $_R0
 }
@@ -1613,11 +1448,12 @@ chk_valid_taps() {
 		V) local _V="-V" ;;
 	esac ; done ; shift $(( OPTIND - 1))
 	local _value="$1"
-	[ -z "$_value" ] && get_msg $_q -m _e0 "VIF" && eval $_R1
+	[ -z "$_value" ] && get_msg $_q -m _e0 "TAPS" && eval $_R1
 
 	# Make sure that it's an integer
 	for _val in $_value ; do
-		! chk_integer -g 0 -v "Number of TAPS (in QMAP)," -- $_value && eval $_R1
+		! chk_integer -g 0 -v "Number of TAPS (in QMAP)," -- $_value \
+			 && get_msg $_q -m _e1 "$_value" "TAPS" && eval $_R1
 	done
 
 	eval $_R0
@@ -1629,7 +1465,8 @@ chk_valid_tmux() {
 		q) local _q='-q' ;;
 		V) local _V="-V" ;;
 	esac ; done ; shift $(( OPTIND - 1))
-	chk_truefalse $_q "$1" "TMUX" && eval $_R0 || eval $_R1
+	chk_truefalse $_q "$1" "TMUX" && eval $_R0
+	get_msg $_q -m _e1 $1 "TMUX" && eval $_R1
 }
 
 chk_valid_schg() {
@@ -1644,7 +1481,7 @@ chk_valid_schg() {
 	case $_value in
 		'') get_msg $_q -m _e0 "SCHG" && eval $_R1 ;;
 		none|sys|all) eval $_R0 ;;
-		*) get_msg $_q -m _e3 "$_value" "SCHG"  ;  eval $_R1
+		*) get_msg $_q -m _e25 "$_value" "SCHG" && eval $_R1 ;;
 	esac
 	eval $_R0
 }
@@ -1657,7 +1494,8 @@ chk_valid_template() {
 	esac ; done ; shift $(( OPTIND - 1))
 	local _value="$1"
 
-	! chk_valid_jail $_qt "$_value" && eval $_R1 || eval $_R0
+	chk_valid_jail $_qt "$_value" && eval $_R0
+	eval $_R0
 }
 
 chk_valid_vcpus() {
@@ -1677,11 +1515,12 @@ chk_valid_vcpus() {
 	_syscpus=$(( _syscpus + 1 ))
 
 	# Ensure that the input is a number
-	! chk_integer -G 0 -v "Number of VCPUS (in QMAP)," -- $_value && eval $_R1
+	! chk_integer -G 0 -v "Number of VCPUS" -- $_value \
+		&& get_msg $_q -m _e1 "$_value" "VCPUS" && eval $_R1
 
 	# Ensure that vpcus doesnt exceed the number of system cpus or bhyve limits
 	if [ "$_value" -gt "$_syscpus" ] || [ "$_value" -gt 16 ] ; then
-		get_msg $_q -m _e27 "$_value" "$_syscpus" && eval $_R1
+		get_msg $_q -m _e27 "$_value" "$_syscpus" && get_msg $_q -m _e1 "$_value" "VCPUS" && eval $_R1
 	fi
 
 	eval $_R0
@@ -1701,8 +1540,8 @@ chk_valid_vnc() {
 		# If value was provided as "true" then assign the default resolution.
 		true) _value=1920x1080 ; eval $_R0 ;;
 		none|false|640x480|800x600|1024x768|1920x1080) eval $_R0 ;;
-		'') get_msg $_q -m _e0 "VNC viewer resolution" && eval $_R1 ;;
-		*) get_msg $_q -m _e58 "VNC viewer resolution" && eval $_R1 ;;
+		'') get_msg $_q -m _e0 "VNC" && eval $_R1 ;;
+		*) get_msg $_q -m _e27 "VNC" && eval $_R1 ;;
 	esac
 }
 
@@ -1712,7 +1551,8 @@ chk_valid_wiremem() {
 		q) local _q='-q' ;;
 		V) local _V="-V" ;;
 	esac ; done ; shift $(( OPTIND - 1))
-	chk_truefalse $_q "$1" "WIREMEM" && eval $_R0 || eval $_R1
+	chk_truefalse $_q "$1" "WIREMEM" && eval $_R0
+	get_msg $_q -m _e1 $1 "WIREMEM" && eval $_R1
 }
 
 chk_valid_x11() {
@@ -1721,7 +1561,8 @@ chk_valid_x11() {
 		q) local _q='-q' ;;
 		V) local _V="-V" ;;
 	esac ; done ; shift $(( OPTIND - 1))
-	chk_truefalse $_q "$1" "X11FWD" && eval $_R0 || eval $_R1
+	chk_truefalse $_q "$1" "X11FWD" && eval $_R0
+	get_msg $_q -m _e1 $1 "X11FWD" && eval $_R1
 }
 
 
@@ -1730,41 +1571,59 @@ chk_valid_x11() {
 ###########################  FUNCTIONS RELATED TO NETWORKING  ##########################
 ########################################################################################
 
-define_ipv4_convention() {
-	# Defines the quBSD internal IP assignment convention.
-	# Variables: $ip0.$ip1.$ip2.$ip3/subnet ; are global; required for discover_open_ipv4(),
-	# and chk_isqubsd_ipv4(). Not best practice, but they're unique from any others.
-	# Return: 0 for normal assignment; 1 for net-firewall. gateway=0control goes first
-	local _fn="define_ipv4_convention" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+remove_tap() {
+	# If TAP is not already on host, find it and bring it to host
+	# Return 1 on failure, otherwise return 0 (even if tap was already on host)
 
-	while getopts qt:V _opts ; do case $_opts in
-		q) local _q='-q' ;;
-		t) local _type="$OPTARG" ;;
-		V) local _V="-V" ;;
-		*) get_msg -m _e9 ;;
-	esac ; done ; shift $(( OPTIND - 1))
+	# Assign name of tap
+	local _tap="$1"  ;  local _jail="$2"
 
-	local _client="$1"
-	# _ip assignments are static, except for $_ip1
-	_ip0=10 ; _ip2=1 ; _ip3=2 ; _subnet=30
+	# Check if it's already on host
+	ifconfig "$_tap" > /dev/null 2>&1  && ifconfig "$_tap" down && return 0
 
-	# Combo of function caller and JAIL/VM determine which IP form to use
-	case $_type in
-		ADHOC) # Temporary, adhoc connections have the form: 10.99.x.2/30
-			_ip1=88 ; _subnet=29 ;;
-		SSH) # Control jails operate on 10.99.x.0/30
-			_ip1=99 ; _subnet=30 ;;
-		NET|*) case "${_client}" in
-				net-firewall*) # firewall IP is not internally assigned, but router dependent.
-					_cycle=256 ; eval $_R1 ;;
-				net-*) # net jails IP address convention is: 10.255.x.0/30
-					_ip1=255 ;;
-				serv-*) # Server jails IP address convention is: 10.128.x.0/30
-					_ip1=128 ;;
-				*) # All other jails should receive convention: 10.1.x.0/30
-					_ip1=1 ;;
-			esac
-	esac
+	# If a specific jail was passed, check that as the first possibility to find/remove tap
+	if [ "$_jail" ] && jexec -l -U root $_jail ifconfig -l | grep -Eqs "$_tap" ; then
+		ifconfig "$_tap" -vnet "$_jail" && ifconfig "$_tap" down && return 0
+	fi
+
+	# If the above fails, then check all jails
+	for _jail in $(get_info -e _ONJAILS) ; do
+		if jexec -l -U root $_jail ifconfig -l | grep -Eqs "$_tap" ; then
+			ifconfig $_tap -vnet $_jail
+			ifconfig $_tap down
+			return 0
+		fi
+	done
+	return 1
+}
+
+assign_ipv4_auto() {
+	# IPV4 assignment during parallel jail starts, has potetial for overlapping IPs. $_TMP_IP
+	# file is used for deconfliction during qb-start, and must be referenced by exec.created
+	local _fn="assign_ipv4_auto" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	while getopts eqt:V opts ; do case $opts in
+			e) _echo="true" ;;
+			q) local _q='-q' ;;
+			t) local _type="$OPTARG" ;;
+			V) local _V="-V" ;;
+			*) get_msg -m _e9 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
+
+	local _client="$1"  ;  _gateway="$2"  ;  local _ipv4=
+	_TMP_IP="${_TMP_IP:=${QTMP}/.qb-start_temp_ip}"
+
+	# Pull pre-set IPV4 from the temp file if it exists, based on 0control or normal
+	if [ -e "$_TMP_IP" ] ; then
+		_ipv4=$(sed -nE "s#^${_client} $_type ##p" $_TMP_IP)
+	fi
+
+	# If there was no ipv4 assigned to _client in the temp file, then find an open ip for the jail.
+	[ -z "$_ipv4" ] && _ipv4=$(discover_open_ipv4 -t "$_type" "$_client" "$_gateway")
+
+	# Echo option or assign global IPV4
+	[ "$_echo" ] && echo "$_ipv4" || IPV4="$_ipv4"
+
 	eval $_R0
 }
 
@@ -1807,8 +1666,8 @@ discover_open_ipv4() {
 
 			# Failure to find IP in the quBSD conventional range
 			if [ $_ip2 -gt 255 ] ; then
-				_pass_var="${_ip0}.${_ip1}.x.${_ip3}"
-				get_msg $_qi -m _e46 "$_client"
+				_passvar="${_ip0}.${_ip1}.X.${_ip3}"
+				get_msg $_qi -m _e30 "$_client" "$_passvar"
 				eval $_R1
 			fi
 		else
@@ -1819,33 +1678,180 @@ discover_open_ipv4() {
 	eval $_R0
 }
 
-assign_ipv4_auto() {
-	# IPV4 assignment during parallel jail starts, has potetial for overlapping IPs. $_TMP_IP
-	# file is used for deconfliction during qb-start, and must be referenced by exec.created
-	local _fn="assign_ipv4_auto" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+define_ipv4_convention() {
+	# Defines the quBSD internal IP assignment convention.
+	# Variables: $ip0.$ip1.$ip2.$ip3/subnet ; are global; required for discover_open_ipv4(),
+	# and chk_isqubsd_ipv4(). Not best practice, but they're unique from any others.
+	# Return: 0 for normal assignment; 1 for net-firewall. gateway=0control goes first
+	local _fn="define_ipv4_convention" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
-	while getopts eqt:V opts ; do case $opts in
-			e) _echo="true" ;;
-			q) local _q='-q' ;;
-			t) local _type="$OPTARG" ;;
+	while getopts qt:V _opts ; do case $_opts in
+		q) local _q='-q' ;;
+		t) local _type="$OPTARG" ;;
+		V) local _V="-V" ;;
+		*) get_msg -m _e9 ;;
+	esac ; done ; shift $(( OPTIND - 1))
+
+	local _client="$1"
+	# _ip assignments are static, except for $_ip1
+	_ip0=10 ; _ip2=1 ; _ip3=2 ; _subnet=30
+
+	# Combo of function caller and JAIL/VM determine which IP form to use
+	case $_type in
+		ADHOC) # Temporary, adhoc connections have the form: 10.99.x.2/30
+			_ip1=88 ; _subnet=29 ;;
+		SSH) # Control jails operate on 10.99.x.0/30
+			_ip1=99 ; _subnet=30 ;;
+		NET|*) case "${_client}" in
+				net-firewall*) # firewall IP is not internally assigned, but router dependent.
+					_cycle=256 ; eval $_R1 ;;
+				net-*) # net jails IP address convention is: 10.255.x.0/30
+					_ip1=255 ;;
+				serv-*) # Server jails IP address convention is: 10.128.x.0/30
+					_ip1=128 ;;
+				*) # All other jails should receive convention: 10.1.x.0/30
+					_ip1=1 ;;
+			esac
+	esac
+	eval $_R0
+}
+
+connect_client_to_gateway() {
+	# When a jail/VM is started, this connects to its gateway
+	# GLOBAL VARIABLES must have been assigned already: $GATEWAY ; $IPV4 ; $MTU
+		# -e (e)cho result  ;  -m (m)tu  ;  -q (q)uiet  ;  -t (t)ype [NET or SSH]
+	local _fn="connect_client_to_gateway" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	local _ipv4=  ;  local _type=  ;  local _ec  ;  local _mtu  ;  local _q
+	local _dhcpd_restart  ;  local _named_restart
+	while getopts cdei:m:nqV opts ; do case $opts in
+			c) _type="SSH" ;;
+			d) _dhcpd_restart="true" ;;
+			e) _ec='true' ;;
+			i) _ipv4="$OPTARG"  ;;
+			m) _mtu="$OPTARG" ;;
+			n) _named_restart="true" ;;
+			q) _q='-q' ;;
 			V) local _V="-V" ;;
 			*) get_msg -m _e9 ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
-	local _client="$1"  ;  _gateway="$2"  ;  local _ipv4=
-	_TMP_IP="${_TMP_IP:=${QTMP}/.qb-start_temp_ip}"
+	# Pos params, default MTU, and _type
+	local _client="$1"  ;  local _gateway="$2"
+	_mtu="${MTU:=$(get_jail_parameter -des MTU $_gateway)}"
+	local _type="${_type:=NET}"
 
-	# Pull pre-set IPV4 from the temp file if it exists, based on 0control or normal
-	if [ -e "$_TMP_IP" ] ; then
-		_ipv4=$(sed -nE "s#^${_client} $_type ##p" $_TMP_IP)
+	# If IP wasnt provided, then find an available one
+	[ -z "$_ipv4" ] && local _ipv4=$(assign_ipv4_auto -et "$_type" "$_client" "$_gateway")
+
+	# This function can be called by multiple scripts/functions that dont know which is a VM or jail
+	if chk_isvm "$_client" ; then
+		# Get tap, send to gateway jail, bring up jail connection
+		_vifb=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_client}")
+		ifconfig "$_vifb" vnet "$_gateway"
+		jexec -l -U root $_gateway ifconfig $_vifb inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
+
+		# If flagged, restart dhcpd, so the new IP will be included
+		if [ "$_dhcpd_restart" ] ; then
+			# While loop avoids races/overlaps for potential multiple VM simultaneous starts
+			local _count=0
+			while jexec -l -U root $_gateway pgrep -fq 'isc-dhcpd restart' > /dev/null 2>&1 ; do
+				{ [ "$_count" -le 10 ] && sleep .2 ; _count=$(( _count + 1 )) ;} || eval $_R1
+			done
+			jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
+		fi
+
+		# If flagged, restart dhcpd, so the new IP will be included
+		if [ "$_named_restart" ] ; then
+			# While loop avoids races/overlaps for potential multiple VM simultaneous starts
+			local _count=0
+			while jexec -l -U root $_gateway pgrep -fq 'named restart' > /dev/null 2>&1 ; do
+				{ [ "$_count" -le 10 ] && sleep .2 ; _count=$(( _count + 1 )) ;} || eval $_R1
+			done
+			jexec -l -U root $_gateway service named restart > /dev/null 2>&1
+		fi
+
+	elif chk_isvm "$_gateway" ; then
+		# Get tap and sent to client jail. Should be DHCP, but modify mtu if necessary
+		_vifb=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_gateway}")
+
+ 		ifconfig $_vifb vnet $_client
+		[ ! "$_mtu" = "1500" ] && jexec -l -U root $_client ifconfig $_vifb mtu $_mtu up
+
+	else
+		# Create epair and assign _vif variables.
+		local _vif=$(ifconfig epair create)  ;  local _vifb="${_vif%?}b"
+		ifconfig "$_vif" vnet $_gateway
+
+		# If connecting two jails (and not host), send the epair, and assign the command modifier.
+		if [ ! "$_client" = "host" ] ; then
+			ifconfig "${_vifb}" vnet $_client
+			local _cmdmod='jexec -l -U root $_client'
+		fi
+
+		# If there's no IP skip the epair assignments
+		if [ ! "$_ipv4" = "none" ] ; then
+			# Assign the gateway IP
+			jexec -l -U root "$_gateway" \
+							ifconfig "$_vif" inet ${_ipv4%.*/*}.1/${_ipv4#*/} mtu $_mtu up
+
+			# Assign the client IP and, default route (if not control gateway)
+			eval "$_cmdmod" ifconfig $_vifb inet ${_ipv4} mtu $_mtu up
+			[ "$_type" = "NET" ] && eval "$_cmdmod" route add default "${_ipv4%.*/*}.1" >/dev/null 2>&1
+	fi fi
+
+	# Add the jail and vif to a tracking file
+	[ "$_type" = "SSH" ] && echo "$_client $_vifb ${_ipv4%%/*}" >> ${QTMP}/control_netmap
+
+	# Echo option. Return epair-b ; it's the external interface for the jail.
+	[ "$_ec" ] && echo "$_vifb"
+	eval $_R0
+}
+
+connect_gateway_to_clients() {
+	# If clients were already started, then the gateway needs to reconnect to its clients
+	local _fn="connect_gateway_to_clients" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	while getopts qV _opts ; do case $_opts in
+		q) local _q='-q' ;;
+		V) local _V="-V" ;;
+	esac ; done ; shift $(( OPTIND - 1))
+
+	local _gateway="$1"
+	[ -z "$_gateway" ] && get_msg $_q -m _e0 "Jail/VM" && eval $_R1
+
+	# All onjails connect to 0control
+	if [ "$CLASS" = "cjail" ] ; then
+		for _client in $(get_info -e _ONJAILS | grep -v "$_gateway") ; do
+			if [ "$(get_jail_parameter $_q -de CONTROL $_client)" = "$_gateway" ] ; then
+				connect_client_to_gateway -c $_q "$_client" "$_gateway"
+				! chk_isvm $_client && copy_control_keys -f $_gateway $_client
+			fi
+		done
 	fi
 
-	# If there was no ipv4 assigned to _client in the temp file, then find an open ip for the jail.
-	[ -z "$_ipv4" ] && _ipv4=$(discover_open_ipv4 -t "$_type" "$_client" "$_gateway")
+	# Restore connection to CLIENTS one by one
+	for _client in $(get_info -e _CLIENTS "$_gateway") ; do
+		if chk_isrunning "$_client" ; then
 
-	# Echo option or assign global IPV4
-	[ "$_echo" ] && echo "$_ipv4" || IPV4="$_ipv4"
+			# Get client IP, bring up connection, and save the VIF used
+			_cIP=$(get_jail_parameter -der IPV4 "$_client")
+			_cVIF=$(connect_client_to_gateway -ei "$_cIP" "$_client" "$_gateway")
 
+			# If client is itself a gateway, its pf.conf needs the new epair and IP (cVIF and cIP)
+			_cPF="${M_ZUSR}/${_client}/${PFCONF}"
+			if [ -e "$_cPF" ] ; then
+
+				# Flags down, modify files
+				chflags -R noschg "${M_ZUSR}/${_client}/rw/etc"
+				sed -i '' -e "s@^[[:blank:]]*EXT_IF[[:blank:]]*=.*@\tEXT_IF = \"${_cVIF}\"@" $_cPF
+				sed -i '' -e "s@^[[:blank:]]*JIP[[:blank:]]*=.*@\tJIP = \"${_cIP}\"@"  $_cPF
+
+				# Restart _client pf service. Restore flags with qb-flags -r (we dont know seclvl here)
+				jexec -l -U root "$_client" service pf restart > /dev/null 2>&1
+				qb-flags -r $_client > /dev/null 2>&1 &
+		fi fi
+	done
 	eval $_R0
 }
 
@@ -1899,8 +1905,7 @@ cleanup_vm() {
 	[ -n "$_norun" ] && eval $_R0
 
 	# Pull _rootenv in case it wasn't provided
-	[ -z "$_rootenv" ] && ! _rootenv=$(get_jail_parameter -e ROOTENV $_VM) \
-		&& get_msg $_qcv -m _e32 "$_VM" && eval $_R1
+	[ -z "$_rootenv" ] && ! _rootenv=$(get_jail_parameter -e ROOTENV $_VM) && eval $_R1
 
 	# Destroy the dataset
 	reclone_zroot -q "$_VM" "$_rootenv"
@@ -1909,7 +1914,7 @@ cleanup_vm() {
 	rm "${QTMP}/qb-bhyve_${_VM}" 2> /dev/null
 
 	# If called with [-x] send an exit message and run exit 0
-	[ -n "$_exit" ] && get_msg -m _e38 "$_VM" && exit 0
+	[ -n "$_exit" ] && get_msg -m _m8 "$_VM" && exit 0
 	eval $_R0
 }
 
@@ -2147,7 +2152,7 @@ finish_vm_connections() {
 	_count=0
 	while ! pgrep -xfq "bhyve: $_VM" ; do
 		sleep 1 ; _count=$(( _count + 1 ))
-		[ "$_count" -ge 15 ] && get_msg -m _e4_1 "$_VM" && eval $_R1
+		[ "$_count" -ge 15 ] && get_msg -m _e4_2 "$_VM" && eval $_R1
 	done
 
 	# Connect control jail
@@ -2202,7 +2207,7 @@ exec_vm_coordinator() {
 	while ! { pgrep -xfq "bhyve: $_VM" \
 				|| pgrep -fl "bhyve" | grep -Eqs "^[[:digit:]]+ .* ${_VM}[[:blank:]]*\$" ;} ; do
 		sleep .5 ; _count=$(( _count + 1 ))
-		[ "$_count" -ge 6 ] && get_msg -m _e31 "$_VM" && eval $_R1
+		[ "$_count" -ge 6 ] && get_msg _e4_1 "$_VM" && eval $_R1
 	done
 
 	finish_vm_connections &

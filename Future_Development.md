@@ -1,21 +1,32 @@
 
-ERROR PLAN
-_QV options throughout (regardless)
-_Track fn -> fn variable. It gets put to the log._
-_return 0 and return 1 should now be an `eval $var` with var reseting the GLOBAL $_FN_
-_Make sure that every function at end (or in middle) will exit with a reset of $_FN_
-	Go through every message and make sure it's clearly descriptive for the end user
-	launch_vm still needs log strategy changed_
-	POPUP error messages based on get_info POPUP and whether it's a situation that might warrant it
+Hardcore Review
+	monitor_startstop
+	exec_vm_start (particularly the start and error messages	
+	launch_vm
+
+Still need to divine ways to handle qb-start parallel start_jail calls and their error messages
+
+POPUP error messages based on get_info POPUP and whether it's a situation that might warrant it
 
 NOTES FOR FUTURE FIXING 
 	- reclone_zusr should have checks for the _jail and _template__
-	Think about get_parameter_lists and it's passing of -q or -V (and in geenral its call to get_jail_parameter
 	qb-cmd "all jails have started, but" ... It happens in alot of places it shouldnt. Should chk_isvm
 	qb-cmd that has no user, only root, the -r is not a helpful command
 
-CHANGED
-	chk_isrunning - doesnt need to get_jail_parameter. Just needs a sequential check.
+Alot of sed in quBSD.sh are not configured to substitute the #default in place of a blank value
+
+Still having problems with '-dash-' (-z for example) options
+
+chk_valid_ppt - we can try to change to a ppt device like the guy on the video for GPU passthru
+
+
+### Problems discovered during error message retooling
+ 
+ERROR: The combination of < DEVFS_RULE > <  > was not found in QMAP.
+qb-ephm is starting < EPHM-message >
+
+It seems like exec.created sed might not be modifiable? Due to dynamic link?
+
 
 ### UPGRADES
 

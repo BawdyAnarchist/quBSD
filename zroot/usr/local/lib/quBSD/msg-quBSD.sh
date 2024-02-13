@@ -4,7 +4,7 @@ get_msg() {
 	local _msg1= ; local _msg2= ; local _error
 
    # Quiet option finally resolves.
-	while getopts l:m:M:qV opts ; do case $opts in
+	while getopts m:M:qV opts ; do case $opts in
 		m) _msg1="$OPTARG" ;;
 		M) _msg2="$OPTARG" ;;
 		q) local _q="true" ;;
@@ -19,6 +19,9 @@ get_msg() {
 		_w*|_e*) # Append messages to top of $ERR1. Must end with `|| :;}` , for `&& cp -a` to work
 			{ msg_qubsd "$@" ; [ "$_msg2" ] && _msg1="$_msg2" && msg_qubsd "$@" \
 				; [ -s "$ERR1" ] && cat $ERR1 || :;} > $ERR2 && cp -a $ERR2 $ERR1
+
+			# If -V was passed, then print the message immediately
+			[ "$_V" ] && msg_qubsd "$@"
 			;;
 	esac
 
@@ -45,11 +48,17 @@ ENDOFMSG
 ENDOFMSG
 		;;
 	_e4) cat << ENDOFMSG
-   Failed to start < $1 >
+   ${0##*/} Failed to start < $1 >. See $QBLOG for details.
 ENDOFMSG
 	;;
 	_e4_1) cat << ENDOFMSG
-   Gave up waiting for VM < $1 > to launch.
+   Failed to detect a VM process for < $1 > within 3 sec of launch.
+ENDOFMSG
+	;;
+	_e4_2) cat << ENDOFMSG
+   Can't configure network for < $1 >. Timeout, waiting for VM to launch.
+   Sometimes a passthru device can delay/hang a launch if it's not responsive.
+   If this VM has a PPT device (like a USB), consider rebooting.
 ENDOFMSG
 	;;
 	_e5) cat << ENDOFMSG
@@ -81,7 +90,7 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e11) cat << ENDOFMSG
-   < $1 > is not an integer 
+   < $1 > is not an integer
 ENDOFMSG
 	;;
 	_e12) cat << ENDOFMSG
@@ -99,8 +108,8 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e13_2) cat << ENDOFMSG
-   JAILNAME < $1 > has an entry in at least one of the following: 
-   jail.conf, QMAP, or zfs dataset at $U_ZFS or $R_ZFS 
+   JAILNAME < $1 > has an entry in at least one of the following:
+   jail.conf, QMAP, or zfs dataset at $U_ZFS or $R_ZFS
    Destroy/remove all occurrences with:  qb-destroy $1
 ENDOFMSG
 	;;
@@ -114,11 +123,11 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e15) cat << ENDOFMSG
-   CLASS may only be <appjail|dispjail|rootjail|cjail|rootVM|appVM> 
+   CLASS may only be <appjail|dispjail|rootjail|cjail|rootVM|appVM>
 ENDOFMSG
 	;;
 	_e16) cat << ENDOFMSG
-   Only comma separated intergers, range, or combo of both. man 1 cpuset 
+   Only comma separated intergers, range, or combo of both. man 1 cpuset
 ENDOFMSG
 	;;
 	_e16_1) cat << ENDOFMSG
@@ -134,7 +143,7 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e19) cat << ENDOFMSG
-   Must be <integer><G|g|M|m|K|k>. See man 8 rctl 
+   Must be <integer><G|g|M|m|K|k>. See man 8 rctl
 ENDOFMSG
 	;;
 	_e20) cat << ENDOFMSG
@@ -163,136 +172,78 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e23) cat << ENDOFMSG
+   < $1 > is an invalid CLASS for a ROOTENV.
 ENDOFMSG
 	;;
 	_e24) cat << ENDOFMSG
+   < $1 > is an invalid SECLVL. Must be: <-1|0|1|2|3>
 ENDOFMSG
 	;;
 	_e25) cat << ENDOFMSG
+   < $1 > is an invalid SCHG. Must be: <none|sys|all>
 ENDOFMSG
 	;;
 	_e26) cat << ENDOFMSG
+   < $1 > must be less-than the number of CPUs cores on
+   the host ($2), and less than bhyve limit of 16.
 ENDOFMSG
 	;;
 	_e27) cat << ENDOFMSG
-   VCPUS must be less than or equal to the number
-   of physical cores on host < $2 > ; AND
-   less than or equal to the bhyve limit of 16.
+   Invalid VNC. Must be: <true|false|640x480|800x600|1024x768|1920x1080>
+   (A value of 'true' will default to a resolution of 1920x1080)
 ENDOFMSG
 	;;
 	_e28) cat << ENDOFMSG
-   < $1 > needs to be designated as a
-   < $2 > in qubsdmap.conf
 ENDOFMSG
 	;;
 	_e29) cat << ENDOFMSG
 ENDOFMSG
 	;;
 	_e30) cat << ENDOFMSG
+   Couldn't find open IP for < $1 > in the range: < $2 >
 ENDOFMSG
 	;;
 	_e31) cat << ENDOFMSG
+   No jails to start. Please specify [-a|-A|-f <file>],
+   or < jail list > at the end of the command.
+ENDOFMSG
+	;;
+	_e31_1) cat << ENDOFMSG
+   [-e] can only be used with [-a|-A|-f <file>], because
+   the positional params are assumed to be jail starts.
+ENDOFMSG
+	;;
+	_e31_2) cat << ENDOFMSG
+   The file < $_SOURCE > doesn't exist.
+ENDOFMSG
+	;;
+	_e31_3) cat << ENDOFMSG
+   [-e] requires a < jail list > as positional parameters.
+ENDOFMSG
+	;;
+	_e31_4) cat << ENDOFMSG
+   The file < $_EXFILE > doesn't exist.
+ENDOFMSG
+	;;
+	_e31_5) cat << ENDOFMSG
+   $0 did not find any jails to ${0##*qb-}
 ENDOFMSG
 	;;
 	_e32) cat << ENDOFMSG
-quBSD msg: VM < $1 > has ended
-ENDOFMSG
-	;;
-	_e33) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_e40) cat << ENDOFMSG
-UNUSED_UNUSED
-ENDOFMSG
-	;;
-	_e41) cat << ENDOFMSG
-UNUSED
-ENDOFMSG
-	;;
-	_e42) cat << ENDOFMSG
-UNUSED_UNUSED
-ENDOFMSG
-	;;
-	_e43) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_e44) cat << ENDOFMSG
-UNUSED_UNUSED
-ENDOFMSG
-	;;
-	_e45) cat << ENDOFMSG
-UNUSED_UNUSED
-ENDOFMSG
-	;;
-	_e46) cat << ENDOFMSG
-   Failed to find open IP for < $1 >
-   It's permissible to use the same IP twice; but ensure that
-   jails with the same IP aren't connected to the same gateway.
-ENDOFMSG
-	;;
-	_e47) cat << ENDOFMSG
-   Parameter < $1 > for < $2 >
-   had a null value in $QBDIR/qubsdmap.conf
-ENDOFMSG
-	;;
-	_e48) cat << ENDOFMSG
    < $1 > is not a clone (has no zfs origin).
    Likely is a ROOTENV.
 ENDOFMSG
 	;;
-	_e49) cat << ENDOFMSG
+	_e32_1) cat << ENDOFMSG
    < $1 > needs a ROOTENV clone. However, its
    ROOTENV < $2 > has no existing snapshots,
    and is curently running. Running ROOTENVs should
    not be snapshot/cloned until turned off.
 ENDOFMSG
 	;;
-	_e50) cat << ENDOFMSG
-UNUSED_UNUSED
-ENDOFMSG
-	;;
-	_e51) cat << ENDOFMSG
+	_e33) cat << ENDOFMSG
    ${2##*bin/} failed to ${2##*qb-} all jails/VMs
    within the allotted timeout of < $2 secs >.
-ENDOFMSG
-	;;
-	_e52) cat << ENDOFMSG
-   $0 did not find any jails to ${0##*qb-}
-ENDOFMSG
-	;;
-	_e53) cat << ENDOFMSG
-   No jails to start. Please specify [-a|-A|-f <file>],
-   or < jail list > at the end of the command.
-ENDOFMSG
-	;;
-	_e54) cat << ENDOFMSG
-   [-e] can only be used with [-a|-A|-f <file>], because
-   the positional params are assumed to be jail starts.
-ENDOFMSG
-	;;
-	_e55) cat << ENDOFMSG
-   The file < $_SOURCE > doesn't exist.
-ENDOFMSG
-	;;
-	_e56) cat << ENDOFMSG
-   [-e] requires a < jail list > as positional parameters.
-ENDOFMSG
-	;;
-	_e57) cat << ENDOFMSG
-   The file < $_EXFILE > doesn't exist.
-ENDOFMSG
-	;;
-	_e58) cat << ENDOFMSG
-   Valid bhyve resolutions for VNC viewer are as follows:
-   640x480 | 800x600 | 1024x768 | 1920x1080
-ENDOFMSG
-	;;
-	_e59) cat << ENDOFMSG
-UNUSED
-ENDOFMSG
-	;;
-	_e60) cat << ENDOFMSG
-UNUSED
 ENDOFMSG
 	;;
 	_w1) cat << ENDOFMSG
@@ -341,7 +292,7 @@ ALERT: Another instance of qb-start or qb-stop is running.
 ENDOFMSG
 	;;
 	_m6) cat << ENDOFMSG
-ALERT: < $2 > is a gateway,   
+ALERT: < $2 > is a gateway,
    pass external traffic for client jails. Setting IP
    to < $1 > will prevent < $2 > and its
    clients from reaching the outside internet.
@@ -352,6 +303,7 @@ ALERT: Assigning IP to < $2 > which has no gateway.
 ENDOFMSG
 	;;
 	_m8) cat << ENDOFMSG
+   quBSD msg: VM < $1 > has successfully shutdown.
 ENDOFMSG
 	;;
 	_m9) cat << ENDOFMSG

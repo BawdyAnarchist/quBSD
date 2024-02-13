@@ -7,14 +7,14 @@ get_options() {
 	while getopts dfhqr opts ; do case $opts in
 		d) ACTION="delete" ;;
 		f) FORCE="true" ; _q='-q' ;;
-		h) msg_edit -eu ;; 
+		h) msg_edit -eu ;;
 		q) QUIET="true" ; _q='-q' ;;
 		r) RESTART="true" ;;
 		*) exit 1 ;;
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Script variables
-	JAIL="$1"
+	JAIL="$1" ; [ -z "$JAIL" ] && msg_edit -Eum _1
 	PARAM="$2"
 
 	# If adding	a line, it might be '-s opt' for bhyve, need full line
@@ -63,7 +63,7 @@ checks() {
 		elif echo "$FILT_PARAMS" | grep -Eqs "$PARAM" ; then
 			# If there was no OLDVALUE, add a new line. However, if VALUE is equal to the default,
 			# then we'll delete the line and rely on the default. EXCEPT for CLASS and ROOTENV.
-			# For safety reasons, jails/VMs should always specify this, even if equal to default. 
+			# For safety reasons, jails/VMs should always specify this, even if equal to default.
 
 			[ -z "$OLDVALUE" ] && ACTION="add"
 			[ "$VALUE" = "$DEFAULT" ] && [ ! "$PARAM" = "CLASS" ] \

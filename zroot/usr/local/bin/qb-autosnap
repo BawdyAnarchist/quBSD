@@ -11,7 +11,7 @@ get_options() {
 		s) 	SNAPSHOT=true ;;
 		t) 	TTL="${OPTARG}" ;;
 		:) 	LIST="all" ;;
-		\?)   msg_autosnap -Eum _e2
+		*)   msg_autosnap -Eum _e2
 	esac done  ;  shift $(( OPTIND - 1 ))
 
 	DATE_UNIX=$(date +%s)
@@ -121,7 +121,7 @@ new_snapshots() {
 	for _dataset in $ZLIST ; do
 		# If the dataset is a zroot dataset (a ROOTENV), skip the snapshot if it's running
 		{ [ -z "${_dataset##"${R_ZFS}"*}" ] && chk_isrunning "${_dataset##*/}" ;} && continue
-		
+
 		zfs snapshot \
 			-o qubsd:autocreated=yes \
 			-o qubsd:autosnap="-" \
@@ -149,7 +149,7 @@ update_stale_clones() {
 	# Update stale zusr clones. They might need fstab replacement and home directory change
 	for _clone in $_uclonelist ; do
 		_origin=$(zfs list -Ho origin $_clone | sed -E "s/${U_ZFS}\///")
-		reclone_zusr ${_clone##*/} "${_origin%%@*}"
+		reclone_zusr ${_clone##*/} "${_origin%%@*}" || msg_autosnap -m _e3
 	done
 }
 
@@ -174,7 +174,7 @@ thin_old_snapshots() {
 			&& _dd1=$(zfs list -H -o qubsd:destroy-date $_snap1) \
 			&&	_writ1=$(zfs list -H -o written $_snap1)
 
-		while [ -n "$_snap1" ] && [ "$_dd0" -ge "$_dd1" ] && [ "${_writ0}${_writ1}" = "00" ] ; do 
+		while [ -n "$_snap1" ] && [ "$_dd0" -ge "$_dd1" ] && [ "${_writ0}${_writ1}" = "00" ] ; do
 			zfs destroy $_snap1 > /dev/null 2>&1 \
 					&& _snaplist_temp=$(echo "$_snaplist_temp" | sed '$d') || break
 			_snap1=$(echo "$_snaplist_temp" | tail -1)

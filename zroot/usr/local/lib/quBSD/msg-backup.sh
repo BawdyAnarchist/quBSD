@@ -1,72 +1,81 @@
 #!/bin/sh
 
 msg_backup() {
-	while getopts eEm:u opts ; do case $opts in
+	while getopts eEm:quV opts ; do case $opts in
 		e) local _exit="exit 0" ;;
 		E) local _exit="exit 1" ;;
 		m) local _message="$OPTARG" ;;
+		q) local _q="true" ;;
 		u) local _usage="true" ;;
+		V) local _V="true" ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
+	# Assemble/retreive the message
+	_MESSAGE=$([ -z "${_message##_e*}" ] && echo "ERROR:  ${0##*/}" \
+		; retreive_msg "$@" ; [ "$GET_MSG" ] && echo "$GET_MSG")
+
+	# If exiting with error, send it to the log
+	[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")  $0\n$_MESSAGE" >> $QBLOG
+
+	# If -q wasnt specified, print message to the terminal
+	[ -z "$_q" ] && echo "$_MESSAGE"
+
+	# Evaluate usage and exit code
+	[ $_usage ] && usage
+	eval $_exit :
+}
+
+retreive_msg() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-
-ERROR: Invalid option
+   Invalid option
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-
-ERROR: [-a] and [-A] are mutually exclusive.
+   [-a] and [-A] are mutually exclusive.
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
-
-ERROR: Positional parameters are interpreted datasets to backed-up
-       but you already specified [-a|-A|-f]. Chose only one.
+UNUSED
 ENDOFMSG
 	;;
 	_e4) cat << ENDOFMSG
-
-ERROR: [-z <destination_dataset>] is mandatory, or qb-backup
-       doesn't know where to send the backup datasets.
+   [-z <destination_dataset>] is mandatory, or qb-backup
+   doesn't know where to send the backup datasets.
 ENDOFMSG
 	;;
 	_e5) cat << ENDOFMSG
-
-ERROR: The destination < $ZBAK > does not exist.
-       Have you imported the zpool?
+   The destination < $ZBAK > does not exist.
+   Have you imported the zpool?
 ENDOFMSG
 	;;
 	_e6) cat << ENDOFMSG
-
-ERROR: The dataset < ${ZBAK}/${_dataset} > already exists
-       at the destination. Pass [-F] to force zfs to overwrite.
+   The dataset < ${ZBAK}/${_dataset} > already exists
+   at the destination. Pass [-F] to force zfs to overwrite.
 ENDOFMSG
 	;;
 	_e7) cat << ENDOFMSG
-
-ERROR: No datasets were specified for backup. Either choose
-       [-a|-A|-f], or specify datasets as positional parameters.
+   No datasets were specified for backup. Either choose
+   [-a|-A|-f], or specify datasets as positional parameters.
 ENDOFMSG
 	;;
 	_e8) cat << ENDOFMSG
-
-ERROR: < $_dataset > is not a valid zfs dataset
+   < $_dataset > is not a valid zfs dataset
 ENDOFMSG
 	;;
 	_e9) cat << ENDOFMSG
-
-ERROR: The following ROOTENVs are currently running. To avoid
-       corruption, shut these down before performing a backup.
+   The following ROOTENVs are currently running. To avoid
+   corruption, shut these down before performing a backup.
 $_ONROOTS
        [Note: After the backup begins, you may then start/use these normally]
 ENDOFMSG
 	;;
 	_w1) cat << ENDOFMSG
-ALERT: One or more the above appjails are running. This can potentially cause
-       data corruption, especially for servers, databases, and P2P nodes.
-       User programs like browsers, media, and office suites, should be okay.
-       BEST PRACTICE IS TO SHUT DOWN ALL JAILS/VMs BEFORE BACKUP!
+ALERT:  $0
+   One or more the above appjails are running. This can potentially cause
+   data corruption, especially for servers, databases, and P2P nodes.
+   User programs like browsers, media, and office suites, should be okay.
+   BEST PRACTICE IS TO SHUT DOWN ALL JAILS/VMs BEFORE BACKUP!
 
 ENDOFMSG
 	;;
@@ -92,9 +101,6 @@ BACKUP COMPLETE. See $BAK_LOG for details
 ENDOFMSG
 	;;
 	esac
-
-	[ $_usage ] && usage
-	eval $_exit :
 }
 
 usage() { cat << ENDOFUSAGE
@@ -108,7 +114,7 @@ Notes: Not designed for network backups. quBSD's qb-autosnap
    too dynamic for incremental send|recv.
 
    Thus, default behavior creates temporary snapshots: @qbBAK
-   of selected datasets. This single snap is what gets sent. 
+   of selected datasets. This single snap is what gets sent.
 
    A nice feature of qb-backup, you can do a recursive [-r]
    backup, but without implying [-R]. Thus you can send all
@@ -136,3 +142,4 @@ Usage: qb-backup
 
 ENDOFUSAGE
 }
+

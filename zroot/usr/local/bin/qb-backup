@@ -21,7 +21,6 @@ get_options() {
 	POS_SETS="$@"
 	SNAPNAME='@qbBAK'
 	BAK_LOG="$(dirname $QBLOG)/qb-backup.log"
-	[ "$MODE" ] && [ "$DATASETS" ] && msg_backup -Eum "_e3"
 }
 
 check_zbackup() {
@@ -89,7 +88,7 @@ check_datasets() {
 		for _sub in $_subsets ; do
 			# Running ROOTENVS should not be backed up. Other jails, maybe (warn).
 			if chk_isrunning ${_sub##*/} ; then
-				get_jail_parameter CLASS ${_sub##*/}
+				get_jail_parameter CLASS -s ${_sub##*/}
 				[ -z "${CLASS##root*}" ] && _ONROOTS=$(printf %b "${_sub##*/}\n$_ONROOTS") \
 					|| _ONJAILS="true"
 			fi
