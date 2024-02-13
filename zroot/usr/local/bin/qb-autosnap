@@ -6,12 +6,12 @@
 get_options() {
 	while getopts ':dhl:st:' opts ; do case $opts in
 		d) 	DESTROY=true ;;
-		h) 	msg_autosnap -eu ;;
+		h) 	get_msg2 -eu ;;
 		l) 	LIST=${OPTARG} ;;
 		s) 	SNAPSHOT=true ;;
 		t) 	TTL="${OPTARG}" ;;
 		:) 	LIST="all" ;;
-		*)   msg_autosnap -Eum _e2
+		*)   get_msg2 -Eum _e2
 	esac done  ;  shift $(( OPTIND - 1 ))
 
 	DATE_UNIX=$(date +%s)
@@ -24,8 +24,8 @@ checks() {
 
 	# Ensure that <_INT><_UNITS> is an integer and proper time unit
 	if [ -n "$TTL" ] ; then
-		! chk_integer -q -g 0 -- "$_INT" && msg_autosnap -Eum _e1
-		! echo "$_UNITS" | grep -Eq "m|H|D|W|Y" && msg_autosnap -Eum _e1
+		! chk_integer -q -g 0 -- "$_INT" && get_msg2 -Eum _e1
+		! echo "$_UNITS" | grep -Eq "m|H|D|W|Y" && get_msg2 -Eum _e1
 	fi
 }
 
@@ -149,7 +149,7 @@ update_stale_clones() {
 	# Update stale zusr clones. They might need fstab replacement and home directory change
 	for _clone in $_uclonelist ; do
 		_origin=$(zfs list -Ho origin $_clone | sed -E "s/${U_ZFS}\///")
-		reclone_zusr ${_clone##*/} "${_origin%%@*}" || msg_autosnap -m _e3
+		reclone_zusr ${_clone##*/} "${_origin%%@*}" || get_msg2 -m _e3
 	done
 }
 
@@ -215,3 +215,5 @@ get_options "$@"
 checks
 
 main
+
+exit 0
