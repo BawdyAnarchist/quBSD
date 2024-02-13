@@ -138,6 +138,12 @@ get_global_variables() {
 	M_ZUSR=$(zfs get -H mountpoint $U_ZFS | awk '{print $3}')
 	[ "$M_QROOT" = "-" ] && get_msg -V -m _e0_3 "$R_ZFS" && exit 1
 	[ "$M_ZUSR" = "-" ]  && get_msg -V -m _e0_3 "$U_ZFS" && exit 1
+
+	# Set the files for error recording, and trap them
+	ERR1=$(mktemp -t quBSD/.${0##*/})
+	ERR2=$(mktemp -t quBSD/.${0##*/})
+	trap "trap_errfiles" HUP INT TERM QUIT EXIT
+
 	return 0
 }
 
@@ -159,6 +165,10 @@ get_networking_variables() {
 	fi
 }
 
+trap_errfiles() {
+	rm $ERR1 $ERR2	
+}
+
 get_msg2() {
 	while getopts eEm:quV opts ; do case $opts in
 		e) local _exit="exit 0" ;;
@@ -176,10 +186,11 @@ get_msg2() {
 				[ -s "$ERR1" ] && cat $ERR1)"
 			# If exiting due to error, log the date and error message to the log file
 			[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QBLOG
+			;;
 	esac
 
 	# If -q wasnt specified, print message to the terminal
-	[ -z "$_q" ] && echo "$_ERROR"
+	[ -z "$_q" ] && [ "$_ERROR" ] && echo "$_ERROR"
 
 	# Evaluate usage and exit code
 	[ $_usage ] && _message="usage" && eval "msg_${0##*-}"
@@ -499,7 +510,7 @@ stop_jail() {
 			if  jail -vR "$_jail"  >> ${QBLOG}_${_jail} 2>&1 ; then
 
 				# Forcible removal likely missed mounts. Clean them up.
-				sh ${QBDIR}/exec.release "$_jail"
+				sh ${QBDIR}/exec-release "$_jail"
 				[ -e "${M_ZUSR}/${JAIL}/rw/etc/fstab" ] \
 									&& umount -aF "${M_ZUSR}/${JAIL}/rw/etc/fstab" > /dev/null 2>&1
 				# Notify about failure to remove normally
@@ -1619,7 +1630,7 @@ remove_tap() {
 
 assign_ipv4_auto() {
 	# IPV4 assignment during parallel jail starts, has potetial for overlapping IPs. $_TMP_IP
-	# file is used for deconfliction during qb-start, and must be referenced by exec.created
+	# file is used for deconfliction during qb-start, and must be referenced by exec-created
 	local _fn="assign_ipv4_auto" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
 	while getopts eqt:V opts ; do case $opts in

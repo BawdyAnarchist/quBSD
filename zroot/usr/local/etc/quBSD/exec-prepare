@@ -6,7 +6,7 @@
 get_parameters() {
 	# Define script variables
 	JAIL="$1"
-	echo "$(date "+%Y-%m-%d_%H:%M") exec.prepare: STARTING: $JAIL" >> $QBLOG ${QBLOG}_$JAIL
+	echo "$(date "+%Y-%m-%d_%H:%M") exec-prepare: STARTING: $JAIL" >> $QBLOG ${QBLOG}_$JAIL
 
 	# Parameters and checks
 	get_jail_parameter CLASS   "$JAIL"    || msg_exec -Em _e1 "CLASS" "$JAIL"
@@ -44,7 +44,7 @@ handle_fstab() {
 		[ -d "$_dir" ] || mkdir -p $_dir > /dev/null 2>&1
 	done
 
-	# Manually mount, caz `jail` expects any fstab in jail.conf to exist, before exec.prepare
+	# Manually mount, caz `jail` expects any fstab in jail.conf to exist, before exec-prepare
 	mount -aF ${M_ZUSR}/${JAIL}/rw/etc/fstab
 }
 

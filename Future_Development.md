@@ -1,15 +1,12 @@
 
-Hardcore Review
-	Alot of sed in quBSD.sh are not configured to substitute the #default in place of a blank value
-	monitor_startstop
-	exec_vm_start (particularly the start and error messages	
-	launch_vm
-
-Still need to divine ways to handle qb-start parallel start_jail calls and their error messages
-
 ONE BY ONE SCRIPT REVIEW
 
-qb-start "all jails have started, but" ... It happens in alot of places it shouldnt. Should chk_isvm
+Hardcore Review
+	monitor_startstop
+	exec_vm_start (particularly the start and error messages)
+	launch_vm
+	Still need to divine ways to handle qb-start parallel start_jail calls and their error messages
+		- qb-start "all jails have started, but" ... It happens in alot of places it shouldnt. Should chk_isvm
 
 POPUP error messages based on get_info POPUP and whether it's a situation that might warrant it
 
