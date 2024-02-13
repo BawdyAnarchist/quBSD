@@ -31,7 +31,7 @@ checks() {
 	fi
 
 	# Check for valid jail, exit if invalid
-	chk_valid_jail "$JAIL" || msg_flags -Eu
+	chk_valid_jail -- "$JAIL" || msg_flags -Eu
 }
 
 main() {

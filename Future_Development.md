@@ -1,21 +1,17 @@
 
 Hardcore Review
+	Alot of sed in quBSD.sh are not configured to substitute the #default in place of a blank value
 	monitor_startstop
 	exec_vm_start (particularly the start and error messages	
 	launch_vm
 
 Still need to divine ways to handle qb-start parallel start_jail calls and their error messages
 
+ONE BY ONE SCRIPT REVIEW
+
+qb-start "all jails have started, but" ... It happens in alot of places it shouldnt. Should chk_isvm
+
 POPUP error messages based on get_info POPUP and whether it's a situation that might warrant it
-
-NOTES FOR FUTURE FIXING 
-	- reclone_zusr should have checks for the _jail and _template__
-	qb-cmd "all jails have started, but" ... It happens in alot of places it shouldnt. Should chk_isvm
-	qb-cmd that has no user, only root, the -r is not a helpful command
-
-Alot of sed in quBSD.sh are not configured to substitute the #default in place of a blank value
-
-Still having problems with '-dash-' (-z for example) options
 
 chk_valid_ppt - we can try to change to a ppt device like the guy on the video for GPU passthru
 
@@ -50,8 +46,6 @@ Host as Unprivileged user
 NICVM - Linux VM (probably alpine) so that it can use all the wireless protocols.
      - Someone made a post about this in FreeBSD
 
-Take another hack at the recording device problems
-
 I2P Gateway
 
 CREATE MANPAGES:  /usr/local/man/man1/qb-scripts
@@ -62,6 +56,8 @@ dispVM
 	- Add new class and boot practices
 	- vm-rc.local should use its IP address to get it's hostname from 0control ftp server
 		- This will require creating a new file in /home/ftp/<IPaddr> on 0control
+
+Take another hack at the recording device problems
 
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS

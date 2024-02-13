@@ -72,7 +72,7 @@ checks_master() {
 	# to attempting to optimistically "fill in the blanks" for users that dont specify all params
 
 	# Check that proposed name is available and valid
-	chk_avail_jailname "$NEWJAIL" || exit 1
+	chk_avail_jailname -- "$NEWJAIL" || exit 1
 
 	# TEMPLATE must have a not-null value for get_jail_parameter to function without an error
 	[ -z "$TEMPLATE" ] && TEMPLATE="none"
@@ -178,7 +178,7 @@ checks_parameters() {
 				done
 			fi
 			# IPv4 validity was checked, but conformance with quBSD conventions was not.
-			[ "$_PAR" = "IPV4" ] && chk_isqubsd_ipv4 "$IPV4" "$NEWJAIL"  >> "$_TMP_WARN"
+			[ "$_PAR" = "IPV4" ] && chk_isqubsd_ipv4 -- "$IPV4" "$NEWJAIL"  >> "$_TMP_WARN"
 		fi
 
 		# Get the #default value for the PARAM, for comparison in the next switch

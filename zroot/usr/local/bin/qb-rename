@@ -17,10 +17,10 @@ get_options() {
 
 checks_and_variables() {
 	# Check that JAIL was specified, and valid
-	! chk_valid_jail -q "$JAIL" && [ -z "$FORCE" ] && msg_rename -Eum _0
+	! chk_valid_jail -q -- "$JAIL" && [ -z "$FORCE" ] && msg_rename -Eum _0
 
 	# Check that the new jailname is available and has no conflicts
-	chk_avail_jailname "$NEWNAME" || msg_rename -Eu
+	chk_avail_jailname -- "$NEWNAME" || msg_rename -Eu
 
 	# Variables change if it's a VM or not
 	get_jail_parameter -qs ROOTENV $JAIL
@@ -53,11 +53,11 @@ rename_common() {
 	# Rename associated zfs datasets
 	chk_valid_zfs ${U_ZFS}/${JAIL} \
 			&& zfs rename -f ${U_ZFS}/${JAIL} ${U_ZFS}/${NEWNAME} \
-			&& ! chk_isvm $NEWNAME && zfs inherit mountpoint ${U_ZFS}/${NEWNAME}
+			&& ! chk_isvm -- $NEWNAME && zfs inherit mountpoint ${U_ZFS}/${NEWNAME}
 
 	chk_valid_zfs ${R_ZFS}/${JAIL} \
 			&& zfs rename -f ${R_ZFS}/${JAIL} ${R_ZFS}/${NEWNAME} \
-			&& ! chk_isvm $NEWNAME && zfs inherit mountpoint ${R_ZFS}/${NEWNAME}
+			&& ! chk_isvm -- $NEWNAME && zfs inherit mountpoint ${R_ZFS}/${NEWNAME}
 }
 
 rename_jail() {
@@ -104,7 +104,7 @@ main() {
 	rename_common
 
 	# Rename things specific to jails
-	! chk_isvm "$JAIL" && rename_jail
+	! chk_isvm -- "$JAIL" && rename_jail
 
 	# Update _CLIENTS , ROOTENV , and TEMPLATE dependencies
 	[ -z "$NOUPDATE" ] && update_dependencies

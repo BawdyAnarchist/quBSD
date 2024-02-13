@@ -30,7 +30,7 @@ checks() {
 	[ -z "$_CMD" ] && msg_pefs -Eum _2
 
 	# Must have a valid jail
-	chk_valid_jail "$JAIL" || msg_pefs -Eu
+	chk_valid_jail -- "$JAIL" || msg_pefs -Eu
 
 	# If performing mount, the directory should already exist.
 	[ "$_CMD" = "mount" ] && ! [ -d "$U_FOLDER" ] && msg_pefs -Eum _3

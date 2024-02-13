@@ -164,7 +164,7 @@ define_variables() {
 handle_if_off() {
 
 	# Jail must be valid
-	chk_valid_jail "$JAIL" || msg_ivpn -Eu
+	chk_valid_jail -- "$JAIL" || msg_ivpn -Eu
 
 	# Will restore original SECLVL later on, after applying ivpn changes
 	SEC_orig=$(sed -En "s/^${JAIL}[[:blank:]]+seclvl[[:blank:]]+//p" $QMAP)

@@ -31,11 +31,11 @@ parse_jail_vars() {
 
 	# Unless already specified, set JAIL to the active window, and check valid
 	JAIL="${JAIL:=$_XJAIL}"
-	chk_valid_jail "$JAIL" || msg_ephm -Eum _2
+	chk_valid_jail -- "$JAIL" || msg_ephm -Eum _2
 
 	# Make name visually easy to identify. Cycle to find available name if in use
 	NEWJAIL="EPHM-${JAIL}"  ;  _cycle=0
-	while ! chk_avail_jailname "$NEWJAIL" ; do
+	while ! chk_avail_jailname -- "$NEWJAIL" ; do
 		_cycle=$(( _cycle + 1 ))
 		NEWJAIL="EPHM-${JAIL}_${_cycle}"
 	done

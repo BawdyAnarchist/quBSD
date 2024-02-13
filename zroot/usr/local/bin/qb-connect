@@ -30,10 +30,10 @@ checks() {
 			# IP checks
 			if [ -n "$IPV4" ] ; then
 				# Invalid IP must be rejected
-				chk_valid_ipv4 "$IPV4" || exit 1
+				chk_valid_ipv4 -- "$IPV4" || exit 1
 
 				# Just temporary connections. Warn for convention mismatch, but don't exit
-				chk_isqubsd_ipv4 "$IPV4"
+				chk_isqubsd_ipv4 -- "$IPV4"
 			else
 
 				# Assign IP if not specified by user

@@ -106,7 +106,7 @@ checks() {
 		;;
 		IPV4)
 				# Extra check for quBSD IPV4 convention.
-				chk_isqubsd_ipv4 $_q "$VALUE" "$JAIL" || msg_edit -EM _f
+				chk_isqubsd_ipv4 $_q -- "$VALUE" "$JAIL" || msg_edit -EM _f
 		;;
 	esac
 }

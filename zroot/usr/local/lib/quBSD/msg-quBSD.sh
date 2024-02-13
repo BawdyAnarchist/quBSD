@@ -9,7 +9,7 @@ get_msg() {
 		M) _msg2="$OPTARG" ;;
 		q) local _q="true" ;;
 		V) local _V="true" ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))
+	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	# DEBUG helps to see what the chain of functions was for an error.
 	[ "$DEBUG" = "1" ] && echo "$(date "+%Y-%m-%d_%H:%M")  $0  ${_FN}" >> $QBLOG
