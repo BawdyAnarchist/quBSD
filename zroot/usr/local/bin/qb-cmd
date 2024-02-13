@@ -87,6 +87,8 @@ main() {
 			start_jail -n "$JAIL" || get_msg2 -m _e6
 			exit 0
 		fi
+		
+		# Launch VM and connect the session
 		! qb-start "$JAIL" && get_msg2 -Em _e1
 		connect_vm_session
 	else
@@ -95,7 +97,10 @@ main() {
 			echo $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT"
 			exit 0
 		fi
+
+		# Start jail, make sure the user has a home directory, and run jexec command 
 		! start_jail $JAIL && get_msg2 -Em _e1
+		[ ! -d "${M_QROOT}/${JAIL}/home/${_USER}" ] && get_msg2 -Em _e7 
 		eval $_NORUN $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT"
 	fi
 }
