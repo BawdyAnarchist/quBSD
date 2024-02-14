@@ -7,7 +7,7 @@ get_options() {
 	while getopts ahHj:lp:szZ opts ; do
 		case $opts in
 			a) _zparams="qubsd:autosnap" ; ZLIST="t" ;;
-			h) msg_list -eu ;;
+			h) get_msg2 -eu ;;
 			H) NOHEAD="-H" ;;
 			j) JAIL="${OPTARG}" ;;
 			l) LIST="t" ;;
@@ -55,7 +55,7 @@ check_and_adjust() {
 			grep -Eqs "^${POS1}[[:blank:]]+" $QMAP && JAIL="$POS1"
 
 			# If jail=param (and not 'none'), then it's ambiguous what the user wanted
-			[ ! "$JAIL" = "none" ] && [ "$PARAM" = "$JAIL" ] && msg_list -Eum _2
+			[ ! "$JAIL" = "none" ] && [ "$PARAM" = "$JAIL" ] && get_msg2 -Eum _e2
 
 			# If both are 'none', then continue, assuming POS1 as JAIL (could be zfs present)
 			[ "$JAIL" = "none" ] && [ "$PARAM" = "none" ] && JAIL="$POS1"
@@ -79,18 +79,18 @@ get_results() {
 
 	case "${LIST}@${ZLIST}@${JAIL}@${PARAM}" in
 
-		# ALL JAILS 
+		# ALL JAILS
 		*@f@none@NONE)
 				_RESULT=$(awk '{print $1}' $QMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
 		;;
 
-		# ALL JAILS + ZFS 
+		# ALL JAILS + ZFS
 		t@t@none@NONE)
 				_RESULT=$(awk '{print $1}' $QMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
 				get_zresult
 		;;
 
-		# ZFS ONLY 
+		# ZFS ONLY
 		f@t@none@NONE)
 				get_zresult
 		;;
@@ -111,12 +111,12 @@ get_results() {
 			_default=$(\
 				sed -nE "s/#default[[:blank:]]+${PARAM}[[:blank:]]+([^[:blank:]]+)/\1/p" $QMAP)
 
-			# PARAMS set to #default arent enumerated in QMAP. So cant just grep/sed them. 
+			# PARAMS set to #default arent enumerated in QMAP. So cant just grep/sed them.
 			for _jail in $_JAILS ; do
 				if [ "$PARAM" = "DEVFS_RULE" ] ; then
-					# Devfs is not inherently a QMAP, parameter, but we provide the info anyways 
-					get_devfs_result "$_jail" 
-				else 
+					# Devfs is not inherently a QMAP, parameter, but we provide the info anyways
+					get_devfs_result "$_jail"
+				else
 					# Reconstruct PARAMS for all jails to include the non-enumerated #default values
 					unset _result
 					_result=$(grep -E "^${_jail}[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
@@ -202,7 +202,7 @@ print_results() {
 
 	[ "$_ZRESULT" ] && echo -e "${_ZRESULT}\n" | column -t
 
-	[ -z "$_RESULT" ] && [ -z "$NOHEAD" ] && [ -z "$_ZRESULT" ] && msg_list -m _6
+	[ -z "$_RESULT" ] && [ -z "$NOHEAD" ] && [ -z "$_ZRESULT" ] && get_msg2 -m _m1
 }
 
 get_global_variables

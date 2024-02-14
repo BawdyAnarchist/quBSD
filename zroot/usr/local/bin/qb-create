@@ -12,12 +12,12 @@ get_options() {
 	# CLASS, ROOTENV, and TEMPLATE are important enough to merit their own options
 	while getopts c:eEGhi:p:r:t:v:yz:Z _opts ; do case $_opts in
 		c) CLASS="$OPTARG" ;;
-		e) msg_create -em _examples ;;
+		e) get_msg2 -em _examples ;;
 		E) _ZCRYPT="-o encryption=on -o keyformat=passphrase -o pbkdf2iters=1000000"
-			_ZCRYPT2="$_ZCRYPT -o keylocation=file:///${QTMP}/qb-create_tempkey" 
-			;; 
+			_ZCRYPT2="$_ZCRYPT -o keylocation=file:///${QTMP}/qb-create_tempkey"
+			;;
 		G) GUIDED="true" ;;
-		h) msg_create -eu ;;
+		h) get_msg2 -eu ;;
 		i) INSTALL="$OPTARG" ;;
 		p) evaluate_p_option "$OPTARG" ;;
 		r) ROOTENV="$OPTARG" ;;
@@ -39,7 +39,7 @@ get_options() {
 	mktemp "$_TMP_PARAMS" > /dev/null
 
 	# Revert all changes in the case of an error
-	trap "cleanup_trapped" INT TERM HUP QUIT EXIT
+	trap "cleanup_trapped ; rm_errfiles" INT TERM HUP QUIT EXIT
 }
 
 evaluate_p_option() {
@@ -50,7 +50,7 @@ evaluate_p_option() {
 	_value=$(echo $_optarg | sed -En 's/.*=(.*)/\1/p')
 
 	# Main purpose is to check for invalid variable characters. Also prelim check for valid PARAM
-	! echo "$ALL_PARAMS" | grep -Eqs -- "$_param" && msg_create -Em _e0
+	! echo "$ALL_PARAMS" | grep -Eqs -- "$_param" && get_msg2 -Em _e0
 
 	# BHYVE_CUSTM does not get checked for validity
 	[ ! "$_param" = "BHYVE_CUSTM" ] && _PARAMS="$_PARAMS $_param"
@@ -88,22 +88,22 @@ checks_master() {
 
 	# One more check for new install rootVM, to ensure there's a way to connect to it
 	[ "$INSTALL" ] && [ "$VNC" = "false" ] && [ "$TMUX" = "false" ] && [ "$X11FWD" = "false" ] \
-															&& msg_create -m _w4 >> $_TMP_WARN
+															&& get_msg2 -m _w4 >> $_TMP_WARN
 }
 
 checks_install() {
 	# Installing a new rootVM comes with different vitals assignments
 
 	# Safety checks, in case the user specified conflicting vital parameters for the new VM
-	: ${CLASS:=rootVM} && [ "$CLASS" = "rootVM" ] || msg_create -Em _e8
-	: ${ROOTENV:=$NEWJAIL} && [ "$ROOTENV" = "$NEWJAIL" ] || msg_create -Em _e8_1
+	: ${CLASS:=rootVM} && [ "$CLASS" = "rootVM" ] || get_msg2 -Em _e8
+	: ${ROOTENV:=$NEWJAIL} && [ "$ROOTENV" = "$NEWJAIL" ] || get_msg2 -Em _e8_1
 	root_cl="rootVM"
 
 	# Must specify volsize; and check existence of the ISO
-	[ -z "$VOLSIZE" ] && msg_create -Em _e8_2
-	[ -e "$INSTALL" ] || msg_create -Em _e8_3
+	[ -z "$VOLSIZE" ] && get_msg2 -Em _e8_2
+	[ -e "$INSTALL" ] || get_msg2 -Em _e8_3
 
-	chk_valid_zfs "${R_ZFS}/${NEWJAIL}" && msg_create -Em _e8_4
+	chk_valid_zfs "${R_ZFS}/${NEWJAIL}" && get_msg2 -Em _e8_4
 
 	# Add qmap line to launch VM with ahci-cd ISO
 	echo "$NEWJAIL  BHYVE_CUSTM  -s #,ahci-cd,${INSTALL}" >> $_TMP_PARAMS
@@ -115,12 +115,12 @@ optimistic_vitals_assignments() {
 
 	# CL options take precedence, followed by -t <template>, followed by #default in quBSD.conf
 	[ -z "$CLASS" ] && ! get_jail_parameter -d CLASS "$TEMPLATE" \
-			&& msg_create -Em _e1 "CLASS"
+			&& get_msg2 -Em _e1 "CLASS"
 	[ -z "$ROOTENV" ] && ! get_jail_parameter -d ROOTENV "$TEMPLATE" \
-			&& msg_create -Em _e1 "ROOTENV"
+			&& get_msg2 -Em _e1 "ROOTENV"
 	[ -z "${CLASS##disp*}" ] && [ "$TEMPLATE" = "none" ] \
 			&& ! get_jail_parameter -d TEMPLATE "$TEMPLATE" \
-			&& msg_create -Em _e1 "TEMPLATE"
+			&& get_msg2 -Em _e1 "TEMPLATE"
 
 	# Need CLASS of ROOTENV to check for jail/VM congruency among vital parameters
 	root_cl=$(sed -nE "s/^${ROOTENV}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
@@ -143,13 +143,13 @@ checks_jailVM_congruency() {
 
 	# Vital parameters must either be all jails ...
 	if ! chk_isvm -c "$CLASS" ; then
-		chk_isvm -c "$root_cl" && msg_create -Em _e2
-		[ ! "$TEMPLATE" = "none" ] && chk_isvm -c "${temp_cl}" && msg_create -Em _e2
+		chk_isvm -c "$root_cl" && get_msg2 -Em _e2
+		[ ! "$TEMPLATE" = "none" ] && chk_isvm -c "${temp_cl}" && get_msg2 -Em _e2
 
 	# ... or vital parameters must be all VMs
 	elif chk_isvm -c "$CLASS" ; then
-		! chk_isvm -c "${root_cl}" && msg_create -Em _e2
-		[ ! "$TEMPLATE" = "none" ] && ! chk_isvm -c "${temp_cl}" && msg_create -Em _e2
+		! chk_isvm -c "${root_cl}" && get_msg2 -Em _e2
+		[ ! "$TEMPLATE" = "none" ] && ! chk_isvm -c "${temp_cl}" && get_msg2 -Em _e2
 	fi
 }
 
@@ -174,7 +174,7 @@ checks_parameters() {
 			if ! ([ "$INSTALL" ] && ( [ "$_PAR" = "CLASS" ] || [ "$_PAR" = "ROOTENV" ] )) ; then
 				# for-loop takes care of cases of multiple values for _PAR
 				for _val in $_VAL ; do
-					eval "chk_valid_${_par}" '--' "$_val" || msg_create -Em _e4 "$_PAR"
+					eval "chk_valid_${_par}" '--' "$_val" || get_msg2 -Em _e4 "$_PAR"
 				done
 			fi
 			# IPv4 validity was checked, but conformance with quBSD conventions was not.
@@ -212,20 +212,20 @@ checks_zopts() {
 	if [ "$U_ZOPT" ] && chk_isvm -c "$CLASS" ; then
 		case $U_ZOPT in
 			dupl) : ;;
-			empty) [ -z "$VOLSIZE" ] && msg_create -Em _e5_4 ;;
-			*) msg_create -Em _e5 ;;
+			empty) [ -z "$VOLSIZE" ] && get_msg2 -Em _e5_4 ;;
+			*) get_msg2 -Em _e5 ;;
 		esac
 	fi
 
 	# Check [-z] value for jail
 	[ "$U_ZOPT" ] && ! chk_isvm -c "$CLASS" \
-			&& ! echo "$U_ZOPT" | grep -Eq "^(dupl|dirs|empty)\$" && msg_create -Em _e5
+			&& ! echo "$U_ZOPT" | grep -Eq "^(dupl|dirs|empty)\$" && get_msg2 -Em _e5
 }
 
 check_valid_volsize() {
    # Check that the volsize was given in proper format
 	! echo "$VOLSIZE" | grep -Eqs '(^[0-9]+(\.[0-9]*)?|^\.[0-9]+)(T|t|G|g|M|m|K|k)$' \
-																				&& msg_create -Em _e5_1
+																				&& get_msg2 -Em _e5_1
 	# Convert to raw bytes for comparison
 	_vol=$(echo $VOLSIZE | sed -nE "s/.\$//p")
 	_avail=$(zfs list -pHo available zusr)
@@ -238,8 +238,8 @@ check_valid_volsize() {
 	esac
 
 	# Check the values, and exit if bad
-	[ "$_vol" -lt 80000000 ] && msg_create -Em _e5_2
-	[ "$_vol" -gt "$_avail" ] && msg_create -Em _e5_3
+	[ "$_vol" -lt 80000000 ] && get_msg2 -Em _e5_2
+	[ "$_vol" -gt "$_avail" ] && get_msg2 -Em _e5_3
 }
 
 assign_datasets() {
@@ -251,11 +251,11 @@ assign_datasets() {
 		# NOTE- some vital PARAMs were set to the #default, and dont need to appear here
 
 		rootjail_)  # rootjails require [-t <template>]
-			msg_create -Em _e6
+			get_msg2 -Em _e6
 			;;
 		appjail_|appjail_rootjail|appjail_appjail|appjail_dispjail)
 			# [-Z] is only for creating rootjails, not appjails from rootjails
-	     	[ "$R_ZOPT" ] && msg_create -Em _e7
+	     	[ "$R_ZOPT" ] && get_msg2 -Em _e7
 
 			# If no template for zusr, try to find one.
 			{ [ -z "$temp_cl" ] || [ -z "${temp_cl##root*}" ] ;} && TEMPLATE="${ROOTENV}-template"
@@ -264,12 +264,12 @@ assign_datasets() {
 			U_ZPARENT="${U_ZFS}/${TEMPLATE}"
 
 			# Handle missing zusr dataset
-			! chk_valid_zfs "$U_ZPARENT" && U_ZOPT="empty" && msg_create -m _w6 >> $_TMP_WARN
+			! chk_valid_zfs "$U_ZPARENT" && U_ZOPT="empty" && get_msg2 -m _w6 >> $_TMP_WARN
 			;;
 
 		appVM_|appVM_rootVM|appVM_appVM|appVM_dispVM)
 			# [-Z] is only for creating rootjails, not appjails from rootjails
-	     	[ "$R_ZOPT" ] && msg_create -Em _e7
+	     	[ "$R_ZOPT" ] && get_msg2 -Em _e7
 
 			# If no template for zusr, try to find one.
 			[ -z "$TEMPLATE" ] && TEMPLATE="${ROOTENV}"
@@ -281,12 +281,12 @@ assign_datasets() {
 			if ! chk_valid_zfs "$U_ZPARENT" ; then
 				U_ZOPT="empty"
 				[ -z "$VOLSIZE" ] && VOLSIZE="80M"
-				msg_create -m _w7 >> $_TMP_WARN
+				get_msg2 -m _w7 >> $_TMP_WARN
 			fi
 		;;
 
 		disp*_app*)  # [-Z] is only for creating rootjails
-	     	[ "$R_ZOPT" ] && msg_create -Em _e7
+	     	[ "$R_ZOPT" ] && get_msg2 -Em _e7
 			R_ZPARENT="${R_ZFS}/${ROOTENV}"
 			U_ZPARENT="${U_ZFS}/${TEMPLATE}"
 
@@ -313,12 +313,12 @@ assign_datasets() {
 			U_ZOPT="skip"
 
 			# If the user entered conflicting options, error and exit
-			[ ! "$TEMPLATE" = "none" ] && [ ! "$TEMPLATE" = "$ROOTENV" ] && msg_create -Em _e9
+			[ ! "$TEMPLATE" = "none" ] && [ ! "$TEMPLATE" = "$ROOTENV" ] && get_msg2 -Em _e9
 		;;
 
 		# New rootjail, but checks for [-Z]. Ensures user intends new rootjail from app/disp jail.
 		root*_app*|root*_disp*)
-			[ "$R_ZOPT" ] || msg_create -Em _e10
+			[ "$R_ZOPT" ] || get_msg2 -Em _e10
 			R_ZPARENT="${R_ZFS}/${TEMPLATE}"
 			R_ORIGIN=$(zfs list -Ho origin "${R_ZFS}/${TEMPLATE}" | sed -E "s/\@.*//")
 			U_ZOPT="skip"
@@ -347,7 +347,7 @@ assign_datasets() {
 	[ "$U_ZPARENT" ] && [ -z "$U_ZOPT" ] && U_ZOPT="dupl"
 
 	# Root dataset was derived from <template>. Check that it exists.
-	chk_valid_zfs "$R_ZPARENT" || msg_create -Em _e11
+	chk_valid_zfs "$R_ZPARENT" || get_msg2 -Em _e11
 
 	# New rootVM [-i] already returned from function
 	# Temporary snapshots to be used for jail duplication.
@@ -366,21 +366,21 @@ assign_datasets() {
 
 confirm_creation() {
 	clear
-	msg_create -m _w0
+	get_msg2 -m _w0
 
 	# Show the disksize that will be occupied by creating the new jail
 	case "${CLASS}_${U_ZOPT}" in
-		rootVM_skip) msg_create -m _w1_4 ;;
-		root*) msg_create -m _w1 ;;
-		app*_dupl) msg_create -m _w1_1 ;;
-		appVM_empty) msg_create -m _w1_2 ;;
-		disp*) msg_create -m _w1_3 ;;
+		rootVM_skip) get_msg2 -m _w1_4 ;;
+		root*) get_msg2 -m _w1 ;;
+		app*_dupl) get_msg2 -m _w1_1 ;;
+		appVM_empty) get_msg2 -m _w1_2 ;;
+		disp*) get_msg2 -m _w1_3 ;;
 	esac
 
-	[ "$_ZCRYPT" ] && msg_create -m _w1_5
+	[ "$_ZCRYPT" ] && get_msg2 -m _w1_5
 
 	# Show the final result of jail parameters
-	msg_create -m _w3
+	get_msg2 -m _w3
 
 	# Warnings for jail parameters.
 	if [ -s "$_TMP_WARN" ] ; then
@@ -390,7 +390,7 @@ confirm_creation() {
 
 	# Get final confirmation, unless [-y] was specified
 	if ! [ "$_ASSM_Y" ] ; then
-		msg_create -m _w5
+		get_msg2 -m _w5
 		get_user_response || exit 0
 	fi
 }
@@ -458,7 +458,7 @@ change_datasets() {
 			   _newdir=$(echo $_dir | sed -e "s#/${TEMPLATE}#/${NEWJAIL}#g")
 				mkdir -p "$_newdir" > /dev/null 2>&1
 			done
-				
+
 			# Handle control jail keys
 			CONTROL=$(sed -En "s/.* CONTROL[[:blank:]]+//p" $_TMP_PARAMS)
 			[ ! -d "${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL}/.ssh" ] \
@@ -547,28 +547,28 @@ change_jconf() {
 guided_mode() {
 
 	# OPENING MESSAGE
-		clear && msg_create -m _m0 && read _dummyvar
+		clear && get_msg2 -m _m0 && read _dummyvar
 
 	# CLASS
-		clear && msg_create -m _m1
-		msg_create -m _resp1 "CLASS"
+		clear && get_msg2 -m _m1
+		get_msg2 -m _resp1 "CLASS"
 
 	# ROOTENV
-		clear && msg_create -m _m2
+		clear && get_msg2 -m _m2
 
 		# Messages diverge based on CLASS
-		[ "$CLASS" = "rootjail" ] && msg_create -m _m3 || msg_create -m _m4
+		[ "$CLASS" = "rootjail" ] && get_msg2 -m _m3 || get_msg2 -m _m4
 
-		msg_create -m _resp1 "ROOTENV"
+		get_msg2 -m _resp1 "ROOTENV"
 
 	# TEMPLATE
 		clear
 
 		# Messages diverge based on CLASS
 		case $CLASS in
-			rootjail) msg_create -m _m5 ; msg_create -m _resp2 ;;
-			appjail|cjail)  msg_create -m _m6 ; msg_create -m _resp2 ;;
-			dispjail) msg_create -m _m7 ;;
+			rootjail) get_msg2 -m _m5 ; get_msg2 -m _resp2 ;;
+			appjail|cjail)  get_msg2 -m _m6 ; get_msg2 -m _resp2 ;;
+			dispjail) get_msg2 -m _m7 ;;
 		esac
 
 		# Complex decision tree unavoidable, due to the potential branches.
@@ -577,7 +577,7 @@ guided_mode() {
 			# Assign the rootjail TEMPLATE as rootjail, since that's what'd normally happen
 			rootjail_1) [ "$CLASS" = "rootjail" ] && TEMPLATE="$ROOTENV" && return 0 ;;
 			rootjail_2) [ "$CLASS" = "rootjail" ] && TEMPLATE="$ROOTENV" ;;
-			rootjail_3) msg_create -m _resp2 ;;
+			rootjail_3) get_msg2 -m _resp2 ;;
 
 			# Will either use template and return to main program, or stay and get parameters
 			appjail_1|cjail_1)  return 0 ;;
@@ -585,14 +585,14 @@ guided_mode() {
 
 			# These cases need to get user entered template, show parameters, and confirm again
 			appjail_3|cjail_3|dispjail*)
-					msg_create -m _resp1 "TEMPLATE"
+					get_msg2 -m _resp1 "TEMPLATE"
 
 					# Give user opportunity to keep checking different template parameters
 					while : ; do
-						clear && msg_create -m _m9 && msg_create -m _resp2
+						clear && get_msg2 -m _m9 && get_msg2 -m _resp2
 
 						! [ "$_RESPONSE" = "3" ] && break
-						msg_create -m _resp1 "TEMPLATE"
+						get_msg2 -m _resp1 "TEMPLATE"
 					done
 
 					# A response of 1, means to use the template for rest of params.
@@ -603,34 +603,34 @@ guided_mode() {
 	# REMAINING JAIL PARAMETERS, ONE BY ONE
 
 	# AUTOSTART
-		clear && msg_create -m _m11 && msg_create -m _resp1 "AUTOSTART"
+		clear && get_msg2 -m _m11 && get_msg2 -m _resp1 "AUTOSTART"
 
 	# AUTOSNAP
-		msg_create -m _m12 && msg_create -m _resp1 "AUTOSNAP"
+		get_msg2 -m _m12 && get_msg2 -m _resp1 "AUTOSNAP"
 
 	# CPUSET
-		msg_create -m _m13 && msg_create -m _resp1 "CPUSET"
+		get_msg2 -m _m13 && get_msg2 -m _resp1 "CPUSET"
 
 	# GATEWAY
-		clear && msg_create -m _m14 && msg_create -m _resp1 "GATEWAY"
+		clear && get_msg2 -m _m14 && get_msg2 -m _resp1 "GATEWAY"
 
 	# IPV4
-		clear && msg_create -m _m15 && msg_create -m _resp1 "IPV4"
+		clear && get_msg2 -m _m15 && get_msg2 -m _resp1 "IPV4"
 
 	# MAXMEM
-		clear && msg_create -m _m16 && msg_create -m _resp1 "MAXMEM"
+		clear && get_msg2 -m _m16 && get_msg2 -m _resp1 "MAXMEM"
 
 	# MTU
-		msg_create -m _m17 && msg_create -m _resp1 "MTU"
+		get_msg2 -m _m17 && get_msg2 -m _resp1 "MTU"
 
 	# NO_DESTROY
-		msg_create -m _m18 && msg_create -m _resp1 "NO_DESTROY"
+		get_msg2 -m _m18 && get_msg2 -m _resp1 "NO_DESTROY"
 
 	# SECLVL
-		msg_create -m _m19 && msg_create -m _resp1 "SECLVL"
+		get_msg2 -m _m19 && get_msg2 -m _resp1 "SECLVL"
 
 	# SCHG
-		clear && msg_create -m _m20 && msg_create -m _resp1 "SCHG"
+		clear && get_msg2 -m _m20 && get_msg2 -m _resp1 "SCHG"
 }
 
 launch_install() {
@@ -649,7 +649,7 @@ cleanup_finished() {
 	[ "$U_SNAP" ] && zfs destroy $U_SNAP > /dev/null 2>&1
 
 	if [ "$_ZCRYPT" ] && [ "$_exit" = "0" ] ; then
-		msg_create -m _w2
+		get_msg2 -m _w2
 		zfs umount "${U_ZFS}/${NEWJAIL}" > /dev/null 2>&1
 		zfs unload-key "${U_ZFS}/${NEWJAIL}" > /dev/null 2>&1
 	fi
@@ -658,7 +658,7 @@ cleanup_finished() {
 	echo ''
 
 	# Unset the trap (or else EXIT will cause all changes to be reverted)
-	trap '' INT TERM HUP QUIT EXIT
+	trap 'rm_errfiles' INT TERM HUP QUIT EXIT
 
 	# INSTALL has further actions. But if _exit was set to 1, it was trapped. Either way, exit.
 	( [ "$_exit" = "1" ] || [ -z "$INSTALL" ] ) && eval exit "$_exit"

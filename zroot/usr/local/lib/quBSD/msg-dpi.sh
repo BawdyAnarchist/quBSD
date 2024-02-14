@@ -1,54 +1,43 @@
 #!/bin/sh
 
-msg_dpi() { 
-	while getopts eEm:u _opts ; do case $_opts in
-		e) local _exit="exit 0" ;;
-		E) local _exit="exit 1" ;;
-		m) local _message="$OPTARG" ;;
-		u) local _usage="true" ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))
-
+msg_dpi() {
 	case "$_message" in
-	_1) cat << ENDOFMSG
+	_e1) cat << ENDOFMSG
 
-ERROR: Proposed DPI is below sanity threshold of 0.3. 
+ERROR: Proposed DPI is below sanity threshold of 0.3.
 ENDOFMSG
-	;;	
-	_2) cat << ENDOFMSG
+	;;
+	_e2) cat << ENDOFMSG
 
-ERROR: Proposed DPI is too high for relative (0.5 to 4); 
+ERROR: Proposed DPI is too high for relative (0.5 to 4);
        but too low to be raw (29 to 386).
 ENDOFMSG
-	;;	
-	_3) cat << ENDOFMSG
+	;;
+	_e3) cat << ENDOFMSG
 
 ERROR: DPI is above sanity threshold of 384.
 ENDOFMSG
 	;;
-	esac
-
-	[ $_usage ] && usage
-	eval $_exit :
-}
-
-usage() { cat << ENDOFUSAGE
+	usage) cat << ENDOFUSAGE
 
 qb-dpi: Quickly change dpi on the fly; revert automatically.
 
-Converts from 
+Converts from
         raw DPI to a scaling constant, referenced at 96.
         For example:  1=96 ; 0.5=48 ; 2=192
 
 Usage: qb-dpi [-r] <new_dpi>
    -h: (h)elp. Outputs this usage message
-	-r: (r)evert. Revert back to system DPI and exit. 
+	-r: (r)evert. Revert back to system DPI and exit.
 	-t: (t)time. Seconds to keep new DPI before reverting
-       to the system default from .Xresources 
+       to the system default from .Xresources
 
    <new_dpi> can be expressed either as a raw value, or with
-   a simple integer acting as a relative scaling constant, 
-   centered at 96. For example:  1=96 ; 2=192 ; 0.5=48   
+   a simple integer acting as a relative scaling constant,
+   centered at 96. For example:  1=96 ; 2=192 ; 0.5=48
 
 ENDOFUSAGE
+		;;
+	esac
 }
 

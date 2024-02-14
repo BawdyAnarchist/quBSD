@@ -1,6 +1,6 @@
 #!/bin/sh
 
-get_msg_ivpn() { 
+get_msg_ivpn() {
 	# _message determines which feedback message to call.
 	# Just call "none" in the case you want no message to match.
 	# _pass_cmd is optional, and can be used to exit and/or show usage
@@ -13,17 +13,17 @@ get_msg_ivpn() {
 	case "$_message" in
 	_1) cat << ENDOFMSG
 
-ERROR: Unable to start jail. Cannot modify IVPN. 
+ERROR: Unable to start jail. Cannot modify IVPN.
 ENDOFMSG
-	;;	
+	;;
 	_2) cat << ENDOFMSG
 
-ERROR: Script is running inside jail, but kern.securelevel is 
+ERROR: Script is running inside jail, but kern.securelevel is
        elevated, and schg is applied to one or more files that
-       need to be modified in order to switch VPN servers. 
+       need to be modified in order to switch VPN servers.
        Re-run this script from host, in order to modify iVPN.
 ENDOFMSG
-	;;	
+	;;
 	_3) cat << ENDOFMSG
 
 ERROR: Failed to start $JAIL. Exiting
@@ -66,7 +66,7 @@ ENDOFMSG
 
 	esac
 
-	case $_pass_cmd in 
+	case $_pass_cmd in
 		usage_0) usage ; exit 0 ;;
 		usage_1) usage ; exit 1 ;;
 		exit_0)  exit 0 ;;

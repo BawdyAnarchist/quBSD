@@ -1,13 +1,6 @@
 #!/bin/sh
 
 msg_help() {
-	while getopts eEm:u _opts ; do case $_opts in
-		e) local _exit="exit 0" ;;
-		E) local _exit="exit 1" ;;
-		m) local _message="$OPTARG" ;;
-		u) local _usage="true" ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))
-
 	case "$_message" in
 	_list_scripts) cat << ENDOFMSG
 
@@ -93,13 +86,7 @@ ENDOFMSG
 #####
 ENDOFMSG
 	;;
-	esac
-
-	[ $_usage ] && usage
-	eval $_exit :
-}
-
-usage() { cat << ENDOFMSG
+	usage) cat << ENDOFMSG
 
 qb-help: Quick help for quBSD scripts
 
@@ -110,4 +97,6 @@ Usage: qb-help list|show > Shows all scripts
 NOTE:  Some commands/parameters apply to both jails and VMs. Others
        apply only to one or the other.  <jail/VM> | <jail> | <VM>
 ENDOFMSG
+		;;
+	esac
 }

@@ -86,9 +86,9 @@ climb_hierarchy() {
 }
 
 encryption_and_mounts(){
-   # Load key if necessary, with popup switch 
+   # Load key if necessary, with popup switch
 	if [ "$(zfs list -Ho keystatus ${U_ZFS}/${_jail})" = "unavailable" ] ; then
-		if [ "$_POPUP" ] ; then 
+		if [ "$_POPUP" ] ; then
 			xterm -e csh -c "/bin/csh -c 'zfs load-key ${U_ZFS}/${_jail}'"
 		else
 			zfs load-key ${U_ZFS}/${_jail}
@@ -182,9 +182,9 @@ main() {
 	_FULLIST=$(echo "$_FULLIST" | sort | uniq)
 	_STARTS=$(echo "$_CLIMBED" | awk 'NR == 1 || $2 > max { max = $2 } END { print max }')
 
-	# Some jails/VMs might be encrypted. They need to decrypted now, before waterfall 
-	get_info _POPUP	
-	for _jail in $_FULLIST ; do 
+	# Some jails/VMs might be encrypted. They need to decrypted now, before waterfall
+	get_info _POPUP
+	for _jail in $_FULLIST ; do
 		chk_valid_zfs "${U_ZFS}/${_jail}" && encryption_and_mounts
 	done
 

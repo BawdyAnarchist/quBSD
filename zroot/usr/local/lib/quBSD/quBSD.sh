@@ -142,7 +142,7 @@ get_global_variables() {
 	# Set the files for error recording, and trap them
 	ERR1=$(mktemp -t quBSD/.${0##*/})
 	ERR2=$(mktemp -t quBSD/.${0##*/})
-	trap "trap_errfiles" HUP INT TERM QUIT EXIT
+	trap "rm_errfiles" HUP INT TERM QUIT EXIT
 
 	return 0
 }
@@ -165,14 +165,15 @@ get_networking_variables() {
 	fi
 }
 
-trap_errfiles() {
+rm_errfiles() {
 	rm $ERR1 $ERR2
 }
 
 get_msg2() {
-	while getopts eEm:quV opts ; do case $opts in
+	while getopts eEFm:quV opts ; do case $opts in
 		e) local _exit="exit 0" ;;
 		E) local _exit="exit 1" ;;
+		F) local _force="true" ; unset _exit= ;;
 		m) local _message="$OPTARG" ;;
 		q) local _q="true" ;;
 		u) local _usage="true" ;;
@@ -181,25 +182,34 @@ get_msg2() {
 
 	# Using the caller script to generalize message calls. Switch between exec- and qb- scripts.
 	local _call="${0##*/}"
-	[ -z "${_call##exec-*}" ] && local _msg="msg_exec" || _msg="msg_${0##*/qb-}"
+	[ -z "${_call##exec-*}" ] && local _msg="msg_exec" || _msg="msg_${0##*-}"
 
 	case $_message in
-		_m*|_w*) eval "$_msg $@" ;;
+		_m*|_w*) _MESSAGE=$("$_msg" "$@") ;;
 		_e*)
-			# Place final ERROR message into a variable.
-			_ERROR="$(echo "ERROR: $_call" ; eval "$_msg $@" ; [ -s "$ERR1" ] && cat $ERR1)"
+			if [ -z "$_force" ] ; then
+				# Place final ERROR message into a variable.
+				_ERROR="$(echo "ERROR: $_call" ; "$_msg" "$@" ; [ -s "$ERR1" ] && cat $ERR1)"
 
-			# If exiting due to error, log the date and error message to the log file
-			[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QBLOG
-			;;
+				# If exiting due to error, log the date and error message to the log file
+				[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QBLOG
+			fi ;;
 	esac
 
-	# If -q wasnt specified, print message to the terminal
-	[ -z "$_q" ] && [ "$_ERROR" ] && echo "$_ERROR"
+	# If -q wasnt specified, print messages to the terminal
+	if [ -z "$_q" ] ; then
+		[ "$_ERROR" ] && echo "$_ERROR"
+		[ "$_MESSAGE" ] && echo "$_MESSAGE"
 
-	# Evaluate usage and exit code
-	[ $_usage ] && _message="usage" && eval "$_msg"
+		# Now that it has been dispositioned, erase the message
+		truncate -s 0 $ERR1 ; unset _ERROR ; unset _MESSAGE
+
+		# Evaluate usage if present
+		[ $_usage ] && _message="usage" && eval "$_msg"
+	fi
+
 	eval $_exit :
+	return 0
 }
 
 get_parameter_lists() {

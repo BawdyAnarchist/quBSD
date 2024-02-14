@@ -10,7 +10,7 @@
 
 get_options(){
 	while getopts hiru:x opts ; do case $opts in
-		h) usage ;;
+		h) get_msg2 -eu ;;
 		i) _i3wm="true" ;;
 		r) _USER="root" ; ROOT="-r" ;;
 		u) _USER="$OPTARG" ;;
@@ -39,7 +39,7 @@ main() {
 	else
 	# Then start jail and read command in the new terminal
 
-		start_jail "$JAIL" || msg_floatcmd "none" "exit_1"
+		start_jail "$JAIL" || get_msg2 "none" "exit_1"
 
 		printf "%b" "Enter Command for $JAIL. Popup will close automatically" \
 					   "\n${_USER}@${JAIL} # "

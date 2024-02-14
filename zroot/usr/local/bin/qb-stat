@@ -6,7 +6,7 @@
 get_options() {
 	while getopts c:h opts ; do case $opts in
 		c) COL="$OPTARG" ;;
-		h) msg_stat -eu  ;;
+		h) get_msg2 -eu  ;;
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Temp files for building the status report

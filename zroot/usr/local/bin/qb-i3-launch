@@ -5,9 +5,9 @@
 
 get_options() {
 	while getopts f:Fht: opts ; do case $opts in
-		f) FILE="${OPTARG}" || msg_launch -Eum _1 ;;
+		f) FILE="${OPTARG}" || get_msg2 -Eum _e1 ;;
 		F) FORCE="true" ;;
-		h) msg_launch -eu ;;
+		h) get_msg2 -eu ;;
 		t) _TIMEOUT="${OPTARG}" ;;
 		*) exit 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
@@ -21,7 +21,7 @@ trap_func() {
 parse_config() {
 	# Check TIMEOUT, if it was specified
 	[ "$_TIMEOUT" ] && { chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
-									&& _TIMEOUT="-t $_TIMEOUT" || msg_launch -Em _2 ;}
+									&& _TIMEOUT="-t $_TIMEOUT" || get_msg2 -Em _e2 ;}
 
 	# Assign default file if one wasn't optioned
 	FILE="${FILE:=${HOME}/.config/i3/i3launch.conf}"
@@ -29,7 +29,7 @@ parse_config() {
 	# Set variable, and trap to remove it on exit
 	CONF=$(mktemp  -t "quBSD/i3-launch.conf")
 	JAILS=$(mktemp -t "quBSD/i3-launch-jails")
-	trap "trap_func" INT TERM HUP QUIT EXIT
+	trap "trap_func ; rm_errfiles" INT TERM HUP QUIT EXIT
 
 	# Copy the launch config to tmp ($CONF), and remove comments and blank lines
 	cp -a $FILE $CONF
@@ -50,7 +50,7 @@ qb_start_jails() {
 	grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}' | uniq > $JAILS
 
 	# Turn on any jails not started
-	qb-start -f $JAILS $_TIMEOUT > /dev/null 2>&1 || msg_launch -Em _3
+	qb-start -f $JAILS $_TIMEOUT > /dev/null 2>&1 || get_msg2 -Em _e3
 
 	# Remove the temporary monitoring popup
 	kill -15 $_pid_stat

@@ -6,15 +6,15 @@
 get_options() {
 	while getopts aAhf:FnrRz: _opts ; do case $_opts in
 		a) MODE="auto" ;;
-		A) [ -z "$MODE" ] && MODE="all" || msg_backup -Eum "_e2" ;;
-		h) msg_backup -eu ;;
+		A) [ -z "$MODE" ] && MODE="all" || get_msg2 -Eum _e2 ;;
+		h) get_msg2 -eu ;;
 		f) FILE="$OPTARG" ;;
 		F) FORCE='-F' ;;
 		n) NORUN="true" ;;
 		r) RECR='-r' ;;
 		R) REPL='-R' ; RECR='-r' ;;
 		z) ZBAK="$OPTARG" ;;
-		*) msg_backup -Eum "_e1" ;;
+		*) get_msg2 -Eum _e1 ;;
 	esac ; done ; shift $(( OPTIND - 1 ))
 
 	DATE=$(date +%b%d)
@@ -25,10 +25,10 @@ get_options() {
 
 check_zbackup() {
 	# [-z] is mandatory
-	[ -z "$ZBAK" ] && msg_backup -Eum "_e4"
+	[ -z "$ZBAK" ] && get_msg2 -Eum _e4
 
 	# Make sure dataset exists
-	! chk_valid_zfs "$ZBAK" && msg_backup -Eum "_e5"
+	! chk_valid_zfs "$ZBAK" && get_msg2 -Eum _e5
 
 	# Set the backup to include the DATE
 	ZBAK="${ZBAK}/${DATE}"
@@ -56,7 +56,7 @@ determine_datasets() {
 	[ "$POS_SETS" ] && DATASETS=$(echo "$DATASETS" ; echo "$POS_SETS")
 
 	# If DATASETS are still zero, then error.
-	[ ! "$DATASETS" ] && msg_backup -Eum "_e7"
+	[ ! "$DATASETS" ] && get_msg2 -Eum _e7
 
 	# Sort DATASETS
 	DATASETS=$(echo "$DATASETS" | sort | uniq)
@@ -73,7 +73,7 @@ check_datasets() {
 	for _dataset in $DATASETS ; do
 		# MODE "auto|all" derived datasets directly from ZFS. Pos params and FILE need checked
 		[ ! "$MODE" = "auto" ] && [ ! "$MODE" = "all" ] \
-			&& ! chk_valid_zfs "$_dataset" && msg_backup -Em "_e8"
+			&& ! chk_valid_zfs "$_dataset" && get_msg2 -Em _e8
 
 		# Datasets with an origin (cloned), in quBSD, do not need to be backed up. Remove them
 		[ ! "$(zfs list -Ho origin $_dataset)" = "-" ] \
@@ -81,7 +81,7 @@ check_datasets() {
 			&& _origRM="true"
 
 		# If no [-F] check that the dataset doesnt already exist at the destination
-		[ -z "$FORCE" ] && chk_valid_zfs "${ZBAK}/${_dataset}" && msg_backup -Em "_e6"
+		[ -z "$FORCE" ] && chk_valid_zfs "${ZBAK}/${_dataset}" && get_msg2 -Em _e6
 
 		# In a [-r|-R] scenario, we need to check the running status of recursive datasets
 		_subsets=$(zfs list -Ho name $RECR $_dataset)
@@ -95,7 +95,7 @@ check_datasets() {
 		done
 	done
 	# Error for running ROOTENVs
-	[ "$_ONROOTS" ] && _ONROOTS=$(echo "$_ONROOTS" | sort | uniq) && msg_backup -Em "_e9"
+	[ "$_ONROOTS" ] && _ONROOTS=$(echo "$_ONROOTS" | sort | uniq) && get_msg2 -Em _e9
 }
 
 cleanup_oldsnaps(){
@@ -108,7 +108,7 @@ cleanup_oldsnaps(){
 calculate_size() {
 	# Creating the snapshots is the most straightforward way to estimate the send sizes.
 	_SIZE=0
-	trap "cleanup_oldsnaps" INT TERM HUP QUIT EXIT
+	trap "cleanup_oldsnaps ; rm_errfiles" INT TERM HUP QUIT EXIT
 	for _dataset in $DATASETS ; do
 		_snap="${_dataset}${SNAPNAME}"
 		_SNAPS=$(echo -e "$_SNAPS\n$_snap")
@@ -134,14 +134,14 @@ calculate_size() {
 
 final_confirmation() {
 	# Full list of datasets to be backed up
-	msg_backup -m "_m1"
+	get_msg2 -m _m1
 
 	# Warn turning off jails/VMs before backups
-	[ "$_ONJAILS" ] && msg_backup -m "_w1"
+	[ "$_ONJAILS" ] && get_msg2 -m _w1
 
 	# Final confirmation
-	msg_backup -m "_m2"
-	! get_user_response && msg_backup -em "_m3"
+	get_msg2 -m _m2
+	! get_user_response && get_msg2 -em _m3
 }
 
 create_dataset_path() {
@@ -192,7 +192,7 @@ main() {
 	# Send warnings/messages, get user confirmation, execute
 	final_confirmation
 	execute_backup
-	msg_backup -em _m4
+	get_msg2 -em _m4
 }
 
 get_global_variables

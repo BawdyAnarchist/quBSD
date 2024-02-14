@@ -1,55 +1,18 @@
 #!/bin/sh
 
 msg_list() {
-	while getopts eEm:u _opts ; do case $_opts in
-		e) local _exit="exit 0" ;;
-		E) local _exit="exit 1" ;;
-		m) local _message="$OPTARG" ;;
-		u) local _usage="true" ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))
-
 	case "$_message" in
-	_1) cat << ENDOFMSG
+	_e1) cat << ENDOFMSG
 
-ERROR: Argument < $POS1 > was neither valid jail, nor qmap parameter.
+   Unable to differentiate betweeen desired JAIL and PARAM.
+   Use options [-j <jail>] and/or [-p <PARAM>] to deliniate.
 ENDOFMSG
 	;;
-	_2) cat << ENDOFMSG
-
-ERROR: Unable to differentiate betweeen desired JAIL and PARAM.
-       Use options [-j <jail>] and/or [-p <PARAM>] to deliniate.
+	_m1) cat << ENDOFMSG
+$0: NO RESULTS TO SHOW
 ENDOFMSG
 	;;
-	_3) cat << ENDOFMSG
-
-ERROR: A zfs option was selected [-a|-s|-z], but no datasets exist for < $JAIL >
-ENDOFMSG
-	;;
-	_4) cat << ENDOFMSG
-
-ERROR: Jail: < $JAIL > doesn't exist or is not configured properly
-ERROR: The parameter < $param > wasn't found in qubsdmap.conf
-ERROR: Combination of < ${jail} > < ${param} >
-       were not found in qubsdmap.conf
-ENDOFMSG
-	;;
-	_5) cat << ENDOFMSG
-
-ERROR: Invalid combination of options
-ENDOFMSG
-	;;
-	_6) cat << ENDOFMSG
-
-NO RESULTS TO SHOW
-ENDOFMSG
-	;;
-	esac
-
-	[ $_usage ] && usage
-	eval $_exit :
-}
-
-usage() { cat << ENDOFUSAGE
+	usage) cat << ENDOFUSAGE
 
 qb-list: List all parameters associated with jail/VM;
          AND/OR zfs datasets associated with jails/VM.
@@ -80,5 +43,8 @@ Usage: qb-list [-aHlsz]   {will show all jails/VMs}
 
 For a list and description of PARAMETERS, run:
    qb-help params
+
 ENDOFUSAGE
+		;;
+	esac
 }

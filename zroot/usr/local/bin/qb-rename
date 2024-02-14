@@ -6,7 +6,7 @@
 get_options() {
 	while getopts fhn opts ; do case $opts in
 		f) FORCE="true" ;;
-		h) msg_rename -eu ;; 
+		h) get_msg2 -eu ;;
 		n) NOUPDATE="true" ;;
 		*) exit 1 ;;
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
@@ -17,10 +17,10 @@ get_options() {
 
 checks_and_variables() {
 	# Check that JAIL was specified, and valid
-	! chk_valid_jail -q -- "$JAIL" && [ -z "$FORCE" ] && msg_rename -Eum _0
+	! chk_valid_jail -q -- "$JAIL" && [ -z "$FORCE" ] && get_msg2 -Eum _e0
 
 	# Check that the new jailname is available and has no conflicts
-	chk_avail_jailname -- "$NEWNAME" || msg_rename -Eu
+	chk_avail_jailname -- "$NEWNAME" || get_msg2 -Eu
 
 	# Variables change if it's a VM or not
 	get_jail_parameter -qs ROOTENV $JAIL
@@ -37,14 +37,14 @@ checks_and_variables() {
 	done
 
 	if ! chk_isblank "$ROOT_FOR $TEMPL_FOR $_CLIENTS" ; then
-		msg_rename -m _1
-		get_user_response || msg_rename -em _2
+		get_msg2 -m _m1
+		get_user_response || get_msg2 -em _m2
 	fi
 }
 
 rename_common() {
 	# Stop all jails before renaming. Rename should not happen if stops fails
-	qb-stop "$JAIL $_RESTARTS" > /dev/null 2>&1 || msg_rename "_3" "exit_1"
+	qb-stop "$JAIL $_RESTARTS" > /dev/null 2>&1 || get_msg2 -Em _e1
 
 	# Modify qmap. Roojails should update their own rootjail to self
 	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}  /g" $QMAP
@@ -110,10 +110,10 @@ main() {
 	[ -z "$NOUPDATE" ] && update_dependencies
 
 	# Inform rename is complete
-	msg_rename "_4"
+	get_msg2 _m3
 
 	# Restart all jails that were stopped. Have to change the RESTART list with NEWNAME
-	[ -n "$_RESTARTS" ] && msg_rename "_5" \
+	[ -n "$_RESTARTS" ] && get_msg2 _m4 \
 				&& qb-start "$(echo $_RESTARTS | sed "s/${JAIL}[[:blank:]]*\$/${NEWNAME}/")"
 }
 

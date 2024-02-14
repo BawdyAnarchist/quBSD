@@ -30,6 +30,11 @@ ENDOFMSG
 Attempt to produce the bhyve command caused the following errors:
 ENDOFMSG
 		;;
+	_e7) cat << ENDOFMSG
+User: < $_USER > doesn't have a /home directory inside of jail.
+Use [-r] if you need to run as root inside of the jail.
+ENDOFMSG
+		;;
 	_m1) cat << ENDOFMSG
 The following bhyve command would be run:
 ENDOFMSG

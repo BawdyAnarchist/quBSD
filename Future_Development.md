@@ -1,5 +1,6 @@
 
 ONE BY ONE SCRIPT REVIEW
+	SKIPPED: qb-start ; qb-stop ; qb-i3-genconf needs further tested. I think it's working
 
 Hardcore Review
 	monitor_startstop

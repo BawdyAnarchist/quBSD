@@ -11,10 +11,10 @@
 get_options() {
 	while getopts chd:mu opts ; do case $opts in
 		c) _CMD="create" ;;
-		h) msg_pefs -eu ;; 
+		h) get_msg2 -eu ;;
 		d) U_FOLDER="$OPTARG" USERDIR="true" ;;
-		m) [ -z "$_CMD" ] && _CMD="mount" || msg_pefs -Eum _1 ;;
-		u) [ -z "$_CMD" ] && _CMD="unmount" || msg_pefs -Eum _1 ;;
+		m) [ -z "$_CMD" ] && _CMD="mount" || get_msg2 -Eum _e1 ;;
+		u) [ -z "$_CMD" ] && _CMD="unmount" || get_msg2 -Eum _e1 ;;
 		*) exit 1 ;;
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
@@ -27,20 +27,20 @@ get_options() {
 checks() {
 
 	# Must specify an action
-	[ -z "$_CMD" ] && msg_pefs -Eum _2
+	[ -z "$_CMD" ] && get_msg2 -Eum _e2
 
 	# Must have a valid jail
-	chk_valid_jail -- "$JAIL" || msg_pefs -Eu
+	chk_valid_jail -- "$JAIL" || get_msg2 -Eu
 
 	# If performing mount, the directory should already exist.
-	[ "$_CMD" = "mount" ] && ! [ -d "$U_FOLDER" ] && msg_pefs -Eum _3
+	[ "$_CMD" = "mount" ] && ! [ -d "$U_FOLDER" ] && get_msg2 -Eum _e3
 
 	# Check that U_FOLDER path is relative to the zusr mount for the jail
-	echo "$U_FOLDER" | grep -qE "^${M_ZUSR}/${JAIL}" || msg_pefs -Eum _4
+	echo "$U_FOLDER" | grep -qE "^${M_ZUSR}/${JAIL}" || get_msg2 -Eum _e4
 
 	# Make sure pefs kernel module is loaded, try to load, or exit on failure
 	kldstat -n pefs.ko > /dev/null 2>&1 || kldload pefs.ko > /dev/null 2>&1 \
-			|| msg_pefs -Em _5
+			|| get_msg2 -Em _e5
 }
 
 unmount_pefs() {
@@ -66,12 +66,12 @@ unmount_pefs() {
 
 			# The nullfs mount under zroot must be removed first.
 			if mount | grep -q $_jdir ; then
-				umount -f $_jdir || msg_pefs -m _6
+				umount -f $_jdir || get_msg2 -m _e6
 			fi
 
 			# Now the actual pefs mount can be removed.
 			if mount | grep -q $_dir ; then
-				umount -f $_dir  || msg_pefs -m _7
+				umount -f $_dir  || get_msg2 -m _e7
 			fi
 		done
 	fi

@@ -17,69 +17,28 @@ msg_edit() {
 		[ ! "$_message" = "_8" ] && unset _message
 	fi
 
-	# QUIET will skip over messages
-	[ -z "$QUIET" ] && case "$_message" in
-		_0) cat << ENDOFMSG
-
+	case "$_message" in
+	_e0) cat << ENDOFMSG
+Missing argument. Need jail, parameter, and value (unless deleting line)
 ENDOFMSG
 		;;
-		_1) cat << ENDOFMSG
-
-ERROR: Missing argument. Need jail, parameter, and value (unless deleting line)
+	_e1) cat << ENDOFMSG
 ENDOFMSG
 		;;
-		_2) cat << ENDOFMSG
-
-ALERT: The new value entered is the same as the old value.
-       No changes were made.
+	_e2) cat << ENDOFMSG
+< $PARAM > isnt valid for CLASS: $CLASS. Valid params are:
+   $FILT_PARAMS
 ENDOFMSG
 		;;
-		_3) cat << ENDOFMSG
-
-ERROR: < $PARAM > isnt valid for CLASS: $CLASS. Valid params are:
-       $FILT_PARAMS
+	_e3) cat << ENDOFMSG
+Combination of < $JAIL $PARAM > not found in qubsdmap.conf
 ENDOFMSG
 		;;
-		_4) cat << ENDOFMSG
-
-ERROR: Combination of < $JAIL $PARAM > was not found in qubsdmap.conf
-       No changes were made.
+	_e4) cat << ENDOFMSG
+< CLASS > should almost never be changed.
 ENDOFMSG
 		;;
-		_5) cat << ENDOFMSG
-
-ERROR: CLASS shouldn't be changed. You can, but you're playing with fire.
-ENDOFMSG
-		;;
-		_6) cat << ENDOFMSG
-
-WARNING: ROOTENV is typically not changed, but it can be if desired.
-ENDOFMSG
-		;;
-		_7) cat << ENDOFMSG
-
-ALERT: For changes to take effect, restart the following:
-ENDOFMSG
-
-[ -n "$_restart1" ] && echo "    $_restart1"
-[ -n "$_restart2" ] && echo "    $_restart2"
-echo -e "Should qb-edit to restart these jails? (y/n):  \c"
-		;;
-		_8)
-			echo -e "Success \c"
-			qb-list -j $JAIL -p $PARAM
-		;;
-		_8_1) cat << ENDOFMSG
-Deleted the following line(s):
-$_delline
-ENDOFMSG
-		;;
-		_8_2) cat << ENDOFMSG
-New setting is same as #default:
-$_default
-ENDOFMSG
-		;;
-		_10) cat << ENDOFMSG
+	_e5) cat << ENDOFMSG
 
 ALERT: Changing GATEWAY to < $VALUE > but IPV4 is set to 'none'.
        IP is necessary to connect < $JAIL > to < $VALUE >.
@@ -87,26 +46,42 @@ ALERT: Changing GATEWAY to < $VALUE > but IPV4 is set to 'none'.
 ENDOFMSG
 echo -e "Would you like to change this to auto? (Y/n): \c"
 	;;
-
-	# End of _message
-	esac
-
-	# Secondary message - informs about the [-f] option
-	[ -z "$QUIET" ] && case $_message2 in
-		_f) cat << ENDOFMSG
-
-Run again with [-f] to force modification.
-    (errors will still be printed to stdout, but ignored)
-
+	_w1) cat << ENDOFMSG
+ALERT: ROOTENV is typically not changed, but it can be.
 ENDOFMSG
 		;;
-	esac
+	_w2) cat << ENDOFMSG
+ALERT: For changes to take effect, restart the following:
+ENDOFMSG
 
-	[ $_usage ] && [ -z "$QUIET" ] && usage
-	eval $_exit :
-}
+[ -n "$_restart1" ] && echo "    $_restart1"
+[ -n "$_restart2" ] && echo "    $_restart2"
+echo -e "Should qb-edit to restart these jails? (y/n):  \c"
+		;;
+	_m1) cat << ENDOFMSG
+< $VALUE > is the same as the old value. No changes made.
+ENDOFMSG
+		;;
+	_m2) [ -z "$_force" ] && cat << ENDOFMSG
+Run again with [-f] to force modification.
+ENDOFMSG
+		;;
+	_m3)
+			echo -e "Success \c"
+			qb-list -j $JAIL -p $PARAM
+		;;
+	_m4) cat << ENDOFMSG
+Deleted the following line(s):
+$_delline
+ENDOFMSG
+		;;
+	_m5) cat << ENDOFMSG
+New setting is same as #default:
+$_default
+ENDOFMSG
+		;;
+	usage) cat << ENDOFUSAGE
 
-usage() { cat << ENDOFUSAGE
 qb-edit:  Modify jail parameters in qubsdmap.conf
 
 Usage: qb-edit <jail> <PARAMETER> <value>
@@ -122,6 +97,9 @@ Usage: qb-edit <jail> <PARAMETER> <value>
 
 For a list and description of PARAMETERS, run:
    qb-help params
+
 ENDOFUSAGE
+		;;
+	esac
 }
 

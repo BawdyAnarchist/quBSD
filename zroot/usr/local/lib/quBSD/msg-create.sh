@@ -1,15 +1,7 @@
 #!/bin/sh
 
 msg_create() {
-	while getopts eEm:u _opts ; do case $_opts in
-		e) local _exit="exit 0" ;;
-		E) local _exit="exit 1" ;;
-		m) local _message="$OPTARG" ;;
-		u) local _usage="true" ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))
-	local _passvar="$1"
 	case "$_message" in
-
 	_e0) cat << ENDOFMSG
 
 ERROR: < $_param > is not a valid quBSD PARAMETER.
@@ -574,7 +566,7 @@ ENDOFMSG
 
 			while : ; do
 				eval read -p \"ENTER ${_PARAM}:  \" $_PARAM
-				eval "chk_valid_${_lowparam}" \"\${$_PARAM}\" && break
+				eval "chk_valid_${_lowparam}" -- \"\${$_PARAM}\" && break
 			done
 	;;
 
@@ -584,14 +576,7 @@ ENDOFMSG
 				echo $_RESPONSE | grep -Eqs "^[123]\$" && break
 			done
 	;;
-
-	esac
-
-	[ $_usage ] && usage
-	eval $_exit :
-}
-
-usage() { cat << ENDOFUSAGE
+	usage) cat << ENDOFUSAGE
 
 qb-create: Creates new jails/VMs. Can duplicate from <template>, or
            create new jail/VM by specificing individual parameters.
@@ -637,4 +622,6 @@ Usage: qb-create [-e|-h|-G] [-y] [-Z] [-c <class>] [-r <rootenv>]
 
 FOR [-p <PARAMETERS>] LIST AND DETAILS, RUN:  qb-help params
 ENDOFUSAGE
+		;;
+	esac
 }

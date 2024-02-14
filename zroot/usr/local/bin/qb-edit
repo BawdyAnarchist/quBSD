@@ -6,15 +6,15 @@
 get_options() {
 	while getopts dfhqr opts ; do case $opts in
 		d) ACTION="delete" ;;
-		f) FORCE="true" ; _q='-q' ;;
-		h) msg_edit -eu ;;
-		q) QUIET="true" ; _q='-q' ;;
+		f) _F='-F' ;;
+		h) get_msg2 -eu ;;
+		q) _q='-q' ;;
 		r) RESTART="true" ;;
 		*) exit 1 ;;
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Script variables
-	JAIL="$1" ; [ -z "$JAIL" ] && msg_edit -Eum _1
+	JAIL="$1" ; [ -z "$JAIL" ] && get_msg2 $_q -Eum _e1
 	PARAM="$2"
 
 	# If adding	a line, it might be '-s opt' for bhyve, need full line
@@ -41,19 +41,19 @@ checks() {
 
 	if [ "$ACTION" = "delete" ] ; then
 		# Make sure that at JAIL and PARAM exist
-		[ -n "$JAIL" ] && [ -n "$PARAM" ] || msg_edit -Eum _1
+		[ -n "$JAIL" ] && [ -n "$PARAM" ] || get_msg2 $_q -Eum _1
 
 		# Make sure at least one line exists to delete
 		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QMAP \
-				|| msg_edit -Em _4
+				|| get_msg2 $_q -Em _e3
 
 	else
 		# Need all 3 parameters
-		[ -z "$JAIL" -o -z "$PARAM" -o -z "$VALUE" ] && msg_edit -Eum _1
+		{ [ -z "$JAIL" ] || [ -z "$PARAM" ] || [ -z "$VALUE" ] ;} && get_msg2 $_q -Eum _1
 
 		# Error if proposed entry already exists
 		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}[[:blank:]]*\$" $QMAP \
-																			&& msg_edit -em _2
+																			&& get_msg2 $_q -em _m1
 
 		# Multi-line parameters receive a new line
 		if echo "$MULT_LN_PARAMS" | grep -Eqs "$PARAM" ; then
@@ -77,37 +77,35 @@ checks() {
 
 		# Otherwise, PARAM was not found to be valid for the jail/VM
 		else
-			msg_edit -Em _3
+			get_msg2 $_q -Em _e2 $_F
 		fi
 
 		# BHYVE_CUSTM is special, but everything else can test for chk_valid_param
 		[ ! "$PARAM" = "BHYVE_CUSTM" ] \
 				&& ! eval "chk_valid_${_param}" $_q '--' \"$VALUE\" \"$JAIL\" \
-				&& [ -z "$FORCE" ] && exit 1
+				&& get_msg2 $_q -m _e $_F && get_msg2 $_q -Em _m2 $_F
 	fi
 
 	# Extra checks/interaction for certain parameters and IPV4
 	case $PARAM in
 
 		# Should not be changing class, unless you really know what you're doing
-		CLASS) msg_edit -Em _5 -M _f ;;
+		CLASS) get_msg2 $_q -m _e4 $_F ; get_msg2 $_q -Em _m2 $_F ;;
 
 		# Warn about changing ROOTENV
-		ROOTENV) msg_edit -m _6 ;;
+		ROOTENV) get_msg2 $_q -m _w1 $_F ;;
 
-		GATEWAY)
+		GATEWAY) # Offer to change IPV4 from 'none' to 'auto', if gateway is valid
 				get_jail_parameter -dqs IPV4 "$JAIL"
 
-				# Offer to change IPV4 from 'none' to 'auto', if gateway is valid
-				if [ ! "$VALUE" = "none" ] && [ "$IPV4" = "none" ] ; then
-					msg_edit -m _10
+				if [ ! "$VALUE" = "none" ] && [ "$IPV4" = "none" ] && [ -z "$_q" ] ; then
+					get_msg2 -m _e5
 					get_user_response && _IPAUTO="true"
 				fi
-		;;
-		IPV4)
-				# Extra check for quBSD IPV4 convention.
-				chk_isqubsd_ipv4 $_q -- "$VALUE" "$JAIL" || msg_edit -EM _f
-		;;
+			;;
+		IPV4) # Extra check for quBSD IPV4 convention.
+				chk_isqubsd_ipv4 $_q -- "$VALUE" "$JAIL" || get_msg2 $_q -Em _m2 $_F
+			;;
 	esac
 }
 
@@ -117,19 +115,19 @@ modify_qmap() {
 		delete)
 			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QMAP)
 			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $QMAP
-		;;
+			;;
 		revert_to_default)
 			_default=$(grep -E "^#default[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
 			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]@ d" $QMAP
-		;;
+			;;
 		add)
 			echo "$JAIL  $PARAM  $VALUE" >> $QMAP
-		;;
+			;;
 		none) :  # No action to take (devfs_ruleset)
-		;;
+			;;
 		*) # Modify QMAP and print new settings on success
 			sed -i '' -E "s@^(${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+).*@\1${VALUE}@" $QMAP
-		;;
+			;;
 	esac
 
 	# Set IPV4 to auto in QMAP, if the user approved it
@@ -155,18 +153,17 @@ modify_autosnap() {
 			_ZFS="${R_ZFS}/${JAIL}"
 			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
 					&& zfs get qubsd:autosnap "$_ZFS"
-		;;
+			;;
 
 		# Appjail/VM will have zusr. Dispjail might, but if not will fail to continue
 		appjail|cjail|dispjail|appVM)
 			_ZFS="${U_ZFS}/${JAIL}"
 			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
 					&& zfs get qubsd:autosnap "$_ZFS"
-		;;
+			;;
 
 		# RootVM will almost certainly have both zroot and zusr (due to /vmusr mounted)
 		rootVM)
-
 			_ZFS="${R_ZFS}/${JAIL}"
 			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
 					&& zfs get qubsd:autosnap "$_ZFS"
@@ -174,7 +171,7 @@ modify_autosnap() {
 			_ZFS="${U_ZFS}/${JAIL}"
 			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
 					&& zfs get qubsd:autosnap "$_ZFS"
-		;;
+			;;
 	esac
 }
 
@@ -212,11 +209,11 @@ handle_restarts() {
 	# If there are no jails to restart, exit
 	[ -z "$_restart1" ] && exit 0
 
-	# If QUIET tagged, only continue if user specified a restart
-	[ -n "$QUIET" ] && [ -z "$RESTART" ] && exit 0
+	# If [-q] tagged, only continue if user specified a restart
+	[ -n "$_q" ] && [ -z "$RESTART" ] && exit 0
 
-	if [ -z "$QUIET" ] ; then
-		msg_edit -m _7
+	if [ -z "$_q" ] ; then
+		get_msg2 -m _w2
 		get_user_response || return 0
 	fi
 
@@ -235,14 +232,13 @@ main() {
 
 	# Print the new value
 	case $ACTION in
-		delete) msg_edit -m _8_1  ;;
-		revert_to_default) msg_edit -m _8_2  ;;
-		*) msg_edit -m _8  ;;
+		delete) get_msg2 $_q -m _m4  ;;
+		revert_to_default) get_msg2 $_q -m _m5  ;;
+		*) get_msg2 $_q -m _m3  ;;
 	esac
 
 	handle_restarts
 }
-
 
 get_global_variables
 

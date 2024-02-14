@@ -5,7 +5,7 @@
 
 get_options() {
 	while getopts hinr opts ; do case $opts in
-		h) msg_ephm -eu ;;
+		h) get_msg2 -eu ;;
 		i) _i3wm="true" ;;
 		n) _NEWWIND="xterm -e" ;;
 		r) _USER="root" ;;
@@ -31,7 +31,7 @@ parse_jail_vars() {
 
 	# Unless already specified, set JAIL to the active window, and check valid
 	JAIL="${JAIL:=$_XJAIL}"
-	chk_valid_jail -- "$JAIL" || msg_ephm -Eum _2
+	chk_valid_jail -- "$JAIL" || get_msg2 -Eum _e2
 
 	# Make name visually easy to identify. Cycle to find available name if in use
 	NEWJAIL="EPHM-${JAIL}"  ;  _cycle=0
@@ -49,7 +49,7 @@ create_newjail() {
 	zfs snapshot $NEWSNAP
 
 	# Trap destroy snapshot and anything else that might exist after qb-create
-	trap 'destroy_ephemeral' INT TERM HUP QUIT EXIT
+	trap 'destroy_ephemeral ; rm_errfiles' INT TERM HUP QUIT EXIT
 
 	# Create dispjail and disable the no_destroy protection
 	qb-create -y -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false -p AUTOSNAP=false \
@@ -90,7 +90,7 @@ monitor_ephm_windows() {
 		exit 0
 	}
 
-	trap 'destroy_ephemeral' INT TERM HUP QUIT EXIT
+	trap 'destroy_ephemeral ; rm_errfiles' INT TERM HUP QUIT EXIT
 
 	# X11 windows can take a moment launch. Ineligant solution, but wait 3 secs before check-loop
 	sleep 3
@@ -130,7 +130,7 @@ main() {
 	monitor_ephm_windows
 
 	# Unset the the trap command, now that the detached monitoring script has executed.
-	trap '' INT TERM HUP QUIT EXIT
+	trap 'rm_errfiles' INT TERM HUP QUIT EXIT
 
 	run_command
 }
