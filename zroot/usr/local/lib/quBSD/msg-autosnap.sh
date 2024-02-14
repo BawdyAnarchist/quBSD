@@ -3,16 +3,16 @@
 msg_autosnap() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-   Invalid [-t <time-to-live>]. Must be formatted: <integer><unit-of-time>
+Invalid [-t <time-to-live>]. Must be formatted: <integer><unit-of-time>
 ENDOFMSG
 		;;
 	_e2) cat << ENDOFMSG
-   Invalid option selected
+Invalid option selected
 ENDOFMSG
 		;;
 	_e3) cat << ENDOFMSG
-   There was a problem when attempting to replace old an old $U_ZFS clone.
-   dataset: < $_clone > ; origin: < $_origin >
+There was a problem when attempting to replace an old $U_ZFS clone.
+dataset: < $_clone > ; origin: < $_origin >
 ENDOFMSG
 		;;
 	usage) cat << ENDOFUSAGE

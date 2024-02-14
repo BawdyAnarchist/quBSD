@@ -3,20 +3,17 @@
 msg_create() {
 	case "$_message" in
 	_e0) cat << ENDOFMSG
-
-ERROR: < $_param > is not a valid quBSD PARAMETER.
+< $_param > is not a valid quBSD PARAMETER.
 ENDOFMSG
 	;;
 	_e1) cat <<ENDOFMSG
-
-ERROR: There was a problem when trying to assign < $_passvar >
+There was a problem when trying to assign < $_passvar >
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-
-ERROR: Cant mix jail/VM between vital PARAMETERS and/or options:
-       [-c] CLASS < $CLASS > was assigned to < $NEWJAIL >
-       [-R] ROOTENV < $ROOTENV > has CLASS < $root_cl >
+Cant mix jail/VM between vital PARAMETERS and/or options:
+   [-c] CLASS < $CLASS > was assigned to < $NEWJAIL >
+   [-R] ROOTENV < $ROOTENV > has CLASS < $root_cl >
 ENDOFMSG
 [ ! "$TEMPLATE" = "none" ] \
 	&& echo "       [-t] TEMPLATE < $TEMPLATE > has CLASS < $temp_cl >"
@@ -25,115 +22,85 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e4) cat << ENDOFMSG
-
-ERROR: < $_VAL > was an invalid value for < $_PAR >
+< $_VAL > was an invalid value for < $_PAR >
 ENDOFMSG
 	;;
 	_e5) cat << ENDOFMSG
-
-ERROR: For jail, [-z] must be one of: <dupl|dirs|empty>
-       For VM, [-z] must be one of: <dupl|empty>
+For jail, [-z] must be one of: <dupl|dirs|empty>
+For VM, [-z] must be one of: <dupl|empty>
 ENDOFMSG
 	;;
 	_e5_1) cat << ENDOFMSG
-
-ERROR: Invalid format for [-z]. For VM, it can either be <dupl>,
-       or <integer><K|M|G|T>, for a zfs block device.
+Invalid format for [-z]. VM ZFS block devices should be:
+   <dupl> or <integer><K|M|G|T>
 ENDOFMSG
 	;;
 	_e5_2) cat << ENDOFMSG
-
-ERROR: A zfs block device must be greater than 80M
+A zfs block device must be greater than 80M
 ENDOFMSG
 	;;
 	_e5_3) cat << ENDOFMSG
-
-ERROR: Specified size < $U_ZOPT > for new zfs block device,
-       is greater than available < $U_ZFS > space: < $(zfs list -Ho available $U_ZFS) >
+Specified size < $U_ZOPT > for new zfs block device,
+   is greater than available < $U_ZFS > space: < $(zfs list -Ho available $U_ZFS) >
 ENDOFMSG
 	;;
 	_e5_4) cat << ENDOFMSG
-
-ERROR: [-z empty] for a new VM ${U_ZFS} block device,
-       must specify [-v <volsize>].
+[-z <empty>] in combination with a new VM, requires [-v <volsize>]
 ENDOFMSG
 	;;
 	_e6) cat << ENDOFMSG
-
-ERROR: When creating a jail of class:  [-c $CLASS],
-       it must be accompanied with option [-t <template>].
+A new jail with [-c $CLASS], requires a [-t <template>].
 ENDOFMSG
 	;;
 	_e7) cat << ENDOFMSG
+[-Z] isnt valid when creating <appjail/VM|dispjail>. The ROOTENV
+is cloned at start/stop, and [-Z] would imply a clone of a clone.
+Thus, <newjail> would be destroyed at <template> start/stop.
 
-ERROR: [-Z] not valid when creating <appjail/VM|dispjail>. Their
-       ROOTENV filesystem is always cloned at start/stop, from a
-       limited set of on-disk ROOTENVs, as a security measure.
-
-       It would imply a clone of a clone, making <newjail>
-       ephemeral, destroyed at <template> stop or start.
-
-       Either create a new on-disk ROOTENV to serve appjails:
-          qb-create [-c rootjail/VM] [-Z] [-t ${TEMPLATE}] $NEWJAIL
-	    OR
-       Create an ephemeral jail with qb-disp.
-          qb-disp $TEMPLATE
+Either create a new on-disk ROOTENV to serve appjails:
+   qb-create [-c rootjail/VM] [-Z] [-t ${TEMPLATE}] $NEWJAIL
+OR Create an ephemeral jail with qb-disp.
+   qb-disp $TEMPLATE
 ENDOFMSG
 	;;
 
 ## [-i] INSTALLATION MESSAGES
 	_e8) cat << ENDOFMSG
-
-ERROR: The only CLASS allowable with [-i] is < rootVM >
+The only CLASS allowable with [-i] is < rootVM >
 ENDOFMSG
 	;;
 	_e8_1) cat << ENDOFMSG
-
-ERROR: [-i] implies < $NEWJAIL > will be the ROOTENV. Thus [-r]
-       is redundant, but at least it should equal < $NEWJAIL >
+[-i] implies < $NEWJAIL > will be the ROOTENV. Thus [-r]
+is redundant, but if included, should equal < $NEWJAIL >
 ENDOFMSG
 	;;
 	_e8_2) cat << ENDOFMSG
-
-ERROR: [-i] requires [-v <volsize>] for the new rootVM volume.
+[-i] requires [-v <volsize>] for the new rootVM volume.
 ENDOFMSG
 	;;
 	_e8_3) cat << ENDOFMSG
-
-ERROR: [-i < $INSTALL >] Must specify the ISO to be installed,
-       but there is currently no file at that path.
+[-i < $INSTALL >] Must specify the path of the ISO to install.
 ENDOFMSG
 	;;
 	_e8_4) cat << ENDOFMSG
-
-ERROR: [-i] zfs already exists at < ${R_ZFS}/${NEWJAIL} >. For safety
-       reasons, qb-create will not overwrite existing volumes.
-       To use this location run qb-destroy, to eliminate
-       possible conflicts with what might be another jail/VM.
+[-i]. ZFS volume already exists at < ${R_ZFS}/${NEWJAIL} >.
+Is this another VM or jail? Use qb-destroy to use this location.
 ENDOFMSG
 	;;
 	_e9) cat << ENDOFMSG
-
-ERROR: Conflicting opts. Creating dispjail with [-t $TEMPLATE]
-       which is a ROOTENV. However, user also specified
-       [-R $ROOTENV], which is in conflict with the template.
+A dispjail with [-t $TEMPLATE] implies a ROOTENV of $TEMPLATE,
+but that is in conflict with a ROOTENV of: [-r $ROOTENV].
 ENDOFMSG
 	;;
 	_e10) cat << ENDOFMSG
-
-ERROR: User specified [-c rootjail/VM] which will create a new
-       ondisk ROOTENV from [-t ${TEMPLATE}] which isn't a
-       ROOTENV. It's an edge usecase operation that creates a
-       full, ondisk duplicate from a snapshot of the clone:
-       ${R_ZFS}/${TEMPLATE}
-
-       Please run command again with [-Z] option, to confirm.
+This will create a new ondisk ROOTENV from [-t $TEMPLATE] from
+ZFS dataset: ${R_ZFS}/${TEMPLATE} (which is a clone).
+   This is permissible, but run again with [-Z], to confirm.
 ENDOFMSG
 	;;
 	_e11) cat << ENDOFMSG
-
-ERROR: The ROOTENV dataset for < $NEWJAIL > is invalid:
-       $R_ZPARENT
+The ROOTENV dataset for < $NEWJAIL > is invalid:
+   $R_ZPARENT
 ENDOFMSG
 	;;
 	_w0) cat << ENDOFMSG

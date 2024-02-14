@@ -3,11 +3,11 @@
 msg_backup() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-   Invalid option
+Invalid option
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-   [-a] and [-A] are mutually exclusive.
+[-a] and [-A] are mutually exclusive.
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
@@ -15,34 +15,33 @@ UNUSED
 ENDOFMSG
 	;;
 	_e4) cat << ENDOFMSG
-   [-z <destination_dataset>] is mandatory, or qb-backup
-   doesn't know where to send the backup datasets.
+[-z <destination_dataset>] is mandatory, or qb-backup
+doesn't know where to send the backup datasets.
 ENDOFMSG
 	;;
 	_e5) cat << ENDOFMSG
-   The destination < $ZBAK > does not exist.
-   Have you imported the zpool?
+Destination < $ZBAK > doesn't exist. Is the zpool imported?
 ENDOFMSG
 	;;
 	_e6) cat << ENDOFMSG
-   The dataset < ${ZBAK}/${_dataset} > already exists
-   at the destination. Pass [-F] to force zfs to overwrite.
+The dataset < ${ZBAK}/${_dataset} > already exists
+at the destination. Pass [-F] to force zfs to overwrite.
 ENDOFMSG
 	;;
 	_e7) cat << ENDOFMSG
-   No datasets were specified for backup. Either choose
-   [-a|-A|-f], or specify datasets as positional parameters.
+No datasets were specified for backup. Either choose
+[-a|-A|-f], or specify datasets as positional parameters.
 ENDOFMSG
 	;;
 	_e8) cat << ENDOFMSG
-   < $_dataset > is not a valid zfs dataset
+< $_dataset > is not a valid zfs dataset
 ENDOFMSG
 	;;
 	_e9) cat << ENDOFMSG
-   The following ROOTENVs are currently running. To avoid
-   corruption, shut these down before performing a backup.
+The following ROOTENVs are currently running. To avoid
+corruption, shut these down before performing a backup.
 $_ONROOTS
-       [Note: After the backup begins, you may then start/use these normally]
+   [Note: After the backup begins, you may then start/use these normally]
 ENDOFMSG
 	;;
 	_w1) cat << ENDOFMSG

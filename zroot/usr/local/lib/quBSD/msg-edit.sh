@@ -38,10 +38,10 @@ ENDOFMSG
 < CLASS > should almost never be changed.
 ENDOFMSG
 		;;
-	_e5) cat << ENDOFMSG
+	_w0) cat << ENDOFMSG
 
-ALERT: Changing GATEWAY to < $VALUE > but IPV4 is set to 'none'.
-       IP is necessary to connect < $JAIL > to < $VALUE >.
+ALERT: Changing GATEWAY to < $VALUE > but IPV4 is set to.
+IP is necessary to connect < $JAIL > to < $VALUE >.
 
 ENDOFMSG
 echo -e "Would you like to change this to auto? (Y/n): \c"

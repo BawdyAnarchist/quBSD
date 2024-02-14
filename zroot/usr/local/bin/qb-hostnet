@@ -52,7 +52,7 @@ cron_down() {
 
 revert_connection() {
 	# User opted out of the <timeout> feature
-	[ "$TIMEOUT" -eq 0 ] && get_msg2 -em _e7
+	[ "$TIMEOUT" -eq 0 ] && get_msg2 -em _w1
 
 	# Wait the prescribed time
 	sleep $TIMEOUT

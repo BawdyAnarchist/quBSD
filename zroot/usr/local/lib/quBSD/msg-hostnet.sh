@@ -3,26 +3,18 @@
 msg_hostnet() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-
-ERROR: Options are mutually exclusive. Chose one.
+Options are mutually exclusive. Chose one.
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-
-ERROR: Must specify an action [-d|-u]
+Must specify an action [-d|-u]
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
-
-ERROR: Tunnel < $JAIL > failed to start.
-       For more info, see: $QBLOG
+Gateway: < $JAIL > failed to start. See: $QBLOG
 ENDOFMSG
 	;;
-	_e6) cat << ENDOFMSG
-ENDOFMSG
-	;;
-	_e7) cat << ENDOFMSG
-
+	_w1) cat << ENDOFMSG
 WARNING: User opted to remove the network timeout. Host
          will keep this network connection indefintely.
 ENDOFMSG

@@ -3,13 +3,11 @@
 msg_ephm() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-
-ERROR: Must specify a < jail > to clone for ephemeral jail
+Must specify a < jail > to clone for ephemeral jail
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-
-ERROR: < $JAIL > is not properly configured or does not exist
+< $JAIL > is not properly configured or does not exist
 ENDOFMSG
 	;;
 	usage) cat << ENDOFUSAGE

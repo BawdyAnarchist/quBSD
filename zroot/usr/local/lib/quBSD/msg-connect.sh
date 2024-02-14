@@ -50,6 +50,7 @@ $_ALL_INTF
 ENDOFMSG
 		;;
 	usage) cat << ENDOFUSAGE
+
 qb-connect: Create adhoc network connection between two jails.
 
 Usage: qb-connect [-i <IP>] [-c|-d] <client-jail> <gateway-jail>

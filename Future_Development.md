@@ -1,15 +1,13 @@
 
-ONE BY ONE SCRIPT REVIEW
-	SKIPPED: qb-start ; qb-stop ; qb-i3-genconf needs further tested. I think it's working
+POPUP error messages based on get_info POPUP and whether it's a situation that might warrant it
 
 Hardcore Review
+	qb-start ; qb-stop
+		- parallel start_jail calls with error messages
+		- qb-start "all jails have started, but" ... It happens in alot of places it shouldnt. Should chk_isvm
 	monitor_startstop
 	exec_vm_start (particularly the start and error messages)
 	launch_vm
-	Still need to divine ways to handle qb-start parallel start_jail calls and their error messages
-		- qb-start "all jails have started, but" ... It happens in alot of places it shouldnt. Should chk_isvm
-
-POPUP error messages based on get_info POPUP and whether it's a situation that might warrant it
 
 chk_valid_ppt - we can try to change to a ppt device like the guy on the video for GPU passthru
 

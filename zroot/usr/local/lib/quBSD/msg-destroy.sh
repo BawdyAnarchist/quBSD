@@ -3,20 +3,16 @@
 msg_destroy() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-
 Exiting, no changes were made.
-
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-
-ERROR: < $JAIL > has the \`no_destroy protection flag' set in
-       qubsdmap.conf.  Change flag to \`false', and run again.
+< $JAIL > has NO_DESTROY set to true in QMAP.
+Use qb-edit to change this to 'false' and try again.
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
-
-ERROR: Must specificy a <jail> to destroy
+Must specificy a <jail> to destroy
 ENDOFMSG
 	;;
 	_e4) cat << ENDOFMSG

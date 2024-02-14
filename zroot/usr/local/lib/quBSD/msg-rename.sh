@@ -3,8 +3,8 @@
 msg_rename() {
 	case "$_message" in
 	_e0) cat << ENDOFMSG
-   < $JAIL > is invalid/incomplete. If you still wish to
-   rename whatever pieces might exist, use [-f] (force).
+< $JAIL > is invalid/incomplete. If you still wish to
+rename whatever pieces might exist, use [-f] (force).
 ENDOFMSG
 	;;
 	_e1) cat << ENDOFMSG

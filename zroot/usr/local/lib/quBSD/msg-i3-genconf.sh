@@ -3,16 +3,12 @@
 msg_genconf() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-
-ERROR: < $1 > does not exist
+< $1 > does not exist
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-
-ERROR: The new config has errors, and was not loaded.
-       It was saved to the following location:
-       ${HOME}/.config/i3/config_attempted
-
+The new config has errors. It was saved but not loaded:
+   ${HOME}/.config/i3/config_attempted
 ENDOFMSG
 	;;
 	_m1) cat << ENDOFMSG

@@ -46,6 +46,7 @@ hasnt been detected yet. Waiting 15 seconds before quitting
 ENDOFMSG
 		;;
 	usage) cat << ENDOFUSAGE
+
 qb-cmd: Runs command in a jail, or connects to VM.
         Jail default is /bin/csh ; VM defaults to
         both tmux and VNC if no option specified.

@@ -14,24 +14,26 @@ msg_ivpn() {
 
 	case "$_message" in
 	_1) cat << ENDOFMSG
-ERROR: Unable to start jail. Cannot modify IVPN.
+ERROR: $0
+Unable to start jail. Cannot modify IVPN.
 ENDOFMSG
 	;;
 	_1_1) cat << ENDOFMSG
-ERROR: Invalid port.
+ERROR: $0
+Invalid port.
 ENDOFMSG
 	;;
 	_2) cat << ENDOFMSG
-ERROR: Script is running inside jail, but kern. securelevel is
-       elevated and/or schg is applied to one or more files
-       that need to be modified in order to switch VPN servers.
-       Re-run this script from host, in order to modify iVPN.
+ERROR: $0
+Script is running inside jail, but kern.securelevel is elevated,
+and/or schg is applied to one or more files which must be
+modified. Run this script from host first, to modify iVPN server.
 ENDOFMSG
 	;;
 	_3) cat << ENDOFMSG
-WARNING: Failed to establish ping to outside internet.
-         Will use existing json files for modifying wg0.conf.
-         {Enter to continue}
+WARNING: $0
+Internet connection not detected. Using last known server list.
+   {Enter to continue}
 ENDOFMSG
 	;;
 	_4) cat << ENDOFMSG
@@ -43,14 +45,13 @@ CURRENT IVPN SERVER INFO.  {Enter to continue}
 ENDOFMSG
 	;;
 	_4_2) cat << ENDOFMSG
-Couldn't establish ping to outside internet.
-Below is the last configured ivpn server.
+Internet connection not detected. Current IVPN server settings:
 ENDOFMSG
 	;;
 	_5) cat << ENDOFMSG
-WARNING: Failed to download fresh server stats.
-         Will use existing json files for modifying wg0.conf.
-			{Enter to continue}
+WARNING: $0
+Failed to download latest servers. Using last known server list.
+   {Enter to continue}
 ENDOFMSG
 	;;
 	_6) cat << ENDOFMSG

@@ -3,18 +3,15 @@
 msg_flags() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-
-ERROR: Must specify an action: [-d][-u][-r]
+Must specify an action: [-d][-u][-r]
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-
-ERROR: Actions are mutually exclusive. Chose only one.
+Actions are mutually exclusive. Chose only one.
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
-
-ERROR: Must specify a target jail
+Must specify a target jail
 ENDOFMSG
 	;;
 	usage) cat << ENDOFUSAGE

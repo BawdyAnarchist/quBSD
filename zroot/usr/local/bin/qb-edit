@@ -99,7 +99,7 @@ checks() {
 				get_jail_parameter -dqs IPV4 "$JAIL"
 
 				if [ ! "$VALUE" = "none" ] && [ "$IPV4" = "none" ] && [ -z "$_q" ] ; then
-					get_msg2 -m _e5
+					get_msg2 -m _w0
 					get_user_response && _IPAUTO="true"
 				fi
 			;;

@@ -3,15 +3,15 @@
 msg_record() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-   Invalid option
+Invalid option
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-   [-v] volume must be an integer 0 to 100.
+[-v] volume must be an integer 0 to 100.
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
-   < $JAIL > is not running.
+< $JAIL > is not running.
 ENDOFMSG
 	;;
 	usage) cat << ENDOFUSAGE

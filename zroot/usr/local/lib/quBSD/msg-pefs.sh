@@ -3,40 +3,31 @@
 msg_pefs() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-
-ERROR: Mutually exclusive options [-c|-m|-u]
+Mutually exclusive options [-c|-m|-u]
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-
-ERROR: Must specify an action [-c|-m|-u]
+Must specify an action [-c|-m|-u]
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
-
-ERROR: < $U_FOLDER > doesn't exist
+< $U_FOLDER > doesn't exist
 ENDOFMSG
 	;;
 	_e4) cat << ENDOFMSG
-
-ERROR: [-d] should specify a directory inside of < $JAIL >
-       < ${M_ZUSR}/${JAIL} > directory path
+[-d] must exist along path: ${M_ZUSR}/${JAIL}/
 ENDOFMSG
 	;;
 	_e5) cat << ENDOFMSG
-
-ERROR: Failed to load pefs.ko kernel module.
-       Check that pefs-kmod pkg is installed on host.
+Failed to load pefs.ko. Is pefs-kmod installed to host?
 ENDOFMSG
 	;;
 	_e6) cat << ENDOFMSG
-
-ERROR: Failed to unmount < $(echo $_dir | sed "s:${M_ZUSR}:${M_QROOT}:") >
+Failed to unmount: $(echo $_dir | sed "s:${M_ZUSR}:${M_QROOT}:")
 ENDOFMSG
 	;;
 	_e7) cat << ENDOFMSG
-
-ERROR: Failed to unmount < $_dir >
+Failed to unmount: $_dir
 ENDOFMSG
 	;;
 	usage) cat << ENDOFUSAGE

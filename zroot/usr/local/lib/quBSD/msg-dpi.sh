@@ -3,19 +3,16 @@
 msg_dpi() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-
-ERROR: Proposed DPI is below sanity threshold of 0.3.
+Proposed DPI is below sanity threshold of 0.3.
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-
-ERROR: Proposed DPI is too high for relative (0.5 to 4);
-       but too low to be raw (29 to 386).
+< $DPI_IN > DPI is too high to be a percent change: (0.5 to 4);
+but too low to be a raw Xft.dpi setting: (29 to 386).
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
-
-ERROR: DPI is above sanity threshold of 384.
+DPI is above sanity threshold of 384.
 ENDOFMSG
 	;;
 	usage) cat << ENDOFUSAGE

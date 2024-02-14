@@ -3,20 +3,16 @@
 msg_launch() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-
-ERROR: < $FILE > does not exist.
+< $FILE > does not exist.
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-
-ERROR: [-t <timeout>] must be integer from 5 to 600. Caution,
-       choose a timeout appropriate for number of starts,
-       longer if starting multiple gateways/clients in a row
+[-t <timeout>] must be an integer from 5 to 600.
+(Choose longer timeouts if starting multiple gateways in a row)
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
-
-ERROR: qb-start failed to launch all jails before timeout
+qb-start failed to launch all jails before timeout
 ENDOFMSG
 	;;
 	usage) cat << ENDOFUSAGE
