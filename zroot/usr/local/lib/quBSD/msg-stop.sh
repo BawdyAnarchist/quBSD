@@ -1,85 +1,59 @@
 #!/bin/sh
 
 msg_stop() {
-	while getopts eEm:u _opts ; do case $_opts in
-		e) local _exit="exit 0" ;;
-		E) local _exit="exit 1" ;;
-		m) local _message="$OPTARG" ;;
-		u) local _usage="true" ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))
-
 	case "$_message" in
 	_e0) cat << ENDOFMSG
-
-ERROR: Two instances of qb-stop or qb-start are already running.
-       Cannot queue another instance until one of these finishes.
+Two instances of qb-stop or qb-start are already running.
+Cannot queue another instance until one of these finishes.
 
 $(pgrep -fl '/bin/sh /usr/local/bin/qb-st(art|op)')
 ENDOFMSG
 	;;
 	_e1) cat << ENDOFMSG
-
-ERROR: Conflicting options. Specify only one: [-a|-A|-f]
+Conflicting options. Specify only one: [-a|-A|-f]
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-
-ERROR: Conflicting options. Either use [-E <file>], or use
-       [-e] and type a list of exclusion jails as positional
-       parameters (aka, at the end of the command).
+Conflicting options. Either use [-E <file>], or use
+[-e] and type a list of exclusion jails as positional
+parameters (aka, at the end of the command).
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
+One or more jails appear to be hung and havent stopped.
+Check /var/log/quBSD.sh for details, and check jls
+list to manually kill all `jail -R` operations.
 
-ERROR: One or more jails appear to be hung and havent stopped.
-       Check /var/log/quBSD.sh for details, and check jls
-       list to manually kill all `jail -R` operations.
-
-       NOTE - No restarts were attempted, due to error.
+No restarts were attempted, due to error.
 ENDOFMSG
 	;;
 	_e4) cat << ENDOFMSG
-
-ERROR: One or more jails appear to be hung and havent stopped.
-       Check /var/log/quBSD.sh for details, and check process
-       list to manually kill all jail stop operations.
+One or more jails appear to be hung and havent stopped.
+Check /var/log/quBSD.sh for details, and check process
+list to manually kill all jail stop operations.
 ENDOFMSG
 	;;
 	_e5) cat << ENDOFMSG
-
-ERROR: [-t <timeout>] must be integer from 5 to 600. Caution,
-       choose a timeout appropriate for number of starts,
-       longer if starting multiple gateways/clients in a row
+[-t <timeout>] must be integer from 5 to 600.
+(Choose longer timeouts if stopping multiple gateways in a row).
 ENDOFMSG
 	;;
 	_m1) cat << ENDOFMSG
-
-ALERT: Force stopping jails/VMs is non-graceful and not preferred.
-       For example, passthru'd PCI devices attached to a VM will
-       likely become unavailable until after a system reboot.
-       Use this only as a last resort for misbehaving containers.
-
+WARNING: $0
+Force stopping is non-graceful. Any passthru PCI devices will
+likely become unavailable until host reboot. Use as last resort.
 ENDOFMSG
-echo -e "Continue? (Y/n): \c"
+	echo -e "Continue? (Y/n): \c"
 	;;
 	_m2) cat << ENDOFMSG
-
 All jails/VMs have been stopped
 ENDOFMSG
 	;;
 	_m3) cat << ENDOFMSG
-
 All jails/VMs were already stopped. No action to take.
 ENDOFMSG
 	;;
-
-	esac
-
-	[ $_usage ] && usage
-	eval $_exit :
-}
-
-usage() { cat << ENDOFUSAGE
+	usage) cat << ENDOFUSAGE
 
 !IMPORTANT; qb-stop MUST be used when stopping multiple
 jails in parallel to avoid race conditions and errors.
@@ -106,5 +80,7 @@ qb-stop [-F] <jail_list>
        *This is auto calculated, so normally dont change this.
 
 ENDOFUSAGE
+		;;
+	esac
 }
 

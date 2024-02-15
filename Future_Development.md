@@ -1,13 +1,14 @@
 
-POPUP error messages based on get_info POPUP and whether it's a situation that might warrant it
-
 Hardcore Review
 	qb-start ; qb-stop
 		- parallel start_jail calls with error messages
-		- qb-start "all jails have started, but" ... It happens in alot of places it shouldnt. Should chk_isvm
+		- qb-start - still undecided on how to handle exit after all jails waterfall 
 	monitor_startstop
 	exec_vm_start (particularly the start and error messages)
 	launch_vm
+
+POPUP error messages based on get_info POPUP and whether it's a situation that might warrant it
+	qb-cmd, qb-start, qb-stop, qb-i3-windows, qb-record, qb-stat
 
 chk_valid_ppt - we can try to change to a ppt device like the guy on the video for GPU passthru
 

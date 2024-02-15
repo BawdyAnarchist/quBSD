@@ -21,7 +21,6 @@ get_options() {
 }
 
 parse_jail_vars() {
-
 	# Default _CMD is $SHELL. If [-v] keep REDIRECT null, ${parameter-word}, otherwise dev/null
 	[ -z "$_CMD" ] && _CMD="${_CMD:=$SHELL}" || _REDIRECT="${_REDIRECT- > /dev/null 2>&1 &}"
 
@@ -37,7 +36,6 @@ parse_jail_vars() {
 }
 
 connect_vm_session() {
-
 	# Pull the qmap parameters for VM attachment
 	get_jail_parameter -d TMUX $JAIL || get_msg2 -Em _e2 TMUX "$JAIL"
 	get_jail_parameter -d VNC  $JAIL || get_msg2 -Em _e2 VNC  "$JAIL"
@@ -56,9 +54,14 @@ connect_vm_session() {
 		# Launch vnc viewer
 		_vncport=$(sockstat -P tcp \
 							| sed -nE "s/.*bhyve[[:blank:]]+${_vmpid}.*\*:([[:digit:]]+).*/\1/p")
-		[ -z "$_vncport" ] && _novnc="true" \
-			|| { rm_errfiles 	; trap '' HUP INT TERM QUIT EXIT ; \
-			vncviewer 0.0.0.0:$_vncport > /dev/null 2>&1 &}
+
+		if [ -z "$_vncport" ] ; then
+			_novnc="true"
+		else
+			# Remove errfiles before permanent new program launches
+			rm_errfiles ; trap '' HUP INT TERM QUIT EXIT
+			vncviewer 0.0.0.0:$_vncport > /dev/null 2>&1 &
+		fi
 	else
 		_novnc="true"
 	fi
@@ -88,9 +91,8 @@ main() {
 			start_jail -n "$JAIL" || get_msg2 -m _e6
 			exit 0
 		fi
-
 		# Launch VM and connect the session
-		! qb-start "$JAIL" && get_msg2 -Em _e1
+		! start_jail "$JAIL" && get_msg2 -m _e1
 		connect_vm_session
 	else
 		if [ "$_NORUN" ] ; then
@@ -99,11 +101,12 @@ main() {
 			exit 0
 		fi
 
-		# Start jail, make sure the user has a home directory
-		! start_jail $JAIL && get_msg2 -Em _e1
+		! start_jail $JAIL && get_msg2 -m _e1
+
+		# Make sure the user has a home directory, and remove errfiles before jexec to new prog. 
 		[ ! "$_USER" = "root" ] && [ ! -d "${M_QROOT}/${JAIL}/home/${_USER}" ] && get_msg2 -Em _e7
-		# Remove errfiles before new program runs with potentially no exit.
 		rm_errfiles	; trap '' HUP INT TERM QUIT EXIT
+
 		eval $_NORUN $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT"
 	fi
 }

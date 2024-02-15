@@ -4,8 +4,7 @@ msg_cmd() {
 	case "$_message" in
 
 	_e1) cat << ENDOFMSG
-< $JAIL > Failed to start. For details, see:
-$QBLOG  and  ${QBLOG_}$JAIL
+< $JAIL > Failed to start.
 ENDOFMSG
 		;;
 	_e2) cat << ENDOFMSG
@@ -14,7 +13,7 @@ PARAMETER: < $1 > for jail: < $2 >
 ENDOFMSG
 		;;
 	_e3) cat << ENDOFMSG
-Timeout waiting for vnc FBUF device to appear in sockstat
+Timed out while waiting for VNC FBUF device to appear in sockstat
 ENDOFMSG
 		;;
 	_e4) cat << ENDOFMSG
@@ -41,8 +40,8 @@ ENDOFMSG
 		;;
 	_m2) cat << ENDOFMSG
 ALERT:  $0
-< $JAIL > is tagged for VNC in QMAP, but the FBUF device
-hasnt been detected yet. Waiting 15 seconds before quitting
+< $JAIL > is tagged for VNC in QMAP, but the FBUF device hasn't
+been detected yet. Waiting 12 more seconds before quitting.
 ENDOFMSG
 		;;
 	usage) cat << ENDOFUSAGE

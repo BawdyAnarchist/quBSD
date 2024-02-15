@@ -6,12 +6,12 @@
 get_options() {
 	while getopts aAeE:hf:Frt: opts ; do case $opts in
 		a) _SOURCE="auto" ;;
-		A) [ "$_SOURCE" ]  && msg_stop -Eum _e1 || _SOURCE="all" ;;
+		A) [ "$_SOURCE" ]  && get_msg2 -Eum _e1 || _SOURCE="all" ;;
 		e) _EXCLUDE="true" ;;
-		E) [ "$_EXCLUDE" ] && msg_stop -Eum _e2 || _EXFILE="${OPTARG}" ;;
-		f) [ "$_SOURCE" ]  && msg_stop -Eum _e1 || _SOURCE="$OPTARG" ;;
+		E) [ "$_EXCLUDE" ] && get_msg2 -Eum _e2 || _EXFILE="${OPTARG}" ;;
+		f) [ "$_SOURCE" ]  && get_msg2 -Eum _e1 || _SOURCE="$OPTARG" ;;
 		F) FORCE="true" ;;
-		h) msg_stop -eu ;;
+		h) get_msg2 -eu ;;
 		r) _RESTART="true" ;;
 		t) _TIMEOUT="$OPTARG" ;;
 		*) exit 1 ;;
@@ -29,13 +29,12 @@ get_options() {
 
 checks() {
 	# Check validity of TIMEOUT
-	[ "$_TIMEOUT" ] && ! chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
-																			&& msg_stop -Em _e5
+	[ "$_TIMEOUT" ] && ! chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" && get_msg2 -Em _e5
 	# Set trap to cleanup files on exit
-	trap "cleanup_trapped" INT TERM HUP QUIT EXIT
+	trap "cleanup_trapped ; rm_errfiles" INT TERM HUP QUIT EXIT
 
    # Ping check if qb-stop may continue, get placed in queue, or exit if timeout happens
-	monitor_startstop -p || msg_stop -Em _e0
+	monitor_startstop -p || get_msg2 -Em _e0
 }
 
 echo_grep() {
@@ -48,7 +47,7 @@ climb_hierarchy() {
 	# hierarchy path is resolved recursively, and as it unwinds at the end, _starts are tallied
 
 	# Prevent infinite loop. Unlikely to be 10 gateways; more likely circular reference
-	[ "$_depth" -gt 10 ] && msg_stop -Em _e3
+	[ "$_depth" -gt 10 ] && get_msg2 -Em _e3
 	_depth=$(( _depth + 1 ))
 
 	# _JAIL gateway path was already handled. Skip further checks.
@@ -130,8 +129,7 @@ begin_waterfall() {
 force_stop_jlist() {
 	# _ASSM_Y is only passed via env variable in monitor_startstop. Should not be user option
 	if [ -z "$_ASSM_Y" ] ; then
-		msg_stop -m _m1
-		get_user_response || exit 0
+		get_msg2 -m _m1 && ! get_user_response && exit 0
 	fi
 
 	for _jail in $_JLIST ; do
@@ -188,16 +186,16 @@ main() {
 	done
 
 	# STARTS keeps track of the number of hiearchy leves. If 0, there was nothing to stop
-	[ "$_STOPS" = 0 ] && msg_stop -em _m3
+	[ "$_STOPS" = 0 ] && get_msg2 -em _m3
 
 	# User specified timeout, or 5 secs for every hierarchy level
 	monitor_startstop "${_TIMEOUT:=$(( _STOPS * 10 ))}" &
 	_MONITOR_PID="$!"
 
 	# Wait for stops to finish. If TIMEOUT, monitor_startstop will kill -15 this script
-	ps -p $_WF_PIDS > /dev/null 2>&1 && wait $_WF_PIDS && msg_stop -m _m2
+	ps -p $_WF_PIDS > /dev/null 2>&1 && wait $_WF_PIDS && get_msg2 -m _m2
 
-	[ "$_RESTART" ] && cleanup_trapped && exec qb-start "$_JLIST"
+	[ "$_RESTART" ] && cleanup_trapped && rm_errfiles && exec qb-start "$_JLIST"
 }
 
 get_global_variables

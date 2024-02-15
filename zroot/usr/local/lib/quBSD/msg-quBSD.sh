@@ -63,7 +63,7 @@ ENDOFMSG
 ENDOFMSG
 		;;
 	_e4) cat << ENDOFMSG
-   ${0##*/} Failed to start < $1 >. See $QBLOG for details.
+   ${0##*/} Failed to start < $1 >
 ENDOFMSG
 	;;
 	_e4_1) cat << ENDOFMSG

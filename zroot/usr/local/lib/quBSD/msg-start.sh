@@ -1,74 +1,50 @@
 #!/bin/sh
 
 msg_start() {
-	while getopts eEm:u _opts ; do case $_opts in
-		e) local _exit="exit 0" ;;
-		E) local _exit="exit 1" ;;
-		m) local _message="$OPTARG" ;;
-		u) local _usage="true" ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))
-
-	case "$_message" in
-
+	case $_message in
 	_e0) cat << ENDOFMSG
-
-ERROR: Two instances of qb-stop or qb-start are already running.
-       Cannot queue another instance until one of these finishes.
+Two instances of qb-stop or qb-start are already running.
+Cannot queue another instance until one of these finishes.
 
 $(pgrep -fl '/bin/sh /usr/local/bin/qb-st(art|op)')
 ENDOFMSG
-	;;
+		;;
 	_e1) cat << ENDOFMSG
-
-ERROR: Conflicting options. Specify only one: [-a|-A|-f]
+Conflicting options. Specify only one: [-a|-A|-f]
 ENDOFMSG
-	;;
+		;;
 	_e2) cat << ENDOFMSG
-
-ERROR: Conflicting options. Either use [-E <file>], or use
-       [-e] and type a list of exclusion jails as positional
-       parameters (aka, at the end of the command).
+Conflicting options. Either use [-E <file>], or use
+[-e] and type a list of exclusion jails as positional
+parameters (aka, at the end of the command).
 ENDOFMSG
-	;;
+		;;
 	_e3) cat << ENDOFMSG
-
-ERROR: Infinite loop detected. There likely a set of jails has
-      gateways that circularly reference each other. Example:
-      Jail-A has Jail-B as gateway,
-             Jail-B has Jail-C as gateway,
-                    Jail-C has Jail-A as gateway.
+Infinite loop detected. There likely a set of jails has
+gateways that circularly reference each other. Example:
+Jail-A has Jail-B as gateway,
+   Jail-B has Jail-C as gateway,
+      Jail-C has Jail-A as gateway.
 ENDOFMSG
-	;;
+		;;
 	_e4) cat << ENDOFMSG
-
-ERROR: < $_JAIL > failed to start. It serves network to
-       client jails. Exiting
+< $_JAIL > failed to start.
 ENDOFMSG
-	;;
+		;;
 	_e5) cat << ENDOFMSG
-
-ERROR: [-t <timeout>] must be integer from 5 to 600. Caution,
-       choose a timeout appropriate for number of starts,
-       longer if starting multiple gateways/clients in a row
+[-t <timeout>] must be integer from 5 to 600.
+(Choose longer timeouts if starting multiple gateways in a row).
 ENDOFMSG
-	;;
+		;;
+	_m0) cat << ENDOFMSG
+qb-start:  All jails/VMs were already running. No action to take.
+ENDOFMSG
+		;;
 	_m1) cat << ENDOFMSG
-
-All jails/VMs have been launched, but VMs might need a moment.
+qb-start:  All jails/VMs were launched. 
 ENDOFMSG
-	;;
-	_m2) cat << ENDOFMSG
-
-All jails/VMs were already running. No action to take.
-ENDOFMSG
-	;;
-	esac
-
-	[ $_usage ] && usage
-	eval $_exit :
-}
-
-usage() { cat << ENDOFUSAGE
+		;;
+	usage) cat << ENDOFUSAGE
 
 !IMPORTANT; qb-start MUST be used when starting multiple
 jails in parallel to avoid race conditions and errors.
@@ -90,6 +66,9 @@ qb-start [-a|-A|-f <file>] [-e|-E <file>]
    -h: (h)elp. Outputs this help message.
    -t: (t)imeout in secs, to wait for jail starts before error
        *This is auto calculated, so normally dont change this.
+
 ENDOFUSAGE
+		;;
+	esac
 }
 

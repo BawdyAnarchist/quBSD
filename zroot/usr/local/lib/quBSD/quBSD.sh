@@ -170,11 +170,15 @@ rm_errfiles() {
 }
 
 get_msg2() {
+	# Unified messaging function. Makes standard calls to individual script messages.
+	# NOTE: The reality is that the error message files could experience race conditions.
+
 	while getopts eEFm:quV opts ; do case $opts in
 		e) local _exit="exit 0" ;;
 		E) local _exit="exit 1" ;;
 		F) local _force="true" ; unset _exit= ;;
 		m) local _message="$OPTARG" ;;
+		p) local _popup="true" ;;
 		q) local _q="true" ;;
 		u) local _usage="true" ;;
 		V) local _V="true" ;;
@@ -185,7 +189,7 @@ get_msg2() {
 	[ -z "${_call##exec-*}" ] && local _msg="msg_exec" || _msg="msg_${0##*-}"
 
 	case $_message in
-		_m*|_w*) _MESSAGE=$("$_msg" "$@") ;;
+		_m*|_w*) [ -z "$_q" ] && eval "$_msg" "$@" ;;
 		_e*)
 			if [ -z "$_force" ] ; then
 				# Place final ERROR message into a variable.
@@ -193,20 +197,17 @@ get_msg2() {
 
 				# If exiting due to error, log the date and error message to the log file
 				[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QBLOG
+			
+				# Send the error message
+				[ -z "$_q" ] && [ "$_ERROR" ] && echo "$_ERROR"
 			fi ;;
 	esac
 
-	# If -q wasnt specified, print messages to the terminal
-	if [ -z "$_q" ] ; then
-		[ "$_ERROR" ] && echo "$_ERROR"
-		[ "$_MESSAGE" ] && echo "$_MESSAGE"
+	# Now that it has been dispositioned, erase the message
+	truncate -s 0 $ERR1 ; unset _ERROR
 
-		# Now that it has been dispositioned, erase the message
-		truncate -s 0 $ERR1 ; unset _ERROR ; unset _MESSAGE
-
-		# Evaluate usage if present
-		[ $_usage ] && _message="usage" && eval "$_msg"
-	fi
+	# Evaluate usage if present
+	[ -z "$_q" ] && [ $_usage ] && _message="usage" && eval "$_msg"
 
 	eval $_exit :
 	return 0
@@ -1010,28 +1011,29 @@ chk_valid_jail() {
 				 && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 			;;
 		appjail|cjail) # Appjails require a dataset at quBSD/zusr
-			! chk_valid_zfs ${U_ZFS}/${_value} && get_msg $_qv -m _e5 -- "$_value" "$U_ZFS" \
-					&& get_msg $_qv -m _e1 -- "$_value" "$U_ZFS" && eval $_R1
+			! chk_valid_zfs ${U_ZFS}/${_value} \
+				&& get_msg $_qv -m _e5 -- "${_value}" "${U_ZFS}" \
+				&& get_msg $_qv -m _e1 -- "${U_ZFS}/${_value}" "ZFS dataset" && eval $_R1
 			;;
 		dispjail) # Verify the dataset of the template for dispjail
 			# Template cant be blank
 			local _template=$(get_jail_parameter -deqs TEMPLATE $_value)
 			[ -z "$_template" ] && get_msg $_qv -m _e2 -- "$_value" "TEMPLATE" \
-					&& get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
+				&& get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
 			# Dispjails can't reference other dispjails
 			local _templ_class=$(sed -nE "s/^${_template}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
 			[ "$_templ_class" = "dispjail" ] \
-					&& get_msg $_qv -m _e6_1 -- "$_value" "$_template" && eval $_R1
+				&& get_msg $_qv -m _e6_1 -- "$_value" "$_template" && eval $_R1
 
 			# Ensure that the template being referenced is valid
 			! chk_valid_jail $_qv -c "$_templ_class" -- "$_template" \
-					&& get_msg $_qv -m _e6_2 -- "$_value" "$_template" \
-					&& get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
+				&& get_msg $_qv -m _e6_2 -- "$_value" "$_template" \
+				&& get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 			;;
 		rootVM) # VM zroot dataset should have no origin (not a clone)
 			! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
-					| grep -Eq '^-$'  && get_msg $_qv -m _e5 -- "$_value" "$R_ZFS" && eval $_R1
+				| grep -Eq '^-$'  && get_msg $_qv -m _e5 -- "$_value" "$R_ZFS" && eval $_R1
 			;;
 		*VM) :
 			;;
@@ -2241,8 +2243,9 @@ exec_vm_coordinator() {
 		eval $_R0
 	fi
 
-	# 0control should always be on
+	# Start upstream jails/VMs, as well as control jail
 	start_jail -q $_control
+	! start_jail $_gateway && eval $_R1 
 
 	# Launch VM sent to background, so connections can be made (network, vnc, tmux)
 	get_msg -m _m1 -- "$_jail" | tee -a $QBLOG ${QBLOG}_${_VM}
@@ -2253,7 +2256,7 @@ exec_vm_coordinator() {
 	while ! { pgrep -xfq "bhyve: $_VM" \
 				|| pgrep -fl "bhyve" | grep -Eqs "^[[:digit:]]+ .* ${_VM}[[:blank:]]*\$" ;} ; do
 		sleep .5 ; _count=$(( _count + 1 ))
-		[ "$_count" -ge 6 ] && get_msg _e4_1 -- "$_VM" && eval $_R1
+		[ "$_count" -ge 6 ] && get_msg -m _e4_1 -- "$_VM" && eval $_R1
 	done
 
 	finish_vm_connections &
