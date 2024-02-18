@@ -24,19 +24,20 @@ get_options() {
 	# This makes it so that _POSPARAMS has one parameter per line
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
 
+	# Trap function important for keeping the lock, timeout, and coordination files clean
+	trap "cleanup_trapped ; rm_errfiles" INT HUP TERM QUIT EXIT
+
 	# Temp files for locking, timeouts, and IP resolution
 	_TMP_LOCK="${QTMP}/.qb-startstop_lock"
 	_TMP_TIME="${QTMP}/.qb-startstop_timeout"
 	_TMP_IP="${QTMP}/.qb-start_temp_ip"
+	_TMP_SNAPS="${QTMP}/.tmpsnaps"
 }
 
 checks() {
 	# Check validity of TIMEOUT
 	[ "$_TIMEOUT" ] && ! chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" \
 																		&& get_msg2 -Em _e5
-	# Trap function
-	trap "cleanup_trapped ; rm_errfiles" INT HUP TERM QUIT EXIT
-
 	# Ping check if qb-start may continue, get placed in queue, or exit if timeout happens
 	monitor_startstop -p || get_msg2 -Em _e0
 }
@@ -159,11 +160,14 @@ cleanup_trapped() {
 	# Immediately kill the monitoring PID, to help prevent any races for cleanup
 	ps -p $_MONITOR_PID > /dev/null 2>&1 && kill -9 $_MONITOR_PID
 
-	# Remove PID from the lock file. If it's empty, all tmp files can be removed
 	if [ -e "$_TMP_LOCK" ] ; then
+		# Remove PID from the lock file. If it's empty remove the file
 		sed -i '' -E "/^$$\$/ d" $_TMP_LOCK
-		[ ! -s "$_TMP_LOCK" ] && rm $_TMP_LOCK $_TMP_IP $_TMP_TIME $_TMP_PIDS > /dev/null 2>&1
+		[ ! -s "$_TMP_LOCK" ] && rm $_TMP_LOCK
 	fi
+		
+	# Other TMP files should all be removed immediately
+	rm $_TMP_IP $_TMP_TIME $_TMP_SNAPS > /dev/null 2>&1
 }
 
 main() {
@@ -182,10 +186,20 @@ main() {
 	_FULLIST=$(echo "$_FULLIST" | sort | uniq)
 	_STARTS=$(echo "$_CLIMBED" | awk 'NR == 1 || $2 > max { max = $2 } END { print max }')
 
-	# Some jails/VMs might be encrypted. They need to decrypted now, before waterfall
+	# Things that need to be checked/coordinated for each jail that must be started
 	get_info _POPUP
 	for _jail in $_FULLIST ; do
+		# Some jails/VMs might be encrypted. They need to decrypted now, before waterfall
 		chk_valid_zfs "${U_ZFS}/${_jail}" && encryption_and_mounts
+
+		# Coordinate ROOTENV and TEMPLATE snapshots to avoid races during reclone functions 
+		_rootenv=$(get_jail_parameter -eq ROOTENV $_jail)
+		! echo_grep "$_ROOTENVS" "$_rootenv" && _ROOTENVS="$_ROOTENVS $_rootenv"
+	done
+
+	# Record the coordinated snapshot for each ROOTENV to tmpsnaps
+	for _rootenv in $_ROOTENVS ; do
+		select_snapshot >> $_TMP_SNAPS /root/temp
 	done
 
 	# IP addr are mapped out ahead of time to prevent overlaps during parallel start

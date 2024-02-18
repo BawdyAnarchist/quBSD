@@ -20,8 +20,12 @@ get_options() {
 	# This makes it so that _POSPARAMS has one parameter per line
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
 
+	# Trap function important for keeping the lock, timeout, and coordination files clean 
+	trap "cleanup_trapped ; rm_errfiles" INT TERM HUP QUIT EXIT
+
 	_TMP_LOCK="${QTMP}/.qb-startstop_lock"
 	_TMP_TIME="${QTMP}/.qb-startstop_timeout"
+	_TMP_SNAPS="${QTMP}/.tmpsnaps"
 
 	# _STOPS is used for calculating the TIMEOUT later on. Initialize to zero
 	_STOPS=0
@@ -30,8 +34,6 @@ get_options() {
 checks() {
 	# Check validity of TIMEOUT
 	[ "$_TIMEOUT" ] && ! chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" && get_msg2 -Em _e5
-	# Set trap to cleanup files on exit
-	trap "cleanup_trapped ; rm_errfiles" INT TERM HUP QUIT EXIT
 
    # Ping check if qb-stop may continue, get placed in queue, or exit if timeout happens
 	monitor_startstop -p || get_msg2 -Em _e0
@@ -146,8 +148,11 @@ cleanup_trapped() {
    # Remove PID from the lock file. If it's empty, all tmp files can be removed
 	if [ -e "$_TMP_LOCK" ] ; then
 		sed -i '' -E "/^$$\$/ d" $_TMP_LOCK
-		[ ! -s "$_TMP_LOCK" ] && rm $_TMP_LOCK $_TMP_IP $_TMP_TIME $_TMP_PIDS > /dev/null 2>&1
+		[ ! -s "$_TMP_LOCK" ] && rm $_TMP_LOCK
 	fi
+
+	# Other TMP files should all be removed immediately
+	rm $_TMP_IP $_TMP_TIME $_TMP_SNAPS > /dev/null 2>&1
 }
 
 main() {
@@ -161,12 +166,21 @@ main() {
 	checks
 
 	# Find gateway hierarchy top for each jail. Returns $_HIERTOP
-	for _jlist in $_JLIST ; do
+	for _jail in $_JLIST ; do
 
 		# Function is recursive, so _depth tracks # of cycles to prevent infinite loop.
 		_depth=0 ; _stops=0
-		climb_hierarchy "$_jlist"
+		climb_hierarchy "$_jail"
+
+		# Coordinate ROOTENV and TEMPLATE snapshots to avoid races in reclone functions 
+		_rootenv=$(get_jail_parameter -eq ROOTENV $_jail)
+		! echo_grep "$_ROOTENVS" "$_rootenv" && _ROOTENVS="$_ROOTENVS $_rootenv"
 	done
+
+	# Record the coordinated snapshot for each ROOTENV to tmpsnaps
+	for _rootenv in $_ROOTENVS ; do
+		select_snapshot >> $_TMP_SNAPS /root/temp
+	done  
 
 	# Set and/or cleanup variables from the climb_hierarcy loop
 	_HIERTOP=$(echo "$_HIERTOP" | sort | uniq)
@@ -179,7 +193,6 @@ main() {
 
 	# Stop the hierarchy tops, then their clients, until all of _JLIST is stopped.
 	for _JAIL in $_HIERTOP; do
-
 		# Hierarchy tops are independent, can be stopped in parallel.
 		begin_waterfall $_JAIL &
 		_WF_PIDS="$_WF_PIDS $!"

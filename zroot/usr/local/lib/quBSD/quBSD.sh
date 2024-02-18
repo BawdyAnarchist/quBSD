@@ -566,6 +566,7 @@ reclone_zroot() {
 	# Destroys the existing _rootenv clone of <_jail>, and replaces it
 	# Detects changes since the last snapshot, creates a new snapshot if necessary,
 	local _fn="reclone_zroot" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+	_tmpsnaps="${QTMP}/.tmpsnaps"
 
 	while getopts qV _opts ; do case $_opts in
 		q) local _qz='-q' ;;
@@ -573,62 +574,22 @@ reclone_zroot() {
 	esac ; done ; shift $(( OPTIND - 1))
 
 	# Variables definitions
-	_jail="$1"
+	local _jail="$1"
 		[ -z "${_jail}" ] && get_msg $_qz -m _e0 -- "Jail" && eval $_R1
-	_rootenv="$2"
+	local _rootenv="$2"
 		[ -z "${_rootenv}" ] && get_msg $_qz -m _e0 -- "ROOTENV" && eval $_R1
-	_jailzfs="${R_ZFS}/${_jail}"
-	_rootzfs="${R_ZFS}/${_rootenv}"
+	local _jailzfs="${R_ZFS}/${_jail}"
 
 	# Check that the _jail being destroyed/cloned has an origin (is a clone).
 	chk_valid_zfs "$_jailzfs" && [ "$(zfs list -Ho origin $_jailzfs)" = "-" ] \
 		&& get_msg $_qz -m _e32 -- "$_jail" && eval $_R1
 
-	# Switch between whether or not ROOTENV is running.
-	if chk_isrunning ${_rootenv} ; then
-		# For safety, running ROOTENV snapshot should be taken from before it was started
-
-		# Get epoch date of ROOTENV pid, and ROOTENV snapshots
-		if chk_isvm ${_rootenv} ; then
-			_jlsdate=$(ps -o lstart -p $(pgrep -f "bhyve: $_rootenv") | tail -1 \
-								| xargs -I@ date -j -f "%a %b %d %T %Y" @ +"%s")
-		else
-			_jlsdate=$(ps -o lstart -J $(jls -j $_rootenv jid) | tail -1 \
-								| xargs -I@ date -j -f "%a %b %d %T %Y" @ +"%s")
-		fi
-		_rootsnaps=$(zfs list -t snapshot -Ho name $_rootzfs)
-		_snapdate=$(echo "$_rootsnaps" | tail -1 | xargs -I@ zfs list -Ho creation @ \
-											| xargs -I@ date -j -f "%a %b %d %H:%M %Y" @ +"%s")
-
-		# Cycle from most-to-least recent, until a snapshot older than the running ROOTENV pid is found
-		while chk_integer -q -g $_jlsdate $(( _snapdate + 59 )) ; do
-			_rootsnaps=$(echo "$_rootsnaps" | sed '$ d')
-			[ -n "$_rootsnaps" ] \
-				&& _snapdate=$(echo "$_rootsnaps" | tail -1 | xargs -I@ zfs list -Ho creation @ \
-													| xargs -I@ date -j -f "%a %b %d %H:%M %Y" @ +"%s")
-		done
-
-		# If no _rootsnap older than the rootenv pid was found, return error
-		_rootsnap=$(echo "$_rootsnaps" | tail -1)
-		[ -z "$_rootsnap" ] && get_msg $_qz -m _e32_1 -- "$_jail" "$_rootenv" && eval $_R1
-
-	else
-		# If ROOTENV is off, make sure that _jail is getting the most recent version of ROOTENV
-
-		# Pull most recent snap, and then create new snapshot for comparison
-		_date=$(date +%s)
-		_newsnap="${_rootzfs}@${_date}"
-		_rootsnap=$(zfs list -t snapshot -Ho name $_rootzfs | tail -1)
-		zfs snapshot -o qubsd:destroy-date=$(( _date + 30 )) \
- 						 -o qubsd:autosnap='-' \
-						 -o qubsd:autocreated="yes" "${_newsnap}"
-
-		# Use zfsprop 'written' to detect any new data. Destroy _newsnap if it has no new data.
-		{ [ ! "$(zfs list -Ho written $_newsnap)" = "0" ] || [ -z "$_rootsnap" ] ;} \
-			&& _rootsnap="$_newsnap" \
-			|| zfs destroy $_newsnap
-	fi
-
+	# Parallel starts create race conditions for zfs snapshot access/comparison. This deconflicts it. 
+	# Use _tmpsnaps if avail. Else, find/create latest rootenv snapshot.
+	[ -e "$_tmpsnaps" ] \
+		&& _rootsnap=$(grep -Eo "^${R_ZFS}/${_rootenv}@.*" $_tmpsnaps) \
+		|| { ! _rootsnap=$(select_snapshot) && get_msg $_qz $_V -m '' && eval $_R1 ;}
+	
    # Destroy the dataset and reclone it
 	zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1
 	zfs clone -o qubsd:autosnap='false' "${_rootsnap}" ${_jailzfs}
@@ -641,6 +602,66 @@ reclone_zroot() {
 				useradd -n $_jail -u 1001 -d /home/${_jail} -s /bin/csh 2>&1
 	fi
 	eval $_R0
+}
+
+select_snapshot() {
+	# Generalized function to be shared across qb-start/stop, and reclone_zfs's
+	# Returns the best/latest snapshot for a given ROOTENV
+	local _jlsdate ; local _rootsnaps ; local _snapdate ; local _newsnap
+	local _tmpsnaps="${QTMP}/.tmpsnaps"
+	local _rootzfs="${R_ZFS}/${_rootenv}"
+
+	# For safety, running ROOTENV snapshot should be taken from before it was started
+	if chk_isrunning ${_rootenv} ; then
+		# Get epoch date of ROOTENV pid, and ROOTENV snapshots
+		if chk_isvm ${_rootenv} ; then
+			_jlsdate=$(ps -o lstart -p $(pgrep -f "bhyve: $_rootenv") | tail -1 \
+								| xargs -I@ date -j -f "%a %b %d %T %Y" @ +"%s")
+		else
+			_jlsdate=$(ps -o lstart -J $(jls -j $_rootenv jid) | tail -1 \
+								| xargs -I@ date -j -f "%a %b %d %T %Y" @ +"%s")
+		fi
+		_rootsnaps=$(zfs list -t snapshot -Ho name $_rootzfs)
+		_snapdate=$(echo "$_rootsnaps" | tail -1 | xargs -I@ zfs list -Ho creation @ \
+											| xargs -I@ date -j -f "%a %b %d %H:%M %Y" @ +"%s")
+
+		# Cycle from most-to-least recent until a snapshot older-than running ROOTENV pid, is found
+		while chk_integer -q -g $_jlsdate $(( _snapdate + 59 )) ; do
+			_rootsnaps=$(echo "$_rootsnaps" | sed '$ d')
+			[ -n "$_rootsnaps" ] \
+				&& _snapdate=$(echo "$_rootsnaps" | tail -1 | xargs -I@ zfs list -Ho creation @ \
+													| xargs -I@ date -j -f "%a %b %d %H:%M %Y" @ +"%s")
+		done
+
+		# If no _rootsnap older than the rootenv pid was found, return error
+		_rootsnap=$(echo "$_rootsnaps" | tail -1)
+		[ -z "$_rootsnap" ] && get_msg $_qz -m _e32_1 -- "$_jail" "$_rootenv" && eval $_R1
+
+	# Latest ROOTENV snapshot unimportant for stops, and prefer not to clutter ROOTENV snaps. 
+	elif [ -z "${0##*exec-prepare}" ] || [ -z "${0##*qb-stop}" ] ; then
+		# The jail is running, meaning there's a ROOTENV snapshot available (no error/chks needed)
+		local _rootsnap=$(zfs list -t snapshot -Ho name $_rootzfs | tail -1)
+
+	# If ROOTENV is off, and jail is starting, make sure it has the absolute latest ROOTENV state
+	else
+		local _date=$(date +%s)
+		local _newsnap="${_rootzfs}@${_date}"
+		local _rootsnap=$(zfs list -t snapshot -Ho name $_rootzfs | tail -1)
+
+		# Perform the snapshot
+		zfs snapshot -o qubsd:destroy-date=$(( _date + 30 )) -o qubsd:autosnap='-' \
+			-o qubsd:autocreated="yes" "${_newsnap}"
+
+		# Use zfsprop 'written' to detect any new data. Destroy _newsnap if it has no new data.
+		if [ ! "$(zfs list -Ho written $_newsnap)" = "0" ] || [ -z "$_rootsnap" ] ; then
+			_rootsnap="$_newsnap"
+		else
+			zfs destroy $_newsnap
+		fi
+	fi
+
+	# Echo the final value and return 0
+	echo "$_rootsnap" && eval $_R0
 }
 
 reclone_zusr() {
