@@ -135,7 +135,6 @@ main() {
 	run_command
 }
 
-
 get_global_variables
 
 get_options "$@"

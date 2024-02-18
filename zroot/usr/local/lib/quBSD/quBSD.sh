@@ -645,9 +645,8 @@ reclone_zusr() {
 	fi
 
    # Destroy the dataset and reclone it (only if jail is off).
-	! chk_isrunning "$_jail" \
-		&& zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1 \
-		&& zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs}
+	! chk_isrunning "$_jail" && { zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1 \
+		; zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs} ;}
 
 	# Drop the flags for etc directory and add the user for the jailname
 	[ -e "${M_ZUSR}/${_jail}/rw" ] && chflags -R noschg ${M_ZUSR}/${_jail}/rw

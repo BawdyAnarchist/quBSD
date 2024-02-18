@@ -389,7 +389,7 @@ confirm_creation() {
 	fi
 
 	# Get final confirmation, unless [-y] was specified
-	if ! [ "$_ASSM_Y" ] ; then
+	if [ -z "$_ASSM_Y" ] ; then
 		get_msg2 -m _w5
 		get_user_response || exit 0
 	fi
