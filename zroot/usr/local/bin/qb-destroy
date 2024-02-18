@@ -19,7 +19,7 @@ get_options() {
 define_variables() {
 
 	# No jail provided
-	[ -z "$JAIL" ] && get_msg2 -Eum _e3
+	[ -z "$JAIL" ] && get_msg2 -Eum _e1
 
 	# Important parameters for checks
 	get_jail_parameter -q CLASS "$JAIL"
@@ -49,25 +49,22 @@ checks() {
 	[ "$NO_DESTROY" = "true" ] && get_msg2 -Eum _e2
 
 	# Extra reminder that they're destorying a rootjail
-	[ -z "${CLASS##root*}" ] && [ -n "$CLASS" ] && get_msg2 -m _e4
+	[ -n "$CLASS" ] && [ -z "${CLASS##root*}" ] && get_msg2 -m _m1
 
 	# Message on datasets depends on if there's any dataset to destroy
 	if [ -z "${zrootDestroy}${zusrDestroy}" ] ; then
-		get_msg2 -m _e5_1
-
+		get_msg2 -m _m2
+		get_user_response || get_msg2 -em _m7
 	else
 		# Print the datasets and amount of data to be destroyed
-		get_msg2 -m _e5
-		[ -n "$zrootDestroy" ] && get_msg2 -m _e6
-		[ -n "$zusrDestroy" ] && get_msg2 -m _e7
+		get_msg2 -m _m3
+		[ -n "$zrootDestroy" ] && get_msg2 -m _m4
+		[ -n "$zusrDestroy" ] && get_msg2 -m _m5
 
 		# Solicit user response
-		get_msg2 -m _e8
-		severe="severe"
+		get_msg2 -m _m6
+		get_user_response $severe || get_msg2 -em _m7
 	fi
-
-	# "severe" requires a full `yes' to be typed
-	get_user_response $severe || get_msg2 -em _e1
 }
 
 main() {
