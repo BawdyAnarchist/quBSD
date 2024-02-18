@@ -22,8 +22,9 @@
 ###############################  LIST OF FUNCTIONS  ################################
 
 ###################  VARIABLE ASSIGNMENTS and VALUE RETRIEVAL  #####################
-# get_global_variables  - File names/locations ; ZFS datasets
+# get_global_variables - File names/locations ; ZFS datasets
 # get_networking_variables - pf.conf ; wireguard ; endpoints
+# rm_errfiles         - Removes the coordinated error files for qb-scripts
 # get_parameter_lists - Valid parameters are tracked here, and divided into groups
 # get_user_response   - Simple yes/no y/n checker
 # get_jail_parameter  - All QMAP entries, along with sanity checks
@@ -43,6 +44,7 @@
 # restart_jail        - Self explanatory
 # reclone_zroot       - Destroys and reclones jails dependent on ROOTENV
 # reclone_zusr        - Destroy and reclones jails with zusr dependency (dispjails)
+# select_snapshot     - Find/create ROOTENV snapshot for reclone.
 # copy_control_keys   - SSH keys for control jail are copied over to running env.
 # monitor_startstop   - Monitors whether qb-start or qb-stop is still alive
 
@@ -604,9 +606,66 @@ reclone_zroot() {
 	eval $_R0
 }
 
+reclone_zusr() {
+	# Destroys the existing zusr clone of <_jail>, and replaces it
+	# Detects changes since the last snapshot, creates a new snapshot if necessary,
+	# and destroys old snapshots when no longer needed.
+	local _fn="reclone_zusr" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	# Variables definitions
+	local _jail="$1"
+	local _jailzfs="${U_ZFS}/${_jail}"
+	local _template="$2"
+	local _templzfs="${U_ZFS}/${_template}"
+
+	local _date=$(date +%s)
+	local _ttl=$(( _date + 30 ))
+	local _newsnap="${_templzfs}@${_date}"
+	local _presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
+
+	[ -z "$_jail" ] && get_msg $_qr -m _e0 -- "jail" && eval $_R1
+	[ -z "$_template" ] && get_msg $_qr -m _e0 -- "template" && eval $_R1
+
+	# `zfs-diff` from other jails causes a momentary snapshot which the reclone operation
+	while [ -z "${_presnap##*@zfs-diff*}" ] ; do
+		# Loop until a proper snapshot is found
+		sleep .1
+		_presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
+	done
+
+	# If there's a presnap, and no changes since then, use it for the snapshot.
+	[ "$_presnap" ] && ! [ "$(zfs diff "$_presnap" "$_templzfs")" ] && _newsnap="$_presnap"
+
+	# If they're equal, then the valid/current snapshot already exists. Otherwise, make one.
+	if ! [ "$_newsnap" = "$_presnap" ] ; then
+		# Clone and set zfs params so snapshot will get auto deleted later.
+		zfs snapshot -o qubsd:destroy-date="$_ttl" \
+		 				 -o qubsd:autosnap='-' \
+						 -o qubsd:autocreated="yes" "$_newsnap"
+	fi
+
+   # Destroy the dataset and reclone it (only if jail is off).
+	! chk_isrunning "$_jail" \
+		&& zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1 \
+		&& zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs}
+
+	# Drop the flags for etc directory and add the user for the jailname
+	[ -e "${M_ZUSR}/${_jail}/rw" ] && chflags -R noschg ${M_ZUSR}/${_jail}/rw
+	[ -e "${M_ZUSR}/${_jail}/home/${_template}" ] \
+			&& chflags noschg ${M_ZUSR}/${_jail}/home/${_template}
+	# Replace the <template> jailname in fstab with the new <jail>
+	sed -i '' -e "s/${_template}/${_jail}/g" ${M_ZUSR}/${_jail}/rw/etc/fstab > /dev/null 2>&1
+
+	# Rename directories and mounts with dispjail name
+	mv ${M_ZUSR}/${_jail}/home/${_template} ${M_ZUSR}/${_jail}/home/${_jail} > /dev/null 2>&1
+
+	eval $_R0
+}
+
 select_snapshot() {
 	# Generalized function to be shared across qb-start/stop, and reclone_zfs's
 	# Returns the best/latest snapshot for a given ROOTENV
+	local _fn="select_snapshot" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 	local _jlsdate ; local _rootsnaps ; local _snapdate ; local _newsnap
 	local _tmpsnaps="${QTMP}/.tmpsnaps"
 	local _rootzfs="${R_ZFS}/${_rootenv}"
@@ -662,63 +721,6 @@ select_snapshot() {
 
 	# Echo the final value and return 0
 	echo "$_rootsnap" && eval $_R0
-}
-
-reclone_zusr() {
-	# Destroys the existing zusr clone of <_jail>, and replaces it
-	# Detects changes since the last snapshot, creates a new snapshot if necessary,
-	# and destroys old snapshots when no longer needed.
-	local _fn="reclone_zusr" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	# Variables definitions
-	local _jail="$1"
-	local _jailzfs="${U_ZFS}/${_jail}"
-	local _template="$2"
-	local _templzfs="${U_ZFS}/${_template}"
-
-	local _date=$(date +%s)
-	local _ttl=$(( _date + 30 ))
-	local _newsnap="${_templzfs}@${_date}"
-	local _presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
-
-	[ -z "$_jail" ] && get_msg $_qr -m _e0 -- "jail" && eval $_R1
-	[ -z "$_template" ] && get_msg $_qr -m _e0 -- "template" && eval $_R1
-
-	# `zfs-diff` from other jails causes a momentary snapshot which the reclone operation
-	while [ -z "${_presnap##*@zfs-diff*}" ] ; do
-
-		# Loop until a proper snapshot is found
-		sleep .1
-		_presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
-	done
-
-	# If there's a presnap, and no changes since then, use it for the snapshot.
-	[ "$_presnap" ] && ! [ "$(zfs diff "$_presnap" "$_templzfs")" ] && _newsnap="$_presnap"
-
-	# If they're equal, then the valid/current snapshot already exists. Otherwise, make one.
-	if ! [ "$_newsnap" = "$_presnap" ] ; then
-		# Clone and set zfs params so snapshot will get auto deleted later.
-		zfs snapshot -o qubsd:destroy-date="$_ttl" \
-		 				 -o qubsd:autosnap='-' \
-						 -o qubsd:autocreated="yes" "$_newsnap"
-	fi
-
-   # Destroy the dataset and reclone it (only if jail is off).
-	! chk_isrunning "$_jail" \
-		&& zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1 \
-		&& zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs}
-
-	# Drop the flags for etc directory and add the user for the jailname
-	[ -e "${M_ZUSR}/${_jail}/rw" ] && chflags -R noschg ${M_ZUSR}/${_jail}/rw
-	[ -e "${M_ZUSR}/${_jail}/home/${_template}" ] \
-			&& chflags noschg ${M_ZUSR}/${_jail}/home/${_template}
-	# Replace the <template> jailname in fstab with the new <jail>
-	sed -i '' -e "s/${_template}/${_jail}/g" ${M_ZUSR}/${_jail}/rw/etc/fstab > /dev/null 2>&1
-
-	# Rename directories and mounts with dispjail name
-	mv ${M_ZUSR}/${_jail}/home/${_template} ${M_ZUSR}/${_jail}/home/${_jail} > /dev/null 2>&1
-
-	eval $_R0
 }
 
 copy_control_keys() {
