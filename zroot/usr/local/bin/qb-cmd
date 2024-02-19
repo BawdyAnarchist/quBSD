@@ -37,8 +37,8 @@ parse_jail_vars() {
 
 connect_vm_session() {
 	# Pull the qmap parameters for VM attachment
-	get_jail_parameter -d TMUX $JAIL || get_msg2 -Em _e2 TMUX "$JAIL"
-	get_jail_parameter -d VNC  $JAIL || get_msg2 -Em _e2 VNC  "$JAIL"
+	get_jail_parameter -d TMUX $JAIL || get_msg2 -Epm _e2 TMUX "$JAIL"
+	get_jail_parameter -d VNC  $JAIL || get_msg2 -Epm _e2 VNC  "$JAIL"
 
 	# Handle the vnc viewer port
 	if [ ! "$VNC" = "false" ] ; then
@@ -47,7 +47,7 @@ connect_vm_session() {
 		while ! _vmpid=$(pgrep -fx "bhyve: $JAIL") ; do
 			# Wait 3 secs before message, to avoid unnecesary clutter
 			[ "$_count" = 3 ] && get_msg2 -m _m2
-			[ "$_count" -gt 15 ] && get_msg2 -Em _e3
+			[ "$_count" -gt 15 ] && get_msg2 -Epm _e3
 			sleep 1 ; _count=$(( _count + 1 ))
 		done
 
@@ -70,10 +70,10 @@ connect_vm_session() {
 	if [ "$TMUX" = "true" ] ; then
 		# Remove errfiles before permanent new program launches
 		rm_errfiles ; trap '' HUP INT TERM QUIT EXIT
-		! tmux attach -t $JAIL && get_msg2 -Em _e4
+		! tmux attach -t $JAIL && get_msg2 -Epm _e4
 	else
 		# Error message for nothing to connect to
-		[ "$_novnc" ] && get_msg2 -Em _e5
+		[ "$_novnc" ] && get_msg2 -Epm _e5
 	fi
 }
 
@@ -92,7 +92,7 @@ main() {
 			exit 0
 		fi
 		# Launch VM and connect the session
-		! start_jail "$JAIL" && get_msg2 -m _e1
+		! start_jail "$JAIL" && get_msg2 -Epm _e1
 		connect_vm_session
 	else
 		if [ "$_NORUN" ] ; then
@@ -101,10 +101,11 @@ main() {
 			exit 0
 		fi
 
-		! start_jail $JAIL && get_msg2 -Em _e1
+		! start_jail $JAIL && get_msg2 -Epm _e1
 
-		# Make sure the user has a home directory, and remove errfiles before jexec to new prog. 
-		[ ! "$_USER" = "root" ] && [ ! -d "${M_QROOT}/${JAIL}/home/${_USER}" ] && get_msg2 -Em _e7
+		# Make sure the user has a home directory, and remove errfiles before jexec to new prog.
+		[ ! "$_USER" = "root" ] && [ ! -d "${M_QROOT}/${JAIL}/home/${_USER}" ] \
+			&& get_msg2 -Epm _e7
 		rm_errfiles	; trap '' HUP INT TERM QUIT EXIT
 
 		eval $_NORUN $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT"

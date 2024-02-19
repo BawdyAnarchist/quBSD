@@ -175,7 +175,7 @@ get_msg2() {
 	# Unified messaging function. Makes standard calls to individual script messages.
 	# NOTE: The reality is that the error message files could experience race conditions.
 
-	while getopts eEFm:quV opts ; do case $opts in
+	while getopts eEFm:pquV opts ; do case $opts in
 		e) local _exit="exit 0" ;;
 		E) local _exit="exit 1" ;;
 		F) local _force="true" ; unset _exit= ;;
@@ -196,12 +196,27 @@ get_msg2() {
 			if [ -z "$_force" ] ; then
 				# Place final ERROR message into a variable.
 				_ERROR="$(echo "ERROR: $_call" ; "$_msg" "$@" ; [ -s "$ERR1" ] && cat $ERR1)"
+				echo -e "$_ERROR\n" > $ERR2
+
+				# Determine if popup should be used or not
+				get_info _POPUP
 
 				# If exiting due to error, log the date and error message to the log file
 				[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QBLOG
 
 				# Send the error message
-				[ -z "$_q" ] && [ "$_ERROR" ] && echo "$_ERROR"
+				if [ -z "$_q" ] && [ "$_ERROR" ] && [ "$_popup" ] && [ "$_POPUP" ] ; then
+					if ps c | grep -qs 'i3' ; then
+						# If using i3, make the window float, and position it at center
+						xterm -e csh -c "i3-msg -q floating enable, move position center ; \
+							/bin/sh -c 'cat $ERR2; echo {Press any key to dismiss}; read _null'"
+					else # Just create a regular xterm
+						xterm -e csh -c \
+							"/bin/sh -c 'cat $ERR2; echo {Press any key to dismiss}; read _null'"
+					fi
+				else
+					echo "$_ERROR"
+				fi
 			fi ;;
 	esac
 
@@ -789,7 +804,7 @@ monitor_startstop() {
 
 		# Timeout has passed, kill qb-start/stop and cleanup files
 		get_msg -m _e33 -- "$0" "$_TIMEOUT"
-		for _pid in $(cat $_TMP_LOCK) ; do
+		[ -e "$_TMP_LOCK" ] && for _pid in $(cat $_TMP_LOCK) ; do
 			kill -15 $_pid > /dev/null 2>&1
 		done
 

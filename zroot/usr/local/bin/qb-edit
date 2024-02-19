@@ -57,7 +57,7 @@ checks() {
 		# Error if proposed entry already exists
 		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}[[:blank:]]*\$" $QMAP \
 																			&& get_msg2 $_q -em _m1
-	
+
 		if echo "$MULT_LN_PARAMS" | grep -Eqs "$PARAM" ; then
 			ACTION="add"
 

@@ -1,13 +1,5 @@
 
-Hardcore Review
-	qb-start ; qb-stop
-		- qb-start - still undecided on how to handle exit after all jails waterfall 
-
-POPUP error messages based on get_info POPUP and whether it's a situation that might warrant it
-	qb-cmd, qb-start, qb-stop, qb-i3-windows, qb-record, qb-stat
-
 chk_valid_ppt - we can try to change to a ppt device like the guy on the video for GPU passthru
-
 
 ### UPGRADES
 
@@ -69,8 +61,11 @@ qb-update - Update rootjails, create snapshots
 
 qb-backup - Add ssh option
 
-qb-stat - Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
+qb-stat
+	- Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
+	- Give a popup option that can be closed with any key (quickview kinda stuff)
 
+qb-i3-windows - popup option
 
 
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP

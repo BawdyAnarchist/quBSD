@@ -11,7 +11,7 @@ get_parameters() {
 }
 
 main() {
-	# Manual umount. fstab cant be referenced in jail.conf, since might be inside encrypt dataset
+	# Manual umount. fstab cant be referenced in jail.conf (might be inside encrypted dataset)
 	umount -aF ${M_ZUSR}/${JAIL}/rw/etc/fstab
 
 	# Search for any lingering mounts, and remove them as well

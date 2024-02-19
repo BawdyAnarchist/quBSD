@@ -6,10 +6,10 @@
 get_options() {
 	while getopts aAeE:hf:Frt: opts ; do case $opts in
 		a) _SOURCE="auto" ;;
-		A) [ "$_SOURCE" ]  && get_msg2 -Eum _e1 || _SOURCE="all" ;;
+		A) [ "$_SOURCE" ]  && get_msg2 -Epum _e1 || _SOURCE="all" ;;
 		e) _EXCLUDE="true" ;;
-		E) [ "$_EXCLUDE" ] && get_msg2 -Eum _e2 || _EXFILE="${OPTARG}" ;;
-		f) [ "$_SOURCE" ]  && get_msg2 -Eum _e1 || _SOURCE="$OPTARG" ;;
+		E) [ "$_EXCLUDE" ] && get_msg2 -Epum _e2 || _EXFILE="${OPTARG}" ;;
+		f) [ "$_SOURCE" ]  && get_msg2 -Epum _e1 || _SOURCE="$OPTARG" ;;
 		F) FORCE="true" ;;
 		h) get_msg2 -eu ;;
 		r) _RESTART="true" ;;
@@ -20,7 +20,7 @@ get_options() {
 	# This makes it so that _POSPARAMS has one parameter per line
 	_POSPARAMS=$(printf '%s\n' "$@" | uniq)
 
-	# Trap function important for keeping the lock, timeout, and coordination files clean 
+	# Trap function important for keeping the lock, timeout, and coordination files clean
 	trap "cleanup_trapped ; rm_errfiles" INT TERM HUP QUIT EXIT
 
 	_TMP_LOCK="${QTMP}/.qb-startstop_lock"
@@ -33,10 +33,10 @@ get_options() {
 
 checks() {
 	# Check validity of TIMEOUT
-	[ "$_TIMEOUT" ] && ! chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" && get_msg2 -Em _e5
+	[ "$_TIMEOUT" ] && ! chk_integer -g 5 -l 600 -q -- "$_TIMEOUT" && get_msg2 -Epm _e5
 
    # Ping check if qb-stop may continue, get placed in queue, or exit if timeout happens
-	monitor_startstop -p || get_msg2 -Em _e0
+	monitor_startstop -p || get_msg2 -Epm _e0
 }
 
 echo_grep() {
@@ -49,7 +49,7 @@ climb_hierarchy() {
 	# hierarchy path is resolved recursively, and as it unwinds at the end, _starts are tallied
 
 	# Prevent infinite loop. Unlikely to be 10 gateways; more likely circular reference
-	[ "$_depth" -gt 10 ] && get_msg2 -Em _e3
+	[ "$_depth" -gt 10 ] && get_msg2 -Epm _e3
 	_depth=$(( _depth + 1 ))
 
 	# _JAIL gateway path was already handled. Skip further checks.
@@ -172,7 +172,7 @@ main() {
 		_depth=0 ; _stops=0
 		climb_hierarchy "$_jail"
 
-		# Coordinate ROOTENV and TEMPLATE snapshots to avoid races in reclone functions 
+		# Coordinate ROOTENV and TEMPLATE snapshots to avoid races in reclone functions
 		_rootenv=$(get_jail_parameter -eq ROOTENV $_jail)
 		! echo_grep "$_ROOTENVS" "$_rootenv" && _ROOTENVS="$_ROOTENVS $_rootenv"
 	done
@@ -180,7 +180,7 @@ main() {
 	# Record the coordinated snapshot for each ROOTENV to tmpsnaps
 	for _rootenv in $_ROOTENVS ; do
 		select_snapshot >> $_TMP_SNAPS
-	done  
+	done
 
 	# Set and/or cleanup variables from the climb_hierarcy loop
 	_HIERTOP=$(echo "$_HIERTOP" | sort | uniq)
@@ -199,7 +199,7 @@ main() {
 	done
 
 	# STARTS keeps track of the number of hiearchy leves. If 0, there was nothing to stop
-	[ "$_STOPS" = 0 ] && get_msg2 -em _m3
+	[ "$_STOPS" = 0 ] && get_msg2 -epm _m3
 
 	# User specified timeout, or 5 secs for every hierarchy level
 	monitor_startstop "${_TIMEOUT:=$(( _STOPS * 10 ))}" &

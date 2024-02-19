@@ -18,11 +18,11 @@ get_options() {
 checks() {
 	# Ensure the volume was 0-100 inclusive
 	if [ -n "$_VOL" ] ; then
-		echo "$_VOL" | grep -Eq "^([1-9][0-9]|100)$" || get_msg2 -Em _e2
+		echo "$_VOL" | grep -Eq "^([1-9][0-9]|100)$" || get_msg2 -Epm _e2
 	fi
 
 	if [ -n "$JAIL" ] ; then
-		chk_isrunning $JAIL || get_msg2 -Em _e3
+		chk_isrunning $JAIL || get_msg2 -Epm _e3
 		UNHIDE=$(grep "devfsrules_qubsd_webcamd" /etc/devfs.rules | grep -Eo "[[:digit:]]")
 		HIDE=$(grep "devfsrules_guijail" /etc/devfs.rules | grep -Eo "[[:digit:]]")
 	fi

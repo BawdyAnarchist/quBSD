@@ -28,8 +28,12 @@ Jail-A has Jail-B as gateway,
 ENDOFMSG
 		;;
 	_e4) cat << ENDOFMSG
-< $_JAIL > failed to start.
+< $_JAIL > failed to start. It serves these clients (also not started):
 ENDOFMSG
+		get_info _CLIENTS "$_JAIL"
+		for _client in $_CLIENTS ; do
+			echo_grep "$_client" "$_JLIST" && echo $_client
+		done
 		;;
 	_e5) cat << ENDOFMSG
 [-t <timeout>] must be integer from 5 to 600.
@@ -41,7 +45,7 @@ qb-start:  All jails/VMs were already running. No action to take.
 ENDOFMSG
 		;;
 	_m1) cat << ENDOFMSG
-qb-start:  All jails/VMs were launched. 
+qb-start has finished
 ENDOFMSG
 		;;
 	usage) cat << ENDOFUSAGE
