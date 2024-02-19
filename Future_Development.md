@@ -1,16 +1,7 @@
 
-EPHM-message didnt remove the errfiles
-
 Hardcore Review
 	qb-start ; qb-stop
-		- parallel start_jail calls with error messages
 		- qb-start - still undecided on how to handle exit after all jails waterfall 
-	monitor_startstop
-
-- Probably the kill -15 -- -$$ line needs to directly remove all TMP files, and kill the next PID in queue (all pids in the TMP file).
-
-	exec_vm_start (particularly the start and error messages)
-	launch_vm
 
 POPUP error messages based on get_info POPUP and whether it's a situation that might warrant it
 	qb-cmd, qb-start, qb-stop, qb-i3-windows, qb-record, qb-stat
