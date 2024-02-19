@@ -317,10 +317,6 @@ ENDOFMSG
 ALERT: Assigning IP to < $2 > which has no gateway.
 ENDOFMSG
 	;;
-	_m8) cat << ENDOFMSG
-   quBSD msg: VM < $1 > has successfully shutdown.
-ENDOFMSG
-	;;
 	_m9) cat << ENDOFMSG
 ALERT: < $1 > diverges from quBSD convention.
        See table below for typical assignments.

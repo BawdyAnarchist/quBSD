@@ -52,15 +52,16 @@ create_newjail() {
 	trap 'destroy_ephemeral ; rm_errfiles' INT TERM HUP QUIT EXIT
 
 	# Create dispjail and disable the no_destroy protection
-	qb-create -y -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false -p AUTOSNAP=false \
-														-c dispjail -t $JAIL $NEWJAIL > /dev/null 2>&1
+	/usr/local/bin/qb-create -y -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false \
+		-p AUTOSNAP=false -c dispjail -t $JAIL $NEWJAIL > /dev/null 2>&1
 }
 
 run_command() {
 
 	if [ -n "$_i3wm" ] ; then
 		# i3-specific command. Launch a floating terminal for the dispjail (ephemeral jail)
-		xterm -e csh -c "i3-msg -q floating enable, move position center; qb-cmd $NEWJAIL"
+		xterm -e csh -c \
+			"i3-msg -q floating enable, move position center; /usr/local/bin/qb-cmd $NEWJAIL"
 	else
 
 		# Can be called without i3 as well.

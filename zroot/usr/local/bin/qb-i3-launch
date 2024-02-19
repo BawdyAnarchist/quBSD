@@ -36,21 +36,22 @@ parse_config() {
 	sed -i '' -e "/^$/ d ; /^[[:blank:]]*#.*/ d" $CONF
 
 	# Get all running windows. Adds "WORKSPACE" at bottom, to simplify sed command later on).
-	WINDS=$(qb-i3-windows| sed "s/Jail://g" | sed "$ a\\
+	WINDS=$(/usr/local/bin/qb-i3-windows| sed "s/Jail://g" | sed "$ a\\
 WORKSPACE")
 }
 
 qb_start_jails() {
 
 	# Create a popup so user can monitor jail starts, then remove it later
-	xterm -fs 12 -e csh -c 'i3-msg floating enable , resize set height 1000 ; qb-stat' &
+	xterm -fs 12 -e csh -c \
+		'i3-msg floating enable , resize set height 1000 ; /usr/local/bin/qb-stat' &
 	_pid_stat="$!"
 
 	# Remove host and NO_WINDOW lines, and save to tmp file
 	grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}' | uniq > $JAILS
 
 	# Turn on any jails not started
-	qb-start -f $JAILS $_TIMEOUT > /dev/null 2>&1 || get_msg2 -Em _e3
+	/usr/local/bin/qb-start -f $JAILS $_TIMEOUT > /dev/null 2>&1 || get_msg2 -Em _e3
 
 	# Remove the temporary monitoring popup
 	kill -15 $_pid_stat
@@ -113,7 +114,7 @@ execute_commands() {
 		;;
 		*)
 			# Execute the command provided
-			eval "qb-cmd $_LOC $_CMD"
+			eval "/usr/local/bin/qb-cmd $_LOC $_CMD"
 
 			# A bit dirty, but it eliminates interference with the eval above
 			[ "$?" = "0" ] && wait_for_window

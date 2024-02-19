@@ -37,10 +37,12 @@ check_zbackup() {
 determine_datasets() {
 	case $MODE in
 		auto) # Backup datasets selected as "auto" in QMAP
-			_JAILS=$(qb-list -Hp BACKUP | grep -Ev "^#" | awk '/.*true$/{print $1}')
+			_JAILS=$(/usr/local/bin/qb-list -Hp BACKUP | grep -Ev "^#" | awk '/.*true$/{print $1}')
 			for _jail in $_JAILS ; do
-				[ -z "$DATASETS" ] && DATASETS=$(qb-list -HZ $_jail | awk '{print $1}') \
-					|| DATASETS=$(echo "$DATASETS" ; qb-list -HZ $_jail | awk '{print $1}')
+				[ -z "$DATASETS" ] \
+					&& DATASETS=$(/usr/local/bin/qb-list -HZ $_jail | awk '{print $1}') \
+					|| DATASETS=$(echo "$DATASETS" \
+						; /usr/local/bin/qb-list -HZ $_jail | awk '{print $1}')
 			done
 			;;
 		all)  # Backup all zroot/qubsd and zusr datasets. Default is [-r] (recurse not Replicate)

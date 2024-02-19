@@ -28,12 +28,12 @@ main() {
 
 		if [ -z "$_i3wm" ] ; then
 			# New xterm window to receive command
-			xterm -e csh -c "/bin/csh -c 'qb-floatcmd -x $JAIL'"
+			xterm -e csh -c "/bin/csh -c '/usr/local/bin/qb-floatcmd -x $JAIL'"
 
 		else
 			# i3wm option for floating xterm
 			xterm -e csh -c "i3-msg -q floating enable, move position center; \
-						/bin/csh -c 'qb-floatcmd -x $JAIL'"
+						/bin/csh -c '/usr/local/bin/qb-floatcmd -x $JAIL'"
 		fi
 
 	else
@@ -46,7 +46,7 @@ main() {
 		read _CMD
 
 		# nohup is required, or the launched command will die with the xterm shell
-		nohup qb-cmd $ROOT $JAIL $_CMD > /dev/null
+		nohup /usr/local/bin/qb-cmd $ROOT $JAIL $_CMD > /dev/null
 	fi
 }
 

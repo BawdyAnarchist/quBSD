@@ -635,7 +635,7 @@ guided_mode() {
 
 launch_install() {
 	# Launch the vm to a detached process
-	exec qb-cmd $NEWJAIL
+	exec /usr/local/bin/qb-cmd $NEWJAIL
 }
 
 cleanup_finished() {

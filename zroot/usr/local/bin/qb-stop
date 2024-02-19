@@ -208,7 +208,7 @@ main() {
 	# Wait for stops to finish. If TIMEOUT, monitor_startstop will kill -15 this script
 	ps -p $_WF_PIDS > /dev/null 2>&1 && wait $_WF_PIDS && get_msg2 -m _m2
 
-	[ "$_RESTART" ] && cleanup_trapped && rm_errfiles && exec qb-start "$_JLIST"
+	[ "$_RESTART" ] && cleanup_trapped && rm_errfiles && exec /usr/local/bin/qb-start "$_JLIST"
 }
 
 get_global_variables

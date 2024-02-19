@@ -173,8 +173,8 @@ handle_if_off() {
 	# Modify seclvl to -1. Trap and restore original if exit before finish
 	# If we're only turning on the jail to LIST its connection, don't mod seclvl
 	if [ "$SEC_orig" -ge 0 ] && [ -z "$LIST" ] ; then
-		trap 'qb-edit -qf $JAIL SECLVL $SEC_orig ; exit 0' INT TERM HUP QUIT EXIT
-		qb-edit -fq $JAIL SECLVL -1
+		trap '/usr/local/bin/qb-edit -qf $JAIL SECLVL $SEC_orig ; exit 0' INT TERM HUP QUIT EXIT
+		/usr/local/bin/qb-edit -fq $JAIL SECLVL -1
 	fi
 
 	start_jail "$JAIL" || msg_ivpn -Em _1
@@ -357,7 +357,7 @@ main() {
 		cp /usr/local/bin/qb-ivpn "${M_QROOT}/${JAIL}/usr/local/bin/qb-ivpn"
 
 		# Re-run script in jail to modify ivpn
-		jexec -l -U root $JAIL qb-ivpn -x -p $PORT
+		jexec -l -U root $JAIL /usr/local/bin/qb-ivpn -x -p $PORT
 
 		# The flags applied somehow still prevent moving until jail is stopped.
 		stop_jail "$JAIL"

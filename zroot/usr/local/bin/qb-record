@@ -74,7 +74,7 @@ toggle_service() {
 				# Must bring down flags to make changes to pwdb, then bring flags up again
 				chflags -R noschg ${M_QROOT}/${JAIL}/etc
 				jexec -l -U root $JAIL pw groupmod -n $_device -m 1001
-				qb-flags -r $JAIL
+				/usr/local/bin/qb-flags -r $JAIL
 			;;
 		esac
 	fi

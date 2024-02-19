@@ -14,14 +14,6 @@ POPUP error messages based on get_info POPUP and whether it's a situation that m
 chk_valid_ppt - we can try to change to a ppt device like the guy on the video for GPU passthru
 
 
-### Problems discovered during error message retooling
- 
-ERROR: The combination of < DEVFS_RULE > <  > was not found in QMAP.
-qb-ephm is starting < EPHM-message >
-
-It seems like exec.created sed might not be modifiable? Due to dynamic link?
-
-
 ### UPGRADES
 
 GUI SECURITY

@@ -44,11 +44,11 @@ checks_and_variables() {
 
 rename_common() {
 	# Stop all jails before renaming. Rename should not happen if stops fails
-	qb-stop "$JAIL $_RESTARTS" > /dev/null 2>&1 || get_msg2 -Em _e1
+	/usr/local/bin/qb-stop "$JAIL $_RESTARTS" > /dev/null 2>&1 || get_msg2 -Em _e1
 
 	# Modify qmap. Roojails should update their own rootjail to self
 	sed -i '' -E "s/^${JAIL}[[:blank:]]/${NEWNAME}  /g" $QMAP
-	[ "$JAIL" = "$ROOTENV" ] && qb-edit -fq ${NEWNAME} ${ROOTENV} ${NEWNAME}
+	[ "$JAIL" = "$ROOTENV" ] && /usr/local/bin/qb-edit -fq ${NEWNAME} ${ROOTENV} ${NEWNAME}
 
 	# Rename associated zfs datasets
 	chk_valid_zfs ${U_ZFS}/${JAIL} \
@@ -84,15 +84,15 @@ rename_jail() {
 update_dependencies() {
 
 	for _jail in $ROOT_FOR ; do
-		[ "$_jail" = "$JAIL" ] || qb-edit -fq $_jail $ROOTENV $NEWNAME
+		[ "$_jail" = "$JAIL" ] || /usr/local/bin/qb-edit -fq $_jail $ROOTENV $NEWNAME
 	done
 
 	for _jail in $TEMPL_FOR ; do
-		qb-edit -fq $_jail TEMPLATE $NEWNAME
+		/usr/local/bin/qb-edit -fq $_jail TEMPLATE $NEWNAME
 	done
 
 	for _jail in $_CLIENTS ; do
-		qb-edit -fq $_jail GATEWAY $NEWNAME
+		/usr/local/bin/qb-edit -fq $_jail GATEWAY $NEWNAME
 	done
 }
 
@@ -113,8 +113,8 @@ main() {
 	get_msg2 _m3
 
 	# Restart all jails that were stopped. Have to change the RESTART list with NEWNAME
-	[ -n "$_RESTARTS" ] && get_msg2 _m4 \
-				&& qb-start "$(echo $_RESTARTS | sed "s/${JAIL}[[:blank:]]*\$/${NEWNAME}/")"
+	[ -n "$_RESTARTS" ] && get_msg2 _m4 && /usr/local/bin/qb-start \
+		"$(echo $_RESTARTS | sed "s/${JAIL}[[:blank:]]*\$/${NEWNAME}/")"
 }
 
 get_global_variables

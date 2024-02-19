@@ -479,7 +479,7 @@ start_jail() {
 
 			# Jail or VM
 			if chk_isvm "$_jail" ; then
-				! eval exec_vm_coordinator $_norun $_qs $_jail $_quiet \
+				! exec_vm_coordinator $_norun $_qs $_jail $_quiet \
 					&& get_msg $_qs -m _e4 -- "$_jail" && eval $_R1
 			else
 				[ "$_norun" ] && return 0
@@ -756,7 +756,7 @@ copy_control_keys() {
 		chflags -R schg ${M_QROOT}/${_client}/home/${_client}/.ssh
 	fi
 
-	[ "$_flags" ] && qb-flags -r $_client &
+	[ "$_flags" ] && /usr/local/bin/qb-flags -r $_client &
 	eval $_R0
 }
 
@@ -1919,7 +1919,7 @@ connect_gateway_to_clients() {
 
 				# Restart _client pf service. Restore flags with qb-flags -r (we dont know seclvl here)
 				jexec -l -U root "$_client" service pf restart > /dev/null 2>&1
-				qb-flags -r $_client > /dev/null 2>&1 &
+				/usr/local/bin/qb-flags -r $_client > /dev/null 2>&1 &
 		fi fi
 	done
 	eval $_R0
@@ -1936,11 +1936,10 @@ cleanup_vm() {
 	local _fn="cleanup_vm" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
 	# Positional params and func variables.
-	while getopts nqVx opts ; do case $opts in
+	while getopts nqV opts ; do case $opts in
 			n) local _norun="-n" ;;
 			q) local _qcv="-q" ;;
 			V) local _V="-V" ;;
-			x) local _exit="true" ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Positional variables
@@ -1980,11 +1979,9 @@ cleanup_vm() {
 	# Destroy the dataset
 	reclone_zroot -q "$_VM" "$_rootenv"
 
-	# Remove the /tmp file
+	# Remove the /tmp files
 	rm "${QTMP}/qb-bhyve_${_VM}" 2> /dev/null
-
-	# If called with [-x] send an exit message and run exit 0
-	[ -n "$_exit" ] && get_msg -m _m8 -- "$_VM" && exit 0
+	rm_errfiles
 	eval $_R0
 }
 
@@ -2126,8 +2123,8 @@ EOF
 	fi
 
 	# Launch a serial port if tmux is set in QMAP. The \" and TMUX2 closing " are intentional.
-	[ "$_tmux" = "true" ] && _STDIO="-l com1,stdio" && _TMUX1="tmux new-session -d -s $_VM \"" \
-		&& _TMUX2='"'
+	[ "$_tmux" = "true" ] && _STDIO="-l com1,stdio" \
+		&& _TMUX1="/usr/local/bin/tmux new-session -d -s $_VM \"" && _TMUX2='"'
 
 	# Invoke the trap function for VM cleanup, in case of any errors after modifying host/trackers
 	trap "cleanup_vm -n $_VM ; exit 0" INT TERM HUP QUIT
@@ -2175,6 +2172,7 @@ launch_vm() {
 	# To ensure VM is completely detached from caller AND trapped after finish, a /tmp script runs
 	# the launch and monitoring. qb-start/stop can only have one instance running (for race/safety)
 	# but VMs launched by qb-start would otherwise persist in the process list with the VM.
+
 	local _fn="launch_vm" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
 	# Send the commands to a temp file
@@ -2184,23 +2182,26 @@ launch_vm() {
 		# New script wont know about caller functions. Need to source them again
 		. /usr/local/lib/quBSD/quBSD.sh
 		. /usr/local/lib/quBSD/msg-quBSD.sh
+
+		# Get globals, although errfiles arent needed
 		get_global_variables
+		rm_errfiles
 
 		# Create trap for post VM exit
-		trap "cleanup_vm -x $_VM $_rootenv ; exit 0" INT TERM HUP QUIT EXIT
+		trap "cleanup_vm $_VM $_rootenv ; exit 0" INT TERM HUP QUIT EXIT
 
 		# Log the exact bhyve command being run
-		echo "$(date "+%Y-%m-%d_%H:%M") Starting VM: $_VM" | tee -a $QBLOG ${QBLOG}_${_VM}
+		echo "\$(date "+%Y-%m-%d_%H:%M") Starting VM: $_VM" | tee -a $QBLOG ${QBLOG}_${_VM}
 		echo $_BHYVE_CMD >> ${QBLOG}_${_VM}
 
 		# Launch the VM to background
 		eval $_BHYVE_CMD
 
-		sleep 2
+		sleep 3
 
 		# Monitor the VM, perform cleanup after done
 		while pgrep -xfq "bhyve: $_VM" ; do sleep 1 ; done
-		echo "$(date "+%Y-%m-%d_%H:%M") VM HAS BEEN SHUTDOWN: $_VM" | tee -a $QBLOG ${QBLOG}_${_VM}
+		echo "\$(date "+%Y-%m-%d_%H:%M") VM: $_VM HAS ENDED." | tee -a $QBLOG ${QBLOG}_${_VM}
 ENDOFCMD
 
 	# Make the file executabel
@@ -2271,18 +2272,18 @@ exec_vm_coordinator() {
 
 	# Launch VM sent to background, so connections can be made (network, vnc, tmux)
 	get_msg -m _m1 -- "$_jail" | tee -a $QBLOG ${QBLOG}_${_VM}
-	eval launch_vm $_quiet &
+	launch_vm $_quiet &
 
 	# Monitor to make sure that the bhyve command started running, then return 0
-	_count=0 ; sleep .5
+	local _count=0 ; sleep .5
+
 	while ! { pgrep -xfq "bhyve: $_VM" \
 				|| pgrep -fl "bhyve" | grep -Eqs "^[[:digit:]]+ .* ${_VM}[[:blank:]]*\$" ;} ; do
-		sleep .5 ; _count=$(( _count + 1 ))
-		[ "$_count" -ge 6 ] && get_msg -m _e4_1 -- "$_VM" && eval $_R1
+	sleep .5 ; _count=$(( _count + 1 ))
+	[ "$_count" -ge 6 ] && get_msg -m _e4_1 -- "$_VM" && eval $_R1
 	done
 
 	finish_vm_connections &
-
 	eval $_R0
 }
 
