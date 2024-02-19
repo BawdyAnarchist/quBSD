@@ -17,6 +17,9 @@ qb_cleanup_start() {
 	# Source the global variables
 	get_global_variables
 
+	# Dont need the trap set by get_global_variables, coz we're removing /tmp/qubsd
+	trap '' HUP INT TERM QUIT EXIT
+
 	cleanup_files
 
 	cleanup_disps
@@ -24,11 +27,11 @@ qb_cleanup_start() {
 
 cleanup_files() {
 	# Remove and replace the quBSD /tmp directory
-	rm /tmp/quBSD > /dev/null 2>&1
+	rm -r /tmp/quBSD > /dev/null 2>&1
 	mkdir /tmp/quBSD > /dev/null 2>&1
 
 	# Empty the contents of the quBSD log directory
-	rm $(dirname $QBLOG)/* > /dev/null 2>&1
+	rm -r $(dirname $QBLOG) > /dev/null 2>&1
 	
 	# Make sure the directory exists
 	mkdir -p $(dirname $QBLOG) > /dev/null 2>&1
