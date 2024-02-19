@@ -199,7 +199,7 @@ get_msg2() {
 
 				# If exiting due to error, log the date and error message to the log file
 				[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QBLOG
-			
+
 				# Send the error message
 				[ -z "$_q" ] && [ "$_ERROR" ] && echo "$_ERROR"
 			fi ;;
@@ -586,12 +586,12 @@ reclone_zroot() {
 	chk_valid_zfs "$_jailzfs" && [ "$(zfs list -Ho origin $_jailzfs)" = "-" ] \
 		&& get_msg $_qz -m _e32 -- "$_jail" && eval $_R1
 
-	# Parallel starts create race conditions for zfs snapshot access/comparison. This deconflicts it. 
+	# Parallel starts create race conditions for zfs snapshot access/comparison. This deconflicts it.
 	# Use _tmpsnaps if avail. Else, find/create latest rootenv snapshot.
 	[ -e "$_tmpsnaps" ] \
 		&& _rootsnap=$(grep -Eo "^${R_ZFS}/${_rootenv}@.*" $_tmpsnaps) \
 		|| { ! _rootsnap=$(select_snapshot) && get_msg $_qz $_V -m '' && eval $_R1 ;}
-	
+
    # Destroy the dataset and reclone it
 	zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1
 	zfs clone -o qubsd:autosnap='false' "${_rootsnap}" ${_jailzfs}
@@ -695,7 +695,7 @@ select_snapshot() {
 		_rootsnap=$(echo "$_rootsnaps" | tail -1)
 		[ -z "$_rootsnap" ] && get_msg $_qz -m _e32_1 -- "$_jail" "$_rootenv" && eval $_R1
 
-	# Latest ROOTENV snapshot unimportant for stops, and prefer not to clutter ROOTENV snaps. 
+	# Latest ROOTENV snapshot unimportant for stops, and prefer not to clutter ROOTENV snaps.
 	elif [ -z "${0##*exec-prepare}" ] || [ -z "${0##*qb-stop}" ] ; then
 		# The jail is running, meaning there's a ROOTENV snapshot available (no error/chks needed)
 		local _rootsnap=$(zfs list -t snapshot -Ho name $_rootzfs | tail -1)
@@ -769,7 +769,7 @@ monitor_startstop() {
 	local _fn="monitor_startstop" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
 	while getopts pqV _opts ; do case $_opts in
-		p) _ping="true" ;;
+		p) local _ping="true" ;;
 		q) local _q='-q' ;;
 		V) local _V="-V" ;;
 	esac ; done ; shift $(( OPTIND - 1))
@@ -789,7 +789,12 @@ monitor_startstop() {
 
 		# Timeout has passed, kill qb-start/stop and cleanup files
 		get_msg -m _e33 -- "$0" "$_TIMEOUT"
-		kill -15 --	-$$
+		for _pid in $(cat $_TMP_LOCK) ; do
+			kill -15 $_pid > /dev/null 2>&1
+		done
+
+		# Probably overkill, but just a backup in case the PID wasn't listed in the lock file
+		kill -15 -- -$$ > /dev/null 2>&1
 	fi
 
 	# Handle the [-p] ping case
@@ -2268,7 +2273,7 @@ exec_vm_coordinator() {
 
 	# Start upstream jails/VMs, as well as control jail
 	start_jail -q $_control
-	! start_jail $_gateway && eval $_R1 
+	! start_jail $_gateway && eval $_R1
 
 	# Launch VM sent to background, so connections can be made (network, vnc, tmux)
 	get_msg -m _m1 -- "$_jail" | tee -a $QBLOG ${QBLOG}_${_VM}

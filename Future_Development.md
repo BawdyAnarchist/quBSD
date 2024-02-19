@@ -1,10 +1,14 @@
 
+EPHM-message didnt remove the errfiles
+
 Hardcore Review
 	qb-start ; qb-stop
 		- parallel start_jail calls with error messages
 		- qb-start - still undecided on how to handle exit after all jails waterfall 
 	monitor_startstop
-		- Probably the kill -15 -- -$$ line needs to directly remove all TMP files, and kill the next PID in queue (all pids in the TMP file).
+
+- Probably the kill -15 -- -$$ line needs to directly remove all TMP files, and kill the next PID in queue (all pids in the TMP file).
+
 	exec_vm_start (particularly the start and error messages)
 	launch_vm
 
@@ -67,7 +71,6 @@ qb-pci
 	- Show what was is currently passthrough'd
 
 qb-list [-e] (evaluate) option to check jail-param combos for validity.
-	- devfs_rule not showing well with summoned
 
 qb-ephm - Clone from zroot too. Tricky, because of "reclone_zroot" operation in exec.prepare 
 
@@ -80,15 +83,6 @@ qb-stat - Change hardcoded to more flexible setup: config file, col selector, RA
 
 
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP
-
-Networking is still dicey. Hit and miss. Sometimes works, other times doesnt.
-	- Might need to write daemons for dhclient and dhcpd servers
-	- I notice it comes up fine if all jails have already started before startx (and qb-start -a). Maybe it's double running qb-start -a that's the problem)
-
-zusr fstabs
-	- They're hand jammed, but maybe qb-edit should come with a function for changing the zfs dataset and mounts
-	- This should probably also change the fstabs? 
-	- Really maybe a bit unnecessary, but maybe do it later
 
 Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file and code.
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
