@@ -49,7 +49,7 @@ create_newjail() {
 	zfs snapshot $NEWSNAP
 
 	# Trap destroy snapshot and anything else that might exist after qb-create
-	trap 'destroy_ephemeral ; rm_errfiles' INT TERM HUP QUIT EXIT
+	trap 'destroy_ephemeral' INT TERM HUP QUIT EXIT
 
 	# Create dispjail and disable the no_destroy protection
 	/usr/local/bin/qb-create -y -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false \
@@ -88,10 +88,11 @@ monitor_ephm_windows() {
 		sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QMAP
 		sed -i '' -E "\\@${NEWJAIL}[[:blank:]]*\\{@,\\@^[[:blank:]]*\\}[[:blank:]]*\\\$@d" $JCONF
 		rm "${QTMP}/qb-${NEWJAIL}" > /dev/null 2>&1
+		rm_errfiles
 		exit 0
 	}
 
-	trap 'destroy_ephemeral ; rm_errfiles' INT TERM HUP QUIT EXIT
+	trap 'destroy_ephemeral' INT TERM HUP QUIT EXIT
 
 	# X11 windows can take a moment launch. Ineligant solution, but wait 3 secs before check-loop
 	sleep 3
@@ -116,6 +117,7 @@ destroy_ephemeral() {
 	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QMAP
 	sed -i '' -E "\@${NEWJAIL}[[:blank:]]*\{@,\@^[[:blank:]]*\}[[:blank:]]*\$@d" $JCONF
 	rm "${QTMP}/qb-ephm_${NEWJAIL}" > /dev/null 2>&1
+	rm_errfiles
 	exit 0
 }
 
