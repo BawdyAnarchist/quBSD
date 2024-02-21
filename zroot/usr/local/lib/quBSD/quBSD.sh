@@ -24,29 +24,30 @@
 ###################  VARIABLE ASSIGNMENTS and VALUE RETRIEVAL  #####################
 # get_global_variables - File names/locations ; ZFS datasets
 # get_networking_variables - pf.conf ; wireguard ; endpoints
-# rm_errfiles         - Removes the coordinated error files for qb-scripts
-# get_parameter_lists - Valid parameters are tracked here, and divided into groups
-# get_user_response   - Simple yes/no y/n checker
-# get_jail_parameter  - All QMAP entries, along with sanity checks
-# get_info            - Info beyond that just for jails or jail parameters
-	# _CLIENTS         - All jails that <jail> serves a network connection
-	# _ONJAILS         - All currently running jails
-	# _USED_IPS        - All IPs used by currently running jails
-	# _XID             - Window ID for the currently active X window
-	# _XJAIL           - Jailname (or 'host') for the currently active X window
-	# _XNAME           - Name of the process for the current active X window
-	# _XPID            - PID for the currently active X window
-# compile_jlist       - Used for qb-start/stop, to get list of jails to act on
+# rm_errfiles          - Removes the coordinated error files for qb-scripts
+# get_parameter_lists  - Valid parameters are tracked here, and divided into groups
+# get_user_response    - Simple yes/no y/n checker
+# get_jail_parameter   - All QMAP entries, along with sanity checks
+# get_info             - Info beyond that just for jails or jail parameters
+	# _CLIENTS          - All jails that <jail> serves a network connection
+	# _ONJAILS          - All currently running jails
+	# _USED_IPS         - All IPs used by currently running jails
+	# _XID              - Window ID for the currently active X window
+	# _XJAIL            - Jailname (or 'host') for the currently active X window
+	# _XNAME            - Name of the process for the current active X window
+	# _XPID             - PID for the currently active X window
+# compile_jlist        - Used for qb-start/stop, to get list of jails to act on
 
 ############################  JAIL HANDLING / ACTIONS  #############################
-# start_jail          - Performs checks before starting, creates log
-# stop_jail           - Performs checks before starting, creates log
-# restart_jail        - Self explanatory
-# reclone_zroot       - Destroys and reclones jails dependent on ROOTENV
-# reclone_zusr        - Destroy and reclones jails with zusr dependency (dispjails)
-# select_snapshot     - Find/create ROOTENV snapshot for reclone.
-# copy_control_keys   - SSH keys for control jail are copied over to running env.
-# monitor_startstop   - Monitors whether qb-start or qb-stop is still alive
+# start_jail           - Performs checks before starting, creates log
+# stop_jail            - Performs checks before starting, creates log
+# restart_jail         - Self explanatory
+# reclone_zroot        - Destroys and reclones jails dependent on ROOTENV
+# reclone_zusr         - Destroy and reclones jails with zusr dependency (dispjails)
+# select_snapshot      - Find/create ROOTENV snapshot for reclone.
+# copy_control_keys    - SSH keys for control jail are copied over to running env.
+# return_ppt           - Set PPT devices back to original state before VM launch.
+# monitor_startstop    - Monitors whether qb-start or qb-stop is still alive
 
 #################################  STATUS  CHECKS  #################################
 # chk_isblank          - Posix workaround: Variable is [-z <null> OR [[:blank:]]*]
@@ -735,6 +736,55 @@ select_snapshot() {
 
 	# Echo the final value and return 0
 	echo "$_rootsnap" && eval $_R0
+}
+
+return_ppt() {
+	# After VM completion, put PPT devices back to original state (as specified in loader.conf)
+	local _fn="return_ppt" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	while getopts qV _opts ; do case $_opts in
+		q) local _q='-q' ;;
+		V) local _V="-V" ;;
+	esac ; done ; shift $(( OPTIND - 1))
+
+	local _VM="$1"
+	[ -z "$_VM" ] && get_msg $_q -m _e0 -- "VM name" && eval $_R1
+
+	# Get PPT devices from the actual bhyve command that was launched for the VM
+	_bhyvecmd=$(tail -1 "${QBLOG}_${_VM}")
+	while : ; do
+		_newppt=$(echo "$_bhyvecmd" | sed -En "s@.*passthru,([0-9/]+[0-9/]+[0-9/]+ ).*@\1@p")
+		[ -z "$_newppt" ] && break
+		_ppt=$(echo "$_ppt $_newppt")
+		_bhyvecmd=$(echo "$_bhyvecmd" | sed -E "s@$_newppt@@")
+	done
+
+	# If there were any _ppt values, reset them to their state before VM launch
+	_pciconf=$(pciconf -l | awk '{print $1}')
+	for _val in $_ppt ; do
+		# convert _val to native pciconf format with :colon: instead of /fwdslash/
+		_val2=$(echo "$_val" | sed "s#/#:#g")
+
+		# Search for the individual device and specific device for devctl functions later
+		_pciline=$(echo "$_pciconf" | grep -Eo ".*${_val2}")
+		_pcidev=$(echo "$_pciline" | grep -Eo "pci.*${_val2}")
+
+		# PCI device doesnt exist on the machine
+		[ -z "$_pciline" ] && get_msg $_q -m _e22 -- "$_val" "PPT" \
+			&& get_msg -Vpm _e1 -- "$_val" "PPT" && eval $_R1
+
+		# If the device isnt listed in loader.conf, then return it to host
+		if ! grep -Eqs "pptdevs=.*${_val}" /boot/loader.conf ; then
+			# Detach the PCI device, and examine the error message
+			_dtchmsg=$(devctl detach "$_pcidev" 2>&1)
+			[ -n "${_dtchmsg##*not configured}" ] && get_msg -m _e22_1 -- "$_pcidev" \
+				&& get_msg -Vpm _w5 -- "$_pcidev"
+
+			# Clear the driver returns it back to the host driver (unless it booted as ppt)
+			! devctl clear driver $_pcidev && get_msg -Vpm _w5 -- "$_pcidev" && eval $_R1
+		fi
+	done
+	eval $_R0
 }
 
 copy_control_keys() {
@@ -1476,55 +1526,6 @@ chk_valid_ppt() {
 	eval $_R0
 }
 
-return_ppt() {
-	# After VM completion, put PPT devices back to original state (as specified in loader.conf)
-	local _fn="return_ppt" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	while getopts qV _opts ; do case $_opts in
-		q) local _q='-q' ;;
-		V) local _V="-V" ;;
-	esac ; done ; shift $(( OPTIND - 1))
-
-	local _VM="$1"
-	[ -z "$_VM" ] && get_msg $_q -m _e0 -- "VM name" && eval $_R1
-
-	# Get PPT devices from the actual bhyve command that was launched for the VM
-	_bhyvecmd=$(tail -1 "${QBLOG}_${_VM}")
-	while : ; do
-		_newppt=$(echo "$_bhyvecmd" | sed -En "s@.*passthru,([0-9/]+[0-9/]+[0-9/]+ ).*@\1@p")
-		[ -z "$_newppt" ] && break
-		_ppt=$(echo "$_ppt $_newppt")
-		_bhyvecmd=$(echo "$_bhyvecmd" | sed -E "s@$_newppt@@")
-	done
-
-	# If there were any _ppt values, reset them to their state before VM launch
-	_pciconf=$(pciconf -l | awk '{print $1}')
-	for _val in $_ppt ; do
-		# convert _val to native pciconf format with :colon: instead of /fwdslash/
-		_val2=$(echo "$_val" | sed "s#/#:#g")
-
-		# Search for the individual device and specific device for devctl functions later
-		_pciline=$(echo "$_pciconf" | grep -Eo ".*${_val2}")
-		_pcidev=$(echo "$_pciline" | grep -Eo "pci.*${_val2}")
-
-		# PCI device doesnt exist on the machine
-		[ -z "$_pciline" ] && get_msg $_q -m _e22 -- "$_val" "PPT" \
-			&& get_msg -Vpm _e1 -- "$_val" "PPT" && eval $_R1
-
-		# If the device isnt listed in loader.conf, then return it to host
-		if ! grep -Eqs "pptdevs=.*${_val}" /boot/loader.conf ; then
-			# Detach the PCI device, and examine the error message
-			_dtchmsg=$(devctl detach "$_pcidev" 2>&1)
-			[ -n "${_dtchmsg##*not configured}" ] && get_msg -m _e22_1 -- "$_pcidev" \
-				&& get_msg -Vpm _w5 -- "$_pcidev"
-
-			# Clear the driver returns it back to the host driver (unless it booted as ppt)
-			! devctl clear driver $_pcidev && get_msg -Vpm _w5 -- "$_pcidev" && eval $_R1
-		fi
-	done
-	eval $_R0
-}
-
 chk_valid_rootenv() {
 	local _fn="chk_valid_rootenv" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
@@ -2011,7 +2012,6 @@ cleanup_vm() {
 
 	# Bring all recorded taps back to host, and destroy
 	for _tap in $(sed -E 's/ .*$//' "${QTMP}/vmtaps_${_VM}" 2> /dev/null) ; do
-
 		if [ -n "$_norun" ] ; then
 			ifconfig "$_tap" destroy 2> /dev/null
 			sed -i '' -E "/$_tap/d" ${QTMP}/control_netmap
@@ -2032,6 +2032,9 @@ cleanup_vm() {
 
 	# Destroy the VM
 	bhyvectl --vm="$_VM" --destroy > /dev/null 2>&1
+
+	# Set the PPT device back to its original state before VM prep/launch 
+	return_ppt "$_VM"
 
 	# If it was a norun, dont spend time recloning
 	[ -n "$_norun" ] && eval $_R0
@@ -2251,7 +2254,7 @@ launch_vm() {
 		rm_errfiles
 
 		# Create trap for post VM exit
-		trap "cleanup_vm $_VM $_rootenv ; return_ppt $_VM ; exit 0" INT TERM HUP QUIT EXIT
+		trap "cleanup_vm $_VM $_rootenv ; exit 0" INT TERM HUP QUIT EXIT
 
 		# Log the exact bhyve command being run
 		echo "\$(date "+%Y-%m-%d_%H:%M") Starting VM: $_VM" | tee -a $QBLOG ${QBLOG}_${_VM}
