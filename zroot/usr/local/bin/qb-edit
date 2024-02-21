@@ -44,7 +44,7 @@ checks() {
 		# Multi-line parameters receive a new line
 	if [ "$ACTION" = "delete" ] ; then
 		# Make sure that at least JAIL and PARAM exist
-		[ -n "$JAIL" ] && [ -n "$PARAM" ] || get_msg2 $_q -Eum _1
+		[ -n "$JAIL" ] && [ -n "$PARAM" ] || get_msg2 $_q -Eum _e0
 
 		# Make sure at least one line exists to delete
 		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QMAP \
@@ -52,9 +52,9 @@ checks() {
 
 	else
 		# Need all 3 parameters
-		{ [ -z "$JAIL" ] || [ -z "$PARAM" ] || [ -z "$VALUE" ] ;} && get_msg2 $_q -Eum _1
+		{ [ -z "$JAIL" ] || [ -z "$PARAM" ] || [ -z "$VALUE" ] ;} && get_msg2 $_q -Eum _e0
 
-		# Error if proposed entry already exists
+		# Exit if proposed entry already exists
 		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}[[:blank:]]*\$" $QMAP \
 																			&& get_msg2 $_q -em _m1
 
