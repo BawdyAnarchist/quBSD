@@ -1434,7 +1434,7 @@ chk_valid_ppt() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	_value="$1"
-	[ -z "$_value" ] && get_msg $_q -m _e0 -- "PPT (passthru)" && eval $_R1
+	[ -z "$_value" ] && get_msg $_q -m _e0 -- "PPT (passthru) device" && eval $_R1
 	[ "$_value" = "none" ] && eval $_R0
 
 	# Get list of pci devices on the machine
@@ -1451,7 +1451,7 @@ chk_valid_ppt() {
 		_pcidev=$(echo "$_pciline" | grep -Eo "pci.*${_val2}")
 
 		# PCI device doesnt exist on the machine
-		[ -z "$_pciline" ] && get_msg $_q -m _e22 -- "$_val" "PPT" \
+		[ -z "$_pciline" ] && get_msg $_q -m _e22_0 -- "$_val" "PPT" \
 			&& get_msg $_q -m _e1 -- "$_val" "PPT" && eval $_R1
 
 		# Extra set of checks for the PCI device, if it's about to be attached to a VM
@@ -1459,16 +1459,17 @@ chk_valid_ppt() {
 			# First detach the PCI device, and examine the error message
 			_dtchmsg=$(devctl detach "$_pcidev" 2>&1)
 			[ -n "${_dtchmsg##*not configured}" ] && get_msg $_q -m _e22_1 -- "$_pcidev" \
-					&& get_msg $_q -m _e1 -- "$_val" "PPT" && eval $_R1
+					&& get_msg $_q -m _e22 -- "$_pcidev" "$_VM" && eval $_R1
 
-			if [ -z "${_pciline##none*}" ] ; then
+			# Swich based on status of the device after being detached
+			if pciconf -l $_pcidev | grep -Eqs "^none" ; then
 				# If the device is 'none' then set the driver to ppt (it attaches automatically).
 				! devctl set driver "$_pcidev" ppt && get_msg $_q -m _e22_2 -- "$_pcidev" \
-					&& get_msg $_q -m _e1 -- "$_val" "PPT" && eval $_R1
+					&& get_msg $_q -m _e22 -- "$_pcidev" "$_VM" && eval $_R1
 			else
 				# Else the devie was already ppt. Attach it, or error if unable
 				! devctl attach "$_pcidev" && get_msg $_q -m _e22_3 -- "$_pcidev" \
-					&& get_msg $_q -m _e1 -- "$_val" "PPT" && eval $_R1
+					&& get_msg $_q -m _e22 -- "$_pcidev" "$_VM" && eval $_R1
 			fi
 		fi
 	done
@@ -1476,6 +1477,52 @@ chk_valid_ppt() {
 }
 
 return_ppt() {
+	# After VM completion, put PPT devices back to original state (as specified in loader.conf)
+	local _fn="return_ppt" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	while getopts qV _opts ; do case $_opts in
+		q) local _q='-q' ;;
+		V) local _V="-V" ;;
+	esac ; done ; shift $(( OPTIND - 1))
+
+	local _VM="$1"
+	[ -z "$_VM" ] && get_msg $_q -m _e0 -- "VM name" && eval $_R1
+
+	# Get PPT devices from the actual bhyve command that was launched for the VM
+	_bhyvecmd=$(tail -1 "${QBLOG}_${_VM}")
+	while : ; do
+		_newppt=$(echo "$_bhyvecmd" | sed -En "s@.*passthru,([0-9/]+[0-9/]+[0-9/]+ ).*@\1@p")
+		[ -z "$_newppt" ] && break
+		_ppt=$(echo "$_ppt $_newppt")
+		_bhyvecmd=$(echo "$_bhyvecmd" | sed -E "s@$_newppt@@")
+	done
+
+	# If there were any _ppt values, reset them to their state before VM launch
+	_pciconf=$(pciconf -l | awk '{print $1}')
+	for _val in $_ppt ; do
+		# convert _val to native pciconf format with :colon: instead of /fwdslash/
+		_val2=$(echo "$_val" | sed "s#/#:#g")
+
+		# Search for the individual device and specific device for devctl functions later
+		_pciline=$(echo "$_pciconf" | grep -Eo ".*${_val2}")
+		_pcidev=$(echo "$_pciline" | grep -Eo "pci.*${_val2}")
+
+		# PCI device doesnt exist on the machine
+		[ -z "$_pciline" ] && get_msg $_q -m _e22 -- "$_val" "PPT" \
+			&& get_msg -Vpm _e1 -- "$_val" "PPT" && eval $_R1
+
+		# If the device isnt listed in loader.conf, then return it to host
+		if ! grep -Eqs "pptdevs=.*${_val}" /boot/loader.conf ; then
+			# Detach the PCI device, and examine the error message
+			_dtchmsg=$(devctl detach "$_pcidev" 2>&1)
+			[ -n "${_dtchmsg##*not configured}" ] && get_msg -m _e22_1 -- "$_pcidev" \
+				&& get_msg -Vpm _w5 -- "$_pcidev"
+
+			# Clear the driver returns it back to the host driver (unless it booted as ppt)
+			! devctl clear driver $_pcidev && get_msg -Vpm _w5 -- "$_pcidev" && eval $_R1
+		fi
+	done
+	eval $_R0
 }
 
 chk_valid_rootenv() {
@@ -2204,7 +2251,7 @@ launch_vm() {
 		rm_errfiles
 
 		# Create trap for post VM exit
-		trap "cleanup_vm $_VM $_rootenv ; exit 0" INT TERM HUP QUIT EXIT
+		trap "cleanup_vm $_VM $_rootenv ; return_ppt $_VM ; exit 0" INT TERM HUP QUIT EXIT
 
 		# Log the exact bhyve command being run
 		echo "\$(date "+%Y-%m-%d_%H:%M") Starting VM: $_VM" | tee -a $QBLOG ${QBLOG}_${_VM}

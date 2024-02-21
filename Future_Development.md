@@ -1,4 +1,10 @@
 
+floatcmd, popups
+	- Make this a qubsd function.
+	- Remove qb-floatcmd
+	- Integrate into messaging system
+	- Improve sizing of the popup box (screen resolution? DPI?)
+
 ### UPGRADES
 
 GUI SECURITY

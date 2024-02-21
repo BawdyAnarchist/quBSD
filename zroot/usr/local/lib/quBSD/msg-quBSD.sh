@@ -4,10 +4,11 @@ get_msg() {
 	local _msg1= ; local _msg2= ; local _error
 
    # Quiet option finally resolves.
-	while getopts m:M:qV opts ; do case $opts in
+	while getopts m:M:pqV opts ; do case $opts in
 		m) _msg1="$OPTARG" ;;
 		M) _msg2="$OPTARG" ;;
 		q) local _q="true" ;;
+		p) local _popup="true" ;;
 		V) local _V="true" ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
@@ -170,6 +171,10 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e22) cat << ENDOFMSG
+   Failed to attach PCI device < $1 > to VM < $2 >
+ENDOFMSG
+	;;
+	_e22_0) cat << ENDOFMSG
    PCI device < $1 > doesn't exist on the host machine.
 ENDOFMSG
 	;;
@@ -283,6 +288,10 @@ ENDOFMSG
 	_w4) cat << ENDOFMSG
 WARNING: < $1 > Is already in use. Not fatal, but you
    must ensure jail/gateway/IP deconfliction. Recommend <auto>.
+ENDOFMSG
+	;;
+	_w5) cat << ENDOFMSG
+WARNING: Was unable to revert PPT: < $1 > to host after VM stop.
 ENDOFMSG
 	;;
 	_m1) cat << ENDOFMSG
