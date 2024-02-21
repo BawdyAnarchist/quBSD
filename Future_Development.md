@@ -1,6 +1,4 @@
 
-chk_valid_ppt - we can try to change to a ppt device like the guy on the video for GPU passthru
-
 ### UPGRADES
 
 GUI SECURITY

@@ -168,7 +168,7 @@ get_networking_variables() {
 }
 
 rm_errfiles() {
-	rm $ERR1 $ERR2
+	rm $ERR1 $ERR2 > /dev/null 2>&1
 }
 
 get_msg2() {
@@ -1456,30 +1456,26 @@ chk_valid_ppt() {
 
 		# Extra set of checks for the PCI device, if it's about to be attached to a VM
 		if [ "$_xtra" ] ; then
-
-			# If the pci device is detached, try to attach it.
-			[ -z "${_pciline##none*}" ] && ! devctl attach "$_pcidev" && _attached="true" \
-					&& get_msg -m _e22_1 -- "$_pciline" \
+			# First detach the PCI device, and examine the error message
+			_dtchmsg=$(devctl detach "$_pcidev" 2>&1)
+			[ -n "${_dtchmsg##*not configured}" ] && get_msg $_q -m _e22_1 -- "$_pcidev" \
 					&& get_msg $_q -m _e1 -- "$_val" "PPT" && eval $_R1
 
-			# Make sure the PCI device is designated for passthrough
-			[ -n "${_pciline##ppt*}" ] && get_msg $_q -m _e22_2 -- "$_val" \
+			if [ -z "${_pciline##none*}" ] ; then
+				# If the device is 'none' then set the driver to ppt (it attaches automatically).
+				! devctl set driver "$_pcidev" ppt && get_msg $_q -m _e22_2 -- "$_pcidev" \
 					&& get_msg $_q -m _e1 -- "$_val" "PPT" && eval $_R1
-
-			# If the device was attached and is ppt, there's no need for dettach/attach test
-			if [ -z "$_attached" ] ; then
-
-				# Check if the PCI device is busy, and would thus cause an error
-				! devctl detach "$_pcidev" && get_msg $_q -m _e22_3 -- "$_pcidev" \
-					&& get_msg $_q -m _e1 -- "$_val" "PPT" && eval $_R1
-
-				# Re-attach PCI, or error if unable
-				! devctl attach "$_pcidev" && get_msg $_q -m _e22_1 -- "$_pcidev" \
+			else
+				# Else the devie was already ppt. Attach it, or error if unable
+				! devctl attach "$_pcidev" && get_msg $_q -m _e22_3 -- "$_pcidev" \
 					&& get_msg $_q -m _e1 -- "$_val" "PPT" && eval $_R1
 			fi
 		fi
 	done
 	eval $_R0
+}
+
+return_ppt() {
 }
 
 chk_valid_rootenv() {

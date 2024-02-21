@@ -174,16 +174,16 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e22_1) cat << ENDOFMSG
-	Failed to attach PCI device < $1 > with devctl.
+   Cant access PCI < $1 >. Is it attached to another VM or in use?
+   Some PCI devices arent dynamic, and must be designated PPT at boottime.
 ENDOFMSG
 	;;
 	_e22_2) cat << ENDOFMSG
-   < $1 > exists on host, but isn't designated for passthru.
-   Check /boot/loader.conf for: < pptdevs="$1" > and reboot.
+   Unable to change < $1 > to PPT.
 ENDOFMSG
 	;;
 	_e22_3) cat << ENDOFMSG
-   Cant access PCI < $1 >. Is it attached to another VM?
+	Failed to attach PCI device < $1 > with devctl.
 ENDOFMSG
 	;;
 	_e23) cat << ENDOFMSG
