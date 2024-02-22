@@ -21,7 +21,7 @@
 ####################################################################################
 ###############################  LIST OF FUNCTIONS  ################################
 
-###################  VARIABLE ASSIGNMENTS and VALUE RETRIEVAL  #####################
+####################  VARIABLES VALUES and HIGH LEVEL FUNCTIONS  ###################
 # get_global_variables - File names/locations ; ZFS datasets
 # get_networking_variables - pf.conf ; wireguard ; endpoints
 # rm_errfiles          - Removes the coordinated error files for qb-scripts
@@ -37,8 +37,9 @@
 	# _XNAME            - Name of the process for the current active X window
 	# _XPID             - PID for the currently active X window
 # compile_jlist        - Used for qb-start/stop, to get list of jails to act on
+# create_popup         - Generic function used for popups
 
-############################  JAIL HANDLING / ACTIONS  #############################
+#########################  JAIL/VM  HANDLING and ACTIONS  ##########################
 # start_jail           - Performs checks before starting, creates log
 # stop_jail            - Performs checks before starting, creates log
 # restart_jail         - Self explanatory
@@ -46,7 +47,6 @@
 # reclone_zusr         - Destroy and reclones jails with zusr dependency (dispjails)
 # select_snapshot      - Find/create ROOTENV snapshot for reclone.
 # copy_control_keys    - SSH keys for control jail are copied over to running env.
-# return_ppt           - Set PPT devices back to original state before VM launch.
 # monitor_startstop    - Monitors whether qb-start or qb-stop is still alive
 
 #################################  STATUS  CHECKS  #################################
@@ -94,6 +94,7 @@
 
 ##################################  VM  FUNCTIONS  #################################
 # cleanup_vm           - Cleans up network connections, and dataset after shutdown
+# return_ppt           - Set PPT devices back to original state before VM launch.
 # prep_bhyve_options   - Retrieves VM variables and handles related functions
 # launch_vm            - Launches the VM to a background subshell
 # exec_vm_coordinator  - Coordinates the clean launching and teardown of VMs
@@ -191,6 +192,9 @@ get_msg2() {
 	local _call="${0##*/}"
 	[ -z "${_call##exec-*}" ] && local _msg="msg_exec" || _msg="msg_${0##*-}"
 
+	# Determine if popup should be used or not
+	get_info _POPUP
+
 	case $_message in
 		_m*|_w*) [ -z "$_q" ] && eval "$_msg" "$@" ;;
 		_e*)
@@ -199,24 +203,12 @@ get_msg2() {
 				_ERROR="$(echo "ERROR: $_call" ; "$_msg" "$@" ; [ -s "$ERR1" ] && cat $ERR1)"
 				echo -e "$_ERROR\n" > $ERR2
 
-				# Determine if popup should be used or not
-				get_info _POPUP
-
 				# If exiting due to error, log the date and error message to the log file
 				[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QBLOG
 
 				# Send the error message
-				if [ -z "$_q" ] && [ "$_ERROR" ] && [ "$_popup" ] && [ "$_POPUP" ] ; then
-					if ps c | grep -qs 'i3' ; then
-						# If using i3, make the window float, and position it at center
-						xterm -e csh -c "i3-msg -q floating enable, move position center ; \
-							/bin/sh -c 'cat $ERR2; echo {Press any key to dismiss}; read _null'"
-					else # Just create a regular xterm
-						xterm -e csh -c \
-							"/bin/sh -c 'cat $ERR2; echo {Press any key to dismiss}; read _null'"
-					fi
-				else
-					echo "$_ERROR"
+				if [ -z "$_q" ] && [ "$_ERROR" ] ; then
+					{ [ "$_popup" ] && [ "$_POPUP" ] && create_popup -f "$ERR2" ;} || echo "$_ERROR"
 				fi
 			fi ;;
 	esac
@@ -466,6 +458,42 @@ compile_jlist() {
 	eval $_R0
 }
 
+create_popup() {
+	# Handles popus to send messages, receive inputs, and pass commands	
+	local _fn="create_popup" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	while getopts f:im:qV opts ; do case $opts in
+			i) local _input="true" ;;
+			f) local _popfile="$OPTARG" ;;
+			m) local _popmsg="$OPTARG" ;;
+			q) local _qs="-q" ; _quiet='> /dev/null 2>&1' ;;
+			V) local _V="-V" ;;
+			*) get_msg -m _e9 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
+
+	# Discern if it's i3, and modify with center/floating options
+	ps c | grep -qs 'i3' && i3mod="i3-msg -q floating enable, move position center"
+
+	[ "$_popfile" ] && _popmsg=$(cat $_popfile)
+
+	# Execute popup depending on if input is needed or not
+	if [ -z "$_input" ] ; then
+		# Simply print a message, and return 0
+		xterm -e /bin/sh -c \
+			"eval \"$i3mod\" ; echo \"$_popmsg\" ; echo \"{Enter} to close\" ; read _INPUT ;"
+		eval $_R0
+	else
+		# Need to collect a variable, and use a tmp file to pull it from the subshell, to a variable.
+		local _poptmp=$(mktemp -t quBSD/.popup)
+		xterm -e /bin/sh -c \
+			"eval \"$i3mod\"; printf \"%b\" \"$_popmsg\"; read _INPUT; echo \"\$_INPUT\" > $_poptmp" 
+
+		# Retreive the user input, remove tmp, and echo the value back to the caller
+		_input=$(cat $_poptmp)	
+		rm $_poptmp > /dev/null 2>&1
+		echo "$_input"	
+	fi
+}
 
 
 ########################################################################################
@@ -736,55 +764,6 @@ select_snapshot() {
 
 	# Echo the final value and return 0
 	echo "$_rootsnap" && eval $_R0
-}
-
-return_ppt() {
-	# After VM completion, put PPT devices back to original state (as specified in loader.conf)
-	local _fn="return_ppt" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	while getopts qV _opts ; do case $_opts in
-		q) local _q='-q' ;;
-		V) local _V="-V" ;;
-	esac ; done ; shift $(( OPTIND - 1))
-
-	local _VM="$1"
-	[ -z "$_VM" ] && get_msg $_q -m _e0 -- "VM name" && eval $_R1
-
-	# Get PPT devices from the actual bhyve command that was launched for the VM
-	_bhyvecmd=$(tail -1 "${QBLOG}_${_VM}")
-	while : ; do
-		_newppt=$(echo "$_bhyvecmd" | sed -En "s@.*passthru,([0-9/]+[0-9/]+[0-9/]+ ).*@\1@p")
-		[ -z "$_newppt" ] && break
-		_ppt=$(echo "$_ppt $_newppt")
-		_bhyvecmd=$(echo "$_bhyvecmd" | sed -E "s@$_newppt@@")
-	done
-
-	# If there were any _ppt values, reset them to their state before VM launch
-	_pciconf=$(pciconf -l | awk '{print $1}')
-	for _val in $_ppt ; do
-		# convert _val to native pciconf format with :colon: instead of /fwdslash/
-		_val2=$(echo "$_val" | sed "s#/#:#g")
-
-		# Search for the individual device and specific device for devctl functions later
-		_pciline=$(echo "$_pciconf" | grep -Eo ".*${_val2}")
-		_pcidev=$(echo "$_pciline" | grep -Eo "pci.*${_val2}")
-
-		# PCI device doesnt exist on the machine
-		[ -z "$_pciline" ] && get_msg $_q -m _e22 -- "$_val" "PPT" \
-			&& get_msg -Vpm _e1 -- "$_val" "PPT" && eval $_R1
-
-		# If the device isnt listed in loader.conf, then return it to host
-		if ! grep -Eqs "pptdevs=.*${_val}" /boot/loader.conf ; then
-			# Detach the PCI device, and examine the error message
-			_dtchmsg=$(devctl detach "$_pcidev" 2>&1)
-			[ -n "${_dtchmsg##*not configured}" ] && get_msg -m _e22_1 -- "$_pcidev" \
-				&& get_msg -Vpm _w5 -- "$_pcidev"
-
-			# Clear the driver returns it back to the host driver (unless it booted as ppt)
-			! devctl clear driver $_pcidev && get_msg -Vpm _w5 -- "$_pcidev" && eval $_R1
-		fi
-	done
-	eval $_R0
 }
 
 copy_control_keys() {
@@ -2048,6 +2027,55 @@ cleanup_vm() {
 	# Remove the /tmp files
 	rm "${QTMP}/qb-bhyve_${_VM}" 2> /dev/null
 	rm_errfiles
+	eval $_R0
+}
+
+return_ppt() {
+	# After VM completion, put PPT devices back to original state (as specified in loader.conf)
+	local _fn="return_ppt" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	while getopts qV _opts ; do case $_opts in
+		q) local _q='-q' ;;
+		V) local _V="-V" ;;
+	esac ; done ; shift $(( OPTIND - 1))
+
+	local _VM="$1"
+	[ -z "$_VM" ] && get_msg $_q -m _e0 -- "VM name" && eval $_R1
+
+	# Get PPT devices from the actual bhyve command that was launched for the VM
+	_bhyvecmd=$(tail -1 "${QBLOG}_${_VM}")
+	while : ; do
+		_newppt=$(echo "$_bhyvecmd" | sed -En "s@.*passthru,([0-9/]+[0-9/]+[0-9/]+ ).*@\1@p")
+		[ -z "$_newppt" ] && break
+		_ppt=$(echo "$_ppt $_newppt")
+		_bhyvecmd=$(echo "$_bhyvecmd" | sed -E "s@$_newppt@@")
+	done
+
+	# If there were any _ppt values, reset them to their state before VM launch
+	_pciconf=$(pciconf -l | awk '{print $1}')
+	for _val in $_ppt ; do
+		# convert _val to native pciconf format with :colon: instead of /fwdslash/
+		_val2=$(echo "$_val" | sed "s#/#:#g")
+
+		# Search for the individual device and specific device for devctl functions later
+		_pciline=$(echo "$_pciconf" | grep -Eo ".*${_val2}")
+		_pcidev=$(echo "$_pciline" | grep -Eo "pci.*${_val2}")
+
+		# PCI device doesnt exist on the machine
+		[ -z "$_pciline" ] && get_msg $_q -m _e22 -- "$_val" "PPT" \
+			&& get_msg -Vpm _e1 -- "$_val" "PPT" && eval $_R1
+
+		# If the device isnt listed in loader.conf, then return it to host
+		if ! grep -Eqs "pptdevs=.*${_val}" /boot/loader.conf ; then
+			# Detach the PCI device, and examine the error message
+			_dtchmsg=$(devctl detach "$_pcidev" 2>&1)
+			[ -n "${_dtchmsg##*not configured}" ] && get_msg -m _e22_1 -- "$_pcidev" \
+				&& get_msg -Vpm _w5 -- "$_pcidev"
+
+			# Clear the driver returns it back to the host driver (unless it booted as ppt)
+			! devctl clear driver $_pcidev && get_msg -Vpm _w5 -- "$_pcidev" && eval $_R1
+		fi
+	done
 	eval $_R0
 }
 
