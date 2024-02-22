@@ -59,6 +59,8 @@ Usage: qb-cmd <jail/VM>
        specified, default environment is the active window
    -N: (N)orun. Print the bhyve command that would be run,
        but do not launch. Only applies to VMs.
+   -p: (p)opup. Receive command for <jail> via temporary popup. 
+       Use this in combination with quick-key settings.
    -r: (r)oot. Run cmd as root. Default is unprivileged user
    -u: (u)ser. Run cmd as <user>. Default is unpriveleged
        user, which is the same name as the jail.
