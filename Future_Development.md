@@ -1,8 +1,8 @@
 
-floatcmd, popups
-	- Make this a qubsd function.
+qb-cmd doesnt seem to have good error messages for failed gateway on message
+
+popups
 	- Remove qb-floatcmd
-	- Integrate into messaging system
 	- Improve sizing of the popup box (screen resolution? DPI?)
 
 ### UPGRADES
