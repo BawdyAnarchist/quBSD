@@ -1,9 +1,7 @@
 
 qb-cmd doesnt seem to have good error messages for failed gateway on message
 
-popups
-	- Remove qb-floatcmd
-	- Improve sizing of the popup box (screen resolution? DPI?)
+popups - Improve sizing of the popup box (screen resolution? DPI?)
 
 ### UPGRADES
 
