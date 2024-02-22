@@ -6,10 +6,11 @@
 . /usr/local/lib/quBSD/msg-cmd.sh
 
 get_options() {
-	while getopts hnNrtu:vV opts ; do case $opts in
+	while getopts hnNprtu:vV opts ; do case $opts in
 		h) get_msg2 -eu ;;
 		n) _NEWWIND="xterm -e" ;;
 		N) _NORUN="exit 0" ; _VERBOSE="true" ;;
+     	p) _POPUP="true" ;;
      	r) _USER="root" ;;
 		u) _USER="${OPTARG}" ;;
 		v) _REDIRECT='' ; _VERBOSE="true" ;;
@@ -106,6 +107,11 @@ main() {
 		# Make sure the user has a home directory, and remove errfiles before jexec to new prog.
 		[ ! "$_USER" = "root" ] && [ ! -d "${M_QROOT}/${JAIL}/home/${_USER}" ] \
 			&& get_msg2 -Epm _e7
+
+		# If [-p] popup was passed, create the popup and return _CMD to be run
+		[ "$_POPUP" ] \
+			&& _CMD=$(create_popup -im "Enter command for $JAIL\\\n${_USER}@${JAIL}: # ")
+
 		rm_errfiles	; trap '' HUP INT TERM QUIT EXIT
 
 		eval $_NORUN $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT"
