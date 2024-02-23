@@ -459,7 +459,7 @@ compile_jlist() {
 }
 
 create_popup() {
-	# Handles popus to send messages, receive inputs, and pass commands	
+	# Handles popus to send messages, receive inputs, and pass commands
 	local _fn="create_popup" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
 	while getopts f:im:qV opts ; do case $opts in
@@ -472,26 +472,52 @@ create_popup() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Discern if it's i3, and modify with center/floating options
-	ps c | grep -qs 'i3' && i3mod="i3-msg -q floating enable, move position center"
+	ps c | grep -qs 'i3' && _i3mod="i3-msg -q floating enable, move position center"
 
+	# If a file was passed, set the msg equal to the contents of the file
 	[ "$_popfile" ] && _popmsg=$(cat $_popfile)
+
+	# Equalizes popup size and fonts between systems of different resolution and DPI settings.
+	calculate_fonts
 
 	# Execute popup depending on if input is needed or not
 	if [ -z "$_input" ] ; then
 		# Simply print a message, and return 0
-		xterm -e /bin/sh -c \
-			"eval \"$i3mod\" ; echo \"$_popmsg\" ; echo \"{Enter} to close\" ; read _INPUT ;"
+		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
+			"eval \"$_i3mod\" ; echo \"$_popmsg\" ; echo \"{Enter} to close $_w $_h\" ; read _INPUT ;"
 		eval $_R0
 	else
 		# Need to collect a variable, and use a tmp file to pull it from the subshell, to a variable.
 		local _poptmp=$(mktemp -t quBSD/.popup)
-		xterm -e /bin/sh -c \
-			"eval \"$i3mod\"; printf \"%b\" \"$_popmsg\"; read _INPUT; echo \"\$_INPUT\" > $_poptmp" 
+		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
+			"eval \"$_i3mod\"; printf \"%b\" \"$_popmsg\"; read _INPUT; echo \"\$_INPUT\" > $_poptmp"
 
 		# Retreive the user input, remove tmp, and echo the value back to the caller
-		_input=$(cat $_poptmp)	
+		_input=$(cat $_poptmp)
 		rm $_poptmp > /dev/null 2>&1
-		echo "$_input"	
+		echo "$_input"
+	fi
+}
+
+calculate_fonts() {
+	# Get vertical resolution of primary display for calculating popup dimensions
+	local _res=$(xrandr | sed -En "s/.*connected primary.*x([0-9]+).*/\1/p")
+	local _h=$(echo "scale=0 ; $_res / 4" | bc | cut -d. -f1)
+	local _w=$(echo "scale=0 ; $_h * 2.5" | bc | cut -d. -f1)
+	_i3mod="${_i3mod}, resize set $_w $_h"
+
+	# If there's a system font size set, use that at .75 size factor.
+	_fs=$(appres XTerm xterm | sed -En "s/XTerm.*faceSize:[[:blank:]]+([0-9]+).*/\1/p")
+	if [ -z "$_fs" ] ; then
+		# If no set fs, then use the ratio of monitor DPI to system DPI to scale font size from 16.
+		local _dpi_mon=$(xdpyinfo | sed -En "s/[[:blank:]]+resolution.*x([0-9]+).*/\1/p")
+		local _dpi_sys=$(xrdb -query | sed -En "s/.*Xft.dpi:[[:blank:]]+([0-9]+)/\1/p")
+		[ -z "$_dpi_sys" ] && _dpi_sys=96
+
+		# 16 is a reference, since it's a sane value when both monitor and logical DPI is 96.
+		_fs=$(echo "scale=0 ; ($_dpi_mon / $_dpi_sys) * 16" | bc | cut -d. -f1)
+	else
+		_fs=$(echo "scale=0 ; $_fs * .75" | bc | cut -d. -f1)
 	fi
 }
 
@@ -2012,7 +2038,7 @@ cleanup_vm() {
 	# Destroy the VM
 	bhyvectl --vm="$_VM" --destroy > /dev/null 2>&1
 
-	# Set the PPT device back to its original state before VM prep/launch 
+	# Set the PPT device back to its original state before VM prep/launch
 	return_ppt "$_VM"
 
 	# If it was a norun, dont spend time recloning
