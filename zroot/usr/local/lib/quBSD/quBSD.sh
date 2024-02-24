@@ -469,11 +469,11 @@ create_popup() {
 			c) local _cmd="$OPTARG" ;;
 			i) local _input="true" ;;
 			f) local _popfile="$OPTARG" ;;
-			h) local _h="$OPTARG" ;; 
+			h) local _h="$OPTARG" ;;
 			m) local _popmsg="$OPTARG" ;;
 			q) local _qs="-q" ; _quiet='> /dev/null 2>&1' ;;
-			V) local _V="-V" ;; 
-			w) local _w="$OPTARG" ;; 
+			V) local _V="-V" ;;
+			w) local _w="$OPTARG" ;;
 			*) get_msg -m _e9 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
@@ -488,7 +488,7 @@ create_popup() {
 
 	# Execute popup depending on if input is needed or not
 	if [ "$_cmd" ] ; then
-		xterm -fa Monospace -fs $_fs -e /bin/sh -c "$_i3mod ; eval $_cmd"		
+		xterm -fa Monospace -fs $_fs -e /bin/sh -c "$_i3mod ; eval $_cmd"
 	elif [ -z "$_input" ] ; then
 		# Simply print a message, and return 0
 		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
@@ -511,7 +511,7 @@ calculate_sizes() {
 	# Get vertical resolution of primary display for calculating popup dimensions
 	local _res=$(xrandr | sed -En "s/.*connected primary.*x([0-9]+).*/\1/p")
 
-	# Adjust that based on inputs from the caller 
+	# Adjust that based on inputs from the caller
 	[ -z "$_h" ] && _h=".25"
 	[ -z "$_w" ] && _w="2.5"
 	_h=$(echo "scale=0 ; $_res * $_h" | bc | cut -d. -f1)
@@ -566,7 +566,11 @@ start_jail() {
 			else
 				[ "$_norun" ] && return 0
 				get_msg -m _m1 -- "$_jail" | tee -a $QBLOG ${QBLOG}_${_jail}
-				! jail -vc "$_jail" >> ${QBLOG}_${_jail} && get_msg $_qs -m _e4 -- "$_jail" && eval $_R1
+				# Slightly hacky/convoluted err messaging, but it aint easy combining qb-cmd, qb-start
+				_jailout=$(jail -vc "$_jail") \
+					&& { echo "$_jailout" >> ${QBLOG}_${_jail} ;} \
+					|| { echo "$_jailout" > $ERR1 && echo "$_jailout" > ${QBLOG}_${_jail} \
+							&& get_msg $_qs -m _e4 -- "$_jail" && eval $_R1 ;}
 			fi
 		else # Jail was invalid
 			return 1

@@ -1,5 +1,4 @@
 
-qb-cmd doesnt seem to have good error messages for failed gateway on message
 qb-stop is still getting weird errors for mounts on a number of VMs
 
 ### UPGRADES
@@ -11,31 +10,29 @@ GUI SECURITY
 			- the qb-xephyr command into qb-cmd -X, including VMs. Make sure works with -n as well.
 			- Integrate an "X" option for qb-ephm as well.
 
-pwd
-	- I think the right way to do this, is export any existing pwd db in /rw, and import it into the created jail (or maybe vice versa) 
-	- Right now I'm not so confident on how that's working
-	- To get around the pw -V problem, you could put /usr/local/bin/pw wrapper
-
 Host as Unprivileged user     
 	- doas commands allowed by unprivileged user
 	- Unprivileged user on host will pass jails SSH commands via Control Jail     
 	- Control jail pf will block all, except port 22 between host and jails     
 
-NICVM - Linux VM (probably alpine) so that it can use all the wireless protocols.
-     - Someone made a post about this in FreeBSD
-
-I2P Gateway
-
 CREATE MANPAGES:  /usr/local/man/man1/qb-scripts
 	- Replaces /share/quBSD
 	- PARAMS should have manpage
+
+pwd
+	- I think the right way to do this, is export any existing pwd db in /rw, and import it into the created jail (or maybe vice versa) 
+	- Right now I'm not so confident on how that's working
+	- To get around the pw -V problem, you could put /usr/local/bin/pw wrapper
 
 dispVM
 	- Add new class and boot practices
 	- vm-rc.local should use its IP address to get it's hostname from 0control ftp server
 		- This will require creating a new file in /home/ftp/<IPaddr> on 0control
 
-Take another hack at the recording device problems
+NICVM - Linux VM (probably alpine) so that it can use all the wireless cards. 
+     - Someone made a post about this in FreeBSD
+
+I2P Gateway
 
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
@@ -69,6 +66,10 @@ qb-stat
 
 
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP
+
+Take another hack at the recording device problems
+
+Check HDAC - I think my sound board is now supported.
 
 Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file and code.
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
