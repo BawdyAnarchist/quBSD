@@ -1,7 +1,6 @@
 
 qb-cmd doesnt seem to have good error messages for failed gateway on message
-
-popups - Improve sizing of the popup box (screen resolution? DPI?)
+qb-stop is still getting weird errors for mounts on a number of VMs
 
 ### UPGRADES
 
@@ -67,7 +66,6 @@ qb-stat
 	- Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
 	- Give a popup option that can be closed with any key (quickview kinda stuff)
 
-qb-i3-windows - popup option
 
 
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP
