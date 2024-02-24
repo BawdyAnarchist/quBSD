@@ -11,8 +11,8 @@ get_parameters() {
 }
 
 main() {
-	# Manual umount. fstab cant be referenced in jail.conf (might be inside encrypted dataset)
-	umount -aF ${M_ZUSR}/${JAIL}/rw/etc/fstab
+	# Manual umount. Cant reference fstab in jail.conf (it might be inside encrypted dataset)
+	umount -aF ${M_ZUSR}/${JAIL}/rw/etc/fstab > /dev/null 2>&1
 
 	# Search for any lingering mounts, and remove them as well
 	JMOUNT=$(mount | egrep -o "${M_QROOT}/${JAIL}/[^[:blank:]]+")

@@ -1,6 +1,4 @@
 
-qb-stop is still getting weird errors for mounts on a number of VMs
-
 ### UPGRADES
 
 GUI SECURITY
