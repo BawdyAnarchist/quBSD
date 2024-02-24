@@ -38,6 +38,7 @@
 	# _XPID             - PID for the currently active X window
 # compile_jlist        - Used for qb-start/stop, to get list of jails to act on
 # create_popup         - Generic function used for popups
+# calculate_sizes      - Calculate window and font size for message popups
 
 #########################  JAIL/VM  HANDLING and ACTIONS  ##########################
 # start_jail           - Performs checks before starting, creates log
@@ -460,14 +461,19 @@ compile_jlist() {
 
 create_popup() {
 	# Handles popus to send messages, receive inputs, and pass commands
+	# _h should be as a percentage of the primary screen height (between 0 and 1)
+	# _w is a multiplication factor for _h
 	local _fn="create_popup" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
-	while getopts f:im:qV opts ; do case $opts in
+	while getopts c:f:h:im:qVw: opts ; do case $opts in
+			c) local _cmd="$OPTARG" ;;
 			i) local _input="true" ;;
 			f) local _popfile="$OPTARG" ;;
+			h) local _h="$OPTARG" ;; 
 			m) local _popmsg="$OPTARG" ;;
 			q) local _qs="-q" ; _quiet='> /dev/null 2>&1' ;;
-			V) local _V="-V" ;;
+			V) local _V="-V" ;; 
+			w) local _w="$OPTARG" ;; 
 			*) get_msg -m _e9 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
@@ -478,13 +484,15 @@ create_popup() {
 	[ "$_popfile" ] && _popmsg=$(cat $_popfile)
 
 	# Equalizes popup size and fonts between systems of different resolution and DPI settings.
-	calculate_fonts
+	calculate_sizes
 
 	# Execute popup depending on if input is needed or not
-	if [ -z "$_input" ] ; then
+	if [ "$_cmd" ] ; then
+		xterm -fa Monospace -fs $_fs -e /bin/sh -c "$_i3mod ; eval $_cmd"		
+	elif [ -z "$_input" ] ; then
 		# Simply print a message, and return 0
 		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
-			"eval \"$_i3mod\" ; echo \"$_popmsg\" ; echo \"{Enter} to close $_w $_h\" ; read _INPUT ;"
+			"eval \"$_i3mod\" ; echo \"$_popmsg\" ; echo \"{Enter} to close\" ; read _INPUT ;"
 		eval $_R0
 	else
 		# Need to collect a variable, and use a tmp file to pull it from the subshell, to a variable.
@@ -499,23 +507,27 @@ create_popup() {
 	fi
 }
 
-calculate_fonts() {
+calculate_sizes() {
 	# Get vertical resolution of primary display for calculating popup dimensions
 	local _res=$(xrandr | sed -En "s/.*connected primary.*x([0-9]+).*/\1/p")
-	local _h=$(echo "scale=0 ; $_res / 4" | bc | cut -d. -f1)
-	local _w=$(echo "scale=0 ; $_h * 2.5" | bc | cut -d. -f1)
+
+	# Adjust that based on inputs from the caller 
+	[ -z "$_h" ] && _h=".25"
+	[ -z "$_w" ] && _w="2.5"
+	_h=$(echo "scale=0 ; $_res * $_h" | bc | cut -d. -f1)
+	_w=$(echo "scale=0 ; $_h * $_w" | bc | cut -d. -f1)
 	_i3mod="${_i3mod}, resize set $_w $_h"
 
 	# If there's a system font size set, use that at .75 size factor.
 	_fs=$(appres XTerm xterm | sed -En "s/XTerm.*faceSize:[[:blank:]]+([0-9]+).*/\1/p")
 	if [ -z "$_fs" ] ; then
-		# If no set fs, then use the ratio of monitor DPI to system DPI to scale font size from 16.
+		# If no set fs, then use the ratio of monitor DPI to system DPI to scale font size from 15.
 		local _dpi_mon=$(xdpyinfo | sed -En "s/[[:blank:]]+resolution.*x([0-9]+).*/\1/p")
 		local _dpi_sys=$(xrdb -query | sed -En "s/.*Xft.dpi:[[:blank:]]+([0-9]+)/\1/p")
 		[ -z "$_dpi_sys" ] && _dpi_sys=96
 
-		# 16 is a reference, since it's a sane value when both monitor and logical DPI is 96.
-		_fs=$(echo "scale=0 ; ($_dpi_mon / $_dpi_sys) * 16" | bc | cut -d. -f1)
+		# 15 is a reference, since it's a sane value when both monitor and logical DPI is 96.
+		_fs=$(echo "scale=0 ; ($_dpi_mon / $_dpi_sys) * 15" | bc | cut -d. -f1)
 	else
 		_fs=$(echo "scale=0 ; $_fs * .75" | bc | cut -d. -f1)
 	fi
