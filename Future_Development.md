@@ -1,4 +1,6 @@
 
+monitor_startstop, I think I can offload that failure and integrate a popup to the main script 
+
 ### UPGRADES
 
 GUI SECURITY
