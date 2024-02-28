@@ -611,12 +611,12 @@ stop_jail() {
 
 		# Attempt normal removal [-r]. If failure, then remove forcibly [-R].
 		elif ! jail -vr "$_jail"  >> ${QBLOG}_${_jail} 2>&1 ; then
-			if  jail -vR "$_jail"  >> ${QBLOG}_${_jail} 2>&1 ; then
+			if chk_isrunning "$_jail" ; then
+				jail -vR "$_jail"  >> ${QBLOG}_${_jail} 2>&1
 
-				# Forcible removal likely missed mounts. Clean them up.
-				sh ${QBDIR}/exec-release "$_jail"
-				[ -e "${M_ZUSR}/${JAIL}/rw/etc/fstab" ] \
-									&& umount -aF "${M_ZUSR}/${JAIL}/rw/etc/fstab" > /dev/null 2>&1
+				# Re-run exec-release to make sure jail is in good ending state
+				/bin/sh ${QBDIR}/exec-release "$_jail"
+
 				# Notify about failure to remove normally
 				get_msg -m _w1 -- "$_jail"
 			else
@@ -873,14 +873,12 @@ monitor_startstop() {
 			eval $_R0
 		fi
 
-		# Timeout has passed, kill qb-start/stop and cleanup files
-		get_msg -m _e33 -- "$0" "$_TIMEOUT"
+		# Timeout has passed, kill qb-start/stop
+		get_msg -Vm _e33 -- "$0" "$_TIMEOUT"
 		[ -e "$_TMP_LOCK" ] && for _pid in $(cat $_TMP_LOCK) ; do
 			kill -15 $_pid > /dev/null 2>&1
 		done
-
-		# Probably overkill, but just a backup in case the PID wasn't listed in the lock file
-		kill -15 -- -$$ > /dev/null 2>&1
+		eval $_R1
 	fi
 
 	# Handle the [-p] ping case
