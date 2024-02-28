@@ -43,7 +43,7 @@ WORKSPACE")
 qb_start_jails() {
 
 	# Create a popup so user can monitor jail starts, then remove it later
-	create_popup -h .9 -w .7 -c "/usr/local/bin/qb-stat" &
+	create_popup -h .9 -w .8 -c "/usr/local/bin/qb-stat" &
 	_pid_stat="$!"
 
 	# Remove host and NO_WINDOW lines, and save to tmp file
