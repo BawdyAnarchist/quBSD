@@ -25,8 +25,8 @@ Converts from
 
 Usage: qb-dpi [-r] <new_dpi>
    -h: (h)elp. Outputs this usage message
-	-r: (r)evert. Revert back to system DPI and exit.
-	-t: (t)time. Seconds to keep new DPI before reverting
+   -r: (r)evert. Revert back to system DPI and exit.
+   -t: (t)time. Seconds to keep new DPI before reverting
        to the system default from .Xresources
 
    <new_dpi> can be expressed either as a raw value, or with
