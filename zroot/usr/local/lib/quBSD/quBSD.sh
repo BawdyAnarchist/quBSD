@@ -612,17 +612,19 @@ stop_jail() {
 		# Attempt normal removal [-r]. If failure, then remove forcibly [-R].
 		elif ! jail -vr "$_jail"  >> ${QBLOG}_${_jail} 2>&1 ; then
 			if chk_isrunning "$_jail" ; then
+				# -(R)emove jail, rerun exec-release to make sure it's in a clean ending state 
 				jail -vR "$_jail"  >> ${QBLOG}_${_jail} 2>&1
-
-				# Re-run exec-release to make sure jail is in good ending state
 				/bin/sh ${QBDIR}/exec-release "$_jail"
-
-				# Notify about failure to remove normally
-				get_msg -m _w1 -- "$_jail"
-			else
-				# Print warning about failure to forcibly remove jail
-				get_msg $_qj -m _w2 -- "$_jail" && eval $_R1
-	fi fi fi
+				
+				if chk_isrunning "$_jail" ; then
+					# Warning about failure to forcibly remove jail
+					get_msg $_qj -m _w2 -- "$_jail" && eval $_R1
+				else
+					# Notify about failure to remove normally
+					get_msg -m _w1 -- "$_jail"
+				fi
+			fi
+	fi fi
 	eval $_R0
 }
 
@@ -874,10 +876,12 @@ monitor_startstop() {
 		fi
 
 		# Timeout has passed, kill qb-start/stop
-		get_msg -Vm _e33 -- "$0" "$_TIMEOUT"
 		[ -e "$_TMP_LOCK" ] && for _pid in $(cat $_TMP_LOCK) ; do
 			kill -15 $_pid > /dev/null 2>&1
+			# Removing the PID is how we communicate to qb-start/stop to issue a failure message
+			sed -i '' -E "/^$$\$/ d" $_TMP_LOCK
 		done
+
 		eval $_R1
 	fi
 

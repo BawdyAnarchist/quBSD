@@ -20,17 +20,16 @@ parameters (aka, at the end of the command).
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
-One or more jails appear to be hung and havent stopped.
-Check /var/log/quBSD.sh for details, and check jls
-list to manually kill all `jail -R` operations.
-
-No restarts were attempted, due to error.
+Potential infinite loop detected. Likely some set of jails
+has gateways that circularly reference each other. Example:
+  Jail-A has Jail-B as gateway,
+    Jail-B has Jail-C as gateway,
+      Jail-C has Jail-A as gateway.
 ENDOFMSG
 	;;
 	_e4) cat << ENDOFMSG
-One or more jails appear to be hung and havent stopped.
-Check /var/log/quBSD.sh for details, and check process
-list to manually kill all jail stop operations.
+Failed to stop all jails/VMs within the timeout of < $_TIMEOUT secs >.
+Check /var/log/quBSD, and/or forcibly stop with: qb-stop -F
 ENDOFMSG
 	;;
 	_e5) cat << ENDOFMSG

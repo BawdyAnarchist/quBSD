@@ -199,15 +199,22 @@ main() {
 	# STARTS keeps track of the number of hiearchy leves. If 0, there was nothing to stop
 	[ "$_STOPS" = 0 ] && get_msg2 -epm _m3
 
-	# User specified timeout, or 5 secs for every hierarchy level
-	monitor_startstop "${_TIMEOUT:=$(( _STOPS * 10 ))}" &
+	# User specified timeout, or 10 secs for every hierarchy level
+	_TIMEOUT="${_TIMEOUT:=$(( _STOPS * 10 ))}"
+	monitor_startstop "$_TIMEOUT" &
 	_MONITOR_PID="$!"
 
-	# Unset trap, coz otherwise it runs 2x if monitor_startstop timeout.
+	# Unset trap, coz otherwise it runs 2x if monitor_startstop times out.
 	trap "" INT TERM HUP QUIT EXIT
 
 	# Wait for stops to finish. If TIMEOUT, monitor_startstop will kill -15 this script
-	ps -p $_WF_PIDS > /dev/null 2>&1 && wait $_WF_PIDS && get_msg2 -m _m2
+	if ps -p $_WF_PIDS > /dev/null 2>&1 ; then
+		wait $_WF_PIDS
+		# Wait a moment for monitor_startstop to remove the PID (to know if we need _e4)
+		sleep .2
+		! grep -Eqs "^$$\$" $_TMP_LOCK && get_msg2 -pm _e4
+		get_msg2 -m _m2
+	fi
 
 	# monitor_startstop `kill -15` doesnt cause execution to stop, so this actually runs now
 	cleanup_trapped
