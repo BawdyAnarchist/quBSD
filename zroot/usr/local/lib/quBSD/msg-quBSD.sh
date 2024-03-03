@@ -18,7 +18,7 @@ get_msg() {
 	case $_msg1 in
 		_m*) [ -z "$_q" ] && msg_qubsd "$@" ;;
 		_w*|_e*) # Append messages to top of $ERR1. Must end with `|| :;}` , for `&& cp -a` to work
-			{ msg_qubsd "$@" ; [ "$_msg2" ] && _msg1="$_msg2" && msg_qubsd "$@" \
+			[ -z "$_q" ] && { msg_qubsd "$@" ; [ "$_msg2" ] && _msg1="$_msg2" && msg_qubsd "$@" \
 				; [ -s "$ERR1" ] && cat $ERR1 || :;} > $ERR2 && cp -a $ERR2 $ERR1
 
 			# If -V was passed, then print the message immediately
