@@ -28,7 +28,7 @@ has gateways that circularly reference each other. Example:
 ENDOFMSG
 	;;
 	_e4) cat << ENDOFMSG
-Failed to stop all jails/VMs within the timeout of < $_TIMEOUT secs >.
+Failed to stop all jails/VMs within timeout of < $_TIMEOUT secs >
 Check /var/log/quBSD, and/or forcibly stop with: qb-stop -F
 ENDOFMSG
 	;;
