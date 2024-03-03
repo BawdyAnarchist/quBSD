@@ -35,6 +35,8 @@ I2P Gateway
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
 
+qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
+
 qb-create
 	- It needs further and more extensive testing 
 	- -z dirs recreated files too, not just directories
@@ -42,14 +44,11 @@ qb-create
 qb_ssh
 	- Probably can remove the FreeBSD parts of it. Maybe the Net/Open ones as well 
 
-qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
 qb-pci
 	- summary of PCI devices relevant to user
 	- USB, NIC, maybe others
 	- Show what was is currently passthrough'd
-
-qb-list [-e] (evaluate) option to check jail-param combos for validity.
 
 qb-ephm - Clone from zroot too. Tricky, because of "reclone_zroot" operation in exec.prepare 
 
