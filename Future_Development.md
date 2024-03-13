@@ -2,11 +2,9 @@
 ### UPGRADES
 
 GUI SECURITY
-	- Test Xpra, Xauth and try to isolate xhost 
-	- Xephyr - Unfortunately I'm not sure this is a real solution. Everything still shares the unix socket
-		- Might not matter, but if I keep it, some ideas:
-			- the qb-xephyr command into qb-cmd -X, including VMs. Make sure works with -n as well.
-			- Integrate an "X" option for qb-ephm as well.
+	- Gonna have to figure out a new way of assessing the jail'd status of a window
+	- add test for x11 server on the jail when doing start_xpra
+	- startx needs to xpra attach all jails running an xpra server 
 
 Host as Unprivileged user     
 	- doas commands allowed by unprivileged user

@@ -103,18 +103,22 @@ encryption_and_mounts(){
 }
 
 determine_ips() {
-	# Map IPs in serial, write to TMP
-	for _jail in $_FULLIST ; do
-		# Only get IPs for offjails
-		if ! chk_isrunning "$_jail" ; then
+	# Only get IPs for off jails
+	if ! chk_isrunning "$_jail" ; then
+		# IP calculations for 0control SSH connections
+		printf "%b" "$_jail SSH $(discover_open_ipv4 -t SSH $_jail)\n" >> $_TMP_IP
 
-			# IP calculations for 0control and jail networking. Skip hierarchy tops
-			printf "%b" "$_jail SSH $(discover_open_ipv4 -t SSH $_jail)\n" >> $_TMP_IP
+		# For networking, skip hierarchy tops.
+		! echo_grep "$_HIERTOP" "$_jail" \
+			&& printf "%b" "$_jail NET $(discover_open_ipv4 -t NET $_jail)\n" >> $_TMP_IP
+	fi
+}
 
-			! echo_grep "$_HIERTOP" "$_jail" \
-					&& printf "%b" "$_jail NET $(discover_open_ipv4 -t NET $_jail)\n" >> $_TMP_IP
-		fi
-	done
+determine_xpra_socket() {
+	# Only get xpra sockets for off jails
+	if ! chk_isrunning "$_jail" ; then
+		printf "%b" "$_jail XPRA $(discover_xpra_socket)\n" >> $_TMP_IP
+	fi
 }
 
 begin_waterfall() {
@@ -202,8 +206,14 @@ main() {
 		select_snapshot >> $_TMP_SNAPS
 	done
 
-	# IP addr are mapped out ahead of time to prevent overlaps during parallel start
-	determine_ips
+	# IP and xpra sockets are mapped ahead of time to prevent overlaps during parallel start
+	# Get the info needed to resolve sockets, then record the sockets in the _TMP_IP file
+	get_info _XPRA_SOCKETS
+	_socket=100
+	for _jail in $_FULLIST ; do
+		determine_ips
+		determine_xpra_socket
+	done
 
 	# Control jails must be started first
 	for _cjail in $(echo "$_CJAILS" | sort | uniq) ; do

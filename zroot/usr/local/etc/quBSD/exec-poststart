@@ -47,6 +47,8 @@ get_options "$@"
 
 handle_dhcp
 
+start_xpra $JAIL
+
 security_flags
 
 exit 0

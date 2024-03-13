@@ -49,6 +49,8 @@
 # select_snapshot      - Find/create ROOTENV snapshot for reclone.
 # copy_control_keys    - SSH keys for control jail are copied over to running env.
 # monitor_startstop    - Monitors whether qb-start or qb-stop is still alive
+# monitor_vm_stop      - Monitors whether qb-start or qb-stop is still alive
+# start_xpra           - Determines the status of X11 and starts xpra for GUI envs 
 
 #################################  STATUS  CHECKS  #################################
 # chk_isblank          - Posix workaround: Variable is [-z <null> OR [[:blank:]]*]
@@ -389,6 +391,9 @@ get_info() {
 			;;
 		_XNAME)  # Gets the name of the active window
 			_value=$(xprop -id $(get_info -e _XID) WM_NAME _NET_WM_NAME WM_CLASS)
+			;;
+		_XPRA_SOCKETS)  # Gets the name of the active window
+			_value=$(pgrep -fl "xpra start" | sed -En 's/.*xpra start :([0-9]+) .*/\1/p')
 			;;
 		_XPID)   # Gets the PID of the active window.
 			_value=$(xprop -id $(get_info -e _XID) _NET_WM_PID | grep -Eo "[[:alnum:]]+$")
@@ -951,6 +956,79 @@ monitor_vm_stop() {
 	eval $_R1
 }
 
+discover_xpra_socket() {
+	# Finds an unused socket for xpra (technically DISPLAY, but socket feels more descriptve)
+	local _fn="discover_xpra_socket" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	local _socket
+	while getopts qV opts ; do case $opts in
+		q) _q='-q' ;;
+		V) local _V="-V" ;;
+		*) get_msg -m _e9 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
+
+	# Obtain necessary information if not already present (for exec-poststart)
+	[ -z "$_TMP_IP" ] && _TMP_IP="${QTMP}/.qb-start_temp_ip"	
+	[ -z "$_XPRA_SOCKETS" ] && get_info _XPRA_SOCKETS 
+	[ -z "$_socket" ] && _socket="100"
+	
+	while : ; do 
+		# Check the TMP_IP, and host ps for an unused xpra socket (DISPLAY) number
+		if grep -Eqs "$_socket" $_TMP_IP || echo "$_XPRA_SOCKETS" | grep -Eqs "$_socket" ; then	
+			_socket=$(( _socket + 1 ))
+			# Error after arbitrary 200 cycles to prevent infinite loop	
+			[ "$_socket" -gt 300 ] && get_msg $_q $_V -m _e && eval $_R1
+		else 
+			break	
+		fi
+	done
+
+	echo $_socket
+	eval $_R0	
+}
+
+start_xpra() {
+	# Starts the xpra server, then client
+	local _fn="start_xpra" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	while getopts qV opts ; do case $opts in
+		q) _q='-q' ;;
+		V) local _V="-V" ;;
+		*) get_msg -m _e9 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
+
+	local _jail="$1"
+	[ -z "$_jail" ] && get_msg $_q -m _e0 -- "JAIL" && eval $_R1
+
+	# Get an available xpra socket (DISPLAY) number
+	! _socket=$(discover_xpra_socket) && get_msg $_q $_V -m _e && eval $_R1
+
+	if chk_isvm "$_jail" ; then
+		:
+	else
+		# Start the server inside the jail
+		jexec -l -U "$_jail" "$_jail" xpra start :${_socket} --pulseaudio=no --notifications=no \
+			--tray=no --system-tray=no > /dev/null 2>&1 &
+
+		# It takes a moment for the server to start. Loop wait
+		_cycle=0 ; sleep .5
+		while : ; do
+			if xpra list --socket-dir="${M_QROOT}/${_jail}/tmp/xpra" 2>&1 \
+					| grep -Eqs "LIVE session at :${_socket}"
+			then	
+				# Only attach if Xorg is actually running on host
+				_display=$(pgrep -fl Xorg | sed -En "s/.*Xorg (:[0-9]+) .*/\1/p") \
+					&&	DISPLAY="$_display" xpra attach \
+						"socket:${M_QROOT}/${_jail}/tmp/xpra/${_socket}/socket" \
+						--pulseaudio=no --notifications=no --tray=no > /dev/null 2>&1 &
+				break
+			else
+				sleep .5 && _cycle=$(( _cycle + 1 ))
+				[ "$_cycle" -gt 10 ] && get_msg $_q $_V -m _e
+			fi
+		done	
+	fi
+}
 
 
 ########################################################################################
