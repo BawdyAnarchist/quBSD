@@ -1,10 +1,12 @@
 
 ### UPGRADES
 
-GUI SECURITY
+GUI SECURITY 
+## I'M GETTING MASSIVE CPU USAGE, and often delays inside apps. NEED TO TROUBLESHOOT
+	- Need to create a check in qb-cmd that the xpra is attached if it's an xpra jail 
+	- qmap should have an option for xpra true/false. Sometimes you want the host connection
+	- Change qb-create and qb-rename to get the proper shell  
 	- Gonna have to figure out a new way of assessing the jail'd status of a window
-	- add test for x11 server on the jail when doing start_xpra
-	- startx needs to xpra attach all jails running an xpra server 
 
 Host as Unprivileged user     
 	- doas commands allowed by unprivileged user
