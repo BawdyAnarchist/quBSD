@@ -50,7 +50,7 @@
 # copy_control_keys    - SSH keys for control jail are copied over to running env.
 # monitor_startstop    - Monitors whether qb-start or qb-stop is still alive
 # monitor_vm_stop      - Monitors whether qb-start or qb-stop is still alive
-# start_xpra           - Determines the status of X11 and starts xpra for GUI envs 
+# start_xpra           - Determines the status of X11 and starts xpra for GUI envs
 
 #################################  STATUS  CHECKS  #################################
 # chk_isblank          - Posix workaround: Variable is [-z <null> OR [[:blank:]]*]
@@ -58,6 +58,7 @@
 # chk_truefalse        - When inputs must be either true or false
 # chk_integer          - Checks that a value is an integer, within a range
 # chk_avail_jailname   - Checks that a proposed jailname is acceptable
+# get_jail_shell       - Gets the SHELL for a particular jail
 
 #################################  SANITY  CHECKS  #################################
 # chk_valid_zfs        - Checks for presence of zfs dataset. Redirect to null
@@ -691,6 +692,7 @@ reclone_zroot() {
 
 	# Jails need to usermod for unique user.
 	if ! chk_isvm "$_jail" ; then
+		get_jail_shell "$_jail"
 		# Drop the flags for etc directory and add the user for the jailname
 		chflags -R noschg ${M_QROOT}/${_jail}/etc/
 		pw -V ${M_QROOT}/${_jail}/etc/ \
@@ -967,24 +969,30 @@ discover_xpra_socket() {
 		*) get_msg -m _e9 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
-	# Obtain necessary information if not already present (for exec-poststart)
-	[ -z "$_TMP_IP" ] && _TMP_IP="${QTMP}/.qb-start_temp_ip"	
-	[ -z "$_XPRA_SOCKETS" ] && get_info _XPRA_SOCKETS 
+	local _jail="$1"
+
+	# See if the jail/socket combo is already allocated in _TMP_IP. Return if so.
+	[ -z "$_TMP_IP" ] && _TMP_IP="${QTMP}/.qb-start_temp_ip"
+	[ -e "$_TMP_IP" ] && _socket=$(sed -En "s/^${_jail} XPRA ([0-9]+)/\1/p" $_TMP_IP)
+	[ "$_socket" ] && echo "$_socket" && eval $_R0
+
+	# Initialize key variables if not already done
+	[ -z "$_XPRA_SOCKETS" ] && get_info _XPRA_SOCKETS
 	[ -z "$_socket" ] && _socket="100"
-	
-	while : ; do 
+
+	# If the socket is empty (nothing in _TMP_IP), then find an available socket
+	while : ; do
 		# Check the TMP_IP, and host ps for an unused xpra socket (DISPLAY) number
-		if grep -Eqs "$_socket" $_TMP_IP || echo "$_XPRA_SOCKETS" | grep -Eqs "$_socket" ; then	
+		if grep -Eqs "XPRA $_socket" $_TMP_IP || echo "$_XPRA_SOCKETS" | grep -Eqs "$_socket" ; then
 			_socket=$(( _socket + 1 ))
-			# Error after arbitrary 200 cycles to prevent infinite loop	
+			# Error after arbitrary 200 cycles to prevent infinite loop
 			[ "$_socket" -gt 300 ] && get_msg $_q $_V -m _e && eval $_R1
-		else 
-			break	
+		else break
 		fi
 	done
 
 	echo $_socket
-	eval $_R0	
+	eval $_R0
 }
 
 start_xpra() {
@@ -1000,33 +1008,60 @@ start_xpra() {
 	local _jail="$1"
 	[ -z "$_jail" ] && get_msg $_q -m _e0 -- "JAIL" && eval $_R1
 
+	# Check that Xpra is installed in the ROOTENV before continuing. Return 0 if not present
+	_rootenv=$(get_jail_parameter -deqs ROOTENV $_jail)
+	[ ! -e "${M_QROOT}/${_rootenv}/usr/local/bin/xpra" ] && eval $_R0
+
 	# Get an available xpra socket (DISPLAY) number
-	! _socket=$(discover_xpra_socket) && get_msg $_q $_V -m _e && eval $_R1
+	! _socket=$(discover_xpra_socket "$_jail") && get_msg $_q $_V -m _e && eval $_R1
 
 	if chk_isvm "$_jail" ; then
 		:
 	else
 		# Start the server inside the jail
-		jexec -l -U "$_jail" "$_jail" xpra start :${_socket} --pulseaudio=no --notifications=no \
-			--tray=no --system-tray=no > /dev/null 2>&1 &
+		jexec -l -U "$_jail" "$_jail" xpra start --pulseaudio=no --notifications=no \
+			--tray=no --system-tray=no :${_socket} > /dev/null 2>&1 &
+
+		# Modify the login environment
+		_b='.profile .bash_profile .bashrc .bash_login .kshrc .shrc .zshrc .zshenv .zprofile .zlogin'
+		_c='.cshrc .tcshrc .login'
+		for _shell in $_b ; do
+			if [ -e "${M_ZUSR}/${_jail}/home/${_jail}/${_shell}" ] ; then
+				sed -i '' -E "/DISPLAY/d" ${M_ZUSR}/${_jail}/home/${_jail}/${_shell}
+				echo "export DISPLAY=:${_socket}" >> ${M_ZUSR}/${_jail}/home/${_jail}/${_shell}
+			fi
+		done
+		for _shell in $_c ; do
+			if [ -e "${M_ZUSR}/${_jail}/home/${_jail}/${_shell}" ] ; then
+				sed -i '' -E "/DISPLAY/d" ${M_ZUSR}/${_jail}/home/${_jail}/${_shell}
+				echo "setenv DISPLAY :${_socket}" >> ${M_ZUSR}/${_jail}/home/${_jail}/${_shell}
+			fi
+		done
 
 		# It takes a moment for the server to start. Loop wait
 		_cycle=0 ; sleep .5
-		while : ; do
+
+		# Make sure that Xorg is on host before infinite loop that will try to connect Xpra
+		pkg query %n Xorg > /dev/null 2>&1 && while : ; do
+			# Infinite loop will connect host X11 whenever it starts.
 			if xpra list --socket-dir="${M_QROOT}/${_jail}/tmp/xpra" 2>&1 \
 					| grep -Eqs "LIVE session at :${_socket}"
-			then	
+			then
 				# Only attach if Xorg is actually running on host
-				_display=$(pgrep -fl Xorg | sed -En "s/.*Xorg (:[0-9]+) .*/\1/p") \
-					&&	DISPLAY="$_display" xpra attach \
-						"socket:${M_QROOT}/${_jail}/tmp/xpra/${_socket}/socket" \
-						--pulseaudio=no --notifications=no --tray=no > /dev/null 2>&1 &
-				break
+				if pgrep -fl Xorg ; then
+					_display=$(pgrep -fl Xorg | sed -En "s/.*Xorg (:[0-9]+) .*/\1/p") \
+						&&	DISPLAY="$_display" xpra attach \
+							--pulseaudio=no --notifications=no --tray=no \
+							"socket:${M_QROOT}/${_jail}/tmp/xpra/${_socket}/socket" > /dev/null 2>&1 &
+					break
+				fi
 			else
+				# Check that xpra still running inside jail. Otherwise no reason to continue loop.
+				pgrep -flj $_jail 'xpra start :' || break
 				sleep .5 && _cycle=$(( _cycle + 1 ))
 				[ "$_cycle" -gt 10 ] && get_msg $_q $_V -m _e
 			fi
-		done	
+		done
 	fi
 }
 
@@ -1153,6 +1188,40 @@ chk_avail_jailname() {
 	eval $_R0
 }
 
+get_jail_shell() {
+	local _fn="get_jail_shell" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	while getopts eqr:V opts ; do case $opts in
+			e) local _ec='true' ;;
+			q) local _qv='-q' ;;
+			r) local _rootenv="$OPTARG" ;;
+			V) local _V="-V" ;;
+			*) get_msg -m _e9 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
+
+	# Positional parmeters and function specific variables.
+	local _jail="$1"
+	[ -z "$_jail" ] && get_msg $_qv -m _e0 -- "jail" && eval $_R1
+
+	# First check jail/rw/etc/ directory
+	_shell=$(pw -V ${M_ZUSR}/${_jail}/rw/etc usershow -n ${_jail} 2>&1 \
+			| sed -En "s@.*${_jail}:(/bin/[a-z]+)@\1@p")
+
+	# If that didn't work, then use the ROOTENV user
+	if [ -z "$_shell" ] ; then
+		[ -z "$_rootenv" ] && _rootenv=$(get_jail_parameter -eqs ROOTENV $_jail)
+		_shell=$(pw -V ${M_QROOT}/${_rootenv}/etc usershow -n ${_rootenv} 2>&1 \
+			| sed -En "s@.*${_rootenv}:(/bin/[a-z]+)@\1@p") \
+
+		# If there is no ROOTENV user, then use the root shell of the ROOTENV
+		[ -z "$_shell" ] &&_shell=$(pw -V ${M_QROOT}/${_rootenv}/etc usershow -n root 2>&1 \
+				| sed -En "s@.*root:(/bin/[a-z]+)@\1@p")
+	fi
+
+	# Either echo the value, or globalize it to the SHELL variable
+	[ -n "$_ec" ] && echo $_shell || SHELL=${_shell}
+	eval $_R0
+}
 
 
 ########################################################################################
