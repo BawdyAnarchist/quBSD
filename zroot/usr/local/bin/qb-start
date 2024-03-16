@@ -102,8 +102,8 @@ encryption_and_mounts(){
 		&& zfs mount ${U_ZFS}/${_jail}
 }
 
-determine_ips() {
-	# Only get IPs for off jails
+ips_and_xpra() {
+	# Only get IP addrs and Xpra sockets for off jails
 	if ! chk_isrunning "$_jail" ; then
 		# IP calculations for 0control SSH connections
 		printf "%b" "$_jail SSH $(discover_open_ipv4 -t SSH $_jail)\n" >> $_TMP_IP
@@ -111,13 +111,10 @@ determine_ips() {
 		# For networking, skip hierarchy tops.
 		! echo_grep "$_HIERTOP" "$_jail" \
 			&& printf "%b" "$_jail NET $(discover_open_ipv4 -t NET $_jail)\n" >> $_TMP_IP
-	fi
-}
 
-determine_xpra_socket() {
-	# Only get xpra sockets for off jails
-	if ! chk_isrunning "$_jail" ; then
-		printf "%b" "$_jail XPRA $(discover_xpra_socket)\n" >> $_TMP_IP
+		# Check if operating on jail, and check if it has xpra installed 
+		! chk_isvm "$_jail" && [ -e "${M_QROOT}/${_rootenv}/usr/local/bin/xpra" ] \
+			&& printf "%b" "$_jail XPRA $(discover_xpra_socket "$_jail")\n" >> $_TMP_IP
 	fi
 }
 
@@ -190,6 +187,10 @@ main() {
 	_FULLIST=$(echo "$_FULLIST" | sort | uniq)
 	_STARTS=$(echo "$_CLIMBED" | awk 'NR == 1 || $2 > max { max = $2 } END { print max }')
 
+	# Pull XPRA info once, instead of pulling it each time in the next for loop.
+	get_info _XPRA_SOCKETS
+	_socket=100
+
 	# Things that need to be checked/coordinated for each jail that must be started
 	get_info _POPUP
 	for _jail in $_FULLIST ; do
@@ -199,20 +200,14 @@ main() {
 		# Coordinate ROOTENV and TEMPLATE snapshots to avoid races during reclone functions
 		_rootenv=$(get_jail_parameter -eq ROOTENV $_jail)
 		! echo_grep "$_ROOTENVS" "$_rootenv" && _ROOTENVS="$_ROOTENVS $_rootenv"
+
+		# IP and xpra sockets are mapped ahead of time to prevent overlaps with parallel starts
+		ips_and_xpra
 	done
 
 	# Record the coordinated snapshot for each ROOTENV to tmpsnaps
 	for _rootenv in $_ROOTENVS ; do
 		select_snapshot >> $_TMP_SNAPS
-	done
-
-	# IP and xpra sockets are mapped ahead of time to prevent overlaps during parallel start
-	# Get the info needed to resolve sockets, then record the sockets in the _TMP_IP file
-	get_info _XPRA_SOCKETS
-	_socket=100
-	for _jail in $_FULLIST ; do
-		determine_ips
-		determine_xpra_socket
 	done
 
 	# Control jails must be started first
