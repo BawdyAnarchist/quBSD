@@ -2,7 +2,6 @@
 
 . /usr/local/lib/quBSD/quBSD.sh
 
-#ln_dirs=$(echo "$ln_files" | sed "s#\(.*\)/.*#\1#" | sed '/^$/d' | uniq)
 main() {
 	JAIL="$1"
 
