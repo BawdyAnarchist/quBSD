@@ -22,6 +22,9 @@ get_options() {
 }
 
 parse_jail_vars() {
+	# Check /zusr/JAIL/rw/etc first; then ROOTENV user, then ROOTENV root. Returns var: $SHELL
+	get_jail_shell "$JAIL"
+
 	# Default _CMD is $SHELL. If [-v] keep REDIRECT null, ${parameter-word}, otherwise dev/null
 	[ -z "$_CMD" ] && _CMD="${_CMD:=$SHELL}" || _REDIRECT="${_REDIRECT- > /dev/null 2>&1 &}"
 
