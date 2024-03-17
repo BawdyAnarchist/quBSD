@@ -497,7 +497,7 @@ change_datasets() {
 
 	# If a special pw user file was copied over, it needs to be modified.
 	if pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usershow 1001 >> /dev/null 2>&1 ; then
-		[ -e ${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL} ] \
+		[ -e "${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL}" ] \
 													|| mkdir -p ${M_ZUSR}/${NEWJAIL}/home/${NEWJAIL}
 		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ usermod 1001 -l $NEWJAIL
 		pw -V ${M_ZUSR}/${NEWJAIL}/rw/etc/ groupmod 1001 -l $NEWJAIL
