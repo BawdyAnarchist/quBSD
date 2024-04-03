@@ -1018,9 +1018,14 @@ start_xpra() {
 	if chk_isvm "$_jail" ; then
 		:
 	else
+		# Make sure things start in a clean state
+		rm -r ${M_ZUSR}/${_jail}/home/${_jail}/.xpra/* > /dev/null 2>&1
+
 		# Start the server inside the jail
-		jexec -l -U "$_jail" "$_jail" xpra start --pulseaudio=no --notifications=no \
-			--tray=no --system-tray=no :${_socket} > /dev/null 2>&1 &
+		jexec -l -U "$_jail" "$_jail" xpra start :${_socket} --socket-dir=/tmp/xpra --audio=no \
+			--notifications=no --tray=no --system-tray=no --opengl=force \
+			--mmap=/tmp/xpra --desktop-scaling=auto --clipboard=yes --clipboard-direction=both \
+			> /dev/null 2>&1 &
 
 		# Modify the login environment
 		_b='.profile .bash_profile .bashrc .bash_login .kshrc .shrc .zshrc .zshenv .zprofile .zlogin'
@@ -1038,31 +1043,76 @@ start_xpra() {
 			fi
 		done
 
-		# It takes a moment for the server to start. Loop wait
-		_cycle=0 ; sleep .5
-
-		# Make sure that Xorg is on host before infinite loop that will try to connect Xpra
-		pkg query %n Xorg > /dev/null 2>&1 && while : ; do
-			# Infinite loop will connect host X11 whenever it starts.
-			if xpra list --socket-dir="${M_QROOT}/${_jail}/tmp/xpra" 2>&1 \
-					| grep -Eqs "LIVE session at :${_socket}"
-			then
-				# Only attach if Xorg is actually running on host
-				if pgrep -fl Xorg ; then
-					_display=$(pgrep -fl Xorg | sed -En "s/.*Xorg (:[0-9]+) .*/\1/p") \
-						&&	DISPLAY="$_display" xpra attach \
-							--pulseaudio=no --notifications=no --tray=no \
-							"socket:${M_QROOT}/${_jail}/tmp/xpra/${_socket}/socket" > /dev/null 2>&1 &
-					break
-				fi
-			else
-				# Check that xpra still running inside jail. Otherwise no reason to continue loop.
-				pgrep -flj $_jail 'xpra start :' || break
-				sleep .5 && _cycle=$(( _cycle + 1 ))
-				[ "$_cycle" -gt 10 ] && get_msg $_q $_V -m _e
-			fi
-		done
+		# If Xorg is installed on host, begin loop (external to start script) to attach xpra.
+		pkg query %n Xorg > /dev/null 2>&1 && launch_xpra_loop &
 	fi
+	eval $_R0
+}
+
+launch_xpra_loop() {
+	# We dont want to hang the start script merely waiting for the host to attach to xpra.
+	# This function is started in a subshell, creates a script, then forks to new process.
+	local _fn="launch_xpra_loop" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	# Send the commands to a temp file
+	cat <<-ENDOFCMD > "${QTMP}/.wait_xpra_${_jail}"
+		#!/bin/sh
+		# New script wont know about caller functions. Need to source them again
+		. /usr/local/lib/quBSD/quBSD.sh
+		. /usr/local/lib/quBSD/msg-quBSD.sh
+
+		# Get globals, although errfiles arent needed
+		get_global_variables
+		rm_errfiles
+
+		# Launch the loop that waits for X11 or for the jail's xpra server to stop
+		connect_host_to_xpra "$_jail" "$_socket"
+ENDOFCMD
+
+	# Make the file executable, and fork to it
+	chmod +x "${QTMP}/.wait_xpra_${_jail}"
+	exec "${QTMP}/.wait_xpra_${_jail}"
+	eval $_R0
+}
+
+connect_host_to_xpra() {
+	# It takes a moment for xpra server to start; plus, host might not be in an Xorg session yet.
+	# /tmp script will manage the loop, waiting for host X11 to start, or jailed xpra server to stop
+
+	# Cleanup the temporary script
+	_jail="$1"
+	_socket="$2"
+	trap "rm ${QTMP}/.wait_xpra_${_jail}" TERM INT HUP QUIT EXIT
+
+	# Wait for the jailed xpra serve to be ready, before continuing to the host X11 wait loop
+	while : ; do
+		if xpra list --socket-dir="${M_QROOT}/${_jail}/tmp/xpra" 2>&1 \
+			| grep -Eqs "LIVE session at :${_socket}"
+		then break
+		else
+			# If xpra fails inside the jail, exit the wait script entirely. Otherwise, loop.
+			! pgrep -qflj ${_jail} xpra && exit 0
+			sleep .5
+		fi
+	done
+
+	while : ; do
+		# Parallel starts, multiple loops sometimes false positive the `pgreg Xorg`. Filter out pgrep
+		#if pgrep -fl '/usr/local/libexec/Xorg' | grep -v pgrep >> /root/tempf ; then
+		if ps -ax | grep '/usr/local/libexec/Xorg' | grep -v grep >> /root/tempf ; then
+			_display=$(pgrep -fl Xorg | sed -En "s/.*Xorg (:[0-9]+) .*/\1/p")
+
+			DISPLAY="$_display" xpra attach --audio=no --notifications=no \
+				--tray=no --system-tray=no --opengl=force --mmap=${Q_ROOT}/${_jail}/tmp/xpra \
+				--desktop-scaling=auto --clipboard=yes --clipboard-direction=both \
+				--socket-dir=${M_QROOT}/${_jail}/tmp/xpra > /dev/null 2>&1 &
+			break
+		else
+			# Check xpra server is still running inside jail. Otherwise no reason to continue loop.
+			! pgrep -flqj ${_jail} 'xpra start :' > /dev/null 2>&1 && break
+			sleep 1
+		fi
+	done
 }
 
 
@@ -2489,7 +2539,7 @@ launch_vm() {
 		echo "\$(date "+%Y-%m-%d_%H:%M") VM: $_VM HAS ENDED." | tee -a $QBLOG ${QBLOG}_${_VM}
 ENDOFCMD
 
-	# Make the file executabel
+	# Make the file executable
 	chmod +x "${QTMP}/qb-bhyve_${_VM}"
 
 	# Call the temp file with exec to separate it from the caller script
