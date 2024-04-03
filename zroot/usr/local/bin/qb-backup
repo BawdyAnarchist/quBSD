@@ -170,7 +170,7 @@ execute_backup() {
 
 		# Modify mountpoint to prevent overmounting on next boot
 		[ "$(zfs list -Ho mountpoint $_dataset)" = '-' ] \
-			&& _MOUNT="" || MOUNT="-o mountpoint=/${ZBAK}/${_dataset}"
+			&& MOUNT="" || MOUNT="-o mountpoint=/${ZBAK}/${_dataset}"
 
 		if [ "$NORUN" ] ; then
 			zfs send -nvw $REPL $_snap | tee -a $BAK_LOG
