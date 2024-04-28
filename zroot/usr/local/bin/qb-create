@@ -105,8 +105,8 @@ checks_install() {
 
 	chk_valid_zfs "${R_ZFS}/${NEWJAIL}" && get_msg2 -Em _e8_4
 
-	# Add qmap line to launch VM with ahci-cd ISO
-	echo "$NEWJAIL  BHYVE_CUSTM  -s #,ahci-cd,${INSTALL}" >> $_TMP_PARAMS
+	# Add qmap line to launch VM with ahci-hd ISO
+	echo "$NEWJAIL  BHYVE_CUSTM  -s #,ahci-hd,${INSTALL}" >> $_TMP_PARAMS
 }
 
 
@@ -639,7 +639,7 @@ launch_install() {
 }
 
 cleanup_finished() {
-	# Once complete, only certain temporary item need removed.
+	# Once complete, only certain temporary items need removed.
 
 	# Remove the TMP files if they exist (ignore if they dont)
 	rm $_TMP_WARN $_TMP_PARAMS $_TMP_JCONF > /dev/null 2>&1
