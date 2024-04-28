@@ -403,7 +403,7 @@ change_datasets() {
 	# ZROOT changes: Only a new ROOTENV is duplicated. Everything else is cloned.
 	if [ -z "${CLASS##rootVM}" ] ; then
 		# Create the empty dataset
-		zfs create -V ${VOLSIZE} -o volmode=dev $_ASANP ${R_ZPARENT} && return 0
+		zfs create -V ${VOLSIZE} -o volmode=dev $_ASNAP ${R_ZPARENT} && return 0
 	elif [ -z "${CLASS##rootjail}" ] ; then
 		echo ''
 		zfs send -vP "$R_SNAP" | zfs recv -v $_ASNAP ${R_ZFS}/${NEWJAIL}
