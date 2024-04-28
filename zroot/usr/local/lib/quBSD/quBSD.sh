@@ -2254,7 +2254,7 @@ cleanup_vm() {
 	bhyvectl --vm="$_VM" --destroy > /dev/null 2>&1
 
 	# Set the PPT device back to its original state before VM prep/launch
-	return_ppt "$_VM"
+	[ ! "$_ppt" = "none" ] && return_ppt "$_VM"
 
 	# If it was a norun, dont spend time recloning
 	[ -n "$_norun" ] && eval $_R0
