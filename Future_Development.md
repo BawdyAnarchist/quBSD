@@ -1,4 +1,14 @@
 
+There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
+
+Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
+
+Probably qb-stop -F should remove lingering VM files in /tmp
+
+qb-create removal of achi-hd might not be working. I dunno I changed it to hd so maybe that was why
+
+When you restore, the datasets dont inherit their qubsd:autosnap properties
+
 ### UPGRADES
 
 High CPU usage
@@ -55,7 +65,6 @@ pwd
 	- To get around the pw -V problem, you could put /usr/local/bin/pw wrapper
 
 dispVM
-	- Add new class and boot practices
 	- vm-rc.local should use its IP address to get it's hostname from 0control ftp server
 		- This will require creating a new file in /home/ftp/<IPaddr> on 0control
 

@@ -712,7 +712,6 @@ reclone_zusr() {
 	local _jailzfs="${U_ZFS}/${_jail}"
 	local _template="$2"
 	local _templzfs="${U_ZFS}/${_template}"
-
 	local _date=$(date +%s)
 	local _ttl=$(( _date + 30 ))
 	local _newsnap="${_templzfs}@${_date}"
@@ -722,11 +721,13 @@ reclone_zusr() {
 	[ -z "$_template" ] && get_msg $_qr -m _e0 -- "template" && eval $_R1
 
 	# `zfs-diff` from other jails causes a momentary snapshot which the reclone operation
-	while [ -z "${_presnap##*@zfs-diff*}" ] ; do
-		# Loop until a proper snapshot is found
-		sleep .1
-		_presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
-	done
+	if chk_valid_zfs "$_presnap" ; then
+		while [ -z "${_presnap##*@zfs-diff*}" ] ; do
+			# Loop until a proper snapshot is found
+			sleep .1
+			_presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
+		done
+	fi
 
 	# If there's a presnap, and no changes since then, use it for the snapshot.
 	[ "$_presnap" ] && ! [ "$(zfs diff "$_presnap" "$_templzfs")" ] && _newsnap="$_presnap"
@@ -743,15 +744,17 @@ reclone_zusr() {
 	! chk_isrunning "$_jail" && { zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1 \
 		; zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs} ;}
 
-	# Drop the flags for etc directory and add the user for the jailname
-	[ -e "${M_ZUSR}/${_jail}/rw" ] && chflags -R noschg ${M_ZUSR}/${_jail}/rw
-	[ -e "${M_ZUSR}/${_jail}/home/${_template}" ] \
-			&& chflags noschg ${M_ZUSR}/${_jail}/home/${_template}
-	# Replace the <template> jailname in fstab with the new <jail>
-	sed -i '' -e "s/${_template}/${_jail}/g" ${M_ZUSR}/${_jail}/rw/etc/fstab > /dev/null 2>&1
+	if ! chk_isvm ${_jail} ; then
+		# Drop the flags for etc directory and add the user for the jailname
+		[ -e "${M_ZUSR}/${_jail}/rw" ] && chflags -R noschg ${M_ZUSR}/${_jail}/rw
+		[ -e "${M_ZUSR}/${_jail}/home/${_template}" ] \
+				&& chflags noschg ${M_ZUSR}/${_jail}/home/${_template}
+		# Replace the <template> jailname in fstab with the new <jail>
+		sed -i '' -e "s/${_template}/${_jail}/g" ${M_ZUSR}/${_jail}/rw/etc/fstab > /dev/null 2>&1
 
-	# Rename directories and mounts with dispjail name
-	mv ${M_ZUSR}/${_jail}/home/${_template} ${M_ZUSR}/${_jail}/home/${_jail} > /dev/null 2>&1
+		# Rename directories and mounts with dispjail name
+		mv ${M_ZUSR}/${_jail}/home/${_template} ${M_ZUSR}/${_jail}/home/${_jail} > /dev/null 2>&1
+	fi
 
 	eval $_R0
 }
@@ -1432,7 +1435,7 @@ chk_valid_class() {
 	# Valid inputs are: appjail | rootjail | cjail | dispjail | appVM | rootVM
 	case $_value in
 		'') get_msg $_q -m _e0 -- "CLASS" && eval $_R1 ;;
-		appjail|dispjail|rootjail|cjail|rootVM|appVM) eval $_R0 ;;
+		appjail|dispjail|rootjail|cjail|rootVM|appVM|dispVM) eval $_R0 ;;
 		*) get_msg $_q -m _e15 && get_msg $_q -m _e1 -- "$_value" "CLASS" && eval $_R1 ;;
 	esac
 }
@@ -2233,7 +2236,7 @@ cleanup_vm() {
 	# Bring all recorded taps back to host, and destroy
 	for _tap in $(sed -E 's/ .*$//' "${QTMP}/vmtaps_${_VM}" 2> /dev/null) ; do
 		if [ -n "$_norun" ] ; then
-			ifconfig "$_tap" destroy 2> /dev/null
+			ifconfig "$_tap" destroy 2>&1 /dev/null
 			sed -i '' -E "/$_tap/d" ${QTMP}/control_netmap
 		else
 			# Trying to prevent searching in all jails, by guessing where tap is
@@ -2259,11 +2262,14 @@ cleanup_vm() {
 	# If it was a norun, dont spend time recloning
 	[ -n "$_norun" ] && eval $_R0
 
-	# Pull _rootenv in case it wasn't provided
+	# Pull _rootenv in case it wasn't provided, and reclone it
 	[ -z "$_rootenv" ] && ! _rootenv=$(get_jail_parameter -e ROOTENV $_VM) && eval $_R1
-
-	# Destroy the dataset
 	reclone_zroot -q "$_VM" "$_rootenv"
+
+	# If it's a dispVM then get the template, and reclone it
+	[ "$(get_jail_parameter -es CLASS $_VM)" = "dispVM" ] && [ -z "$_template" ] \
+		&& ! _template=$(get_jail_parameter -e TEMPLATE $_VM) && eval $_R1
+	reclone_zusr "$_VM" "$_template"
 
 	# Remove the /tmp files
 	rm "${QTMP}/qb-bhyve_${_VM}" 2> /dev/null
@@ -2343,6 +2349,7 @@ prep_bhyve_options() {
 	_bhyveopts=$(get_jail_parameter -de BHYVEOPTS "$_VM")  || eval $_R1
 	_rootenv=$(get_jail_parameter -e ROOTENV "$_VM")       || eval $_R1
 	_taps=$(get_jail_parameter -de TAPS "$_VM")            || eval $_R1
+	_template=$(get_jail_parameter -ez TEMPLATE "$_VM")    || eval $_R1
 	_vcpus=$(get_jail_parameter -de VCPUS "$_VM")          || eval $_R1
 	_vnc=$(get_jail_parameter -dez VNC "$_VM")             || eval $_R1
 	_x11=$(get_jail_parameter -dez X11 "$_VM")             || eval $_R1
