@@ -2290,7 +2290,7 @@ return_ppt() {
 	[ -z "$_VM" ] && get_msg $_q -m _e0 -- "VM name" && eval $_R1
 
 	# Get PPT devices from the actual bhyve command that was launched for the VM
-	_bhyvecmd=$(tail -1 "${QBLOG}_${_VM}")
+	_bhyvecmd=$(tail -1 "${QBLOG}_${_VM}" 2>&1)
 	while : ; do
 		_newppt=$(echo "$_bhyvecmd" | sed -En "s@.*passthru,([0-9/]+[0-9/]+[0-9/]+ ).*@\1@p")
 		[ -z "$_newppt" ] && break
