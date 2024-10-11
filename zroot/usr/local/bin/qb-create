@@ -87,8 +87,7 @@ checks_master() {
 	checks_zopts
 
 	# One more check for new install rootVM, to ensure there's a way to connect to it
-	[ "$INSTALL" ] && [ "$VNC" = "false" ] && [ "$TMUX" = "false" ] && [ "$X11FWD" = "false" ] \
-															&& get_msg2 -m _w4 >> $_TMP_WARN
+	[ "$INSTALL" ] && [ "$VNC" = "false" ] && [ "$TMUX" = "false" ] && get_msg2 -m _w4 >> $_TMP_WARN
 }
 
 checks_install() {
@@ -698,7 +697,7 @@ main() {
 
 	# Give VM a moment for the VM to launch, then delete the special qmap line, and exit
 	sleep 10
-	sed -i '' -E "\@^${NEWJAIL}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+-s #,ahci-cd,${INSTALL}@d" $QMAP
+	sed -i '' -E "\@^${NEWJAIL}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+-s #,ahci-hd,${INSTALL}@d" $QMAP
 }
 
 get_global_variables
