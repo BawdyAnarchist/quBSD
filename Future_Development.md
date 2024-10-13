@@ -42,7 +42,7 @@ qb-create
 	- -z dirs recreated files too, not just directories
 	- qb-create removal of achi-hd might not be working. I dunno I changed it to hd so maybe that was why
 
-qb_ssh
+qb_ssh [[actually it's likely I dont need this now that I'm gonna go to fat32 zfs volumes for new VMs)
 	- Probably can remove the FreeBSD parts of it. Maybe the Net/Open ones as well 
 
 qb-pci
@@ -175,4 +175,8 @@ loader.conf needs if_wg_load="YES"
 	autoboot_delay="2"
 
 zpool import -f vmusr
+
+
+### NEW INSTALLER NOTES 
+pkg install might need xpra or xephyr added depending on how that all turns out. Also doas if you get off root.
 
