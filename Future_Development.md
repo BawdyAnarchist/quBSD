@@ -64,6 +64,12 @@ qb-stat
 
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP
 
+0control qb-copy is SLOW af alot of times
+
+/etc/devfs.rules
+	- I probably have the mixer being added, but jails don't need it.
+	- the new one for webcam
+
 Take another hack at the recording device problems
 
 Check HDAC - I think my sound board is now supported.
@@ -86,19 +92,9 @@ I think `jail` caches fstab before completion of exec.prepare which edits it. Ne
 
 ##### qubsd installer #######
 
-kldload pf is required (in addition to others)
+zfs custom props to the datasets as created (qubsd-installer)
 
-/etc/devfs.rules - I probably have the mixer being added, but jails don't need it.
-	- qb-autosnap 
-	- /etc/crontab
-	- Need to add the zfs custom props to the datasets as created (qubsd-installer)
-
-qb-autostart
-	/etc/rc.conf
-	/rc.d/jautostart 
-
-Expand install options     
-	Can select to merge zroot and zusr with other existing dataset/mount     
+rc.conf
 
 /qubsd/0base installer needs to create the /rw/ folder, or appjails based on it, won't mount properly
 	Also touch /etc/fstab with header so disps work. (for all jails actually)
@@ -113,28 +109,22 @@ Expand install options
 	- copy .cshrc and .vim*
 	- change /rc.d/wireguard to remove the kldunload
 
+net-jails - Check that pf conf is updated with required dhcp port, and the simplified version
+
 0serv and 0serv-template need integrated	
 	- www and usr diretories are quite large. Script integration:
 		- at quBSD installation, copy files over from 0serv
 		- qb-create should in realtime copy over /usr/local/etc from 0serv
 		- There might even be problems with pkg-upgrade operating on this dir
 		- Make sure to chown the directories as appropriate
-	
-devfs.rules
-	- add qubsd to the naming convention
-	- the new one for webcam
-	- Maybe the file should be added to the get_global_variables assignments library
-
-net-jails
-	pkg install isc-dhcp44-server bind918 wireguard-tools jq vim
-	- Check that pf conf is updated with required dhcp port, and the simplified version
-
-R_ZFS and U_ZFS ; and mountpoints changed. Less cumbersome, more straightforward
 
 Should make the $qubsd/zroot/0net 0gui 0vms and everything files here for specific stuff like rc.conf
 
 need to check if boot_mute is required now or if I got my messages problem for ttyv0 sorted out with _msg2 overhaul
 
+
+### NEW INSTALLER NOTES 
+pkg install might need xpra or xephyr added depending on how that all turns out. Also doas if you get off root.
 
 
 
@@ -172,7 +162,4 @@ need to check if boot_mute is required now or if I got my messages problem for t
 
 zpool import -f vmusr
 
-
-### NEW INSTALLER NOTES 
-pkg install might need xpra or xephyr added depending on how that all turns out. Also doas if you get off root.
 
