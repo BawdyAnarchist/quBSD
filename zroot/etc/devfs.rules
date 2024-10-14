@@ -33,5 +33,3 @@ add path 'tty*' unhide
 #add path drm unhide
 #add path 'drm/*' unhide
 #add path pci unhide
-
-
