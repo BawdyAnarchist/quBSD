@@ -1,0 +1,37 @@
+# net-jails need specific devices
+#
+[devfsrules_qubsd_netjail=]
+add include $devfsrules_hide_all
+add include $devfsrules_unhide_basic
+add include $devfsrules_unhide_login
+add include $devfsrules_jail
+add path pf unhide
+add path 'tun*' unhide
+# unhide bpf if you need tcpdump (then devfs restart)
+#add path 'bpf*' unhide #tcpdump
+# apparently ssh needs tty to function properly
+add path 'tty*' unhide 
+
+# GUI jail specifics
+#
+[devfsrules_qubsd_guijail=]
+#add include $devfsrules_hide_all
+#add include $devfsrules_unhide_basic
+#add include $devfsrules_unhide_login
+#add include $devfsrules_jail
+#add path 'mixer*' unhide
+#add path 'dsp*' unhide
+#add path 'video*' unhide
+
+# Graphics card specific devices
+#
+#add path 'nvidia*' unhide
+#
+#add path dri unhide
+#add path 'dri/*' unhide
+#add path 'dri/card*' unhide
+#add path drm unhide
+#add path 'drm/*' unhide
+#add path pci unhide
+
+
