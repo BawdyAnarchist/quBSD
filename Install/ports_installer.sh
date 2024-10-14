@@ -5,7 +5,7 @@
 
 # Repo location for files copy
 _SHARE="/usr/local/share/"
-_SHARE="/usr/local/share/quBSD"
+_REPO="/usr/local/share/quBSD"
 
 # Install dependencies - possibly also xpra, xephyr, and doas in later revisions
 pkg install bhyve-firmware tmux
@@ -24,7 +24,6 @@ rm ${_SHARE}/main.zip
 [ -e /boot/loader.conf.d ]  || mkdir -p /boot/loader.conf.d
 
 # Copy files to their directories 
-[ -e /etc/pf.conf ] && mv /etc/pf.conf /etc/pf.conf_orig
 cp -a ${_REPO}/zroot/usr/local/bin/*       /usr/local/bin/
 cp -a ${_REPO}/zroot/usr/local/lib/quBSD/* /usr/local/lib/quBSD/
 cp -a ${_REPO}/zroot/usr/local/etc/quBSD/* /usr/local/etc/quBSD/
@@ -32,4 +31,5 @@ cp -a ${_REPO}/zroot/usr/local/etc/rc.d/*  /usr/local/etc/rc.d/
 cp -a ${_REPO}/zroot/boot/loader.conf.d/*  /boot/loader.conf.d/
 
 # Check for AMD CPU, and add it to the loader file 
-dmesg | grep -Eqs "^CPU.*AMD" && echo 'hw.vmm.amdvi.enable="1"' >> /boot/loader.conf.d/qubsd_loader.conf
+dmesg | grep -Eqs "^CPU.*AMD" && echo -e "# This machine has an AMD CPU\nhw.vmm.amdvi.enable=\"1\"" \
+	>> /boot/loader.conf.d/qubsd_loader.conf
