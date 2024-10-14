@@ -131,14 +131,10 @@ net-jails
 
 R_ZFS and U_ZFS ; and mountpoints changed. Less cumbersome, more straightforward
 
-VMs integration
-	- install bhyve-uefi firmware
-	
-quBSD.conf removed. Everything now in jailmap.conf
-
 Should make the $qubsd/zroot/0net 0gui 0vms and everything files here for specific stuff like rc.conf
 
-loader.conf needs if_wg_load="YES"
+need to check if boot_mute is required now or if I got my messages problem for ttyv0 sorted out with _msg2 overhaul
+
 
 
 
