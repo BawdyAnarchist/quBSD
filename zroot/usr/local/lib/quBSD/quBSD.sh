@@ -127,8 +127,8 @@ get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
 
 	# Define variables for files
-	JCONF="/etc/jail.conf"
 	QBDIR="/usr/local/etc/quBSD"
+	JCONF="${QBDIR}/jail.conf"
 	QMAP="${QBDIR}/qubsdmap.conf"
 	QBLOG="/var/log/quBSD/quBSD.log"
 	QTMP="/tmp/quBSD"
