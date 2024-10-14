@@ -24,7 +24,7 @@ checks() {
 	if [ -n "$JAIL" ] ; then
 		chk_isrunning $JAIL || get_msg2 -Epm _e3
 		UNHIDE=$(grep "devfsrules_qubsd_webcamd" /etc/devfs.rules | grep -Eo "[[:digit:]]")
-		HIDE=$(grep "devfsrules_guijail" /etc/devfs.rules | grep -Eo "[[:digit:]]")
+		HIDE=$(grep "devfsrules_qubsd_guijail" /etc/devfs.rules | grep -Eo "[[:digit:]]")
 	fi
 }
 
