@@ -17,19 +17,36 @@ mv ${_SHARE}/quBSD-main ${_REPO}
 rm ${_SHARE}/main.zip
 
 # Make sure the required directories exist
-[ -e /usr/local/lib/quBSD ] || mkdir -p /usr/local/lib/quBSD
-[ -e /usr/local/bin/quBSD ] || mkdir -p /usr/local/bin/quBSD
 [ -e /usr/local/etc/quBSD ] || mkdir -p /usr/local/etc/quBSD
+[ -e /usr/local/lib/quBSD ] || mkdir -p /usr/local/lib/quBSD
 [ -e /usr/local/etc/rc.d ]  || mkdir -p /usr/local/etc/rc.d   
 [ -e /boot/loader.conf.d ]  || mkdir -p /boot/loader.conf.d
+[ -e /etc/cron.d ]          || mkdir -p /etc/cron.d
 
 # Copy files to their directories 
+cp -a ${_REPO}/zroot/usr/local/etc/quBSD/* /usr/local/etc/quBSD/
 cp -a ${_REPO}/zroot/usr/local/bin/*       /usr/local/bin/
 cp -a ${_REPO}/zroot/usr/local/lib/quBSD/* /usr/local/lib/quBSD/
-cp -a ${_REPO}/zroot/usr/local/etc/quBSD/* /usr/local/etc/quBSD/
 cp -a ${_REPO}/zroot/usr/local/etc/rc.d/*  /usr/local/etc/rc.d/
 cp -a ${_REPO}/zroot/boot/loader.conf.d/*  /boot/loader.conf.d/
+cp -a ${_REPO}/zroot/etc/cron.d/qubsd_cron /etc/cron.d/qubsd_cron
 
 # Check for AMD CPU, and add it to the loader file 
 dmesg | grep -Eqs "^CPU.*AMD" && echo -e "# This machine has an AMD CPU\nhw.vmm.amdvi.enable=\"1\"" \
 	>> /boot/loader.conf.d/qubsd_loader.conf
+
+# Handle devfs.rule by trying to find the first available rule numbers, then adding them
+rulenum1=$(sed -n "s/^\[devfsrules.*=//p ; s/\]//p" /etc/devfs.rules | tail -1)
+while : ; do
+	rulenum1=$(( rulenum1 + 1 ))
+	rulenum2=$(( rulenum1 + 2 ))
+	! grep -Eqs "^\[devfsrules.*=${rulenum1}" /etc/devfs.rules \
+		&& ! grep -Eqs "^\[devfsrules.*=${rulenum2}" /etc/devfs.rules && break
+done
+
+# Modify devfs.rules and also update jail.conf
+cat ${_REPO}/zroot/etc/devfs.rules >> /etc/devfs.rules 
+sed -i '' -E "s/(^\[devfsrules_qubsd_netjail=)/\1$rulenum1/" /etc/devfs.rules
+sed -i '' -E "s/(^\[devfsrules_qubsd_guijail=)/\1$rulenum2/" /etc/devfs.rules
+sed -i '' -E "s/NETRULENUM1/$rulenum1/g" /usr/local/etc/quBSD/jail.conf
+sed -i '' -E "s/GUIRULENUM2/$rulenum2/g" /usr/local/etc/quBSD/jail.conf
