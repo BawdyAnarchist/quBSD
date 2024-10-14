@@ -158,7 +158,7 @@ get_devfs_result() {
 
 	# Then get the full name of the rulenumber from devfs.rules
 	if [ -n "$_rulenum" ] ; then
-		_rulename=$(sed -En "s/.*devfsrules_(.*=${_rulenum}).*/\1/p" /etc/devfs.rules)
+		_rulename=$(sed -En "s/.*devfsrules_qubsd_(.*=${_rulenum}).*/\1/p" /etc/devfs.rules)
 
 		# Modify result
 		_RESULT=$(echo "$_RESULT" ; echo "$_jail  DEVFS_RULE  ${_rulename}")
