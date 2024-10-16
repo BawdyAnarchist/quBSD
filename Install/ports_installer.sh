@@ -50,3 +50,11 @@ sed -i '' -E "s/(^\[devfsrules_qubsd_netjail=)/\1$rulenum1/" /etc/devfs.rules
 sed -i '' -E "s/(^\[devfsrules_qubsd_guijail=)/\1$rulenum2/" /etc/devfs.rules
 sed -i '' -E "s/NETRULENUM1/$rulenum1/g" /usr/local/etc/quBSD/jail.conf
 sed -i '' -E "s/GUIRULENUM2/$rulenum2/g" /usr/local/etc/quBSD/jail.conf
+
+# Based on pciconf class=network, find the first interface listed in rc.conf and assume it's the primary nic 
+_nics=$(pciconf -lv | grep -B3 "= network" | grep -Eo "^[[:alnum:]]+" | grep -v none)
+for _dev in $_nics ; do
+	grep -E "^ifconfig_${_dev}" /etc/rc.conf \
+		&& sed "s/#nic=.*/nic=${_nic}/" ${_REPO}/Install/install.conf \
+		&& nic="$_dev" && break
+done
