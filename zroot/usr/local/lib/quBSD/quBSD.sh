@@ -1734,7 +1734,7 @@ chk_valid_ppt() {
 			[ -n "${_dtchmsg##*not configured}" ] && get_msg $_q -m _e22_1 -- "$_pcidev" \
 					&& get_msg $_q -m _e22 -- "$_pcidev" "$_VM" && eval $_R1
 
-			# Swich based on status of the device after being detached
+			# Switch based on status of the device after being detached
 			if pciconf -l $_pcidev | grep -Eqs "^none" ; then
 				# If the device is 'none' then set the driver to ppt (it attaches automatically).
 				! devctl set driver "$_pcidev" ppt && get_msg $_q -m _e22_2 -- "$_pcidev" \
