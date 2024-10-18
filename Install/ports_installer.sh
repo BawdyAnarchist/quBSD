@@ -1,6 +1,7 @@
 #!/bin/sh
 
-# Copies primary files onto host machine in a way that requires no user input.
+# Copies primary files onto host machine in a way that requires no user input, 
+# and which doesn't modify any pre-existing files outside of /usr/local 
 # This function will become the ports/pkg install script, with a secondary installer required later. 
 
 # Repo location for files copy
@@ -29,32 +30,15 @@ cp -a ${_REPO}/zroot/usr/local/bin/*       /usr/local/bin/
 cp -a ${_REPO}/zroot/usr/local/lib/quBSD/* /usr/local/lib/quBSD/
 cp -a ${_REPO}/zroot/usr/local/etc/rc.d/*  /usr/local/etc/rc.d/
 cp -a ${_REPO}/zroot/boot/loader.conf.d/*  /boot/loader.conf.d/
-cp -a ${_REPO}/zroot/etc/cron.d/qubsd_cron /etc/cron.d/qubsd_cron
 
 # Check for AMD CPU, and add it to the loader file 
 dmesg | grep -Eqs "^CPU.*AMD" && echo -e "# This machine has an AMD CPU\nhw.vmm.amdvi.enable=\"1\"" \
 	>> /boot/loader.conf.d/qubsd_loader.conf
-
-# Handle devfs.rule by trying to find the first available rule numbers, then adding them
-rulenum1=$(sed -n "s/^\[devfsrules.*=//p ; s/\]//p" /etc/devfs.rules | tail -1)
-while : ; do
-	rulenum1=$(( rulenum1 + 1 ))
-	rulenum2=$(( rulenum1 + 2 ))
-	! grep -Eqs "^\[devfsrules.*=${rulenum1}" /etc/devfs.rules \
-		&& ! grep -Eqs "^\[devfsrules.*=${rulenum2}" /etc/devfs.rules && break
-done
-
-# Modify devfs.rules and also update jail.conf
-cat ${_REPO}/zroot/etc/devfs.rules >> /etc/devfs.rules 
-sed -i '' -E "s/(^\[devfsrules_qubsd_netjail=)/\1$rulenum1/" /etc/devfs.rules
-sed -i '' -E "s/(^\[devfsrules_qubsd_guijail=)/\1$rulenum2/" /etc/devfs.rules
-sed -i '' -E "s/NETRULENUM1/$rulenum1/g" /usr/local/etc/quBSD/jail.conf
-sed -i '' -E "s/GUIRULENUM2/$rulenum2/g" /usr/local/etc/quBSD/jail.conf
 
 # Based on pciconf class=network, find the first interface listed in rc.conf and assume it's the primary nic 
 _nics=$(pciconf -lv | grep -B3 "= network" | grep -Eo "^[[:alnum:]]+" | grep -v none)
 for _dev in $_nics ; do
 	grep -E "^ifconfig_${_dev}" /etc/rc.conf \
 		&& sed "s/#nic=.*/nic=${_nic}/" ${_REPO}/Install/install.conf \
-		&& nic="$_dev" && break
+		&& break
 done
