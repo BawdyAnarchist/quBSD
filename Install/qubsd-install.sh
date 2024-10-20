@@ -80,15 +80,16 @@ get_usbs() {
 	tmp1=$(mktemp /tmp/qubsd_usbconf1)
 	tmp2=$(mktemp /tmp/qubsd_usbconf2)
 	tmp3=$(mktemp /tmp/qubsd_usbconf3)
-	trap 'rm $tmp1 $tmp2 $tmp3' INT TERM HUP QUIT EXIT
-	
+	tmp4=$(mktemp /tmp/qubsd_usbconf4)
+	trap 'rm $tmp1 $tmp2 $tmp3 $tmp4' INT TERM HUP QUIT EXIT
+
 	# Set monitoring loop to background, give user instructions, wait for user input when finished.
 	usb_config &
-	clear && msg_installer "_m7"
+	clear && msg_installer "_m7" 
 	read _cont 
 
 	# Signal usb_config infinite loop to exit, and give a moment for the loop to finish and exit 
-	echo "exit" > $tmp3
+	echo "exit" > $tmp4
 	sleep 1
 }
 
@@ -99,19 +100,27 @@ usb_config() {
 	# Continuously monitor usbconfig output for changes as user plugs/unplugs USB to ports.
 	while : ; do
 		usbconfig > $tmp2	
-		usb=$(diff $tmp1 $tmp2 | sed -En "/^> /s/^> //p")
-		echo "$USBS" | grep -qs "$usb" || USBS=$(echo "$USBS" ; echo "$usb")
+		usbs=$(diff $tmp1 $tmp2 | sed -En "/^> /s/^> //p")
+
+		# read-while necessary in case the user plugs multiple usbs simultaneously
+		echo "$usbs" | while IFS= read -r _line ; do
+			grep -qs "$_line" $tmp3 || echo "${_line}" >> $tmp3
+		done
+
 		sleep .5
-		grep -qs "exit" $tmp3 && break 
+		grep -qs "exit" $tmp4 && break 
 	done	
 
-	# Cleanup tmp files and trap
-	rm $tmp1 $tmp2 $tmp3
-	trap '' INT TERM HUP QUIT EXIT
+	return 0
 }
 
 translate_usbs() {
 	# Translate the output of usbconfig to ppt devices
+
+	USBS=$(cat $tmp3)
+	# Cleanup tmp files and trap
+	rm $tmp1 $tmp2 $tmp3 $tmp4
+	trap '' INT TERM HUP QUIT EXIT
 
 	# First find the corresponding PCI device name via sysctl
 	usbus=$(echo $USBS | grep -Eo "usbus[[:digit:]]+" | sed -E 's/usbus/usbus./')
@@ -233,30 +242,28 @@ install_0gui() {
 main() {
 	define_vars
 	load_kernel_modules
-read "END vars defined, kern mods loaded" sldkfj	
+
 	# PREPARATION - Get missing parameters from the user before making any changes 
 	get_datasets
-read "END get_datasets" sdlkfj
 	get_nic
-read "END get_nic"  sdlkfj
 	get_usbs
-read "END get_usbs"  sdlfkj
 	translate_usbs
-read "END translate_usbs"  sdlfkj
 
+echo no changes made yet. exiting. change line 262 to remove this and proceed
+exit 0
 	# SYSTEM INSTALLATION
 	add_gui_pkgs
-read "END add_gui_pkgs"  sdlfkj
+read -p "END add_gui_pkgs"  sdlfkj
 	create_datasets
-read "END create_datasets"  sdlfkj
+read -p "END create_datasets"  sdlfkj
 	modify_pptdevs
-read "END modify_pptdevs"  sdlfkj
+read -p "END modify_pptdevs"  sdlfkj
 	modify_devfs_rules
-read "END modify_devfs_rules"  sdlfkj
+read -p "END modify_devfs_rules"  sdlfkj
 
 	# ROOTJAILS INSTALLATION
 	install_0base
-read "END install 0base"  sdlfkj
+read -p "END install 0base"  sdlfkj
 	install_0net
 	install_0gui
 
