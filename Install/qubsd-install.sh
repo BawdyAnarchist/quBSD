@@ -1,14 +1,16 @@
 #!/bin/sh
 
 define_vars() {
-	_REPO="/usr/local/share/quBSD"
+	REPO="/usr/local/share/quBSD"
 	XINIT="/usr/local/etc/X11/xinit/xinitrc"
 	QLOADER="/boot/loader.conf.d/qubsd_loader.conf"
-	QCONF="/usr/local/etc/quBSD/qubsdmap.conf"
-	QJ_CONF="/usr/local/etc/quBSD/jail.conf"
+	Q_DIR="/usr/local/etc/quBSD"
+	QCONF="${Q_DIR}/qubsdmap.conf"
+	J_CONF="${Q_DIR}/jail.conf"
+	RC_CONF="${Q_DIR}/rc.conf"
 
 	# Read all uncommented variables from install.conf
-	. ${_REPO}/install.conf
+	. ${REPO}/install.conf
 	. /usr/local/lib/quBSD/msg-installer.sh
 }
 
@@ -78,7 +80,7 @@ get_usbs() {
 	tmp1=$(mktemp /tmp/qubsd_usbconf1)
 	tmp2=$(mktemp /tmp/qubsd_usbconf2)
 	tmp3=$(mktemp /tmp/qubsd_usbconf3)
-	trap "rm $tmp1 $tmp2 $tmp3" INT TERM HUP QUIT EXIT
+	trap 'rm $tmp1 $tmp2 $tmp3' INT TERM HUP QUIT EXIT
 	
 	# Set monitoring loop to background, give user instructions, wait for user input when finished.
 	usb_config &
@@ -144,7 +146,7 @@ create_datasets() {
 
 	# Modify qubsdmap and jail.conf with path for rootjails 
 	sed -i '' -E "s:(#NONE[[:blank:]]+jails_zfs[[:blank:]]+)zroot/qubsd:\1$jails_zfs:" $QCONF
-	sed -i '' -E "s:(^path=/)qubsd:\1${root_mount}:" $QJ_CONF 
+	sed -i '' -E "s:(^path=/)qubsd:\1${root_mount}:" $J_CONF 
 }
 
 modify_pptdevs() {
@@ -181,13 +183,13 @@ modify_devfs_rules() {
 	done
 
 	# Add the discovered rule numbers to quBSD devfs and jail.conf
-	cat ${_REPO}/zroot/etc/devfs.rules >> /etc/devfs.rules 
+	cat ${REPO}/zroot/etc/devfs.rules >> /etc/devfs.rules 
 	sed -i '' -E "s/(^\[devfsrules_qubsd_netjail=)/\1$rulenum1/" $tmp_devfs 
 	sed -i '' -E "s/(^\[devfsrules_qubsd_guijail=)/\1$rulenum2/" $tmp_devfs 
-	sed -i '' -E "s/NETRULENUM1/$rulenum1/g" $QJ_CONF 
-	sed -i '' -E "s/GUIRULENUM2/$rulenum2/g" $QJ_CONF
+	sed -i '' -E "s/NETRULENUM1/$rulenum1/g" $J_CONF 
+	sed -i '' -E "s/GUIRULENUM2/$rulenum2/g" $J_CONF
 
-	# Check for all GPUs in pciconf, and uncomment/unhide based on available vendor(s)
+	# Check for all GPUs in pciconf, and uncomment/unhide based on vendor(s)
 	for _dev in $(pciconf -l | sed -En "/class=0x03/s/(^[[:alnum:]]+).*/\1/p") ; do
 		if pciconf -lv $_dev | grep -Eqs "NVIDIA" ; then
 			sed -i '' -E "s/^#(add path.*nvidia.*)/\1/" $tmp_devfs 
@@ -202,6 +204,32 @@ modify_devfs_rules() {
 	rm $tmp_devfs
 }
 
+install_0base() {
+	# Create the zroot/qubsd dataset and extract the new jail
+	zfs create -o mountpoint="${jails_mount}/0base" -o qubsd:autosnap="true" ${jails_zfs}/0base
+	tar -C ${jails_mount}/0base -xf /usr/freebsd-dist/base.txz 
+	head -1 /etc/fstab > /qubsd/0base/etc/fstab
+
+	# Create the zusr dataset and copy files from the repo 
+	zfs create -o mountpoint="${zusr_mount}/0base" -o qubsd:autosnap="true" ${zusr_zfs}/0base
+	cp -a ${REPO}/zusr/0base/ ${zusr_mount}/0base
+
+	# base.txz point releases do not include patches. Update 0base
+	jail -c 0base
+	freebsd-update -b ${jails_mount}/0base fetch install
+}
+
+install_0net() {
+	# pkg install isc-dhcp44-server bind918 wireguard-tools vim jq
+	# copy .cshrc and .vim*
+	# ??change /rc.d/wireguard to remove the kldunload??
+}
+
+install_0gui() {
+	# pkg installs 
+	# copy .cshrc and .vim*
+
+}
 main() {
 	define_vars
 	load_kernel_modules
@@ -218,23 +246,27 @@ main() {
 	modify_pptdevs
 	modify_devfs_rules
 
-#	install_0base
-		# zfs create zroot/qubsd/0base
-		# tar -C /qubsd/0base -xvf /usr/freebsd-dist/base.txz 
-		# head -1 /etc/fstab > /qubsd/0base/etc/fstab
+	# ROOTJAILS INSTALLATION
+	install_0base
+	install_0net
+	install_0gui
 
-#	install_0net
-		# pkg install isc-dhcp44-server bind918 wireguard-tools vim jq
-		# copy .cshrc and .vim*
-		# ??change /rc.d/wireguard to remove the kldunload??
+####
+# Still to do: VM installation
 
-#	install_0gui	
-		# pkg installs 
-		# copy .cshrc and .vim*
+###
 
 	# qubsd_cron and rc.conf are last, so no code tries to run until install completion 
-	cp -a ${_REPO}/zroot/etc/cron.d/qubsd_cron /etc/cron.d/qubsd_cron
+	cp -a ${REPO}/zroot/etc/cron.d/qubsd_cron /etc/cron.d/qubsd_cron
+
 	# Modify rc.conf
+	cat ${REPO}/zroot/etc/rc.conf >> ${RC_CONF}
+
+# FINAL NOTES ABOUT WHICH SYSTEM FILES WERE MODIFIED/ADDED
+# REBOOT SYSTEM
 }
 
+
 main
+
+
