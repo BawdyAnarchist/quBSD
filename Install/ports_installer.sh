@@ -11,7 +11,7 @@ download_base() {
 	link_txz="https://ftp.freebsd.org/releases/$(uname -m)/${rel}/base.txz"
 	dl_size=$(echo "$(fetch -s $link_txz) / 1048576" | bc)
 	[ -d "${BASETXZ%/*}" ] || mkdir ${BASETXZ%/*} 
-	fetch -o $BASETXZ $link_txz &
+	fetch -o $BASETXZ $link_txz > /dev/null 2>&1
 	DL_PID="$!"
 }
 
@@ -42,14 +42,14 @@ copy_repo() {
 
 modify_files() {
 	# Check for AMD CPU, and add it to the loader file 
-	dmesg | grep -Eqs "^CPU.*AMD" && echo -e "# This machine has an AMD CPU\nhw.vmm.amdvi.enable=\"1\"" \
+	dmesg | grep -Eqs "^CPU.*AMD" && echo -e "\n# This machine has an AMD CPU\nhw.vmm.amdvi.enable=\"1\"" \
 		>> /boot/loader.conf.d/qubsd_loader.conf
 
 	# Based on pciconf class=network, find the first interface listed in rc.conf and assume it's the primary nic 
 	_nics=$(pciconf -lv | grep -B3 "= network" | grep -Eo "^[[:alnum:]]+" | grep -v none)
 	for _nic in $_nics ; do
 		grep -E "^ifconfig_${_nic}" /etc/rc.conf \
-			&& sed "s/#nic=.*/nic=${_nic}/" ${REPO}/Install/install.conf \
+			&& sed -i '' -E "s/nic=/nic=${_nic}/" ${REPO}/Install/install.conf \
 			&& break
 	done
 }
@@ -69,10 +69,10 @@ verify_base_download() {
 }
 
 main() {
-	download_base
+	download_base &
 	
 	# Install dependencies - possibly also xpra, xephyr, and doas in later revisions
-	pkg install bhyve-firmware tmux
+	pkg install -y bhyve-firmware tmux
 
 	fetch_repo
 	copy_repo	
