@@ -19,7 +19,7 @@ fetch_repo() {
 	# Fetch repo to /usr/local/share
 	REPO="/usr/local/share/quBSD"
 	fetch -o ${REPO%/*} https://github.com/BawdyAnarchist/quBSD/archive/refs/heads/main.zip
-	unzip -qd ${REPO%/*} ${REPO%/*}/main.zip
+	unzip -qd ${REPO%/*} ${REPO%/*}/main.zip > /dev/null 2>&1
 	mv ${REPO%/*}/quBSD-main ${REPO}
 	rm ${REPO%/*}/main.zip
 }
@@ -48,7 +48,7 @@ modify_files() {
 	# Based on pciconf class=network, find the first interface listed in rc.conf and assume it's the primary nic 
 	_nics=$(pciconf -lv | grep -B3 "= network" | grep -Eo "^[[:alnum:]]+" | grep -v none)
 	for _nic in $_nics ; do
-		grep -E "^ifconfig_${_nic}" /etc/rc.conf \
+		grep -Eqs "^ifconfig_${_nic}" /etc/rc.conf \
 			&& sed -i '' -E "s/nic=/nic=${_nic}/" ${REPO}/Install/install.conf \
 			&& break
 	done
