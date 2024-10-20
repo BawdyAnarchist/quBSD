@@ -10,7 +10,7 @@ define_vars() {
 	RC_CONF="${Q_DIR}/rc.conf"
 
 	# Read all uncommented variables from install.conf
-	. ${REPO}/install.conf
+	. ${REPO}/Install/install.conf
 	. /usr/local/lib/quBSD/msg-installer.sh
 }
 
@@ -58,12 +58,12 @@ get_nic() {
 	if [ -z "$nic" ] ; then
 		_NICS=$(pciconf -lv | grep -B3 "= network")
 		_nics=$(echo "$_NICS" | grep -Eo "^[[:alnum:]]+" | grep -v none | tr '\n' ' ')
-		get_msg "_m5" ; get_msg "_m6"
+		msg_installer "_m5"
 		read nic 
 
 		while : ; do 
 			echo "$_nics" | grep -Eqs "${nic}|skip" && break
-			get_msg "_m7" ; get_msg "_m6"
+			msg_installer "_m6"
 			read nic
 		done
 	fi
@@ -74,7 +74,7 @@ get_nic() {
 }
 
 get_usbs() {
-	# temp files and background function, monitor/record USB ports for user ppt passthru selection.
+	# temp files and background function monitor/record USB ports for user ppt passthru selection.
 	
 	# Make temporary files for diff function and communication to `usb_config`
 	tmp1=$(mktemp /tmp/qubsd_usbconf1)
@@ -84,7 +84,7 @@ get_usbs() {
 	
 	# Set monitoring loop to background, give user instructions, wait for user input when finished.
 	usb_config &
-	clear && msg_installer "_m8"
+	clear && msg_installer "_m7"
 	read _cont 
 
 	# Signal usb_config infinite loop to exit, and give a moment for the loop to finish and exit 
@@ -233,21 +233,30 @@ install_0gui() {
 main() {
 	define_vars
 	load_kernel_modules
-	
+read "END vars defined, kern mods loaded" sldkfj	
 	# PREPARATION - Get missing parameters from the user before making any changes 
 	get_datasets
+read "END get_datasets" sdlkfj
 	get_nic
+read "END get_nic"  sdlkfj
 	get_usbs
+read "END get_usbs"  sdlfkj
 	translate_usbs
+read "END translate_usbs"  sdlfkj
 
 	# SYSTEM INSTALLATION
 	add_gui_pkgs
+read "END add_gui_pkgs"  sdlfkj
 	create_datasets
+read "END create_datasets"  sdlfkj
 	modify_pptdevs
+read "END modify_pptdevs"  sdlfkj
 	modify_devfs_rules
+read "END modify_devfs_rules"  sdlfkj
 
 	# ROOTJAILS INSTALLATION
 	install_0base
+read "END install 0base"  sdlfkj
 	install_0net
 	install_0gui
 
