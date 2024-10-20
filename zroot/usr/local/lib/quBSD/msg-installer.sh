@@ -6,10 +6,9 @@ msg_installer() {
 		echo -e "Proposed dataset for rootjails < $jails_zfs > doesnt exist and cant be created."
 		echo -e "Enter valid name (normally zroot/qubsd):  \c"
 		;;
-	_m2) cat << ENDOFMSG
+	_m2)
 		echo -e "Proposed dataset for appjails < $zusr_zfs > doesnt exist and cant be created." 
 		echo -e "Enter valid name (normally zroot/zusr):  \c"
-ENDOFMSG
 		;;
 	_m3)
 		echo -e "Proposed mountpoint for rootjails < $jails_mount > isnt a valid name." 
