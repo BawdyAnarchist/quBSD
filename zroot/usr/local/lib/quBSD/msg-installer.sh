@@ -20,7 +20,7 @@ msg_installer() {
 		;;
 	_m5)
 		echo -e "Installer couldnt determine a network interface to passthru to the nicvm." 
-		echo -e "Here's a list of physical network interfaces:  $_nic"
+		echo -e "Here's a list of physical network interfaces:  $_nics"
 		echo -e "Please enter one of the above interfaces (or: skip):  \c"
 		;;
 	_m6)

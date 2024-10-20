@@ -27,7 +27,7 @@ get_datasets() {
 	# Loop until valid dataset is entered (either already exists, or could be created)
 	while : ; do 
 		zfs list "$jails_zfs" > /dev/null 2>&1 && break
-		zfs create -n "$jails_zfs" && break
+		zfs create -n "$jails_zfs" > /dev/null 2>&1 && break
 
 		msg_installer "_m1"
 		read jails_zfs
@@ -59,18 +59,18 @@ get_nic() {
 		_NICS=$(pciconf -lv | grep -B3 "= network")
 		_nics=$(echo "$_NICS" | grep -Eo "^[[:alnum:]]+" | grep -v none | tr '\n' ' ')
 		msg_installer "_m5"
-		read nic 
+		read _nic 
 
 		while : ; do 
-			echo "$_nics" | grep -Eqs "${nic}|skip" && break
+			echo "$_nics skip" | grep -Eqs "${_nic}" && break
 			msg_installer "_m6"
-			read nic
+			read _nic
 		done
 	fi
 	
 	# Get the device bus based on the network card name selected
-	[ ! "$nic" = "skip" ] && ppt_nic=$(pciconf -l ppt1 \
-			| sed -E "s/ppt1@pci[[:digit:]]+:([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
+	[ ! "$_nic" = "skip" ] && ppt_nic=$(pciconf -l $_nic \
+			| sed -E "s/$_nic@pci[[:digit:]]+:([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
 }
 
 get_usbs() {
@@ -249,7 +249,8 @@ main() {
 	get_usbs
 	translate_usbs
 
-echo no changes made yet. exiting. change line 262 to remove this and proceed
+echo TESTING COMPLETE UP TO THIS POINT. SHOULD BE GOOD TO GO 
+echo CHANGE IN lin 253
 exit 0
 	# SYSTEM INSTALLATION
 	add_gui_pkgs
