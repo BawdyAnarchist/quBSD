@@ -6,9 +6,10 @@ msg_installer() {
 		echo -e "Proposed dataset for rootjails < $jails_zfs > doesnt exist and cant be created."
 		echo -e "Enter valid name (normally zroot/qubsd):  \c"
 		;;
-	_m2)
+	_m2) cat << ENDOFMSG
 		echo -e "Proposed dataset for appjails < $zusr_zfs > doesnt exist and cant be created." 
 		echo -e "Enter valid name (normally zroot/zusr):  \c"
+ENDOFMSG
 		;;
 	_m3)
 		echo -e "Proposed mountpoint for rootjails < $jails_mount > isnt a valid name." 
@@ -20,7 +21,7 @@ msg_installer() {
 		;;
 	_m5)
 		echo -e "Installer couldnt determine a network interface to passthru to the nicvm." 
-		echo -e "Here's a list of physical network interfaces:  $_nics"
+		echo -e "Here's a list of physical network interfaces:  $_nic"
 		echo -e "Please enter one of the above interfaces (or: skip):  \c"
 		;;
 	_m6)
@@ -33,6 +34,23 @@ Simply plug/unplug a USB to each port one at a time. Press {Enter} when done.
 ENDOFMSG
 		;;
 	esac
+	_m7) cat << ENDOFMSG
+Configuration to be installed:
+Rootjail Dataset:    $jails_zfs
+Rootjail Mountpoint: $jails_mount
+Appjail Dataset:     $zusr_zrs
+Appjail Mountpoint:  $zusr_mount
+Network Interface:   $nic  at  $ppt_nic
+USBs for nicvm:      $dev_usbs  at  $ppt_usbs
+Install GUI (xorg):  $GUI
+Install i3wm:        $i3wm 
+ENDOFMSG
+echo -e "Continue? (Y/n):  \c"
+		;;
+	_m8) cat << ENDOFMSG
+EXITING. No changes were made.
+ENDOFMSG
+		;;
 }
 
 usage() { cat << ENDOFUSAGE
@@ -44,4 +62,3 @@ Usage: qb-
 
 ENDOFUSAGE
 }
-
