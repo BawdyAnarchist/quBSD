@@ -1,3 +1,4 @@
+
 ## QUBSD ADDITIONS ##
 # quBSD net-jails need specific devices
 #
@@ -8,8 +9,8 @@ add include $devfsrules_unhide_login
 add include $devfsrules_jail
 add path pf unhide
 add path 'tun*' unhide
-# unhide bpf if you need tcpdump (then devfs restart)
-#add path 'bpf*' unhide #tcpdump
+# For tcpdump in netjail, unhide bpf and restart devfs
+#add path 'bpf*' unhide
 # apparently ssh needs tty to function properly
 add path 'tty*' unhide 
 
@@ -25,7 +26,6 @@ add path 'dsp*' unhide
 add path 'video*' unhide
 # Graphics card specific devices
 #add path 'nvidia*' unhide
-#
 #add path dri unhide
 #add path 'dri/card*' unhide
 #add path drm unhide
