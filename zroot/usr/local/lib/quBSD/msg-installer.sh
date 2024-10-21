@@ -20,9 +20,9 @@ ENDOFMSG
 		echo -e "Enter valid name (normally /zusr):  \c"
 		;;
 	_m5)
-		echo -e "Installer couldnt determine a network interface to passthru to the nicvm." 
-		echo -e "Here's a list of physical network interfaces:  $_nic"
-		echo -e "Please enter one of the above interfaces (or: skip):  \c"
+		echo -e "For host security, all network interfaces will be designated for pci passthru:"
+		echo -e "   $_nics"
+		echo -e "Enter one of the above to be used for the nicvm (or "skip"):  \c"
 		;;
 	_m6)
 		echo -e "< $_nic > is not a valid response. Try again:  \c"
@@ -40,7 +40,7 @@ Rootjail Mountpoint: $jails_mount
 Appjail Dataset:     $zusr_zfs
 Appjail Mountpoint:  $zusr_mount
 Network Interface:   $nic at $ppt_nic
-USBs for usbvm:      $user_input_devs $dev_usbs at $ppt_usbs
+USBs for usbvm:      $dev_usbs at $ppt_usbs
 Install GUI (xorg):  $GUI
 Install i3wm:        $i3wm 
 ENDOFMSG
