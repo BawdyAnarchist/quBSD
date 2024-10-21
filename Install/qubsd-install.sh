@@ -5,7 +5,7 @@ define_vars() {
 	XINIT="/usr/local/etc/X11/xinit/xinitrc"
 	QLOADER="/boot/loader.conf.d/qubsd_loader.conf"
 	Q_DIR="/usr/local/etc/quBSD"
-	QCONF="${Q_DIR}/qubsdmap.conf"
+	Q_CONF="${Q_DIR}/qubsdmap.conf"
 	J_CONF="${Q_DIR}/jail.conf"
 	RC_CONF="${Q_DIR}/rc.conf"
 
@@ -59,23 +59,26 @@ get_nic() {
 		_NICS=$(pciconf -lv | grep -B3 "= network")
 		_nics=$(echo "$_NICS" | grep -Eo "^[[:alnum:]]+" | grep -v none | tr '\n' ' ')
 		msg_installer "_m5"
-		read _nic 
+		read nic 
 
 		while : ; do 
-			echo "$_nics skip" | grep -Eqs "${_nic}" && break
+			echo "$_nics skip" | grep -Eqs "${nic}" && break
 			msg_installer "_m6"
-			read _nic
+			read nic
 		done
 	fi
 	
 	# Get the device bus based on the network card name selected
-	[ ! "$_nic" = "skip" ] && ppt_nic=$(pciconf -l $_nic \
-			| sed -E "s/$_nic@pci[[:digit:]]+:([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
+	[ ! "$nic" = "skip" ] && ppt_nic=$(pciconf -l $nic \
+			| sed -E "s/$nic@pci[[:digit:]]+:([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
 }
 
 get_usbs() {
 	# temp files and background function monitor/record USB ports for user ppt passthru selection.
-	
+
+	#Make sure that tmp files dont already exist (in case install was killed ungracefully previously.
+	rm /tmp/qubsd_usbconf* > /dev/null 2>&1
+
 	# Make temporary files for diff function and communication to `usb_config`
 	tmp1=$(mktemp /tmp/qubsd_usbconf1)
 	tmp2=$(mktemp /tmp/qubsd_usbconf2)
@@ -117,6 +120,12 @@ usb_config() {
 translate_usbs() {
 	# Translate the output of usbconfig to ppt devices
 
+	# For reporting purposes, if install.conf has ppts_usbs specified, translate them to names
+	for _dev in $ppt_usbs ; do
+		_dev=$(echo $_dev | sed -E 's#/#:#g')
+		user_input_devs=$(echo "$user_input_devs $(pciconf -l | sed -En "s/(^[[:alnum:]]+)@.*${_dev}.*/\1/p")")
+	done	
+
 	USBS=$(cat $tmp3)
 	# Cleanup tmp files and trap
 	rm $tmp1 $tmp2 $tmp3 $tmp4
@@ -125,14 +134,27 @@ translate_usbs() {
 	# First find the corresponding PCI device name via sysctl
 	usbus=$(echo $USBS | grep -Eo "usbus[[:digit:]]+" | sed -E 's/usbus/usbus./')
 	for _usb in $usbus ; do
-		dev_usbs=$(echo "$dev_usbs" ; sysctl dev.${_usb}.%parent | grep -Eo '[^[:blank:]]+$')
+		dev_usbs=$(echo "$dev_usbs $(sysctl dev.${_usb}.%parent | grep -Eo '[^[:blank:]]+$')")
 	done
 
 	# Then translate each name to an actual bus location
 	for _bus in $dev_usbs ; do
 		_ppt=$(pciconf -l $_bus | grep -Eo "pci[^[:blank:]]+[[:digit:]]" | sed -E "s#:#/#g")
-		ppt_usbs="$ppt_usbs $_ppt"		
+		echo "$ppt_usbs" | grep -Eqs "$_ppt" || ppt_usbs="$ppt_usbs $_ppt"		
 	done
+
+	# Clean up spaces in final variables
+	dev_usbs=$(echo $dev_usbs | sed -E 's/^[[:blank:]]+(.*)[[:blank:]]+$/\1/')
+	user_input_devs=$(echo $user_input_devs | sed -E 's/^[[:blank:]]+(.*)[[:blank:]]+$/\1/')
+}
+
+final_confirmation() {
+	msg_installer "_m8"
+	read _response
+   case "$_response" in
+      y|Y|yes|YES) echo success ; return 0   ;;
+      *) msg_installer "_m9" ; exit 0 ;;
+   esac 
 }
 
 add_gui_pkgs() {
@@ -148,13 +170,14 @@ add_gui_pkgs() {
 
 create_datasets() {
 	# Create datasets and modify custom props appropriately
-	! zfs list $jails_zfs > /dev/null 2>&1	\
-			&& zfs create -o mountpoint="$mount_jails" -o qubsd:autosnap=true $jails_zfs
-	! zfs list $zusr_zfs > /dev/null 2>&1	\
-			&& zfs create -o mountpoint="$mount_zusr"  -o qubsd:autosnap=true $zusr_zfs
+	zfs list $jails_zfs > /dev/null 2>&1 || zfs create $jails_zfs
+	zfs set mountpoint="$mount_jails" qubsd:autosnap=true $jails_zfs
+	
+	zfs list $zusr_zfs > /dev/null 2>&1	|| zfs create $zusr_zfs
+	zfs set mountpoint="$mount_zusr"  qubsd:autosnap=true $zusr_zfs
 
 	# Modify qubsdmap and jail.conf with path for rootjails 
-	sed -i '' -E "s:(#NONE[[:blank:]]+jails_zfs[[:blank:]]+)zroot/qubsd:\1$jails_zfs:" $QCONF
+	sed -i '' -E "s:(#NONE[[:blank:]]+jails_zfs[[:blank:]]+)zroot/qubsd:\1$jails_zfs:" $Q_CONF
 	sed -i '' -E "s:(^path=/)qubsd:\1${root_mount}:" $J_CONF 
 }
 
@@ -248,9 +271,9 @@ main() {
 	get_nic
 	get_usbs
 	translate_usbs
+	final_confirmation
 
-echo TESTING COMPLETE UP TO THIS POINT. SHOULD BE GOOD TO GO 
-echo CHANGE IN lin 253
+echo mysafety exit
 exit 0
 	# SYSTEM INSTALLATION
 	add_gui_pkgs
@@ -283,6 +306,10 @@ read -p "END install 0base"  sdlfkj
 # REBOOT SYSTEM
 }
 
+setlog() {
+	set -x 
+	exec > /root/debug 2>&1
+}
 
 main
 
