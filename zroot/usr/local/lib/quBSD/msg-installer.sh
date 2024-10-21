@@ -39,7 +39,7 @@ Rootjail Dataset:    $jails_zfs
 Rootjail Mountpoint: $jails_mount
 Appjail Dataset:     $zusr_zfs
 Appjail Mountpoint:  $zusr_mount
-Network Interface:   $nic at $ppt_nic
+Network Interface:   $nic
 USBs for usbvm:      $dev_usbs at $ppt_usbs
 Install GUI (xorg):  $GUI
 Install i3wm:        $i3wm 

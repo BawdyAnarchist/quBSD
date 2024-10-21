@@ -68,9 +68,10 @@ get_nic() {
 		done
 	fi
 	
-	# Get the device bus based on the network card name selected
-	[ ! "$nic" = "skip" ] && ppt_nic=$(pciconf -l $nic \
-			| sed -E "s/$nic@pci[[:digit:]]+:([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
+	# $nic will be used later for nicvm, but all NICs will be passthru, for host security.
+	for _dev in $_nics ; do
+		ppt_nics=$(pciconf -l $_dev | sed -E "s/${_dev}@pci([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
+	done
 }
 
 get_usbs() {
@@ -120,32 +121,32 @@ usb_config() {
 translate_usbs() {
 	# Translate the output of usbconfig to ppt devices
 
-	# For reporting purposes, if install.conf has ppts_usbs specified, translate them to names
-	for _dev in $ppt_usbs ; do
-		_dev=$(echo $_dev | sed -E 's#/#:#g')
-		user_input_devs=$(echo "$user_input_devs $(pciconf -l | sed -En "s/(^[[:alnum:]]+)@.*${_dev}.*/\1/p")")
-	done	
-
 	USBS=$(cat $tmp3)
 	# Cleanup tmp files and trap
 	rm $tmp1 $tmp2 $tmp3 $tmp4
 	trap '' INT TERM HUP QUIT EXIT
 
+	# For final_confirmation, if install.conf has ppts_usbs specified, translate them to names
+	for _dev in $ppt_usbs ; do
+		_dev=$(echo $_dev | sed -E 's#/#:#g')
+		dev_usbs=$(echo "$dev_usbs $(pciconf -l | sed -En "s/(^[[:alnum:]]+)@.*${_dev}.*/\1/p")")
+	done	
+
 	# First find the corresponding PCI device name via sysctl
 	usbus=$(echo $USBS | grep -Eo "usbus[[:digit:]]+" | sed -E 's/usbus/usbus./')
 	for _usb in $usbus ; do
-		dev_usbs=$(echo "$dev_usbs $(sysctl dev.${_usb}.%parent | grep -Eo '[^[:blank:]]+$')")
+		_usb=$(sysctl dev.${_usb}.%parent | grep -Eo '[^[:blank:]]+$')
+		echo "$dev_usbs" | grep -qs "$_usb" || dev_usbs="$dev_usbs $_usb"
 	done
 
 	# Then translate each name to an actual bus location
-	for _bus in $dev_usbs ; do
-		_ppt=$(pciconf -l $_bus | grep -Eo "pci[^[:blank:]]+[[:digit:]]" | sed -E "s#:#/#g")
+	for _ppt in $dev_usbs ; do
+		_ppt=$(pciconf -l $_ppt | sed -E "s/^.*@pci([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
 		echo "$ppt_usbs" | grep -Eqs "$_ppt" || ppt_usbs="$ppt_usbs $_ppt"		
 	done
 
 	# Clean up spaces in final variables
 	dev_usbs=$(echo $dev_usbs | sed -E 's/^[[:blank:]]+(.*)[[:blank:]]+$/\1/')
-	user_input_devs=$(echo $user_input_devs | sed -E 's/^[[:blank:]]+(.*)[[:blank:]]+$/\1/')
 }
 
 final_confirmation() {
@@ -194,7 +195,7 @@ modify_pptdevs() {
 	fi
 
 	# Modify qubsd_loader.conf
-	sysrc -f $QLOADER "$devsnum"+="$ppt_nic $ppt_usbs"
+	sysrc -f $QLOADER "$devsnum"+="$ppt_nics $ppt_usbs"
 }
 
 modify_devfs_rules() {
