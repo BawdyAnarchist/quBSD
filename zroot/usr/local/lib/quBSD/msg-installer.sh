@@ -33,7 +33,7 @@ ports that will be set for pci passthru, and only available inside the usbvm.
 Simply plug/unplug a USB to each port one at a time. Press {Enter} when done. 
 ENDOFMSG
 		;;
-	_m7) cat << ENDOFMSG
+	_m8) cat << ENDOFMSG
 Configuration to be installed:
 Rootjail Dataset:    $jails_zfs
 Rootjail Mountpoint: $jails_mount
@@ -46,7 +46,7 @@ Install i3wm:        $i3wm
 ENDOFMSG
 echo -e "Continue? (Y/n):  \c"
 		;;
-	_m8) cat << ENDOFMSG
+	_m9) cat << ENDOFMSG
 EXITING. No changes were made.
 ENDOFMSG
 		;;
