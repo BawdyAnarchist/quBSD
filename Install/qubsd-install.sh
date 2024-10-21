@@ -244,24 +244,52 @@ modify_devfs_rules() {
 	rm $tmp_devfs
 }
 
+modify_rc_conf() {
+	# Need to be careful about modifying user's rc.conf. Comment out duplicate lines
+   while IFS= read -r _line ; do
+      _param=$(echo $_line | sed -E "s/^#//" | sed -E "s@^(.*=).*@\1@")
+      [ -n "$_param" ] && sed -i '' -E "s@^(${_param}.*)@#\1@" /etc/rc.conf
+   done < "${REPO}/zroot/etc/rc.conf"
+
+   # Copy qubsd lines and restart jail
+   cat ${REPO}/zroot/etc/rc.conf >> /etc/rc.conf
+   service jail restart
+}
+
 install_0base() {
 	# Create the zroot/qubsd dataset and extract the new jail
 	zfs create -o mountpoint="${jails_mount}/0base" -o qubsd:autosnap="true" ${jails_zfs}/0base
-	tar -C ${jails_mount}/0base -xf /usr/local/freebsd-dist/base.txz 
+	tar -C ${jails_mount}/0base -xf /usr/local/freebsd-dist/base.txz
 	head -1 /etc/fstab > /qubsd/0base/etc/fstab
 
-	# Create the zusr dataset and copy files from the repo 
+	# Create the zusr dataset and copy/modify files from the repo
 	zfs create -o mountpoint="${zusr_mount}/0base" -o qubsd:autosnap="true" ${zusr_zfs}/0base
 	cp -a ${REPO}/zusr/0base/ ${zusr_mount}/0base
+	cp ${REPO}/zusr/0base/home/0base/ ${jails_mount}/0base/root
+	change_fstab "0base"
+	mkdir ${jails_mount}/0base/rw
 
 	# base.txz point releases do not include patches. Update 0base
-	PAGER=cat freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install 
+	PAGER=cat freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install
+
+	ASSUME_ALWAYS_YES="yes" export $ASSUME_ALWAYS_YES
+	pkg -r ${jails_mount}/0base update
+
+	# Snapshot 0base so it can be used for other rootjails
+	zfs snapshot ${jails_zfs}/0base@INSTALL
 }
 
 install_0net() {
-	# pkg install isc-dhcp44-server bind918 wireguard-tools vim jq
-	# copy .cshrc and .vim*
-	# ??change /rc.d/wireguard to remove the kldunload??
+	# Duplicate 0base for 0net
+	zfs send ${jails_zfs}/0base@INSTALL | zfs recv ${jails_zfs}/0net
+
+	# Create the zusr dataset and copy files from the repo
+	zfs create -o mountpoint="${zusr_mount}/0net" -o qubsd:autosnap="true" ${zusr_zfs}/0net
+	cp -a ${REPO}/zusr/0net/ ${zusr_mount}/0net
+
+	change_fstab "0net"
+
+	pkg -r ${jails_mount}/0net install -y isc-dhcp44-server bind918 wireguard-tools vim jq
 }
 
 install_0gui() {
@@ -269,6 +297,19 @@ install_0gui() {
 	# copy .cshrc and .vim*
 
 }
+
+change_fstab() {
+	# Mountpoints in rw/etc/fstab must reference the user's zfs mountpoints
+	_jail="$1"
+
+	# Use tmp file so that column can make the file pretty
+	sed -E "s: /qubsd: ${jails_mount}:" ${jails_mount}/${_jail}/rw/etc/fstab > /tmp/temp_fstab
+	cat /tmp/temp_fstab > ${jails_mount}/${_jail}/rw/etc/fstab
+	sed -E "s:^/zusr:${zusr_mount}:" ${jails_mount}/${_jail}/rw/etc/fstab | column -t > /temp/temp_fstab
+	cat /tmp/temp_fstab > ${jails_mount}/${_jail}/rw/etc/fstab
+	rm /tmp/temp_fstab
+}
+
 main() {
 	define_vars
 	load_kernel_modules
@@ -285,6 +326,8 @@ main() {
 	create_datasets
 	modify_pptdevs
 	modify_devfs_rules
+	modify_rc_conf
+	[ -d "/tmp/quBSD" ] || mkdir /tmp/quBSD
 
 	# ROOTJAILS INSTALLATION
 	install_0base
@@ -299,13 +342,13 @@ exit 0
 
 ###
 
-	# qubsd_cron and rc.conf are last, so no code tries to run until install completion 
+	# qubsd_cron is last so no code tries to run until install completion 
 	cp -a ${REPO}/zroot/etc/cron.d/qubsd_cron /etc/cron.d/qubsd_cron
 
-	# Modify rc.conf
-	cat ${REPO}/zroot/etc/rc.conf >> ${RC_CONF}
-
 # FINAL NOTES ABOUT WHICH SYSTEM FILES WERE MODIFIED/ADDED
+	# rc.conf 
+	# devfs.rules
+	# /boot/loader.conf.d ; /etc/cron.d
 # REBOOT SYSTEM
 }
 
@@ -315,12 +358,6 @@ setlog() {
 }
 
 main
-
-
-### NOTES ON IF I WANT TO START JAIL BEFORE REBOOT ###
-# jail.conf in /etc even tho rc.conf was changed
-# need to run your rc scripts to do stuff like create /tmp/qubsd
-
 
 
 
