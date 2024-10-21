@@ -33,7 +33,6 @@ ports that will be set for pci passthru, and only available inside the usbvm.
 Simply plug/unplug a USB to each port one at a time. Press {Enter} when done. 
 ENDOFMSG
 		;;
-	esac
 	_m7) cat << ENDOFMSG
 Configuration to be installed:
 Rootjail Dataset:    $jails_zfs
@@ -51,6 +50,8 @@ echo -e "Continue? (Y/n):  \c"
 EXITING. No changes were made.
 ENDOFMSG
 		;;
+
+	esac
 }
 
 usage() { cat << ENDOFUSAGE
