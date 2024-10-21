@@ -16,7 +16,7 @@ ENDOFMSG
 		echo -e "Enter valid name (normally /qubsd):  \c"
 		;;
 	_m4)
-		echo -e "Proposed mountpoint for appjails < $jails_mount > isnt a valid name." 
+		echo -e "Proposed mountpoint for appjails < $zusr_mount > isnt a valid name." 
 		echo -e "Enter valid name (normally /zusr):  \c"
 		;;
 	_m5)
@@ -28,19 +28,19 @@ ENDOFMSG
 		echo -e "< $_nic > is not a valid response. Try again:  \c"
 		;;
 	_m7) cat << ENDOFMSG
-It's safer to handle USB storage devices inside a VM. Here you can select USB
-ports that will be set for pci passthru, and only available inside the usbvm.
-Simply plug/unplug a USB to each port one at a time. Press {Enter} when done. 
+Safer to keep USB storage devices inside a VM. Select USB ports to be set for
+pci passthru, and only available inside the usbvm. Simply plug/unplug a USB
+to each port you want, one at a time. Press {Enter} when done (or to skip).
 ENDOFMSG
 		;;
 	_m8) cat << ENDOFMSG
 Configuration to be installed:
 Rootjail Dataset:    $jails_zfs
 Rootjail Mountpoint: $jails_mount
-Appjail Dataset:     $zusr_zrs
+Appjail Dataset:     $zusr_zfs
 Appjail Mountpoint:  $zusr_mount
-Network Interface:   $nic  at  $ppt_nic
-USBs for nicvm:      $dev_usbs  at  $ppt_usbs
+Network Interface:   $nic at $ppt_nic
+USBs for usbvm:      $user_input_devs $dev_usbs at $ppt_usbs
 Install GUI (xorg):  $GUI
 Install i3wm:        $i3wm 
 ENDOFMSG
