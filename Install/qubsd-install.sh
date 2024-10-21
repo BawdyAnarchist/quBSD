@@ -147,15 +147,16 @@ translate_usbs() {
 		echo "$ppt_usbs" | grep -Eqs "$_ppt" || ppt_usbs="$ppt_usbs $_ppt"		
 	done
 
-	# Clean up spaces in final variables
+	# Clean up spaces in final variables. Set variable so "at" doesnt appear if there were no usbs.
 	dev_usbs=$(echo $dev_usbs | sed -E 's/^[[:blank:]]+(.*)[[:blank:]]+$/\1/')
+	[ -n "$dev_usbs" ] && _at=" at "
 }
 
 final_confirmation() {
 	msg_installer "_m8"
 	read _response
    case "$_response" in
-      y|Y|yes|YES) echo success ; return 0   ;;
+      y|Y|yes|YES) return 0 ;;
       *) msg_installer "_m9" ; exit 0 ;;
    esac 
 }
@@ -246,7 +247,7 @@ modify_devfs_rules() {
 install_0base() {
 	# Create the zroot/qubsd dataset and extract the new jail
 	zfs create -o mountpoint="${jails_mount}/0base" -o qubsd:autosnap="true" ${jails_zfs}/0base
-	tar -C ${jails_mount}/0base -xf /usr/freebsd-dist/base.txz 
+	tar -C ${jails_mount}/0base -xf /usr/local/freebsd-dist/base.txz 
 	head -1 /etc/fstab > /qubsd/0base/etc/fstab
 
 	# Create the zusr dataset and copy files from the repo 
@@ -254,8 +255,7 @@ install_0base() {
 	cp -a ${REPO}/zusr/0base/ ${zusr_mount}/0base
 
 	# base.txz point releases do not include patches. Update 0base
-	jail -c 0base
-	freebsd-update -b ${jails_mount}/0base fetch install
+	PAGER=cat freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install 
 }
 
 install_0net() {
@@ -286,11 +286,11 @@ main() {
 	modify_pptdevs
 	modify_devfs_rules
 
-echo my safety exit
-exit 0
 	# ROOTJAILS INSTALLATION
 	install_0base
-read -p "END install 0base"  sdlfkj
+
+echo MY SAFETY EXIT
+exit 0
 	install_0net
 	install_0gui
 
@@ -315,5 +315,13 @@ setlog() {
 }
 
 main
+
+
+### NOTES ON IF I WANT TO START JAIL BEFORE REBOOT ###
+# jail.conf in /etc even tho rc.conf was changed
+# need to run your rc scripts to do stuff like create /tmp/qubsd
+
+
+
 
 
