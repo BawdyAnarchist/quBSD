@@ -54,10 +54,11 @@ get_datasets() {
 }
 
 get_nic() {
+	_NICS=$(pciconf -lv | grep -B3 "= network")
+	_nics=$(echo "$_NICS" | grep -Eo "^[[:alnum:]]+" | grep -v none | tr '\n' ' ')
+
 	# Missing $nic implies pkg install failed to find interface. Ask user for input 
 	if [ -z "$nic" ] ; then
-		_NICS=$(pciconf -lv | grep -B3 "= network")
-		_nics=$(echo "$_NICS" | grep -Eo "^[[:alnum:]]+" | grep -v none | tr '\n' ' ')
 		msg_installer "_m5"
 		read nic 
 
@@ -70,7 +71,8 @@ get_nic() {
 	
 	# $nic will be used later for nicvm, but all NICs will be passthru, for host security.
 	for _dev in $_nics ; do
-		ppt_nics=$(pciconf -l $_dev | sed -E "s/${_dev}@pci([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
+		_nic=$(pciconf -l $_dev | sed -E "s/^${_dev}@pci([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
+		echo "$ppt_nics" | grep -qs "$_nic" || ppt_nics="$ppt_nics $_nic"
 	done
 }
 
@@ -162,6 +164,7 @@ add_gui_pkgs() {
 	# Install pkgs
 	[ "$GUI" = "true" ] && _pkgs="xorg tigervnc-viewer"
 	[ "$i3wm" = "true" ] && _pkgs="$_pkgs i3 i3lock i3status"
+	pkg update
 	pkg install -y $_pkgs
 
 	# Modify xinitrc
@@ -172,10 +175,10 @@ add_gui_pkgs() {
 create_datasets() {
 	# Create datasets and modify custom props appropriately
 	zfs list $jails_zfs > /dev/null 2>&1 || zfs create $jails_zfs
-	zfs set mountpoint="$mount_jails" qubsd:autosnap=true $jails_zfs
+	zfs set mountpoint="$jails_mount" qubsd:autosnap=true $jails_zfs
 	
 	zfs list $zusr_zfs > /dev/null 2>&1	|| zfs create $zusr_zfs
-	zfs set mountpoint="$mount_zusr"  qubsd:autosnap=true $zusr_zfs
+	zfs set mountpoint="$zusr_mount"  qubsd:autosnap=true $zusr_zfs
 
 	# Modify qubsdmap and jail.conf with path for rootjails 
 	sed -i '' -E "s:(#NONE[[:blank:]]+jails_zfs[[:blank:]]+)zroot/qubsd:\1$jails_zfs:" $Q_CONF
@@ -202,21 +205,24 @@ modify_devfs_rules() {
 	# /etc/devfs.rules is modified here and not at pkg install,
 	# because it requires changing a file outside of /usr/local
 
+	# Add default devfs if it doesnt exist.
+	[ -e "/etc/devfs.rules" ] || cp -a /etc/defaults/devfs.rules /etc/devfs.rules
+
 	# Make a copy of the qubsd devfs.rules in /tmp 
 	tmp_devfs=$(mktemp /tmp/qubsd_devfs)
 	cp -a $REPO/zroot/etc/devfs.rules $tmp_devfs
 
 	# Check /etc/devfs.rules, and search for two consecutive unused rule numbers 
-	rulenum1=$(sed -n "s/^\[devfsrules.*=//p ; s/\]//p" /etc/devfs.rules | tail -1)
+	_lastnum=$(sed -n "s/^\[devfsrules.*=//p ; s/\]//p" /etc/devfs.rules | tail -1)
+	[ -z "$_lastnum" ] && _lastnum=0
 	while : ; do
-		rulenum1=$(( rulenum1 + 1 ))
-		rulenum2=$(( rulenum1 + 2 ))
+		rulenum1=$(( _lastnum + 1 ))
+		rulenum2=$(( _lastnum + 2 ))
 			! grep -Eqs "^\[devfsrules.*=${rulenum1}" /etc/devfs.rules \
 				&& ! grep -Eqs "^\[devfsrules.*=${rulenum2}" /etc/devfs.rules && break
 	done
 
 	# Add the discovered rule numbers to quBSD devfs and jail.conf
-	cat ${REPO}/zroot/etc/devfs.rules >> /etc/devfs.rules 
 	sed -i '' -E "s/(^\[devfsrules_qubsd_netjail=)/\1$rulenum1/" $tmp_devfs 
 	sed -i '' -E "s/(^\[devfsrules_qubsd_guijail=)/\1$rulenum2/" $tmp_devfs 
 	sed -i '' -E "s/NETRULENUM1/$rulenum1/g" $J_CONF 
@@ -274,18 +280,14 @@ main() {
 	translate_usbs
 	final_confirmation
 
-echo mysafety exit
-exit 0
 	# SYSTEM INSTALLATION
 	add_gui_pkgs
-read -p "END add_gui_pkgs"  sdlfkj
 	create_datasets
-read -p "END create_datasets"  sdlfkj
 	modify_pptdevs
-read -p "END modify_pptdevs"  sdlfkj
 	modify_devfs_rules
-read -p "END modify_devfs_rules"  sdlfkj
 
+echo my safety exit
+exit 0
 	# ROOTJAILS INSTALLATION
 	install_0base
 read -p "END install 0base"  sdlfkj
