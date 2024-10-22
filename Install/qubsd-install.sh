@@ -9,9 +9,9 @@ define_vars() {
 	QJ_CONF="${Q_DIR}/jail.conf"
 	QRC_CONF="${Q_DIR}/rc.conf"
 
-	# Read all uncommented variables from install.conf
+	# Read variables and messages
 	. "${REPO}/Install/install.conf"
-	. "/usr/local/lib/quBSD/msg-installer.sh"
+	. /usr/local/lib/quBSD/msg-installer.sh
 }
 
 load_kernel_modules() {
@@ -259,68 +259,48 @@ add_gui_pkgs() {
 	[ "$i3wm" = "true" ] && echo "i3" >> $XINIT
 }
 
-install_0base() {
-	# Create the datasets and extract new jail
+install_rootjails() {
+	# Create 0base and extract new jail
 	zfs create -o mountpoint="${jails_mount}/0base" -o qubsd:autosnap="true" ${jails_zfs}/0base
-	zfs create -o mountpoint="${zusr_mount}/0base" -o qubsd:autosnap="true" ${zusr_zfs}/0base
 	tar -C ${jails_mount}/0base -xf /usr/local/freebsd-dist/base.txz
 
-	# Copy and modify files 
-	cp -a ${REPO}/zusr/0base/ ${zusr_mount}/0base
-	cp -a ${REPO}/zusr/0base/home/0base/ ${jails_mount}/0base/root
+	# Copy and modify files (copy all 0base user rc and conf files to root for convenience)
 	head -1 /etc/fstab > /qubsd/0base/etc/fstab
 	mkdir ${jails_mount}/0base/rw
-	modify_fstab "0base"
+	cp -a ${REPO}/zusr/0base/home/0base/.*shrc ${jails_mount}/0base/root
 
-	# Update 0base (base.txz doesnt include latest patches), and install pkg
-	PAGER='cat' freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install
+	# Update 0base (base.txz doesnt include latest patches), install pkg, and snapshot
 	ASSUME_ALWAYS_YES="yes" ; export ASSUME_ALWAYS_YES
+	PAGER='cat' freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install
 	pkg -r ${jails_mount}/0base update
-
-	# Snapshot 0base so it can be used for other rootjails
 	zfs snapshot ${jails_zfs}/0base@INSTALL
-}
 
-install_0net() {
-	# Handle datasets  
-	zfs send ${jails_zfs}/0base@INSTALL | zfs recv ${jails_zfs}/0net
-	zfs create -o mountpoint="${zusr_mount}/0net" -o qubsd:autosnap="true" ${zusr_zfs}/0net
+	# Install all other rootjails as indicated by install.conf 
+	[ "$GUI" = "true" ] && rootjails="0gui" && appjails="0gui dispajail"
+	[ "$server" = "true" ] && rootjails="$rootjails 0serv" && appjails="$appjails 0serv"
 
-	# Copy/modify files
-	cp -a ${REPO}/zusr/0net/ ${zusr_mount}/0net
-	modify_fstab "0net"
+	for _jail in 0net $rootjails ; do
+		case $_jail in 
+			0net) _pkgs="vim jq wireguard-tools isc-dhcp44-server bind918" ;;
+			0gui) _pkgs="vim xorg $nvidia $guipkgs" ;;
+			0serv) _pkgs="vim $serverpkgs" ;; 
+		esac
 
-	# Install 0net pkgs and snapshot
-	
-	pkg -r ${jails_mount}/0net install -y vim jq wireguard-tools isc-dhcp44-server bind918
-	zfs snapshot ${jails_zfs}/0net@INSTALL
-}
-
-install_0gui() {
-	# If the variable wasnt assigned, do not install
-	[ -z "$GUI" ] && return 0
-
-	# Handle datasets  
-	zfs send ${jails_zfs}/0base@INSTALL | zfs recv ${jails_zfs}/0gui
-	zfs create -o mountpoint="${zusr_mount}/0gui" -o qubsd:autosnap="true" ${zusr_zfs}/0gui
-
-	# Copy/modify files
-	cp -a ${REPO}/zusr/0gui/ ${zusr_mount}/0gui
-	modify_fstab "0gui"
-
-	# Install 0gui pkgs and snapshot
-	pkg -r ${jails_mount}/0gui install -y vim xorg $nvidia $extrapkgs
-	zfs snapshot ${jails_zfs}/0gui@INSTALL
+		# Install pkgs and snapshot rootjail	
+		zfs send ${jails_zfs}/0base@INSTALL | zfs recv ${jails_zfs}/${_jail}
+		pkg -r ${jails_mount}/${_jail} install -y $_pkgs
+		zfs snapshot ${jails_zfs}/${_jail}@INSTALL
+	done
 }
 
 install_appjails() {
-	appjails="0control net-firewall net-vpn net-tor"
-	[ "$GUI" = "true" ] && appjails="$appjails dispjail"
-	[ "$server" = "true" ] && appjails="$appjails 0serv"
+	appjails="0base 0net 0control net-firewall net-vpn net-tor $appjails"
 
 	for _jail in $appjails ; do
-		cp -a ${REPO}/zusr/$_jail ${zusr_mount}/
+		zfs create -o mountpoint="${zusr_mount}/${_jail}" -o qubsd:autosnap="true" ${zusr_zfs}/${_jail}
+		cp -a ${REPO}/zusr/${_jail}/ ${zusr_mount}/${_jail}
 		modify_fstab "$_jail"		
+		zfs snapshot ${zusr_zfs}/${_jail}@INSTALL
 	done
 }
 
@@ -329,7 +309,7 @@ modify_fstab() {
 	_jail="$1"
 
 	# Use tmp file so that column can make the file pretty
-	sed -E "s: /qubsd: ${zusr_mount}:" ${zusr_mount}/${_jail}/rw/etc/fstab > /tmp/temp_fstab
+	sed -E "s: /qubsd: ${jails_mount}:" ${zusr_mount}/${_jail}/rw/etc/fstab > /tmp/temp_fstab
 	cat /tmp/temp_fstab > ${zusr_mount}/${_jail}/rw/etc/fstab
 	sed -E "s:^/zusr:${zusr_mount}:" ${zusr_mount}/${_jail}/rw/etc/fstab | column -t > /tmp/temp_fstab
 	cat /tmp/temp_fstab > ${zusr_mount}/${_jail}/rw/etc/fstab
@@ -355,23 +335,11 @@ main() {
 	add_gui_pkgs
 	[ -d "/tmp/quBSD" ] || mkdir /tmp/quBSD
 
-	# ROOTJAILS INSTALLATION
-	install_0base
-	install_0net
-	install_0gui
-
-	# APPJAILS INSTALLATION
+	# JAILS/VM INSTALLATION
+	install_rootjails
 	install_appjails
 
-
-echo MY SAFETY EXIT
-exit 0
-
-
-####
 # Still to do: VM installation
-
-###
 
 	# qubsd_cron is last so no code tries to run until install completion 
 	cp -a ${REPO}/zroot/etc/cron.d/qubsd_cron /etc/cron.d/qubsd_cron
@@ -380,6 +348,10 @@ exit 0
 	# rc.conf 
 	# devfs.rules
 	# /boot/loader.conf.d ; /etc/cron.d
+
+# MORE NOTES ON WHERE TO PUT STUFF FOR INITIAL SETUP
+	# $REPO/zusr/0base/home/0base --> all configs you want in all jail roots (rc files, configs), should be placed here
+
 # REBOOT SYSTEM
 }
 
