@@ -7,7 +7,7 @@ define_vars() {
 	Q_DIR="/usr/local/etc/quBSD"
 	Q_CONF="${Q_DIR}/qubsdmap.conf"
 	QJ_CONF="${Q_DIR}/jail.conf"
-	QRC_CONF="${Q_DIR}/rc.conf"
+	QRC_CONF="${REPO}/zroot/etc/rc.conf"
 
 	# Read variables and messages
 	. "${REPO}/Install/install.conf"
