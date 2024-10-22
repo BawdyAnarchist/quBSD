@@ -285,7 +285,8 @@ install_rootjails() {
 
 		# Create rootjail, install pkgs, and snapshot
 		zfs send ${jails_zfs}/0base@INSTALL | zfs recv ${jails_zfs}/${_jail}
-pkg -r ${jails_mount}/${_jail} install -y $_pkgs > /dev/null 2>&1
+		pkg -r ${jails_mount}/${_jail} install -y $_pkgs
+		zfs destroy ${jails_zfs}/${_jail}@INSTALL
 		zfs snapshot ${jails_zfs}/${_jail}@INSTALL
 	done
 }
@@ -347,7 +348,6 @@ main() {
 	# /boot/loader.conf.d ; /etc/cron.d
 
 # MORE NOTES ON WHERE TO PUT STUFF FOR INITIAL SETUP
-	# pkg -r on 288 needs to be un > /dev/null'd 
 	# $REPO/zusr/0base/home/0base --> all configs you want in all jail roots (rc files, configs), should be placed here
 
 # REBOOT SYSTEM
