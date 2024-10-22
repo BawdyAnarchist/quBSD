@@ -7,8 +7,6 @@ Instead of all the named and ftp nonsense in 0control, just use a fat32 formatte
 
 When you restore, the datasets dont inherit their qubsd:autosnap properties
 
-remember to remove pefs.ko entirely now that you're using zfs encryted datasets
-
 This was a comment on 0net in the installer, but maybe it's old by now. Delete this line if there's no problems later
 # ??change /rc.d/wireguard to remove the kldunload??
 
