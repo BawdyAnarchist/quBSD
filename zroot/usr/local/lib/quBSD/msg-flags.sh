@@ -21,7 +21,7 @@ qb-flags: Toggles schg/noschg for the indicated jail
 Usage: qb-flags [-h|-d|-u|-r] <jail>
    -d: (d)own. Recursive noschg flags for <jail>
    -h: (h)elp. Outputs this help message
-   -r: (r)estore qmap settings for <jail>
+   -r: (r)estore qconf settings for <jail>
    -u: (u)p. Recursive schg flags for <jail>
 
 ENDOFUSAGE

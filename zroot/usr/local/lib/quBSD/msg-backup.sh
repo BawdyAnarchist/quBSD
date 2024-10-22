@@ -96,7 +96,7 @@ Usage: qb-backup [-n][-F][-r][-R] [-z <destiation_dataset>]
        [-a|-A] [-f <file>] <dataset1> <dataset2>...<datasetX>
 
 Usage: qb-backup
-   -a: (a)uto. Jails/VMs tagged with BACKUP=true in QMAP; plus
+   -a: (a)uto. Jails/VMs tagged with BACKUP=true in QCONF; plus
        datasets indicated by <FILE> or positional arguments.
    -A: (A)ll $_RZFS $U_ZFS and descendants, plus datasets
        indicated by <FILE> or pos args.  Implies [-r] for all

@@ -59,7 +59,7 @@ qb-start [-a|-A|-f <file>] [-e|-E <file>]
    If no [-a|-A|-f] is specified; < jail list > (positional
    parameters) at the end are assumed to be jail starts.
 
-   -a: (a)uto. Start all jails tagged with autostart in qmap
+   -a: (a)uto. Start all jails tagged with autostart in qconf
        This is the default behavior if no opts are specified.
    -A: (A)ll. Start ALL valid jails on the system.
    -e: (e)xclude. Starts jails as indicated by options,

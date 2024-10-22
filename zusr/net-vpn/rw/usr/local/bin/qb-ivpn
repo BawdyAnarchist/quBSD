@@ -178,7 +178,7 @@ handle_if_off() {
 	chk_valid_jail "$JAIL" || get_msg_ivpn "none" "usage_1" 
 
 	# Will restore original SECLVL later on, after applying ivpn changes
-	SEC_orig=$(sed -En "s/^${JAIL}[[:blank:]]+seclvl[[:blank:]]+//p" $QMAP)
+	SEC_orig=$(sed -En "s/^${JAIL}[[:blank:]]+seclvl[[:blank:]]+//p" $QCONF)
 
 	# Modify seclvl to -1. Trap and restore original if exit before finish
 	# If we're only turning on the jail to LIST its connection, don't mod seclvl

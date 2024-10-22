@@ -37,7 +37,7 @@ define_colors() {
 
 get_stat_variables() {
 	#Jails data
-	JAILS=$(sed -En "s/^([^[:blank:]]+)[[:blank:]]+CLASS.*/\1/p" $QMAP)
+	JAILS=$(sed -En "s/^([^[:blank:]]+)[[:blank:]]+CLASS.*/\1/p" $QCONF)
 
 	# Jailname of the active window is assigned to: $_XJAIL
 	get_info _XJAIL
@@ -59,7 +59,7 @@ get_jails_loop() {
 	# Get key variables
 	class=$(get_jail_parameter -eqs CLASS "$_jail")
 	gateway=$(get_jail_parameter -deqs GATEWAY "$_jail")
-	rootenv=$(sed -En "s/^${_jail}[[:blank:]]+ROOTENV.*[[:blank:]]+//p" $QMAP)
+	rootenv=$(sed -En "s/^${_jail}[[:blank:]]+ROOTENV.*[[:blank:]]+//p" $QCONF)
 	rootenv="${rootenv:=-}"
 
 	if chk_isrunning "$_jail" ; then
@@ -137,7 +137,7 @@ main() {
 			get_jails_loop > /dev/null 2>&1
 		done
 
-		# Sort -b ignores leadings spaces, -f ignores case ; grep remove #defaults from QMAP
+		# Sort -b ignores leadings spaces, -f ignores case ; grep remove #defaults from QCONF
 		(head -n 1 $TMP1 && tail -n +2 $TMP1 | sort -fbk $COL | cut -f 1,2,3,4,5,7,8,9 \
 				| grep -Ev '#default') >> $TMP2
 

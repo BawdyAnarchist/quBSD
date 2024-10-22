@@ -30,13 +30,13 @@ get_options() {
 	_param=$(echo "$PARAM" | tr '[:upper:]' '[:lower:]')
 
 	# Necessary for editing lines vs adding lines
-	OLDVALUE=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]].*" $QMAP)
-	DEFAULT=$(sed -En "s/^#default[[:blank:]]+${PARAM}[[:blank:]]+//p" $QMAP)
+	OLDVALUE=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]].*" $QCONF)
+	DEFAULT=$(sed -En "s/^#default[[:blank:]]+${PARAM}[[:blank:]]+//p" $QCONF)
 }
 
 checks() {
-	# Check that the jail/VM exists in QMAP
-	! grep -Eqs "^${JAIL}[[:blank:]]" $QMAP && get_msg2 $_q -Em _e1
+	# Check that the jail/VM exists in QCONF
+	! grep -Eqs "^${JAIL}[[:blank:]]" $QCONF && get_msg2 $_q -Em _e1
 
 	# This will return global variables: CLASS and FILT_PARAMS
 	get_parameter_lists $JAIL
@@ -47,7 +47,7 @@ checks() {
 		[ -n "$JAIL" ] && [ -n "$PARAM" ] || get_msg2 $_q -Eum _e0
 
 		# Make sure at least one line exists to delete
-		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QMAP \
+		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QCONF \
 				|| get_msg2 $_q -Em _e3
 
 	else
@@ -55,7 +55,7 @@ checks() {
 		{ [ -z "$JAIL" ] || [ -z "$PARAM" ] || [ -z "$VALUE" ] ;} && get_msg2 $_q -Eum _e0
 
 		# Exit if proposed entry already exists
-		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}[[:blank:]]*\$" $QMAP \
+		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}[[:blank:]]*\$" $QCONF \
 																			&& get_msg2 $_q -em _m1
 
 		if echo "$MULT_LN_PARAMS" | grep -Eqs "$PARAM" ; then
@@ -71,7 +71,7 @@ checks() {
 			[ "$VALUE" = "$DEFAULT" ] && [ ! "$PARAM" = "CLASS" ] \
 				&& [ ! "$PARAM" = "ROOTENV" ] && ACTION="revert_to_default"
 
-		elif echo "$NON_QMAP" | grep -Eqs "$PARAM" ; then
+		elif echo "$NON_QCONF" | grep -Eqs "$PARAM" ; then
 			ACTION="none"
 
 		# Values of the #default can be modified regardless of CLASS
@@ -111,38 +111,38 @@ checks() {
 	esac
 }
 
-modify_qmap() {
+modify_qconf() {
 
 	case $ACTION in
 		delete)
-			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QMAP)
-			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $QMAP
+			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QCONF)
+			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $QCONF
 			;;
 		revert_to_default)
-			_default=$(grep -E "^#default[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
-			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]@ d" $QMAP
+			_default=$(grep -E "^#default[[:blank:]]+${PARAM}[[:blank:]]" $QCONF)
+			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]@ d" $QCONF
 			;;
 		add)
-			echo "$JAIL  $PARAM  $VALUE" >> $QMAP
+			echo "$JAIL  $PARAM  $VALUE" >> $QCONF
 			;;
 		none) :  # No action to take (devfs_ruleset)
 			;;
-		*) # Modify QMAP and print new settings on success
-			sed -i '' -E "s@^(${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+).*@\1${VALUE}@" $QMAP
+		*) # Modify QCONF and print new settings on success
+			sed -i '' -E "s@^(${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+).*@\1${VALUE}@" $QCONF
 			;;
 	esac
 
-	# Set IPV4 to auto in QMAP, if the user approved it
+	# Set IPV4 to auto in QCONF, if the user approved it
 	[ "$_IPAUTO" ] \
-		&& sed -i '' -E "\@^${JAIL}[[:blank:]]+IPV4@s@[^[:blank:]]+\$@auto@" $QMAP
+		&& sed -i '' -E "\@^${JAIL}[[:blank:]]+IPV4@s@[^[:blank:]]+\$@auto@" $QCONF
 
 	# Clean up the columns and sorting. Make sure there's no duplicates
-	_newQMAP=$(column -t $QMAP | uniq)
-	_newQMAP=$(echo "$_newQMAP" | sort -k1,1 -k2,2)
-	echo "$_newQMAP" > $QMAP
+	_newQCONF=$(column -t $QCONF | uniq)
+	_newQCONF=$(echo "$_newQCONF" | sort -k1,1 -k2,2)
+	echo "$_newQCONF" > $QCONF
 
 	# BHYVE_CUSTM has extra spaces. At least remove the first space
-	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $QMAP
+	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $QCONF
 }
 
 modify_autosnap() {
@@ -227,9 +227,9 @@ main() {
 
 	# Some edits are coordinated across other quBSD configs/params, for user-facing simplicity
 	case "$PARAM" in
-		AUTOSNAP)  modify_autosnap ; modify_qmap  ;;
+		AUTOSNAP)  modify_autosnap ; modify_qconf  ;;
 		DEVFS_RULE) modify_jconf_devfs  ;;
-		*) modify_qmap  ;;
+		*) modify_qconf  ;;
 	esac
 
 	# Print the new value

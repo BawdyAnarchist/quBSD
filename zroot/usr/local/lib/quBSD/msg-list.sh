@@ -34,9 +34,9 @@ Usage: qb-list [-aHlsz]   {will show all jails/VMs}
    -a: (a)autosnap. Show qubsd:autosnap column in zfs output
    -h: (h)elp: Outputs this help message
    -H: (H)eaders (none). Scripting mode, no headers for PARAMs
-   -j: (j)ail: Show qmap settings for <jail>
+   -j: (j)ail: Show qconf settings for <jail>
    -l: (l)ist: List names of all unique jails and VMs
-   -p: (p)arameter: Show all qmap entries with <parameter>
+   -p: (p)arameter: Show all qconf entries with <parameter>
    -s: (s)napshots: Show zfs snapshots in results
    -z: (z)fs: Show zfs datasets (snapshots only with [-s])
    -Z: (Z)fs: ONLY show zfs datasets, but not parameters

@@ -206,7 +206,7 @@ quBSD classes:  rootjail | cjail | appjail | dispjail | appVM | rootVM
 
    cjail   -  Control Jail connects via SSH to all jails/VMs.
               Default is 0control, but this can be changed
-              with the CONTROL parameter in qmap.
+              with the CONTROL parameter in qconf.
 
    appjail -  These are the actual workstation jails. The root
               filesystem is cloned from a designated rootjail,
@@ -513,7 +513,7 @@ ENDOFMSG
 	_examples) cat << ENDOFMSG
 
 QUICK and EASY USAGE
-From qmap #defaut:  qb-create <newjail/VM>
+From qconf #defaut:  qb-create <newjail/VM>
 From Template:      qb-create -t <template> <newjail/VM>
 Specific PARAMS:    qb-create -t <template> -p GATEWAY=<gateway> -p CPUSET=<size> <newjail/VM>
 Basic GUI jail:     qb-create -t 0gui-template <newjail>

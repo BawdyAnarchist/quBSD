@@ -68,7 +68,7 @@ modify_files() {
 			&& sed -i '' -e "s@WGPORTS[[:blank:]]*=.*@WGPORTS = \"${WG_PORTS}\"@" $JPF
 	fi
 
-	# Make sure the MTU matches qmap
+	# Make sure the MTU matches qconf
 	[ "$MTU" ] && [ -e "$JWG" ] \
 						&& sed -i '' -E "s/^MTU.*/MTU = ${MTU}/" $JWG
 

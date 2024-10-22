@@ -37,12 +37,12 @@ msg_qubsd() {
 ENDOFMSG
 		;;
 	_e0_1) cat << ENDOFMSG
-ERROR: There is no $1 PARAMETER in QMAP. Expecting a valid ZFS dataset.
+ERROR: There is no $1 PARAMETER in QCONF. Expecting a valid ZFS dataset.
        This is a global error, as quBSD can't function without this PARAMETER.
 ENDOFMSG
 		;;
 	_e0_2) cat << ENDOFMSG
-ERROR: QMAP PARAMETER $1 is set to: < $2 >, which isnt a valid zfs dataset.
+ERROR: QCONF PARAMETER $1 is set to: < $2 >, which isnt a valid zfs dataset.
        This is a global error, as quBSD can't function without this PARAMETER.
 ENDOFMSG
 		;;
@@ -56,11 +56,11 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-   < $1 > has no $2 in QMAP
+   < $1 > has no $2 in QCONF
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
-   < $1 > has an invalid $2 in QMAP
+   < $1 > has an invalid $2 in QCONF
 ENDOFMSG
 		;;
 	_e4) cat << ENDOFMSG
@@ -125,7 +125,7 @@ ENDOFMSG
 	;;
 	_e13_2) cat << ENDOFMSG
    JAILNAME < $1 > has an entry in at least one of the following:
-   jail.conf, QMAP, or zfs dataset at $U_ZFS or $R_ZFS
+   jail.conf, QCONF, or zfs dataset at $U_ZFS or $R_ZFS
    Destroy/remove all occurrences with:  qb-destroy $1
 ENDOFMSG
 	;;
@@ -344,7 +344,7 @@ ENDOFMSG
 msg_exec() {
 	case "$_message" in
 	_e1) cat << ENDOFMSG
-   < $2 > has an invalid $1 in QMAP
+   < $2 > has an invalid $1 in QCONF
 ENDOFMSG
 		;;
 	_e2) cat << ENDOFMSG

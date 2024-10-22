@@ -27,7 +27,7 @@
 # rm_errfiles          - Removes the coordinated error files for qb-scripts
 # get_parameter_lists  - Valid parameters are tracked here, and divided into groups
 # get_user_response    - Simple yes/no y/n checker
-# get_jail_parameter   - All QMAP entries, along with sanity checks
+# get_jail_parameter   - All QCONF entries, along with sanity checks
 # get_info             - Info beyond that just for jails or jail parameters
 	# _CLIENTS          - All jails that <jail> serves a network connection
 	# _ONJAILS          - All currently running jails
@@ -65,7 +65,7 @@
 # chk_valid_jail       - Makes sure the jail has minimum essential elements
 # chk_valid_autosnap   - true|false ; Include in qb-autosnap /etc/crontab snapshots
 # chk_valid_autostart  - true|false ; Autostart at boot
-# chk_valid_bhyveopts  - Checks bhyve options in QMAP for valid or not
+# chk_valid_bhyveopts  - Checks bhyve options in QCONF for valid or not
 # chk_valid_class      - appjail | rootjail | dispjail | appVM | rootVM
 # chk_valid_cpuset     - Must be in man 1 cpuset format. Limit jail CPUs
 # chk_valid_gateway    - Jail adheres to gateway jail norms
@@ -80,7 +80,7 @@
 # chk_valid_schg       - none | sys | all ; quBSD convention, schg flags on jail
 # chk_valid_seclvl     - -1|0|1|2|3 ; Applied to jail after start
 # chk_valid_template   - Somewhat redundant with: chk_valid_jail
-# chk_valid_taps       - QMAP designates number of taps to add (must be :digit:)
+# chk_valid_taps       - QCONF designates number of taps to add (must be :digit:)
 # chk_valid_tmux       - tmux for terminal access to FreeBSD jails. true/false
 # chk_valid_template   - Must be any valid jail
 # chk_valid_vcpus      - Must be an integer less than cpuset -g
@@ -129,15 +129,15 @@ get_global_variables() {
 	# Define variables for files
 	QBDIR="/usr/local/etc/quBSD"
 	JCONF="${QBDIR}/jail.conf"
-	QMAP="${QBDIR}/qubsd.conf"
+	QCONF="${QBDIR}/qubsd.conf"
 	QBLOG="/var/log/quBSD/quBSD.log"
 	QTMP="/tmp/quBSD"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
-	sed -i '' -E 's/[[:blank:]]*$//' $QMAP
+	sed -i '' -E 's/[[:blank:]]*$//' $QCONF
 	# Get datasets, mountpoints; and define files.
-   R_ZFS=$(sed -nE "s:#NONE[[:blank:]]+jails_zfs[[:blank:]]+::p" $QMAP)
-   U_ZFS=$(sed -nE "s:#NONE[[:blank:]]+zusr_zfs[[:blank:]]+::p" $QMAP)
+   R_ZFS=$(sed -nE "s:#NONE[[:blank:]]+jails_zfs[[:blank:]]+::p" $QCONF)
+   U_ZFS=$(sed -nE "s:#NONE[[:blank:]]+zusr_zfs[[:blank:]]+::p" $QCONF)
 	[ -z "$R_ZFS" ] && get_msg -V -m "_e0_1" "jails_zfs" && exit 1
 	[ -z "$U_ZFS" ] && get_msg -V -m "_e0_1" "zusr_zfs" && exit 1
 	! chk_valid_zfs "$R_ZFS" && get_msg -V -m _e0_2 -- "jails_zfs" "$R_ZFS" && exit 1
@@ -244,7 +244,7 @@ get_parameter_lists() {
 	VM_PARAMS="BHYVEOPTS MEMSIZE TAPS TMUX VCPUS VNC WIREMEM X11"
 	MULT_LN_PARAMS="BHYVE_CUSTM PPT"
 	ALL_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE $VM_PARAMS $MULT_LN_PARAMS"
-	NON_QMAP="DEVFS_RULE"
+	NON_QCONF="DEVFS_RULE"
 
 	# Unless suppressed with [-n], group by CLASS
 	if [ -z "$_nc" ] ; then
@@ -282,9 +282,9 @@ get_user_response() {
 }
 
 get_jail_parameter() {
-	# Get corresponding <value> for <jail> <param> from QMAP.
+	# Get corresponding <value> for <jail> <param> from QCONF.
 	# Assigns global variable of ALL CAPS <param> name, with <value>
-	 # -dp: If _value is null, retreive #default from QMAP
+	 # -dp: If _value is null, retreive #default from QCONF
 	 # -ep: echo _value rather than setting global variable. If using inside $(command_substitution),
 	 	  ## best to use [-q] with it to prevent unpredictable behavior
 	 # -qp: quiet any error/alert messages. Otherwise error messages are shown.
@@ -316,12 +316,12 @@ get_jail_parameter() {
 	[ -z "$_param" ] && get_msg $_qp $_V -m _e0 -- "PARAMETER and jail" && eval "$_sp $_R1"
 	[ -z "$_jail" ] && get_msg $_qp $_V -m _e0 -- "jail" && eval "$_sp $_R1"
 
-	# Get the <_value> from QMAP.
-	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
+	# Get the <_value> from QCONF.
+	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $QCONF)
 
 	# Substitute <#default> values, so long as [-d] was not passed
 	[ -z "$_value" ] && [ -n "$_dp" ] \
-		&& _value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $QMAP)
+		&& _value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $QCONF)
 
 	# If still blank, check for -z or -s options. Otherwise err message and return 1
 	if [ -z "$_value" ] ; then
@@ -361,8 +361,8 @@ get_info() {
 	[ -z "$_info" ] && get_msg $_qp -m _e0 -- "INFO PARAMETER" && eval "$_sp $_R1"
 
 	case $_info in
-		_CLIENTS)  # All _clients listed in QMAP, which depend on _jail as a gateway
-			_value=$(sed -nE "s/[[:blank:]]+GATEWAY[[:blank:]]+${_jail}//p" $QMAP)
+		_CLIENTS)  # All _clients listed in QCONF, which depend on _jail as a gateway
+			_value=$(sed -nE "s/[[:blank:]]+GATEWAY[[:blank:]]+${_jail}//p" $QCONF)
 			;;
 		_ONJAILS)  # All jails/VMs that are currently running
 			_value=$(jls | sed "1 d" | awk '{print $2}' ; \
@@ -431,13 +431,13 @@ compile_jlist() {
 		;;
 
 		auto)
-			# Find jails tagged with autostart in QMAP.
-			_JLIST=$(grep -E "AUTOSTART[[:blank:]]+true" $QMAP | awk '{print $1}' | uniq)
+			# Find jails tagged with autostart in QCONF.
+			_JLIST=$(grep -E "AUTOSTART[[:blank:]]+true" $QCONF | awk '{print $1}' | uniq)
 		;;
 
 		all)
-			# ALL jails from QMAP, except commented lines
-			_JLIST=$(awk '{print $1}' $QMAP | uniq | sed "/^#/d")
+			# ALL jails from QCONF, except commented lines
+			_JLIST=$(awk '{print $1}' $QCONF | uniq | sed "/^#/d")
 		;;
 
 		?*)
@@ -1209,7 +1209,7 @@ chk_isvm() {
 
 chk_avail_jailname() {
 	# Checks that the proposed new jailname does not have any entries or partial entries
-	# in JCONF, QMAP, and ZFS datasets
+	# in JCONF, QCONF, and ZFS datasets
 	# Return 0 jailname available, return 1 for any failure
 	local _fn="chk_avail_jailname" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
@@ -1233,7 +1233,7 @@ chk_avail_jailname() {
    # Checks that proposed jailname doesn't exist or partially exist
 	if chk_valid_zfs "${R_ZFS}/$_jail" || \
 		chk_valid_zfs "${U_ZFS}/$_jail"  || \
-		grep -Eq "^${_jail}[[:blank:]]+" $QMAP || \
+		grep -Eq "^${_jail}[[:blank:]]+" $QCONF || \
 		grep -Eq "^${_jail}[[:blank:]]*\{" $JCONF ; then
 		get_msg $_qa -m _e13_2 -- "$_jail" && eval $_R1
 	fi
@@ -1287,7 +1287,7 @@ chk_valid_zfs() {
 }
 
 chk_valid_jail() {
-	# Checks that jail has JCONF, QMAP, and corresponding ZFS dataset
+	# Checks that jail has JCONF, QCONF, and corresponding ZFS dataset
 	# Return 0 for passed all checks, return 1 for any failure
 	local _fn="chk_valid_jail" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
@@ -1306,8 +1306,8 @@ chk_valid_jail() {
 	# _class is a necessary element of all jails. Use it for pulling datasets
 	[ -z "$_class" ] && _class=$(get_jail_parameter -eqs CLASS $_value)
 
-	# Must have a ROOTENV in QMAP.
-	! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $QMAP \
+	# Must have a ROOTENV in QCONF.
+	! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $QCONF \
 		&& get_msg $_qv $_V -m _e2 -- "$_value" "ROOTENV" \
 		&& get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
@@ -1316,7 +1316,7 @@ chk_valid_jail() {
 			&& get_msg $_qv -m _e7 -- "$_value" && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
 	case $_class in
-		"") # Empty, no class exists in QMAP
+		"") # Empty, no class exists in QCONF
 			get_msg $_qv $_V -m _e2 -- "jail" "$_value" \
 			get_msg $_qv $_V -m _e1 -- "$_value" "class" && eval $_R1
 			;;
@@ -1337,7 +1337,7 @@ chk_valid_jail() {
 				&& get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
 			# Dispjails can't reference other dispjails
-			local _templ_class=$(sed -nE "s/^${_template}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
+			local _templ_class=$(sed -nE "s/^${_template}[[:blank:]]+CLASS[[:blank:]]+//p" $QCONF)
 			[ "$_templ_class" = "dispjail" ] \
 				&& get_msg $_qv -m _e6_1 -- "$_value" "$_template" && eval $_R1
 
@@ -1483,7 +1483,7 @@ chk_valid_control() {
 	# 'none' is valid for control jail
 	[ "$_value" = "none" ] && eval $_R0
 
-	local _class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
+	local _class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QCONF)
 	chk_valid_jail $_qt -c "$_class" -- "$_value" && eval $_R0
 	get_msg $_qt -m _e1 -- "$_value" "CONTROL" && eval $_R1
 }
@@ -1515,7 +1515,7 @@ chk_valid_gateway() {
 	[ "$_gw" = "none" ] && eval $_R0
 
 	# Nonlocal var, class of the gateway is important for jail startups
-	local _class_gw=$(sed -nE "s/^${_gw}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
+	local _class_gw=$(sed -nE "s/^${_gw}[[:blank:]]+CLASS[[:blank:]]+//p" $QCONF)
 
 	# Class of gateway should never be a ROOTENV
 	{ [ "$_class_gw" = "rootjail" ] || [ "$_class_gw" = "rootVM" ] ;} \
@@ -1605,8 +1605,8 @@ chk_isqubsd_ipv4() {
 	# Otherwise, a value of none, auto, or DHCP are fine
 	{ [ "$_value" = "none" ] || [ "$_value" = "auto" ] || [ "$_value" = "DHCP" ] ;} && eval $_R0
 
-	# Compare against QMAP, and _USED_IPS.
-	{ grep -v "^$_jail" $QMAP | grep -qs "$_value" \
+	# Compare against QCONF, and _USED_IPS.
+	{ grep -v "^$_jail" $QCONF | grep -qs "$_value" \
 		|| get_info -e _USED_IPS | grep -qs "${_value%/*}" ;} \
 			&& get_msg $_q -m _w4 -- "$_value" "$_jail" && eval $_R1
 
@@ -1668,7 +1668,7 @@ chk_valid_memsize() {
 	[ "$_value" = "none" ] && get_msg -m _e21 \
 		&& get_msg $_q -m _e1 -- "$_value" "MEMSIZE" && eval $_R1
 
-	# It's the exact same program/routine. Different QMAP params to be technically specific.
+	# It's the exact same program/routine. Different QCONF params to be technically specific.
 	chk_valid_maxmem $_q -- "$1" && eval $_R0 || eval $_R1
 }
 
@@ -1713,7 +1713,7 @@ chk_valid_ppt() {
 	# Get list of pci devices on the machine
 	_pciconf=$(pciconf -l | awk '{print $1}')
 
-	# Check all listed PPT devices from QMAP
+	# Check all listed PPT devices from QCONF
 	for _val in $_value ; do
 
 		# convert _val to native pciconf format with :colon: instead of /fwdslash/
@@ -1760,8 +1760,8 @@ chk_valid_rootenv() {
 	local _value="$1"
 	[ -z "$_value" ] && get_msg $_q -m _e0 -- "CLASS" && eval $_R1
 
-	# Must be designated as a ROOTENV in QMAP
-	local _class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QMAP)
+	# Must be designated as a ROOTENV in QCONF
+	local _class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QCONF)
 	case $_class in
 		'') get_msg $_q -m _e2 -- "$_value" "CLASS"
 			 get_msg $_q -m _e1 -- "$_value" "ROOTENV" && eval $_R1
@@ -1796,7 +1796,7 @@ chk_valid_seclvl() {
 }
 
 chk_valid_taps() {
-	# Taps in QMAP just lists how many are wanted
+	# Taps in QCONF just lists how many are wanted
 	local _fn="chk_valid_taps" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
 	while getopts qV _opts ; do case $_opts in
@@ -1808,7 +1808,7 @@ chk_valid_taps() {
 
 	# Make sure that it's an integer
 	for _val in $_value ; do
-		! chk_integer -g 0 -v "Number of TAPS (in QMAP)," -- $_value \
+		! chk_integer -g 0 -v "Number of TAPS (in QCONF)," -- $_value \
 			 && get_msg $_q -m _e1 -- "$_value" "TAPS" && eval $_R1
 	done
 
@@ -2013,9 +2013,9 @@ discover_open_ipv4() {
 	# Increment $_ip2 until an open IP is found
 	while [ $_ip2 -le 255 ] ; do
 
-		# Compare against QMAP, and the IPs already in use, including the temp file.
+		# Compare against QCONF, and the IPs already in use, including the temp file.
 		_ip_test="${_ip0}.${_ip1}.${_ip2}"
-		if grep -Fq "$_ip_test" $QMAP || echo "$_USED_IPS" | grep -Fq "$_ip_test" \
+		if grep -Fq "$_ip_test" $QCONF || echo "$_USED_IPS" | grep -Fq "$_ip_test" \
 				|| grep -Fqs "$_ip_test" "$_TMP_IP" ; then
 
 			# Increment for next cycle
@@ -2337,7 +2337,7 @@ prep_bhyve_options() {
 		*) get_msg -m _e9 ;;
 	esac ; done ; shift $(( OPTIND - 1))
 
-	# Get simple QMAP variables
+	# Get simple QCONF variables
 	_VM="$1"
 	_cpuset=$(get_jail_parameter -de CPUSET "$_VM")        || eval $_R1
 	_gateway=$(get_jail_parameter -dez GATEWAY "$_VM")     || eval $_R1
@@ -2362,7 +2362,7 @@ prep_bhyve_options() {
 	_BHOPTS="-${_bhyveopts}"
 
 	# Get wildcard bhyve option added by user
-	_bhyve_custm=$(sed -En "s/${_VM}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+//p" $QMAP \
+	_bhyve_custm=$(sed -En "s/${_VM}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+//p" $QCONF \
 						| sed -En "s/[[:blank:]]+/ /p")
 
 	# RAM and memory handling
@@ -2447,7 +2447,7 @@ EOF
 	# Assign VNC FBUF options
 	if [ "$_vnc" ] && [ ! "$_vnc" = "false" ] ; then
 
-		# Define height/width from the QMAP entry
+		# Define height/width from the QCONF entry
 		_w=$(echo "$_vnc" | grep -Eo "^[[:digit:]]+")
 		_h=$(echo "$_vnc" | grep -Eo "[[:digit:]]+\$")
 
@@ -2464,7 +2464,7 @@ EOF
 		_TAB="-s 30,xhci,tablet"
 	fi
 
-	# Launch a serial port if tmux is set in QMAP. The \" and TMUX2 closing " are intentional.
+	# Launch a serial port if tmux is set in QCONF. The \" and TMUX2 closing " are intentional.
 	[ "$_tmux" = "true" ] && _STDIO="-l com1,stdio" \
 		&& _TMUX1="/usr/local/bin/tmux new-session -d -s $_VM \"" && _TMUX2='"'
 

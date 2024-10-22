@@ -36,7 +36,7 @@ check_zbackup() {
 
 determine_datasets() {
 	case $MODE in
-		auto) # Backup datasets selected as "auto" in QMAP
+		auto) # Backup datasets selected as "auto" in QCONF
 			_JAILS=$(/usr/local/bin/qb-list -Hp BACKUP | grep -Ev "^#" | awk '/.*true$/{print $1}')
 			for _jail in $_JAILS ; do
 				[ -z "$DATASETS" ] \

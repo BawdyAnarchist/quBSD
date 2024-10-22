@@ -8,7 +8,7 @@ msg_cmd() {
 ENDOFMSG
 		;;
 	_e2) cat << ENDOFMSG
-Failed to retreive a valid parameter from QMAP.
+Failed to retreive a valid parameter from QCONF.
 PARAMETER: < $1 > for jail: < $2 >
 ENDOFMSG
 		;;
@@ -40,7 +40,7 @@ ENDOFMSG
 		;;
 	_m2) cat << ENDOFMSG
 ALERT:  $0
-< $JAIL > is tagged for VNC in QMAP, but the FBUF device hasn't
+< $JAIL > is tagged for VNC in QCONF, but the FBUF device hasn't
 been detected yet. Waiting 12 more seconds before quitting.
 ENDOFMSG
 		;;

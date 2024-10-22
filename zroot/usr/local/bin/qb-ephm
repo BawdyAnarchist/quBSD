@@ -82,7 +82,7 @@ monitor_ephm_windows() {
 		zfs destroy -rRf ${R_ZFS}/$NEWJAIL > /dev/null 2>&1
 		zfs destroy -rRf ${U_ZFS}/$NEWJAIL > /dev/null 2>&1
 		zfs destroy -rRf $NEWSNAP > /dev/null 2>&1
-		sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QMAP
+		sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QCONF
 		sed -i '' -E "\\@${NEWJAIL}[[:blank:]]*\\{@,\\@^[[:blank:]]*\\}[[:blank:]]*\\\$@d" $JCONF
 		rm "${QTMP}/qb-${NEWJAIL}" > /dev/null 2>&1
 		rm_errfiles
@@ -111,7 +111,7 @@ destroy_ephemeral() {
 	zfs destroy -rRf ${R_ZFS}/$NEWJAIL > /dev/null 2>&1
 	zfs destroy -rRf ${U_ZFS}/$NEWJAIL > /dev/null 2>&1
 	zfs destroy $NEWSNAP > /dev/null 2>&1
-	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QMAP
+	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QCONF
 	sed -i '' -E "\@${NEWJAIL}[[:blank:]]*\{@,\@^[[:blank:]]*\}[[:blank:]]*\$@d" $JCONF
 	rm "${QTMP}/qb-ephm_${NEWJAIL}" > /dev/null 2>&1
 	rm_errfiles

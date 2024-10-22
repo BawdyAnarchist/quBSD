@@ -7,7 +7,7 @@ Must specificy a <jail> to destroy
 ENDOFMSG
 	;;
 	_e2) cat << ENDOFMSG
-< $JAIL > has NO_DESTROY set to true in QMAP.
+< $JAIL > has NO_DESTROY set to true in QCONF.
 Use qb-edit to change this to 'false' and try again.
 ENDOFMSG
 	;;

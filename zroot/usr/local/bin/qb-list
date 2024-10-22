@@ -49,10 +49,10 @@ check_and_adjust() {
 		none@*@none@none)
 
 			# Check if it's a parameter
-			awk '{print $2}' $QMAP | grep -Eqsi "$POS1" && PARAM="$POS1"
+			awk '{print $2}' $QCONF | grep -Eqsi "$POS1" && PARAM="$POS1"
 
-			# Check if it's an entry in QMAP
-			grep -Eqs "^${POS1}[[:blank:]]+" $QMAP && JAIL="$POS1"
+			# Check if it's an entry in QCONF
+			grep -Eqs "^${POS1}[[:blank:]]+" $QCONF && JAIL="$POS1"
 
 			# If jail=param (and not 'none'), then it's ambiguous what the user wanted
 			[ ! "$JAIL" = "none" ] && [ "$PARAM" = "$JAIL" ] && get_msg2 -Eum _e2
@@ -81,12 +81,12 @@ get_results() {
 
 		# ALL JAILS
 		*@f@none@NONE)
-				_RESULT=$(awk '{print $1}' $QMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
+				_RESULT=$(awk '{print $1}' $QCONF | uniq | grep -Ev "^(#|host)" | sort -k1)
 		;;
 
 		# ALL JAILS + ZFS
 		t@t@none@NONE)
-				_RESULT=$(awk '{print $1}' $QMAP | uniq | grep -Ev "^(#|host)" | sort -k1)
+				_RESULT=$(awk '{print $1}' $QCONF | uniq | grep -Ev "^(#|host)" | sort -k1)
 				get_zresult
 		;;
 
@@ -98,7 +98,7 @@ get_results() {
 		# SINGLE JAIL
 		*@*@*@NONE)
 			# Add in devfs if appropriate, and supplement missing values with #defaults
-			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $QMAP)
+			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $QCONF)
 			get_devfs_result "$JAIL"
 			supplement_jail
 			[ "$ZLIST" = "t" ] && get_zresult
@@ -106,20 +106,20 @@ get_results() {
 
 		# SINGLE PARAMETER
 		*@*@none@*)
-			# Get list of all jails in QMAP (include #default).
-			_JAILS=$(echo '#default' ; awk '!/^#/{print $1}' $QMAP | uniq)
+			# Get list of all jails in QCONF (include #default).
+			_JAILS=$(echo '#default' ; awk '!/^#/{print $1}' $QCONF | uniq)
 			_default=$(\
-				sed -nE "s/#default[[:blank:]]+${PARAM}[[:blank:]]+([^[:blank:]]+)/\1/p" $QMAP)
+				sed -nE "s/#default[[:blank:]]+${PARAM}[[:blank:]]+([^[:blank:]]+)/\1/p" $QCONF)
 
-			# PARAMS set to #default arent enumerated in QMAP. So cant just grep/sed them.
+			# PARAMS set to #default arent enumerated in QCONF. So cant just grep/sed them.
 			for _jail in $_JAILS ; do
 				if [ "$PARAM" = "DEVFS_RULE" ] ; then
-					# Devfs is not inherently a QMAP, parameter, but we provide the info anyways
+					# Devfs is not inherently a QCONF, parameter, but we provide the info anyways
 					get_devfs_result "$_jail"
 				else
 					# Reconstruct PARAMS for all jails to include the non-enumerated #default values
 					unset _result
-					_result=$(grep -E "^${_jail}[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
+					_result=$(grep -E "^${_jail}[[:blank:]]+${PARAM}[[:blank:]]" $QCONF)
 					[ -z "$_result" ] && _result="$_jail  $PARAM  $_default"
 					[ -z "$_RESULT" ] && _RESULT=$(echo "$_result") \
 						|| _RESULT=$(echo "$_RESULT" ; echo "$_result")
@@ -130,10 +130,10 @@ get_results() {
 		# Show a jail/parameter combo
 		*@f@*@*)
 			[ "$PARAM" = "DEVFS_RULE" ] && get_devfs_result "$JAIL" \
-				|| _RESULT=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
+				|| _RESULT=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $QCONF)
 
 			[ -z "$_RESULT" ] \
-					&& _RESULT=$(grep -E "^#default[[:blank:]]+${PARAM}[[:blank:]]" $QMAP)
+					&& _RESULT=$(grep -E "^#default[[:blank:]]+${PARAM}[[:blank:]]" $QCONF)
 
 			[ "$ZLIST" = "t" ] && get_zresult
 		;;
@@ -175,7 +175,7 @@ supplement_jail() {
 	# Find the #defaults that will need to be added
 	for _param in $FILT_PARAMS ; do
 		! echo "$_current_params" | grep -qs "$_param" && _RESULT="$(echo "$_RESULT" \
-										; grep -E "^#default[[:blank:]]+${_param}[[:blank:]]" $QMAP)"
+										; grep -E "^#default[[:blank:]]+${_param}[[:blank:]]" $QCONF)"
 	done
 
 	# Sort the result by the 2nd column

@@ -23,7 +23,7 @@ Missing argument. Need jail, parameter, and value (unless deleting line)
 ENDOFMSG
 		;;
 	_e1) cat << ENDOFMSG
-Jail/VM: < $JAIL > doesn't exist in QMAP. Check your spelling.
+Jail/VM: < $JAIL > doesn't exist in QCONF. Check your spelling.
 ENDOFMSG
 		;;
 	_e2) cat << ENDOFMSG

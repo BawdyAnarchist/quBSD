@@ -54,8 +54,8 @@ cleanup_disps() {
 		zfs destroy -rRf $_ephm > /dev/null 2>&1
 	done
 
-	# Remove anything that starts with ^EPHM in qmap and jail.conf
-   sed -i '' -E "/^EPHM/d" $QMAP
+	# Remove anything that starts with ^EPHM in qconf and jail.conf
+   sed -i '' -E "/^EPHM/d" $QCONF
 	sed -i '' -E "/^EPHM.*(\{|[[:blank:]])/,/^}/d" $JCONF
 }
 

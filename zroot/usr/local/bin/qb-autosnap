@@ -66,14 +66,14 @@ calculate_variables() {
 	fi
 }
 
-sync_from_qmap() {
+sync_from_qconf() {
 
-	# Get list of all jails with an AUTOSNAP setting in QMAP
+	# Get list of all jails with an AUTOSNAP setting in QCONF
 	_jlist=$(/usr/local/bin/qb-list -Hp AUTOSNAP | awk '/.*true$/{print $1}')
 	for _jail in $_jlist ; do
 
-		# Pull the value of the AUTOSNAP, and conform datasets to QMAP
-		_value=$(sed -En "s/^${_jail}[[:blank:]]+AUTOSNAP[[:blank:]]+//gp" $QMAP)
+		# Pull the value of the AUTOSNAP, and conform datasets to QCONF
+		_value=$(sed -En "s/^${_jail}[[:blank:]]+AUTOSNAP[[:blank:]]+//gp" $QCONF)
 		case "$(get_jail_parameter -deqs CLASS "$_jail")" in
 
 			app*)  chk_valid_zfs "${U_ZFS}/${_jail}" \
@@ -192,8 +192,8 @@ thin_old_snapshots() {
 }
 
 main() {
-	# Sync from QMAP just in case of differences or hand jammed updates
-	sync_from_qmap
+	# Sync from QCONF just in case of differences or hand jammed updates
+	sync_from_qconf
 
 	# List first
 	[ -n "$LIST" ] && list_datasets && exit 0
