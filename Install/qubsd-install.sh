@@ -259,7 +259,7 @@ add_gui_pkgs() {
 	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT \
 		&& sed -i '' -E "/twm/ d" $XINIT \
 		&& sed -i '' -E "/xclock/ d" $XINIT \
-		&& sed -i '' -E "/xterm -geometry/ d" $XINIT \
+		&& sed -i '' -E "/xterm -geometry/ d" $XINIT
 	[ "$i3wm" = "true" ] && echo "i3" >> $XINIT
 }
 
@@ -280,7 +280,7 @@ install_rootjails() {
 	zfs snapshot ${jails_zfs}/0base@INSTALL
 
 	# Install all other rootjails as indicated by install.conf 
-	[ "$GUI" = "true" ] && rootjails="0gui" && appjails="0gui disp3"
+	[ "$GUI" = "true" ] && rootjails="0gui" && appjails="0gui"
 	[ "$server" = "true" ] && rootjails="$rootjails 0serv" && appjails="$appjails 0serv"
 
 	for _jail in 0net $rootjails ; do
@@ -299,7 +299,7 @@ install_rootjails() {
 }
 
 install_appjails() {
-	appjails="0base 0net 0control net-firewall disp1 disp2 net-vpn net-tor $appjails"
+	appjails="0base 0net 0control net-firewall net-vpn net-tor $appjails"
 
 	for _jail in $appjails ; do
 		zfs create -o mountpoint="${zusr_mount}/${_jail}" -o qubsd:autosnap="true" ${zusr_zfs}/${_jail}
