@@ -161,18 +161,6 @@ final_confirmation() {
    esac 
 }
 
-add_gui_pkgs() {
-	# Install pkgs
-	[ "$GUI" = "true" ] && _pkgs="xorg tigervnc-viewer"
-	[ "$i3wm" = "true" ] && _pkgs="$_pkgs i3 i3lock i3status"
-	pkg update
-	pkg install -y $_pkgs
-
-	# Modify xinitrc
-	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT
-	[ "$i3wm" = "true" ] && echo "i3" >> $XINIT
-}
-
 create_datasets() {
 	# Create datasets and modify custom props appropriately
 	zfs list $jails_zfs > /dev/null 2>&1 || zfs create $jails_zfs
@@ -232,6 +220,7 @@ modify_devfs_rules() {
 	# Check for all GPUs in pciconf, and uncomment/unhide based on vendor(s)
 	for _dev in $(pciconf -l | sed -En "/class=0x03/s/(^[[:alnum:]]+).*/\1/p") ; do
 		if pciconf -lv $_dev | grep -Eqs "NVIDIA" ; then
+			nvidia="nvidia-driver nvidia-settings"
 			sed -i '' -E "s/^#(add path.*nvidia.*)/\1/" $tmp_devfs 
 		else
 			sed -i '' -E "s/^#(add path.*dri.*)/\1/" $tmp_devfs 
@@ -256,23 +245,35 @@ modify_rc_conf() {
    service jail restart
 }
 
+add_gui_pkgs() {
+	# Install pkgs
+	[ "$GUI" = "true" ] && _pkgs="xorg tigervnc-viewer"
+	[ "$i3wm" = "true" ] && _pkgs="$_pkgs i3 i3lock i3status"
+
+	pkg update
+	pkg install -y $_pkgs $nvidia
+
+	# Modify xinitrc
+	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT
+	[ "$i3wm" = "true" ] && echo "i3" >> $XINIT
+}
+
 install_0base() {
-	# Create the zroot/qubsd dataset and extract the new jail
+	# Create the datasets and extract new jail
 	zfs create -o mountpoint="${jails_mount}/0base" -o qubsd:autosnap="true" ${jails_zfs}/0base
-	tar -C ${jails_mount}/0base -xf /usr/local/freebsd-dist/base.txz
-	head -1 /etc/fstab > /qubsd/0base/etc/fstab
-
-	# Create the zusr dataset and copy/modify files from the repo
 	zfs create -o mountpoint="${zusr_mount}/0base" -o qubsd:autosnap="true" ${zusr_zfs}/0base
+	tar -C ${jails_mount}/0base -xf /usr/local/freebsd-dist/base.txz
+
+	# Copy and modify files 
 	cp -a ${REPO}/zusr/0base/ ${zusr_mount}/0base
-	cp ${REPO}/zusr/0base/home/0base/ ${jails_mount}/0base/root
-	change_fstab "0base"
+	cp -a ${REPO}/zusr/0base/home/0base/ ${jails_mount}/0base/root
+	head -1 /etc/fstab > /qubsd/0base/etc/fstab
 	mkdir ${jails_mount}/0base/rw
+	change_fstab "0base"
 
-	# base.txz point releases do not include patches. Update 0base
+	# Update 0base (base.txz doesnt include latest patches), and install pkg
 	PAGER=cat freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install
-
-	ASSUME_ALWAYS_YES="yes" export $ASSUME_ALWAYS_YES
+	ASSUME_ALWAYS_YES="yes" ; export $ASSUME_ALWAYS_YES
 	pkg -r ${jails_mount}/0base update
 
 	# Snapshot 0base so it can be used for other rootjails
@@ -280,22 +281,35 @@ install_0base() {
 }
 
 install_0net() {
-	# Duplicate 0base for 0net
+	# Handle datasets  
 	zfs send ${jails_zfs}/0base@INSTALL | zfs recv ${jails_zfs}/0net
-
-	# Create the zusr dataset and copy files from the repo
 	zfs create -o mountpoint="${zusr_mount}/0net" -o qubsd:autosnap="true" ${zusr_zfs}/0net
-	cp -a ${REPO}/zusr/0net/ ${zusr_mount}/0net
 
+	# Copy/modify files
+	cp -a ${REPO}/zusr/0net/ ${zusr_mount}/0net
 	change_fstab "0net"
 
-	pkg -r ${jails_mount}/0net install -y isc-dhcp44-server bind918 wireguard-tools vim jq
+	# Install 0net pkgs and snapshot
+	
+	pkg -r ${jails_mount}/0net install -y vim jq wireguard-tools isc-dhcp44-server bind918
+	zfs snapshot ${jails_zfs}/0net@INSTALL
 }
 
 install_0gui() {
-	# pkg installs 
-	# copy .cshrc and .vim*
+	# If the variable wasnt assigned, do not install
+	[ -z "GUI" ] && return 0
 
+	# Handle datasets  
+	zfs send ${jails_zfs}/0base@INSTALL | zfs recv ${jails_zfs}/0gui
+	zfs create -o mountpoint="${zusr_mount}/0gui" -o qubsd:autosnap="true" ${zusr_zfs}/0gui
+
+	# Copy/modify files
+	cp -a ${REPO}/zusr/0gui/ ${zusr_mount}/0gui
+	change_fstab "0gui"
+
+	# Install 0gui pkgs and snapshot
+	pkg -r ${jails_mount}/0gui install -y vim xorg $nvidia $extrapkgs
+	zfs snapshot ${jails_zfs}/0gui@INSTALL
 }
 
 change_fstab() {
@@ -322,20 +336,19 @@ main() {
 	final_confirmation
 
 	# SYSTEM INSTALLATION
-	add_gui_pkgs
 	create_datasets
 	modify_pptdevs
 	modify_devfs_rules
 	modify_rc_conf
+	add_gui_pkgs
 	[ -d "/tmp/quBSD" ] || mkdir /tmp/quBSD
 
 	# ROOTJAILS INSTALLATION
 	install_0base
-
-echo MY SAFETY EXIT
-exit 0
 	install_0net
 	install_0gui
+echo MY SAFETY EXIT
+exit 0
 
 ####
 # Still to do: VM installation
