@@ -258,7 +258,7 @@ add_gui_pkgs() {
 	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT && [ -n "$nvidia" ] \
 		&& { sysrc -f $QLOAD 'nvidia_load="YES"' ; sysrc -f $QLOAD 'nvidia-modeset_load="YES"' ;}
 
-	[ "$i3wm" = "true" ] && cp -a ${REPO}/zroot/root/.config/i3/ /root/.config/i3
+	[ "$i3wm" = "true" ] && cp -a ${REPO}/zroot/root/.config/i3/ /root/.config/i3 \
 		&& sed -i '' -E "/twm/ d" $XINIT \
 		&& sed -i '' -E "/xclock/ d" $XINIT \
 		&& sed -i '' -E "/xterm -geometry/ d" $XINIT \
@@ -365,6 +365,7 @@ main() {
 	# rc.conf 
 	# devfs.rules
 	# /boot/loader.conf.d ; /etc/cron.d
+	# ntp.conf
 
 # MORE NOTES ON WHERE TO PUT STUFF FOR INITIAL SETUP
 	# $REPO/zusr/0base/home/0base --> all configs you want in all jail roots (rc files, configs), should be placed here
