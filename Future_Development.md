@@ -8,7 +8,7 @@ Instead of all the named and ftp nonsense in 0control, just use a fat32 formatte
 
 When you restore, the datasets dont inherit their qubsd:autosnap properties
 
-Maybe should really do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
+Maybe should do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
 
 ntpd - ongoing
 	1. Modified /etc/ntp.conf
@@ -107,7 +107,4 @@ I think `jail` caches fstab before completion of exec.prepare which edits it. Ne
 
 This was a comment on 0net in the installer, but maybe it's old by now. Delete this line if there's no problems later
 # ??change /rc.d/wireguard to remove the kldunload??
-
-need to check if boot_mute is required now or if I got my messages problem for ttyv0 sorted out with _msg2 overhaul
-
 
