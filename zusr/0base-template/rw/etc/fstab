@@ -1,3 +1,0 @@
-# Device                        Mountpoint                           FStype   Options Dump Pass#
-/zusr/0base-template/rw/        /jails/0base-template/rw/            nullfs   rw      0    0	
-/zusr/0base-template/home/  /jails/0base-template/home/      nullfs   rw      0    0
