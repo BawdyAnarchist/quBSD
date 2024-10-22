@@ -14,6 +14,8 @@ remember to remove pefs.ko entirely now that you're using zfs encryted datasets
 This was a comment on 0net in the installer, but maybe it's old by now. Delete this line if there's no problems later
 # ??change /rc.d/wireguard to remove the kldunload??
 
+Maybe should really do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
+
 
 ### UPGRADES
 
