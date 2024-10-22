@@ -4,9 +4,8 @@ define_vars() {
 	REPO="/usr/local/share/quBSD"
 	XINIT="/usr/local/etc/X11/xinit/xinitrc"
 	QLOADER="/boot/loader.conf.d/qubsd_loader.conf"
-	Q_DIR="/usr/local/etc/quBSD"
-	Q_CONF="${Q_DIR}/qubsdmap.conf"
-	QJ_CONF="${Q_DIR}/jail.conf"
+	Q_CONF="/usr/local/etc/quBSD/qubsdmap.conf"
+	QJ_CONF="${REPO}/zroot/etc/jail.conf"
 	QRC_CONF="${REPO}/zroot/etc/rc.conf"
 
 	# Read variables and messages
@@ -233,6 +232,11 @@ modify_devfs_rules() {
 	rm $tmp_devfs
 }
 
+modify_jail_conf() {
+	[ -e "/etc/jail.conf" ] && cp -a /etc/jail.conf /etc/jail.conf_bak
+	cp -a ${QJ_CONF} /etc/jail.conf
+}
+
 modify_rc_conf() {
 	# Need to be careful about modifying user's rc.conf. Comment out duplicated lines
    while IFS= read -r _line ; do
@@ -273,7 +277,7 @@ install_rootjails() {
 	zfs snapshot ${jails_zfs}/0base@INSTALL
 
 	# Install all other rootjails as indicated by install.conf 
-	[ "$GUI" = "true" ] && rootjails="0gui" && appjails="0gui dispjail"
+	[ "$GUI" = "true" ] && rootjails="0gui" && appjails="0gui disp3"
 	[ "$server" = "true" ] && rootjails="$rootjails 0serv" && appjails="$appjails 0serv"
 
 	for _jail in 0net $rootjails ; do
@@ -292,7 +296,7 @@ install_rootjails() {
 }
 
 install_appjails() {
-	appjails="0base 0net 0control net-firewall net-vpn net-tor $appjails"
+	appjails="0base 0net 0control net-firewall disp1 disp2 net-vpn net-tor $appjails"
 
 	for _jail in $appjails ; do
 		zfs create -o mountpoint="${zusr_mount}/${_jail}" -o qubsd:autosnap="true" ${zusr_zfs}/${_jail}
@@ -330,6 +334,7 @@ main() {
 	modify_pptdevs
 	modify_devfs_rules
 	modify_rc_conf
+	modify_jail_conf
 	add_gui_pkgs
 	[ -d "/tmp/quBSD" ] || mkdir /tmp/quBSD
 
