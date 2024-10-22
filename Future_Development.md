@@ -10,8 +10,13 @@ When you restore, the datasets dont inherit their qubsd:autosnap properties
 
 Maybe should really do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
 
-ntpd - ntpd only runs during qb-hostnet. Maybe can nullfs mount or devfs? the ntpd database/location to a jail. 
-
+ntpd - ongoing
+	1. Modified /etc/ntp.conf
+	2. Modified qb-hostnet -c to copy /var/db/ntpd.drift from net-firewall
+	3. Modified net-firewall rc.conf to enable ntp 
+	# still need to modify firwall pf
+	# installer should modify ntp.conf of host, or replace with its own
+	# had a problem with schg and seclvl of firewall when launching ntp
 
 ### UPGRADES
 
