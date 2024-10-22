@@ -32,7 +32,7 @@ ENDOFMSG
 ENDOFMSG
 		;;
 	_e3) cat << ENDOFMSG
-Combination of < $JAIL $PARAM > not found in qubsdmap.conf
+Combination of < $JAIL $PARAM > not found in qubsd.conf
 ENDOFMSG
 		;;
 	_e4) cat << ENDOFMSG
@@ -83,7 +83,7 @@ ENDOFMSG
 		;;
 	usage) cat << ENDOFUSAGE
 
-qb-edit:  Modify jail parameters in qubsdmap.conf
+qb-edit:  Modify jail parameters in qubsd.conf
 
 Usage: qb-edit <jail> <PARAMETER> <value>
        qb-edit [-h] | [-f][-q][-r] <jail> <PARAM> <value>

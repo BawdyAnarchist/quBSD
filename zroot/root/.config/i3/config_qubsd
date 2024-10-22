@@ -49,7 +49,7 @@ for_window [title="Spectacle"] floating enable
 	# 1) Extra workspaces require additional modes to access them (using the number keys)
 	# 2) "quickselect" mode contains your most commonly used commands.
 
-# "grave" is the tilde sign: "~".
+# "grave" is the ~tilde~ sign
 bindsym $mod+grave mode "quickselect1"
 
 mode "quickselect1" {

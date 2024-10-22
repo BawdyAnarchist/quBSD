@@ -129,7 +129,7 @@ get_global_variables() {
 	# Define variables for files
 	QBDIR="/usr/local/etc/quBSD"
 	JCONF="${QBDIR}/jail.conf"
-	QMAP="${QBDIR}/qubsdmap.conf"
+	QMAP="${QBDIR}/qubsd.conf"
 	QBLOG="/var/log/quBSD/quBSD.log"
 	QTMP="/tmp/quBSD"
 
@@ -1985,7 +1985,7 @@ assign_ipv4_auto() {
 }
 
 discover_open_ipv4() {
-	# Finds an IP address unused by any running jails, or in qubsdmap.conf. Requires [-t], to resolve
+	# Finds an IP address unused by any running jails, or in qubsd.conf. Requires [-t], to resolve
 	# the different types of IPs, like with control jails, net jails, or adhoc connections.
 	# Echo open IP on success; Returns 1 if failure to find an available IP.
 	local _fn="discover_open_ipv4" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"

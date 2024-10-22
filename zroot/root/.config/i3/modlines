@@ -1,5 +1,0 @@
-# quBSD: HIGHLY RECOMMEND. Opens xterm on host, or in jail, depending on active window
-bindsym $mod+Return exec qb-cmd -n 
-
-# quBSD: HIGHLY RECOMMEND. Like above, but if active window is a jail, open xterm on host
-bindsym $mod+Shift+Return exec xterm 

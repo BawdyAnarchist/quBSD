@@ -1,8 +1,6 @@
 
 with NIC, make qb-edit so that a new NIC also updates loader.conf.
 
-Just call it qubsd.conf and not qubsdmap.conf
-
 There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
 
 Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM

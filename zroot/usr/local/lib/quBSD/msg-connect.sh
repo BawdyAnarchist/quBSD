@@ -26,7 +26,7 @@ ENDOFMSG
    setting, indicates this is a security critical jail,
    and probably shoudn't participate in adhoc connections
    such as this. If you still wish to prevent this error,
-   modify seclvl in qubsdmap.conf and restart the jail(s).
+   modify seclvl in qubsd.conf and restart the jail(s).
 ENDOFMSG
 		;;
 	_m1) cat << ENDOFMSG

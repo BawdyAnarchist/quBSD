@@ -49,10 +49,10 @@ ENDOFMSG
 	usage) cat << ENDOFUSAGE
 
 qb-destroy: Destroy <jail/VM> and purge associated configs:
-            jail.conf ; qubsdmap.conf ; zfs datasets
+            jail.conf ; qubsd.conf ; zfs datasets
 
 Even if jail is partially created, this command will purge it.
-qubsdmap.conf has a parameter called \`no_destroy', which
+qubsd.conf has a parameter called \`no_destroy', which
 prevents destruction of jail/VM if set to true (default).
 Manually edit this setting to false, to use qb-destroy.
 

@@ -4,7 +4,7 @@ define_vars() {
 	REPO="/usr/local/share/quBSD"
 	XINIT="/usr/local/etc/X11/xinit/xinitrc"
 	QLOADER="/boot/loader.conf.d/qubsd_loader.conf"
-	Q_CONF="/usr/local/etc/quBSD/qubsdmap.conf"
+	Q_CONF="/usr/local/etc/quBSD/qubsd.conf"
 	QJ_CONF="${REPO}/zroot/etc/jail.conf"
 	QRC_CONF="${REPO}/zroot/etc/rc.conf"
 
@@ -168,7 +168,7 @@ create_datasets() {
 	zfs list $zusr_zfs > /dev/null 2>&1	|| zfs create $zusr_zfs
 	zfs set mountpoint="$zusr_mount"  qubsd:autosnap=true $zusr_zfs
 
-	# Modify qubsdmap and jail.conf with path for rootjails 
+	# Modify qubsd.conf and jail.conf with path for rootjails 
 	sed -i '' -E "s:(#NONE[[:blank:]]+jails_zfs[[:blank:]]+)zroot/qubsd:\1$jails_zfs:" $Q_CONF
 	sed -i '' -E "s:(^path=/)qubsd:\1${jails_mount}:" $QJ_CONF 
 }
@@ -260,7 +260,8 @@ add_gui_pkgs() {
 		&& sed -i '' -E "/twm/ d" $XINIT \
 		&& sed -i '' -E "/xclock/ d" $XINIT \
 		&& sed -i '' -E "/xterm -geometry/ d" $XINIT
-	[ "$i3wm" = "true" ] && echo "i3" >> $XINIT
+	[ "$i3wm" = "true" ] && echo "i3" >> $XINIT \
+		&& cp -a ${REPO}/zroot/root/.config/i3/ /root/.config/i3
 }
 
 install_rootjails() {

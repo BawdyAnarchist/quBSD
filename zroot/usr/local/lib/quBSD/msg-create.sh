@@ -280,7 +280,7 @@ At the command line, a new ROOTENV requires a template,
 to prevent accidental creation of an ondisk ROOTENV. Here
 we'll assume you want to use < $ROOTENV > as the template.
 
-Here are the qubsdmap.conf settings for:  $ROOTENV
+Here are the qubsd.conf settings for:  $ROOTENV
 ENDOFMSG
 		qb-list -j $ROOTENV
 
@@ -302,7 +302,7 @@ A TEMPLATE ACCOMPLISHES TWO DISTINCT FUNCITONS
    or use [-z] to copy only its directory structure (no files).
 
 IF NO TEMPLATE IS SPECIFIED
-1. "#default" Jail Parameters in qubsdmap.conf are used.
+1. "#default" Jail Parameters in qubsd.conf are used.
 2. The zusr template associated with the ROOTENV, is duplicated.
    (These have baseline files associated with their purpose).
    0base-template, 0net-template, 0gui-template, 0serv-template
@@ -521,7 +521,7 @@ Dispjail:           qb-create -c dispjail -t <template> <newjail>
 Duplicate ROOTENV:  qb-create -t <existing_rootenv> <newjail/VM>
 Install rootVM:     qb-create -i /usr/local/share/ISOs/<ISOfile> -v <size> <newVM>
 
-If no opts or <template> are specified, qubsdmap \'#default' are used.
+If no opts or <template> are specified, qubsd.conf \'#default' are used.
   #default can be viewed with:   qb-list -j #default
   #default can be changed with:  qb-edit #default <PARAM> <value>
 
