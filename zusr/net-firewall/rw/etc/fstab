@@ -1,2 +1,2 @@
-# Device                 Mountpoint                FStype  Options Dump Pass#
-m_zusr/net-firewall/rw/  m_jails/net-firewall/rw/  nullfs  rw      0    0	
+#Device                  Mountpoint               FStype  Options Dump Pass#
+/zusr/net-firewall/rw/  /qubsd/net-firewall/rw/  nullfs  rw      0    0	

@@ -6,12 +6,12 @@ define_vars() {
 	QLOADER="/boot/loader.conf.d/qubsd_loader.conf"
 	Q_DIR="/usr/local/etc/quBSD"
 	Q_CONF="${Q_DIR}/qubsdmap.conf"
-	J_CONF="${Q_DIR}/jail.conf"
-	RC_CONF="${Q_DIR}/rc.conf"
+	QJ_CONF="${Q_DIR}/jail.conf"
+	QRC_CONF="${Q_DIR}/rc.conf"
 
 	# Read all uncommented variables from install.conf
-	. ${REPO}/Install/install.conf
-	. /usr/local/lib/quBSD/msg-installer.sh
+	. "${REPO}/Install/install.conf"
+	. "/usr/local/lib/quBSD/msg-installer.sh"
 }
 
 load_kernel_modules() {
@@ -131,7 +131,7 @@ translate_usbs() {
 	# For final_confirmation, if install.conf has ppts_usbs specified, translate them to names
 	for _dev in $ppt_usbs ; do
 		_dev=$(echo $_dev | sed -E 's#/#:#g')
-		dev_usbs=$(echo "$dev_usbs $(pciconf -l | sed -En "s/(^[[:alnum:]]+)@.*${_dev}.*/\1/p")")
+		dev_usbs="$dev_usbs $(pciconf -l | sed -En "s/(^[[:alnum:]]+)@.*${_dev}.*/\1/p")"
 	done	
 
 	# First find the corresponding PCI device name via sysctl
@@ -171,7 +171,7 @@ create_datasets() {
 
 	# Modify qubsdmap and jail.conf with path for rootjails 
 	sed -i '' -E "s:(#NONE[[:blank:]]+jails_zfs[[:blank:]]+)zroot/qubsd:\1$jails_zfs:" $Q_CONF
-	sed -i '' -E "s:(^path=/)qubsd:\1${root_mount}:" $J_CONF 
+	sed -i '' -E "s:(^path=/)qubsd:\1${jails_mount}:" $QJ_CONF 
 }
 
 modify_pptdevs() {
@@ -214,8 +214,8 @@ modify_devfs_rules() {
 	# Add the discovered rule numbers to quBSD devfs and jail.conf
 	sed -i '' -E "s/(^\[devfsrules_qubsd_netjail=)/\1$rulenum1/" $tmp_devfs 
 	sed -i '' -E "s/(^\[devfsrules_qubsd_guijail=)/\1$rulenum2/" $tmp_devfs 
-	sed -i '' -E "s/NETRULENUM1/$rulenum1/g" $J_CONF 
-	sed -i '' -E "s/GUIRULENUM2/$rulenum2/g" $J_CONF
+	sed -i '' -E "s/NETRULENUM1/$rulenum1/g" $QJ_CONF 
+	sed -i '' -E "s/GUIRULENUM2/$rulenum2/g" $QJ_CONF
 
 	# Check for all GPUs in pciconf, and uncomment/unhide based on vendor(s)
 	for _dev in $(pciconf -l | sed -En "/class=0x03/s/(^[[:alnum:]]+).*/\1/p") ; do
@@ -238,11 +238,12 @@ modify_rc_conf() {
    while IFS= read -r _line ; do
       _param=$(echo $_line | sed -E "s/^#//" | sed -E "s@^(.*=).*@\1@")
       [ -n "$_param" ] && sed -i '' -E "s@^(${_param}.*)@#\1@" /etc/rc.conf
-   done < "${REPO}/zroot/etc/rc.conf"
+   done < "$QRC_CONF"
 
    # Copy qubsd lines and restart jail
-   cat ${REPO}/zroot/etc/rc.conf >> /etc/rc.conf
+   cat $QRC_CONF >> /etc/rc.conf
    service jail restart
+	sysrc qb_autostart_enable="YES"
 }
 
 add_gui_pkgs() {
@@ -269,11 +270,11 @@ install_0base() {
 	cp -a ${REPO}/zusr/0base/home/0base/ ${jails_mount}/0base/root
 	head -1 /etc/fstab > /qubsd/0base/etc/fstab
 	mkdir ${jails_mount}/0base/rw
-	change_fstab "0base"
+	modify_fstab "0base"
 
 	# Update 0base (base.txz doesnt include latest patches), and install pkg
-	PAGER=cat freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install
-	ASSUME_ALWAYS_YES="yes" ; export $ASSUME_ALWAYS_YES
+	PAGER='cat' freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install
+	ASSUME_ALWAYS_YES="yes" ; export ASSUME_ALWAYS_YES
 	pkg -r ${jails_mount}/0base update
 
 	# Snapshot 0base so it can be used for other rootjails
@@ -287,7 +288,7 @@ install_0net() {
 
 	# Copy/modify files
 	cp -a ${REPO}/zusr/0net/ ${zusr_mount}/0net
-	change_fstab "0net"
+	modify_fstab "0net"
 
 	# Install 0net pkgs and snapshot
 	
@@ -297,7 +298,7 @@ install_0net() {
 
 install_0gui() {
 	# If the variable wasnt assigned, do not install
-	[ -z "GUI" ] && return 0
+	[ -z "$GUI" ] && return 0
 
 	# Handle datasets  
 	zfs send ${jails_zfs}/0base@INSTALL | zfs recv ${jails_zfs}/0gui
@@ -305,22 +306,33 @@ install_0gui() {
 
 	# Copy/modify files
 	cp -a ${REPO}/zusr/0gui/ ${zusr_mount}/0gui
-	change_fstab "0gui"
+	modify_fstab "0gui"
 
 	# Install 0gui pkgs and snapshot
 	pkg -r ${jails_mount}/0gui install -y vim xorg $nvidia $extrapkgs
 	zfs snapshot ${jails_zfs}/0gui@INSTALL
 }
 
-change_fstab() {
+install_appjails() {
+	appjails="0control net-firewall net-vpn net-tor"
+	[ "$GUI" = "true" ] && appjails="$appjails dispjail"
+	[ "$server" = "true" ] && appjails="$appjails 0serv"
+
+	for _jail in $appjails ; do
+		cp -a ${REPO}/zusr/$_jail ${zusr_mount}/
+		modify_fstab "$_jail"		
+	done
+}
+
+modify_fstab() {
 	# Mountpoints in rw/etc/fstab must reference the user's zfs mountpoints
 	_jail="$1"
 
 	# Use tmp file so that column can make the file pretty
-	sed -E "s: /qubsd: ${jails_mount}:" ${jails_mount}/${_jail}/rw/etc/fstab > /tmp/temp_fstab
-	cat /tmp/temp_fstab > ${jails_mount}/${_jail}/rw/etc/fstab
-	sed -E "s:^/zusr:${zusr_mount}:" ${jails_mount}/${_jail}/rw/etc/fstab | column -t > /temp/temp_fstab
-	cat /tmp/temp_fstab > ${jails_mount}/${_jail}/rw/etc/fstab
+	sed -E "s: /qubsd: ${zusr_mount}:" ${zusr_mount}/${_jail}/rw/etc/fstab > /tmp/temp_fstab
+	cat /tmp/temp_fstab > ${zusr_mount}/${_jail}/rw/etc/fstab
+	sed -E "s:^/zusr:${zusr_mount}:" ${zusr_mount}/${_jail}/rw/etc/fstab | column -t > /tmp/temp_fstab
+	cat /tmp/temp_fstab > ${zusr_mount}/${_jail}/rw/etc/fstab
 	rm /tmp/temp_fstab
 }
 
@@ -347,8 +359,14 @@ main() {
 	install_0base
 	install_0net
 	install_0gui
+
+	# APPJAILS INSTALLATION
+	install_appjails
+
+
 echo MY SAFETY EXIT
 exit 0
+
 
 ####
 # Still to do: VM installation
