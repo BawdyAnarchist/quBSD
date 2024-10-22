@@ -234,16 +234,13 @@ modify_devfs_rules() {
 }
 
 modify_rc_conf() {
-	# Need to be careful about modifying user's rc.conf. Comment out duplicate lines
+	# Need to be careful about modifying user's rc.conf. Comment out duplicated lines
    while IFS= read -r _line ; do
       _param=$(echo $_line | sed -E "s/^#//" | sed -E "s@^(.*=).*@\1@")
       [ -n "$_param" ] && sed -i '' -E "s@^(${_param}.*)@#\1@" /etc/rc.conf
    done < "$QRC_CONF"
 
-   # Copy qubsd lines and restart jail
    cat $QRC_CONF >> /etc/rc.conf
-   service jail restart
-	sysrc qb_autostart_enable="YES"
 }
 
 add_gui_pkgs() {
@@ -276,7 +273,7 @@ install_rootjails() {
 	zfs snapshot ${jails_zfs}/0base@INSTALL
 
 	# Install all other rootjails as indicated by install.conf 
-	[ "$GUI" = "true" ] && rootjails="0gui" && appjails="0gui dispajail"
+	[ "$GUI" = "true" ] && rootjails="0gui" && appjails="0gui dispjail"
 	[ "$server" = "true" ] && rootjails="$rootjails 0serv" && appjails="$appjails 0serv"
 
 	for _jail in 0net $rootjails ; do
@@ -286,9 +283,9 @@ install_rootjails() {
 			0serv) _pkgs="vim $serverpkgs" ;; 
 		esac
 
-		# Install pkgs and snapshot rootjail	
+		# Create rootjail, install pkgs, and snapshot
 		zfs send ${jails_zfs}/0base@INSTALL | zfs recv ${jails_zfs}/${_jail}
-		pkg -r ${jails_mount}/${_jail} install -y $_pkgs
+pkg -r ${jails_mount}/${_jail} install -y $_pkgs > /dev/null 2>&1
 		zfs snapshot ${jails_zfs}/${_jail}@INSTALL
 	done
 }
@@ -350,6 +347,7 @@ main() {
 	# /boot/loader.conf.d ; /etc/cron.d
 
 # MORE NOTES ON WHERE TO PUT STUFF FOR INITIAL SETUP
+	# pkg -r on 288 needs to be un > /dev/null'd 
 	# $REPO/zusr/0base/home/0base --> all configs you want in all jail roots (rc files, configs), should be placed here
 
 # REBOOT SYSTEM
