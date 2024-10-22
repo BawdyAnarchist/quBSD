@@ -275,6 +275,11 @@ install_rootjails() {
 	mkdir ${jails_mount}/0base/rw
 	cp -a ${REPO}/zusr/0base/home/0base/.*shrc ${jails_mount}/0base/root
 
+	# Find the user's shell and assume that shell for 0base and all jails thereafter
+	_shell=$(pw usershow root | grep -Eo '/bin/.*$')
+	pw -V ${jails_mount}/0base/etc usermod root -s $_shell
+	pw -V ${jails_mount}/0base/etc usermod 1000 -s $_shell > /dev/null 2>&1
+
 	# Update 0base (base.txz doesnt include latest patches), install pkg, and snapshot
 	ASSUME_ALWAYS_YES="yes" ; export ASSUME_ALWAYS_YES
 	PAGER='cat' freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install
@@ -309,6 +314,10 @@ install_appjails() {
 		modify_fstab "$_jail"		
 		zfs snapshot ${zusr_zfs}/${_jail}@INSTALL
 	done
+
+	# 0control needs some key management
+	ssh-keygen -t rsa -b 4096 -N "" -f ${zusr_mount}/0control/rw/root/.ssh/id_rsa
+	cp -a /zusr/0control/rw/root/.ssh/id_rsa.pub ${zusr_mount}/0control/home/ftp
 }
 
 modify_fstab() {
@@ -345,11 +354,9 @@ main() {
 	# JAILS/VM INSTALLATION
 	install_rootjails
 	install_appjails
-	complete_0control
 
 # Still to do
 	# VM installation
-	# 0control keys need to be done
 
 	# qubsd_cron is last so no code tries to run until install completion 
 	cp -a ${REPO}/zroot/etc/cron.d/qubsd_cron /etc/cron.d/qubsd_cron

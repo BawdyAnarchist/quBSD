@@ -1,3 +1,4 @@
+Need to double check the next install that 0net/root/.ssh isnt schg. I dont know how it happened the first time
 
 with NIC, make qb-edit so that a new NIC also updates loader.conf.
 
@@ -11,6 +12,8 @@ Maybe should really do the fstab inside the rootjail, and only fstab in /rw when
 
 
 ### UPGRADES
+
+PUT XORG and i3 in a jail - At least try it. Might work?
 
 CREATE MANPAGES:  /usr/local/man/man1/qb-scripts
 	- Replaces /share/quBSD
@@ -101,35 +104,5 @@ This was a comment on 0net in the installer, but maybe it's old by now. Delete t
 # ??change /rc.d/wireguard to remove the kldunload??
 
 need to check if boot_mute is required now or if I got my messages problem for ttyv0 sorted out with _msg2 overhaul
-
-
-
-### Control Jail
-# KEYGEN
-	- cp -a group master.passwd passwd pwd.db spwd.db from 0net to /zusr/0control/rw/etc/
-	- mkdir -p /zusr/0control/home/0control
-	- chown -R 1001:1001 /zusr/0control/home/0control
-	- mkdir -p /zusr/0control/home/ftpd
-	- chown -R 1002:1002 /zusr/0control/home/ftpd
-	- chmod 755 /zusr/0control/home/ftpd
-	- mkdir -p /zusr/0control/rw/root/.ssh
-	- chmod 700 /zusr/0control/rw/root/.ssh
-	- pw -V /zusr/0control/rw/etc useradd -n 0control -u 1001 -d /home/0control -s /bin/csh
-	- pw -V /zusr/0control/rw/etc useradd -n ftpd -u 1002 -d /home/ftpd -s /bin/sbin/nologin
-	- ssh-keygen -t rsa -b 4096 -N "" -f /zusr/0control/rw/root/.ssh/id_rsa
-	- cp -a /zusr/0control/rw/root/.ssh/id_rsa.pub /zusr/0control/home/ftpd
-	- cp -a qb_ssh script to /home/ftpd 
-	- chmod 755 /zusr/0control/home/ftpd/*
-	
-# rootjails need copy of 0control pubkey	
-# SSHD in all rootjails 
-# 0bsdvm needs to have a daemon for continually checking/attmepting dhclient on vtnet0 
-
-
-### 0bsdvm Steps
-/boot/loader
-	autoboot_delay="2"
-
-zpool import -f vmusr
 
 
