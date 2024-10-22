@@ -1,5 +1,5 @@
-#Device                Mountpoint                 FStype Options Dump Pass#
-/zusr/0control/rw/     /qubsd/0control/rw/        nullfs rw      0    0
-/zusr/0control/home    /qubsd/0control/home/      nullfs rw      0    0
+#Device                Mountpoint                  FStype Options Dump Pass#
+/zusr/0control/rw/     /qubsd/0control/rw/         nullfs rw      0    0
+/zusr/0control/home    /qubsd/0control/home/       nullfs rw      0    0
 /zusr/0control/usr/local/etc/namedb /qubsd/0control/usr/local/etc/namedb/ nullfs rw 0 0
-/tmp/quBSD/            /qubsd/0control/tmp/quBSD/ nullfs r       0    0 
+/tmp/quBSD/            /qubsd/0control/tmp/quBSD/  nullfs r       0    0 

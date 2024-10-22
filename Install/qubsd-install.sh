@@ -3,7 +3,7 @@
 define_vars() {
 	REPO="/usr/local/share/quBSD"
 	XINIT="/usr/local/etc/X11/xinit/xinitrc"
-	QLOADER="/boot/loader.conf.d/qubsd_loader.conf"
+	QLOAD="/boot/loader.conf.d/qubsd_loader.conf"
 	Q_CONF="/usr/local/etc/quBSD/qubsd.conf"
 	QJ_CONF="${REPO}/zroot/etc/jail.conf"
 	QRC_CONF="${REPO}/zroot/etc/rc.conf"
@@ -182,11 +182,10 @@ modify_pptdevs() {
 
 		# loader.conf.d supercedes loader.conf, so copy over pptdevs3 if there was one.
 		ppt3=$(grep "pptdevs3" /boot/loader.conf)
-		[ "$ppt3" ] && echo "$ppt3" >> $QLOADER 
+		[ "$ppt3" ] && echo "$ppt3" >> $QLOAD
 	fi
-
 	# Modify qubsd_loader.conf
-	sysrc -f $QLOADER "$devsnum"+="$ppt_nics $ppt_usbs"
+	sysrc -f $QLOAD "$devsnum"+="$ppt_nics $ppt_usbs"
 }
 
 modify_devfs_rules() {
@@ -255,13 +254,15 @@ add_gui_pkgs() {
 	pkg update
 	pkg install -y $_pkgs $nvidia
 
-	# Modify xinitrc
-	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT \
+	# Modify a number of files based on GUI and if there's an nvidia GPU 
+	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT && [ -n "$nvidia" ] \
+		&& { sysrc -f $QLOAD 'nvidia_load="YES"' ; sysrc -f $QLOAD 'nvidia-modeset_load="YES"' ;}
+
+	[ "$i3wm" = "true" ] && cp -a ${REPO}/zroot/root/.config/i3/ /root/.config/i3
 		&& sed -i '' -E "/twm/ d" $XINIT \
 		&& sed -i '' -E "/xclock/ d" $XINIT \
-		&& sed -i '' -E "/xterm -geometry/ d" $XINIT
-	[ "$i3wm" = "true" ] && echo "i3" >> $XINIT \
-		&& cp -a ${REPO}/zroot/root/.config/i3/ /root/.config/i3
+		&& sed -i '' -E "/xterm -geometry/ d" $XINIT \
+		&& echo "i3" >> $XINIT
 }
 
 install_rootjails() {
@@ -340,13 +341,15 @@ main() {
 	modify_rc_conf
 	modify_jail_conf
 	add_gui_pkgs
-	[ -d "/tmp/quBSD" ] || mkdir /tmp/quBSD
 
 	# JAILS/VM INSTALLATION
 	install_rootjails
 	install_appjails
+	complete_0control
 
-# Still to do: VM installation
+# Still to do
+	# VM installation
+	# 0control keys need to be done
 
 	# qubsd_cron is last so no code tries to run until install completion 
 	cp -a ${REPO}/zroot/etc/cron.d/qubsd_cron /etc/cron.d/qubsd_cron

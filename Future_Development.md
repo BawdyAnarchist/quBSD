@@ -7,22 +7,19 @@ Instead of all the named and ftp nonsense in 0control, just use a fat32 formatte
 
 When you restore, the datasets dont inherit their qubsd:autosnap properties
 
-This was a comment on 0net in the installer, but maybe it's old by now. Delete this line if there's no problems later
-# ??change /rc.d/wireguard to remove the kldunload??
-
 Maybe should really do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
 
 
 ### UPGRADES
 
+CREATE MANPAGES:  /usr/local/man/man1/qb-scripts
+	- Replaces /share/quBSD
+	- PARAMS should have manpage
+
 Host as Unprivileged user     
 	- doas commands allowed by unprivileged user
 	- Unprivileged user on host will pass jails SSH commands via Control Jail     
 	- Control jail pf will block all, except port 22 between host and jails     
-
-CREATE MANPAGES:  /usr/local/man/man1/qb-scripts
-	- Replaces /share/quBSD
-	- PARAMS should have manpage
 
 pwd
 	- I think the right way to do this, is export any existing pwd db in /rw, and import it into the created jail (or maybe vice versa) 
@@ -38,6 +35,7 @@ NICVM - Linux VM (probably alpine) so that it can use all the wireless cards.
 
 I2P Gateway
 
+0serv 
 
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
@@ -99,39 +97,10 @@ I think `jail` caches fstab before completion of exec.prepare which edits it. Ne
 
 ##### qubsd installer #######
 
-zfs custom props to the datasets as created (qubsd-installer)
-
-rc.conf
-
-/qubsd/0base installer needs to create the /rw/ folder, or appjails based on it, won't mount properly
-	Also touch /etc/fstab with header so disps work. (for all jails actually)
-
-0base
-	zfs create zroot/qubsd/0base
-	tar -C /qubsd/0base -xvf /usr/freebsd-dist/base.txz
-	head -1 /etc/fstab > /qubsd/0base/etc/fstab	
-
-0net
-	- pkg install isc-dhcp44-server bind918 wireguard-tools vim jq
-	- copy .cshrc and .vim*
-	- change /rc.d/wireguard to remove the kldunload
-
-net-jails - Check that pf conf is updated with required dhcp port, and the simplified version
-
-0serv and 0serv-template need integrated	
-	- www and usr diretories are quite large. Script integration:
-		- at quBSD installation, copy files over from 0serv
-		- qb-create should in realtime copy over /usr/local/etc from 0serv
-		- There might even be problems with pkg-upgrade operating on this dir
-		- Make sure to chown the directories as appropriate
-
-Should make the $qubsd/zroot/0net 0gui 0vms and everything files here for specific stuff like rc.conf
+This was a comment on 0net in the installer, but maybe it's old by now. Delete this line if there's no problems later
+# ??change /rc.d/wireguard to remove the kldunload??
 
 need to check if boot_mute is required now or if I got my messages problem for ttyv0 sorted out with _msg2 overhaul
-
-
-### NEW INSTALLER NOTES 
-pkg install might need xpra or xephyr added depending on how that all turns out. Also doas if you get off root.
 
 
 
@@ -155,12 +124,6 @@ pkg install might need xpra or xephyr added depending on how that all turns out.
 # rootjails need copy of 0control pubkey	
 # SSHD in all rootjails 
 # 0bsdvm needs to have a daemon for continually checking/attmepting dhclient on vtnet0 
-
-
-# NOTES FROM RE-INSTALL
-	make sure that zroot/qubsd is mounted at /qubsd and not /zroot/qubsd
-	
-	pf.ko wasnt loaded ..?
 
 
 ### 0bsdvm Steps
