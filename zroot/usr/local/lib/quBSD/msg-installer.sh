@@ -50,6 +50,24 @@ echo -e "Continue? (Y/n):  \c"
 EXITING. No changes were made.
 ENDOFMSG
 		;;
+	_m10) cat << ENDOFMSG
+INSTALLING PACKAGES TO HOST: $_pkgs
+  - To view progress, see:  $QLOG
+ENDOFMSG
+		;;
+	_m11) cat << ENDOFMSG
+UPDATING 0base
+ENDOFMSG
+		;;
+	_m12) cat << ENDOFMSG
+INSTALLING PKG TO 0base
+ENDOFMSG
+		;;
+	_m13) cat << ENDOFMSG
+INSTALLING $_jail PKGS: $_pkgs 
+  - To view progress, see:  $QLOG
+ENDOFMSG
+		;;
 
 	esac
 }

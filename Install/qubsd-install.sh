@@ -7,6 +7,7 @@ define_vars() {
 	Q_CONF="/usr/local/etc/quBSD/qubsd.conf"
 	QJ_CONF="${REPO}/zroot/etc/jail.conf"
 	QRC_CONF="${REPO}/zroot/etc/rc.conf"
+	QLOG="/var/log/quBSD/install.log"
 
 	# Read variables and messages
 	. "${REPO}/Install/install.conf"
@@ -243,9 +244,12 @@ modify_rc_conf() {
 	[ -e "/etc/rc.conf" ] && cp -a /etc/rc.conf /etc/rc.conf_qubsd_bak
 
    while IFS= read -r _line ; do
-      _param=$(echo $_line | sed -E "s/^#//" | sed -E "s@^(.*=).*@\1@")
-      [ -n "$_param" ] && sed -i '' -E "s@^(${_param}.*)@#\1@" /etc/rc.conf
+		_param=$(echo $_line | sed -E "s/^#//" | sed -E "s@^(.*=).*@\1@")
+		[ -n "$_param" ] && sed -i '' -E "s@^(${_param}.*)@#\1@" /etc/rc.conf
    done < "$QRC_CONF"
+
+	# Also comment out any lines for ifconfig_, as all interfaces are going to ppt
+	sed -i '' -E "s/^(ifconfig_.*)/#\1/" /etc/rc.conf
 
    cat $QRC_CONF >> /etc/rc.conf
 }
@@ -254,14 +258,14 @@ add_gui_pkgs() {
 	# Install pkgs
 	[ "$GUI" = "true" ] && _pkgs="xorg tigervnc-viewer"
 	[ "$i3wm" = "true" ] && _pkgs="$_pkgs i3 i3lock i3status"
+	msg_installer "_m10"
+	pkg install -y $_pkgs $nvidia >> $QLOG
 
-echo "INSTALLING HOST PKGS"
-pkg install -y $_pkgs $nvidia > /dev/null
-
-	# Modify a number of files based on GUI and if there's an nvidia GPU 
+	# xhost + local: requried for quBSD GUI jails. Also modify loader for nvidia modules 
 	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT && [ -n "$nvidia" ] \
 		&& { sysrc -f $QLOAD 'nvidia_load="YES"' ; sysrc -f $QLOAD 'nvidia-modeset_load="YES"' ;}
 
+	# Add the quBSD i3 config supplementation, and change xinitrc for i3wm
 	[ "$i3wm" = "true" ] && mkdir -p /root/.config/i3 >> /dev/null 2>&1 \
 		&& cp -a ${REPO}/zroot/root/.config/i3/ /root/.config/i3 \
 		&& sed -i '' -E "/twm/ d" $XINIT \
@@ -286,14 +290,15 @@ install_rootjails() {
 	pw -V ${jails_mount}/0base/etc usermod 1000 -s $_shell > /dev/null 2>&1
 
 	# Update 0base (base.txz doesnt include latest patches), install pkg, and snapshot
+	msg_installer "_m11"
 	ASSUME_ALWAYS_YES="yes" ; export ASSUME_ALWAYS_YES
-echo "INSTALLING 0BASE UPDATES"
-PAGER='cat' freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install > /dev/null
-echo "INSTALLING 0BASE PKG" > /dev/null
-pkg -r ${jails_mount}/0base update
+	PAGER='cat' freebsd-update -b ${jails_mount}/0base --not-running-from-cron \
+		fetch install >>  $QLOG
+	msg_installer "_m12"
+	pkg -r ${jails_mount}/0base update >> $QLOG
 	zfs snapshot ${jails_zfs}/0base@INSTALL
 
-	# Install all other rootjails as indicated by install.conf 
+	# Install all other rootjails and their pkgs as indicated by install.conf 
 	[ "$GUI" = "true" ] && rootjails="0gui" && appjails="0gui"
 	[ "$server" = "true" ] && rootjails="$rootjails 0serv" && appjails="$appjails 0serv"
 
@@ -306,8 +311,8 @@ pkg -r ${jails_mount}/0base update
 
 		# Create rootjail, install pkgs, and snapshot
 		zfs send ${jails_zfs}/0base@INSTALL | zfs recv ${jails_zfs}/${_jail}
-echo "INSTALLING $_jail PKGS"
-pkg -r ${jails_mount}/${_jail} install -y $_pkgs > /dev/null
+		msg_installer "_m13"
+		pkg -r ${jails_mount}/${_jail} install -y $_pkgs >> $QLOG
 		zfs destroy ${jails_zfs}/${_jail}@INSTALL
 		zfs snapshot ${jails_zfs}/${_jail}@INSTALL
 	done
