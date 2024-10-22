@@ -10,6 +10,8 @@ When you restore, the datasets dont inherit their qubsd:autosnap properties
 
 Maybe should really do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
 
+ntpd - ntpd only runs during qb-hostnet. Maybe can nullfs mount or devfs? the ntpd database/location to a jail. 
+
 
 ### UPGRADES
 
@@ -90,8 +92,6 @@ Generalize net-firewall
 	- chk_isqubsd_ipv4 - define_ipv4_convention - discover_open_ipv4
 
 Crons - No crons running. Probably something long term security that should be integrated and automated.
-
-ntpd - ntpd only runs during qb-hostnet. Maybe can nullfs mount or devfs? the ntpd database/location to a jail. 
 
 qme-firefox needs fixed (personal note)
 
