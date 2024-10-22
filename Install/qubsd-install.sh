@@ -192,8 +192,10 @@ modify_devfs_rules() {
 	# /etc/devfs.rules is modified here and not at pkg install,
 	# because it requires changing a file outside of /usr/local
 
-	# Add default devfs if it doesnt exist.
-	[ -e "/etc/devfs.rules" ] || cp -a /etc/defaults/devfs.rules /etc/devfs.rules
+	# Make backup copy of devfs.rules, or add the default if it doesnt exist
+	[ -e "/etc/devfs.rules" ] \
+		&& cp -a /etc/devfs.rules /etc/devfs.rules_qubsd_bak \
+		|| cp -a /etc/defaults/devfs.rules /etc/devfs.rules
 
 	# Make a copy of the qubsd devfs.rules in /tmp 
 	tmp_devfs=$(mktemp /tmp/qubsd_devfs)
@@ -232,12 +234,14 @@ modify_devfs_rules() {
 }
 
 modify_jail_conf() {
-	[ -e "/etc/jail.conf" ] && cp -a /etc/jail.conf /etc/jail.conf_bak
+	[ -e "/etc/jail.conf" ] && cp -a /etc/jail.conf /etc/jail.conf_qubsd_bak
 	cp -a ${QJ_CONF} /etc/jail.conf
 }
 
 modify_rc_conf() {
 	# Need to be careful about modifying user's rc.conf. Comment out duplicated lines
+	[ -e "/etc/rc.conf" ] && cp -a /etc/rc.conf /etc/rc.conf_qubsd_bak
+
    while IFS= read -r _line ; do
       _param=$(echo $_line | sed -E "s/^#//" | sed -E "s@^(.*=).*@\1@")
       [ -n "$_param" ] && sed -i '' -E "s@^(${_param}.*)@#\1@" /etc/rc.conf
@@ -251,14 +255,15 @@ add_gui_pkgs() {
 	[ "$GUI" = "true" ] && _pkgs="xorg tigervnc-viewer"
 	[ "$i3wm" = "true" ] && _pkgs="$_pkgs i3 i3lock i3status"
 
-	pkg update
-	pkg install -y $_pkgs $nvidia
+echo "INSTALLING HOST PKGS"
+pkg install -y $_pkgs $nvidia > /dev/null
 
 	# Modify a number of files based on GUI and if there's an nvidia GPU 
 	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT && [ -n "$nvidia" ] \
 		&& { sysrc -f $QLOAD 'nvidia_load="YES"' ; sysrc -f $QLOAD 'nvidia-modeset_load="YES"' ;}
 
-	[ "$i3wm" = "true" ] && cp -a ${REPO}/zroot/root/.config/i3/ /root/.config/i3 \
+	[ "$i3wm" = "true" ] && mkdir -p /root/.config/i3 >> /dev/null 2>&1 \
+		&& cp -a ${REPO}/zroot/root/.config/i3/ /root/.config/i3 \
 		&& sed -i '' -E "/twm/ d" $XINIT \
 		&& sed -i '' -E "/xclock/ d" $XINIT \
 		&& sed -i '' -E "/xterm -geometry/ d" $XINIT \
@@ -282,8 +287,10 @@ install_rootjails() {
 
 	# Update 0base (base.txz doesnt include latest patches), install pkg, and snapshot
 	ASSUME_ALWAYS_YES="yes" ; export ASSUME_ALWAYS_YES
-	PAGER='cat' freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install
-	pkg -r ${jails_mount}/0base update
+echo "INSTALLING 0BASE UPDATES"
+PAGER='cat' freebsd-update -b ${jails_mount}/0base --not-running-from-cron fetch install > /dev/null
+echo "INSTALLING 0BASE PKG" > /dev/null
+pkg -r ${jails_mount}/0base update
 	zfs snapshot ${jails_zfs}/0base@INSTALL
 
 	# Install all other rootjails as indicated by install.conf 
@@ -299,7 +306,8 @@ install_rootjails() {
 
 		# Create rootjail, install pkgs, and snapshot
 		zfs send ${jails_zfs}/0base@INSTALL | zfs recv ${jails_zfs}/${_jail}
-		pkg -r ${jails_mount}/${_jail} install -y $_pkgs
+echo "INSTALLING $_jail PKGS"
+pkg -r ${jails_mount}/${_jail} install -y $_pkgs > /dev/null
 		zfs destroy ${jails_zfs}/${_jail}@INSTALL
 		zfs snapshot ${jails_zfs}/${_jail}@INSTALL
 	done
@@ -379,7 +387,6 @@ setlog() {
 }
 
 main
-
 
 
 
