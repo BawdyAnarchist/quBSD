@@ -256,7 +256,10 @@ add_gui_pkgs() {
 	pkg install -y $_pkgs $nvidia
 
 	# Modify xinitrc
-	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT
+	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT \
+		&& sed -i '' -E "/twm/ d" $XINIT \
+		&& sed -i '' -E "/xclock/ d" $XINIT \
+		&& sed -i '' -E "/xterm -geometry/ d" $XINIT \
 	[ "$i3wm" = "true" ] && echo "i3" >> $XINIT
 }
 
