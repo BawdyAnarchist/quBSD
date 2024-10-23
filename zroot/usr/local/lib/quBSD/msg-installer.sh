@@ -68,16 +68,28 @@ INSTALLING $_jail PKGS: $_pkgs
   - To view progress, see:  $QLOG
 ENDOFMSG
 		;;
+	_m14) cat << ENDOFMSG
+SYSTEM FILES WERE MODIFIED. Your originals were saved as: <file>_qubsd_bak
+  /etc/jail.conf     -->   /etc/jail.conf_qubsd_bak
+    - Completely replaced by quBSD
+  /etc/rc.conf       -->   /etc/rc.conf_qubsd_bak
+    - Some lines might be commented out. quBSD required lines at the bottom
+  /etc/devfs.rules   -->   /etc/devfs.rules_qubsd_bak
+    - quBSD lines added to the bottom
+  /etc/ntp.conf      -->   /etc/ntp.conf_qubsd_bak
+    - Replaced by quBSD. (External URLs removed, using solely drift file)
+
+These modifications are required for quBSD to function.
+No other pre-existing system files were modified.
+
+RECOMMEND RUNNING THE quBSD TUTORIAL.
+  man qubsd-tutorial
+
+
+###  REBOOT  REQUIRED  ###
+  Please reboot before attempting to run quBSD
+ENDOFMSG
+		;;
 
 	esac
-}
-
-usage() { cat << ENDOFUSAGE
-
-qb-
-
-Usage: qb-
-   -h: (h)elp. Outputs this help message.
-
-ENDOFUSAGE
 }

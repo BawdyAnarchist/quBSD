@@ -346,15 +346,6 @@ modify_fstab() {
 	rm /tmp/temp_fstab
 }
 
-final_notifications() {
-	# rc.conf 
-	# jail.conf
-	# devfs.rules
-	# ntp.conf
-	# /boot/loader.conf.d ; /etc/cron.d
-	# /root/.config/i3  ;  xinitrc
-}
-
 main() {
 	define_vars
 	load_kernel_modules
@@ -383,9 +374,8 @@ main() {
 
 	# qubsd_cron is last so no code tries to run until install completion 
 	cp -a ${REPO}/zroot/etc/cron.d/qubsd_cron /etc/cron.d/qubsd_cron
-	final_notifications
 
-	# Reboot
+	msg_installer "_m14"
 }
 
 setlog() {
