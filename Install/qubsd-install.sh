@@ -12,6 +12,8 @@ define_vars() {
 	# Read variables and messages
 	. "${REPO}/Install/install.conf"
 	. /usr/local/lib/quBSD/msg-installer.sh
+
+	[ -d "$(dirname $QLOG)" ] || mkdir -p "$(dirname $QLOG)"
 }
 
 load_kernel_modules() {
@@ -330,7 +332,7 @@ install_appjails() {
 	done
 
 	# 0control needs some key management
-	ssh-keygen -t rsa -b 4096 -N "" -f ${zusr_mount}/0control/rw/root/.ssh/id_rsa
+	ssh-keygen -qt rsa -b 4096 -N "" -f ${zusr_mount}/0control/rw/root/.ssh/id_rsa
 	cp -a /zusr/0control/rw/root/.ssh/id_rsa.pub ${zusr_mount}/0control/home/ftp
 }
 
@@ -378,10 +380,6 @@ main() {
 	msg_installer "_m14"
 }
 
-setlog() {
-	set -x
-	exec > /root/debug 2>&1
-}
 
 main
 

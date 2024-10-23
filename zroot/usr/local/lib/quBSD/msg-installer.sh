@@ -69,6 +69,7 @@ INSTALLING $_jail PKGS: $_pkgs
 ENDOFMSG
 		;;
 	_m14) cat << ENDOFMSG
+
 SYSTEM FILES WERE MODIFIED. Your originals were saved as: <file>_qubsd_bak
   /etc/jail.conf     -->   /etc/jail.conf_qubsd_bak
     - Completely replaced by quBSD
@@ -82,12 +83,13 @@ SYSTEM FILES WERE MODIFIED. Your originals were saved as: <file>_qubsd_bak
 These modifications are required for quBSD to function.
 No other pre-existing system files were modified.
 
+
 RECOMMEND RUNNING THE quBSD TUTORIAL.
   man qubsd-tutorial
 
 
 ###  REBOOT  REQUIRED  ###
-  Please reboot before attempting to run quBSD
+  PLEASE REBOOT BEFORE ATTEMPTING TO RUN QUBSD
 ENDOFMSG
 		;;
 

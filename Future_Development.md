@@ -1,4 +1,6 @@
 
+When back on normal setup, fix the i3gen.conf to match QubesTricks
+
 ntpd - ongoing
 	1. Modified /etc/ntp.conf
 	2. Modified qb-hostnet -c to copy /var/db/ntpd.drift from net-firewall
