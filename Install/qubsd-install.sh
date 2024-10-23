@@ -145,7 +145,7 @@ translate_usbs() {
 
 	# Then translate each name to an actual bus location
 	for _ppt in $dev_usbs ; do
-		_ppt=$(pciconf -l $_ppt | sed -E "s/^.*@pci([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
+		_ppt=$(pciconf -l $_ppt | sed -E "s/.*pci[0-9]+:([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
 		echo "$ppt_usbs" | grep -Eqs "$_ppt" || ppt_usbs="$ppt_usbs $_ppt"
 	done
 
@@ -264,8 +264,8 @@ add_gui_pkgs() {
 	pkg install -y $_pkgs $nvidia >> $QLOG
 
 	# xhost + local: requried for quBSD GUI jails. Also modify loader for nvidia modules
-	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT && [ -n "$nvidia" ] \
-		&& { sysrc -f $QLOAD 'nvidia_load="YES"' ; sysrc -f $QLOAD 'nvidia-modeset_load="YES"' ;}
+	[ "$GUI" = "true" ] && sysrc 'kld_list+=nvidia-modeset' \
+		&& echo "xhost + local:" >> $XINIT && [ -n "$nvidia" ]
 
 	# Add the quBSD i3 config supplementation, and change xinitrc for i3wm
 	[ "$i3wm" = "true" ] && mkdir -p /root/.config/i3 >> /dev/null 2>&1 \
