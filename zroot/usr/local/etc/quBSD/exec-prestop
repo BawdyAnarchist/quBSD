@@ -51,3 +51,5 @@ get_global_variables
 get_script_variables "$@"
 
 main
+
+exit 0

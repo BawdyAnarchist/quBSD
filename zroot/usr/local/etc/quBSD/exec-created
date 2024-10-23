@@ -132,3 +132,5 @@ get_parameters "$@"
 get_networking_variables
 
 main
+
+exit 0
