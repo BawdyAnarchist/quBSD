@@ -68,11 +68,16 @@ verify_base_download() {
 	done			
 }
 
-install_instructions() {
-# README
-# MAIN CONFIG FILE 
-# ENVIRONMENT CONFIGS IN 0BASE
-# FILESYSTEM ROOT LEVEL CONFIGS IN 0BASE
+install_instructions() { cat << ENDOFMSG
+
+You will have a better installation if you read and follow:
+  /usr/local/share/quBSD/Install/README.md
+
+AT A MINIMUM, TO FINISH INSTALLING YOU MUST:
+  1. Edit:  /usr/local/share/quBSD/Install/install.conf
+  2. Run:   sh /usr/local/share/quBSD/Install/qubsd-install.sh
+  3. REBOOT
+ENDOFMSG
 }
 
 main() {

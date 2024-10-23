@@ -1,4 +1,4 @@
-#### quBSD is a jails/bhyve wrapper which emulates a Qubes inspired containerization schema. Written in shell, based on zfs, and uses the underlying FreeBSD tools.
+#### quBSD is a FreeBSD jails/bhyve wrapper which emulates a Qubes inspired containerization schema. Written in shell, based on zfs, and uses the underlying FreeBSD tools.
 
 ### Summary of Default Features: 
 
@@ -12,7 +12,6 @@ Streamlined configuration/editing:
 - gateway changes
 - autostart, automatic snapshots
 - create/destroy/rename/edit/list
-- realtime mo
 
 ### Security Schema
 *Rootjails* maintain a pristine root environment for launching appjails.
@@ -31,16 +30,9 @@ Host remains offline, except for updates.
 Physical network card and USBs are isolated in VMs (nicvm and usbvm)
 
 ### Additional Features
-i3wm integration, if desired (still usable with other window managers).
--
 Well documented man pages
+i3wm integration (still usable with other window managers)
 Control jail is used with ssh for file transfers between VMs.
 
-- exec.scripts automate all jail start/stop functions   
-- qb-scripts facilitate    
-   - Quick/easy creation of new jails     
-   - Viewing and editing of jail parameters     
-   - Realtime continuous monitoring of jail status and resource usage     
-   - Descriptive help pages      
-   - Simplified handling/access for nicvm and usbvm virtual machines     
-
+### Install to host
+`pkg install qubsd`

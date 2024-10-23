@@ -1,16 +1,4 @@
 
-with NIC, make qb-edit so that a new NIC also updates loader.conf.
-
-There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
-
-Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
-
-When you restore, the datasets dont inherit their qubsd:autosnap properties
-
-Maybe should do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
-
-generalize the schg to being able to list specific files, and not my preselected ones
-
 ntpd - ongoing
 	1. Modified /etc/ntp.conf
 	2. Modified qb-hostnet -c to copy /var/db/ntpd.drift from net-firewall
@@ -18,6 +6,15 @@ ntpd - ongoing
 	# still need to modify firwall pf
 	# installer should modify ntp.conf of host, or replace with its own
 	# had a problem with schg and seclvl of firewall when launching ntp
+
+Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
+generalize the schg to being able to list specific files, and not my preselected ones
+Maybe should do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
+
+with NIC, make qb-edit so that a new NIC also updates loader.conf.
+There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
+When you restore, the datasets dont inherit their qubsd:autosnap properties
+
 
 ### UPGRADES
 

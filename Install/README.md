@@ -1,3 +1,9 @@
+## MAIN CONFIG FILE
+	usr/local/share/quBSD/Install/install.conf
+
+## ENVIRONMENT CUSTOMIZATION
+
+## ROOT FILESYSTEM CONFIGS
 
 ## REQUIREMENTS
 - You must have at least one zfs zpool/dataset available on host
@@ -14,4 +20,5 @@
 - The installer allows you to choose the same zpool for both rootjail data, and jail's user data (zusr). However, it's best practice (even on a normal system), to segregate user data to a different pool/partition.
 
 ## TUTORIAL
+
 ## MAN PAGES
