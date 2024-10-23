@@ -148,6 +148,7 @@ get_global_variables() {
 	[ "$M_ZUSR" = "-" ]  && get_msg -V -m _e0_3 "$U_ZFS" && exit 1
 
 	# Set the files for error recording, and trap them
+	[ -d "$QTMP" ] || mkdir $QTMP
 	ERR1=$(mktemp -t quBSD/.${0##*/})
 	ERR2=$(mktemp -t quBSD/.${0##*/})
 	trap "rm_errfiles" HUP INT TERM QUIT EXIT
