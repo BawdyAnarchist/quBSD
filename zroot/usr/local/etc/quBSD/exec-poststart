@@ -4,8 +4,9 @@
 
 get_options() {
 	JAIL="$1"
-	get_jail_parameter -d SCHG "$JAIL"   || get_msg2 -m _e
-	get_jail_parameter -d SECLVL "$JAIL" || get_msg2 -m _e
+	get_jail_parameter -dqs CLASS "$JAIL" || get_msg2 -m _e
+	get_jail_parameter -d SCHG "$JAIL"    || get_msg2 -m _e
+	get_jail_parameter -d SECLVL "$JAIL"  || get_msg2 -m _e
 }
 
 handle_dhcp() {
@@ -21,6 +22,10 @@ handle_dhcp() {
 }
 
 security_flags() {
+	# Rootjail file protections can prevent updates, installs, disrupt start ops for
+	# dependent appjails. No dangerous work should be happening in rootjails anyways.
+	[ "$CLASS" = "rootjail" ] && return 0
+
 	# Different directories are schg flagged depending on user settings
 	case $SCHG in
 		all)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw /usr"
@@ -47,8 +52,6 @@ get_options "$@"
 
 handle_dhcp
 
-start_xpra $JAIL
+#start_xpra $JAIL
 
 security_flags
-
-exit 0

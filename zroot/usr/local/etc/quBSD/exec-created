@@ -125,7 +125,6 @@ main() {
 	resource_control
 }
 
-
 get_global_variables
 
 get_parameters "$@"
@@ -133,6 +132,3 @@ get_parameters "$@"
 get_networking_variables
 
 main
-
-exit 0
-

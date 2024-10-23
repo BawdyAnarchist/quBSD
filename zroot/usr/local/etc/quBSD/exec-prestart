@@ -4,15 +4,18 @@
 
 main() {
 	JAIL="$1"
-
-	# class was already retrieved/check in exec-prepare. Don't check again [-sq]
-	get_jail_parameter -dqs CLASS "$JAIL" || get_msg2 -Em _e
-
+	
 	# /rw/ nullfs mounts are best symlinked from within the cloned appjail's root
+	# Make sure flags are down for directory and file, then symlink to /rw
 	chroot ${M_QROOT}/${JAIL} /bin/sh <<"EOT"
 		for _file in $(find "/rw" -type f | sed "s:/rw::") ; do
-				[ -d "$(dirname $_file)" ] || mkdir -p $(dirname $_file)
-				ln -sf /rw${_file} $_file
+			if	[ -d "$(dirname $_file)" ] ; then
+				chflags noschg "$(dirname $_file)"
+				[ -e "$_file" ] && chflags noschg $_file
+			else
+				mkdir -p $(dirname $_file)
+			fi
+			ln -sf /rw${_file} $_file
 		done
 EOT
 }

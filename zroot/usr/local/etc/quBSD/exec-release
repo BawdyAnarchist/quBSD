@@ -49,5 +49,3 @@ get_global_variables
 get_parameters "$@"
 
 main
-
-exit 0
