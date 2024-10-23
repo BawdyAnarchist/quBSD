@@ -21,7 +21,7 @@ remove_interfaces() {
 	for _epair in $EPAIRS ; do
 		ifconfig $_epair -vnet $JAIL
 		ifconfig $_epair destroy
-		sed -i '' -E "/${_epair%?}b/d" $NETMAP
+		sed -i '' -E "/^${JAIL} epair/d" $NETMAP
 	done
 }
 

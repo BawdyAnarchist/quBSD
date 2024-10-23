@@ -68,6 +68,13 @@ verify_base_download() {
 	done			
 }
 
+install_instructions() {
+# README
+# MAIN CONFIG FILE 
+# ENVIRONMENT CONFIGS IN 0BASE
+# FILESYSTEM ROOT LEVEL CONFIGS IN 0BASE
+}
+
 main() {
 	download_base &
 	
@@ -78,6 +85,7 @@ main() {
 	copy_repo	
 	modify_files
 	verify_base_download
+	install_instructions
 }
 
 main

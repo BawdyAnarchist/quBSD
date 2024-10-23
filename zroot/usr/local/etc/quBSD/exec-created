@@ -111,9 +111,8 @@ main() {
 		# Connect JAIL to 0control SSH
 		chk_isrunning "$CONTROL" && connect_client_to_gateway -c "$JAIL" "$CONTROL"
 
-		# Copy the ssh pubkey from control jail to JAIL. Not applicable for rootjails.
-		chk_isrunning "$CONTROL" && [ ! "$CLASS" = "rootjail" ] \
-			&& copy_control_keys "$CONTROL" "$JAIL"
+		# Copy the ssh pubkey from control jail to JAIL.
+		chk_isrunning "$CONTROL" && copy_control_keys "$CONTROL" "$JAIL"
 
 		# Connect jail to its gateway, retrieving the VIF assigned
 		chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -ei $IPV4 "$JAIL" "$GATEWAY")

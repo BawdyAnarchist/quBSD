@@ -282,7 +282,8 @@ install_rootjails() {
 	# Copy and modify files (copy all 0base user rc and conf files to root for convenience)
 	head -1 /etc/fstab > /qubsd/0base/etc/fstab
 	mkdir ${jails_mount}/0base/rw
-	cp -a ${REPO}/zusr/0base/home/0base/.*shrc ${jails_mount}/0base/root
+	cp -a ${REPO}/zusr/0base/home/0base/.*shrc ${jails_mount}/0base/root/
+	cp -a ${REPO}/zusr/0base/rw/etc/rc.conf ${jails_mount}/0base/etc/
 
 	# Find the user's shell and assume that shell for 0base and all jails thereafter
 	_shell=$(pw usershow root | grep -Eo '/bin/.*$')
@@ -345,6 +346,15 @@ modify_fstab() {
 	rm /tmp/temp_fstab
 }
 
+final_notifications() {
+	# rc.conf 
+	# jail.conf
+	# devfs.rules
+	# ntp.conf
+	# /boot/loader.conf.d ; /etc/cron.d
+	# /root/.config/i3  ;  xinitrc
+}
+
 main() {
 	define_vars
 	load_kernel_modules
@@ -368,22 +378,14 @@ main() {
 	install_rootjails
 	install_appjails
 
-# Still to do
+# STILL DO DO
 	# VM installation
 
 	# qubsd_cron is last so no code tries to run until install completion 
 	cp -a ${REPO}/zroot/etc/cron.d/qubsd_cron /etc/cron.d/qubsd_cron
+	final_notifications
 
-# FINAL NOTES ABOUT WHICH SYSTEM FILES WERE MODIFIED/ADDED
-	# rc.conf 
-	# devfs.rules
-	# /boot/loader.conf.d ; /etc/cron.d
-	# ntp.conf
-
-# MORE NOTES ON WHERE TO PUT STUFF FOR INITIAL SETUP
-	# $REPO/zusr/0base/home/0base --> all configs you want in all jail roots (rc files, configs), should be placed here
-
-# REBOOT SYSTEM
+	# Reboot
 }
 
 setlog() {

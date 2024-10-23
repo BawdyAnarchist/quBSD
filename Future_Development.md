@@ -1,4 +1,3 @@
-Need to double check the next install that 0net/root/.ssh isnt schg. I dont know how it happened the first time
 
 with NIC, make qb-edit so that a new NIC also updates loader.conf.
 
@@ -9,6 +8,8 @@ Instead of all the named and ftp nonsense in 0control, just use a fat32 formatte
 When you restore, the datasets dont inherit their qubsd:autosnap properties
 
 Maybe should do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
+
+generalize the schg to being able to list specific files, and not my preselected ones
 
 ntpd - ongoing
 	1. Modified /etc/ntp.conf
