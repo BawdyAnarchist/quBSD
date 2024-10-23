@@ -2,21 +2,21 @@
 
 msg_installer() {
 	case "$1" in
-	_m1) 
+	_m1)
 		echo -e "Proposed dataset for rootjails < $jails_zfs > doesnt exist and cant be created."
 		echo -e "Enter valid name (normally zroot/qubsd):  \c"
 		;;
 	_m2) cat << ENDOFMSG
-		echo -e "Proposed dataset for appjails < $zusr_zfs > doesnt exist and cant be created." 
+		echo -e "Proposed dataset for appjails < $zusr_zfs > doesnt exist and cant be created."
 		echo -e "Enter valid name (normally zroot/zusr):  \c"
 ENDOFMSG
 		;;
 	_m3)
-		echo -e "Proposed mountpoint for rootjails < $jails_mount > isnt a valid name." 
+		echo -e "Proposed mountpoint for rootjails < $jails_mount > isnt a valid name."
 		echo -e "Enter valid name (normally /qubsd):  \c"
 		;;
 	_m4)
-		echo -e "Proposed mountpoint for appjails < $zusr_mount > isnt a valid name." 
+		echo -e "Proposed mountpoint for appjails < $zusr_mount > isnt a valid name."
 		echo -e "Enter valid name (normally /zusr):  \c"
 		;;
 	_m5)
@@ -42,7 +42,7 @@ Appjail Mountpoint:  $zusr_mount
 Network Interface:   $nic
 USBs for usbvm:      $dev_usbs $_at $ppt_usbs
 Install GUI (xorg):  $GUI
-Install i3wm:        $i3wm 
+Install i3wm:        $i3wm
 ENDOFMSG
 echo -e "Continue? (Y/n):  \c"
 		;;
@@ -64,7 +64,7 @@ INSTALLING PKG TO 0base
 ENDOFMSG
 		;;
 	_m13) cat << ENDOFMSG
-INSTALLING $_jail PKGS: $_pkgs 
+INSTALLING $_jail PKGS: $_pkgs
   - To view progress, see:  $QLOG
 ENDOFMSG
 		;;

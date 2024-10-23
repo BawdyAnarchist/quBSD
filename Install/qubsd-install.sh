@@ -20,19 +20,19 @@ load_kernel_modules() {
 	kldload -n vmm.ko
 	kldload -n pf.ko
 	kldload -n if_wg.ko
-	kldload -n if_bridge.ko 
+	kldload -n if_bridge.ko
 }
 
 get_datasets() {
 	# Loop until valid dataset is entered (either already exists, or could be created)
-	while : ; do 
+	while : ; do
 		zfs list "$jails_zfs" > /dev/null 2>&1 && break
 		zfs create -n "$jails_zfs" > /dev/null 2>&1 && break
 
 		msg_installer "_m1"
 		read jails_zfs
 	done
-	while : ; do 
+	while : ; do
 		zfs list "$zusr_zfs" > /dev/null 2>&1 && break
 		zfs create -n "$zusr_zfs" > /dev/null 2>&1 && break
 
@@ -41,12 +41,12 @@ get_datasets() {
 	done
 
 	# Loop until valid mountpoints are entered (syntactically)
-	while : ; do 
+	while : ; do
 		echo "$jails_mount" | grep -Eqs '^(/[A-Za-z0-9._-]+)+$' && break
 		msg_installer "_m3"
 		read jails_mount
 	done
-	while : ; do 
+	while : ; do
 		echo "$zusr_mount" | grep -Eqs '^(/[A-Za-z0-9._-]+)+$' && break
 		msg_installer "_m4"
 		read zusr_mount
@@ -57,18 +57,18 @@ get_nic() {
 	_NICS=$(pciconf -lv | grep -B3 "= network")
 	_nics=$(echo "$_NICS" | grep -Eo "^[[:alnum:]]+" | grep -v none | tr '\n' ' ')
 
-	# Missing $nic implies pkg install failed to find interface. Ask user for input 
+	# Missing $nic implies pkg install failed to find interface. Ask user for input
 	if [ -z "$nic" ] ; then
 		msg_installer "_m5"
-		read nic 
+		read nic
 
-		while : ; do 
+		while : ; do
 			echo "$_nics skip" | grep -Eqs "${nic}" && break
 			msg_installer "_m6"
 			read nic
 		done
 	fi
-	
+
 	# $nic will be used later for nicvm, but all NICs will be passthru, for host security.
 	for _dev in $_nics ; do
 		_nic=$(pciconf -l $_dev | sed -E "s/^${_dev}@pci([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
@@ -91,21 +91,21 @@ get_usbs() {
 
 	# Set monitoring loop to background, give user instructions, wait for user input when finished.
 	usb_config &
-	clear && msg_installer "_m7" 
-	read _cont 
+	clear && msg_installer "_m7"
+	read _cont
 
-	# Signal usb_config infinite loop to exit, and give a moment for the loop to finish and exit 
+	# Signal usb_config infinite loop to exit, and give a moment for the loop to finish and exit
 	echo "exit" > $tmp4
 	sleep 1
 }
 
 usb_config() {
 	# Record pre-state of usb situation
-	usbconfig > $tmp1 
+	usbconfig > $tmp1
 
 	# Continuously monitor usbconfig output for changes as user plugs/unplugs USB to ports.
 	while : ; do
-		usbconfig > $tmp2	
+		usbconfig > $tmp2
 		usbs=$(diff $tmp1 $tmp2 | sed -En "/^> /s/^> //p")
 
 		# read-while necessary in case the user plugs multiple usbs simultaneously
@@ -114,8 +114,8 @@ usb_config() {
 		done
 
 		sleep .5
-		grep -qs "exit" $tmp4 && break 
-	done	
+		grep -qs "exit" $tmp4 && break
+	done
 
 	return 0
 }
@@ -132,7 +132,7 @@ translate_usbs() {
 	for _dev in $ppt_usbs ; do
 		_dev=$(echo $_dev | sed -E 's#/#:#g')
 		dev_usbs="$dev_usbs $(pciconf -l | sed -En "s/(^[[:alnum:]]+)@.*${_dev}.*/\1/p")"
-	done	
+	done
 
 	# First find the corresponding PCI device name via sysctl
 	usbus=$(echo $USBS | grep -Eo "usbus[[:digit:]]+" | sed -E 's/usbus/usbus./')
@@ -144,7 +144,7 @@ translate_usbs() {
 	# Then translate each name to an actual bus location
 	for _ppt in $dev_usbs ; do
 		_ppt=$(pciconf -l $_ppt | sed -E "s/^.*@pci([^[:blank:]]+):.*/\1/" | sed -E "s#:#/#g")
-		echo "$ppt_usbs" | grep -Eqs "$_ppt" || ppt_usbs="$ppt_usbs $_ppt"		
+		echo "$ppt_usbs" | grep -Eqs "$_ppt" || ppt_usbs="$ppt_usbs $_ppt"
 	done
 
 	# Clean up spaces in final variables. Set variable so "at" doesnt appear if there were no usbs.
@@ -158,20 +158,20 @@ final_confirmation() {
    case "$_response" in
       y|Y|yes|YES) return 0 ;;
       *) msg_installer "_m9" ; exit 0 ;;
-   esac 
+   esac
 }
 
 create_datasets() {
 	# Create datasets and modify custom props appropriately
 	zfs list $jails_zfs > /dev/null 2>&1 || zfs create $jails_zfs
 	zfs set mountpoint="$jails_mount" qubsd:autosnap=true $jails_zfs
-	
+
 	zfs list $zusr_zfs > /dev/null 2>&1	|| zfs create $zusr_zfs
 	zfs set mountpoint="$zusr_mount"  qubsd:autosnap=true $zusr_zfs
 
-	# Modify qubsd.conf and jail.conf with path for rootjails 
+	# Modify qubsd.conf and jail.conf with path for rootjails
 	sed -i '' -E "s:(#NONE[[:blank:]]+jails_zfs[[:blank:]]+)zroot/qubsd:\1$jails_zfs:" $Q_CONF
-	sed -i '' -E "s:(^path=/)qubsd:\1${jails_mount}:" $QJ_CONF 
+	sed -i '' -E "s:(^path=/)qubsd:\1${jails_mount}:" $QJ_CONF
 }
 
 modify_pptdevs() {
@@ -198,11 +198,11 @@ modify_devfs_rules() {
 		&& cp -a /etc/devfs.rules /etc/devfs.rules_qubsd_bak \
 		|| cp -a /etc/defaults/devfs.rules /etc/devfs.rules
 
-	# Make a copy of the qubsd devfs.rules in /tmp 
+	# Make a copy of the qubsd devfs.rules in /tmp
 	tmp_devfs=$(mktemp /tmp/qubsd_devfs)
 	cp -a $REPO/zroot/etc/devfs.rules $tmp_devfs
 
-	# Check /etc/devfs.rules, and search for two consecutive unused rule numbers 
+	# Check /etc/devfs.rules, and search for two consecutive unused rule numbers
 	_lastnum=$(sed -n "s/^\[devfsrules.*=//p ; s/\]//p" /etc/devfs.rules | tail -1)
 	[ -z "$_lastnum" ] && _lastnum=0
 	while : ; do
@@ -213,19 +213,19 @@ modify_devfs_rules() {
 	done
 
 	# Add the discovered rule numbers to quBSD devfs and jail.conf
-	sed -i '' -E "s/(^\[devfsrules_qubsd_netjail=)/\1$rulenum1/" $tmp_devfs 
-	sed -i '' -E "s/(^\[devfsrules_qubsd_guijail=)/\1$rulenum2/" $tmp_devfs 
-	sed -i '' -E "s/NETRULENUM1/$rulenum1/g" $QJ_CONF 
+	sed -i '' -E "s/(^\[devfsrules_qubsd_netjail=)/\1$rulenum1/" $tmp_devfs
+	sed -i '' -E "s/(^\[devfsrules_qubsd_guijail=)/\1$rulenum2/" $tmp_devfs
+	sed -i '' -E "s/NETRULENUM1/$rulenum1/g" $QJ_CONF
 	sed -i '' -E "s/GUIRULENUM2/$rulenum2/g" $QJ_CONF
 
 	# Check for all GPUs in pciconf, and uncomment/unhide based on vendor(s)
 	for _dev in $(pciconf -l | sed -En "/class=0x03/s/(^[[:alnum:]]+).*/\1/p") ; do
 		if pciconf -lv $_dev | grep -Eqs "NVIDIA" ; then
 			nvidia="nvidia-driver nvidia-settings"
-			sed -i '' -E "s/^#(add path.*nvidia.*)/\1/" $tmp_devfs 
+			sed -i '' -E "s/^#(add path.*nvidia.*)/\1/" $tmp_devfs
 		else
-			sed -i '' -E "s/^#(add path.*dri.*)/\1/" $tmp_devfs 
-			sed -i '' -E "s/^#(add path.*drm.*)/\1/" $tmp_devfs 
+			sed -i '' -E "s/^#(add path.*dri.*)/\1/" $tmp_devfs
+			sed -i '' -E "s/^#(add path.*drm.*)/\1/" $tmp_devfs
 		fi
 	done
 
@@ -261,7 +261,7 @@ add_gui_pkgs() {
 	msg_installer "_m10"
 	pkg install -y $_pkgs $nvidia >> $QLOG
 
-	# xhost + local: requried for quBSD GUI jails. Also modify loader for nvidia modules 
+	# xhost + local: requried for quBSD GUI jails. Also modify loader for nvidia modules
 	[ "$GUI" = "true" ] && echo "xhost + local:" >> $XINIT && [ -n "$nvidia" ] \
 		&& { sysrc -f $QLOAD 'nvidia_load="YES"' ; sysrc -f $QLOAD 'nvidia-modeset_load="YES"' ;}
 
@@ -299,15 +299,15 @@ install_rootjails() {
 	pkg -r ${jails_mount}/0base update >> $QLOG
 	zfs snapshot ${jails_zfs}/0base@INSTALL
 
-	# Install all other rootjails and their pkgs as indicated by install.conf 
+	# Install all other rootjails and their pkgs as indicated by install.conf
 	[ "$GUI" = "true" ] && rootjails="0gui" && appjails="0gui"
 	[ "$server" = "true" ] && rootjails="$rootjails 0serv" && appjails="$appjails 0serv"
 
 	for _jail in 0net $rootjails ; do
-		case $_jail in 
+		case $_jail in
 			0net) _pkgs="vim jq wireguard-tools isc-dhcp44-server bind918" ;;
 			0gui) _pkgs="vim xorg $nvidia $guipkgs" ;;
-			0serv) _pkgs="vim $serverpkgs" ;; 
+			0serv) _pkgs="vim $serverpkgs" ;;
 		esac
 
 		# Create rootjail, install pkgs, and snapshot
@@ -325,7 +325,7 @@ install_appjails() {
 	for _jail in $appjails ; do
 		zfs create -o mountpoint="${zusr_mount}/${_jail}" -o qubsd:autosnap="true" ${zusr_zfs}/${_jail}
 		cp -a ${REPO}/zusr/${_jail}/ ${zusr_mount}/${_jail}
-		modify_fstab "$_jail"		
+		modify_fstab "$_jail"
 		zfs snapshot ${zusr_zfs}/${_jail}@INSTALL
 	done
 
@@ -350,7 +350,7 @@ main() {
 	define_vars
 	load_kernel_modules
 
-	# PREPARATION - Get missing parameters from the user before making any changes 
+	# PREPARATION - Get missing parameters from the user before making any changes
 	get_datasets
 	get_nic
 	get_usbs
@@ -372,14 +372,14 @@ main() {
 # STILL DO DO
 	# VM installation
 
-	# qubsd_cron is last so no code tries to run until install completion 
+	# qubsd_cron is last so no code tries to run until install completion
 	cp -a ${REPO}/zroot/etc/cron.d/qubsd_cron /etc/cron.d/qubsd_cron
 
 	msg_installer "_m14"
 }
 
 setlog() {
-	set -x 
+	set -x
 	exec > /root/debug 2>&1
 }
 
