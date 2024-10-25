@@ -286,6 +286,7 @@ install_rootjails() {
 	mkdir ${jails_mount}/0base/rw
 	cp -a ${REPO}/zusr/0base/home/0base/.*shrc ${jails_mount}/0base/root/
 	cp -a ${REPO}/zusr/0base/rw/etc/rc.conf ${jails_mount}/0base/etc/
+	cp -a /etc/localtime  ${jails_mount}/0base/etc/
 
 	# Find the user's shell and assume that shell for 0base and all jails thereafter
 	_shell=$(pw usershow root | grep -Eo '/bin/.*$')
