@@ -1102,8 +1102,7 @@ connect_host_to_xpra() {
 
 	while : ; do
 		# Parallel starts, multiple loops sometimes false positive the `pgreg Xorg`. Filter out pgrep
-		#if pgrep -fl '/usr/local/libexec/Xorg' | grep -v pgrep >> /root/tempf ; then
-		if ps -ax | grep '/usr/local/libexec/Xorg' | grep -v grep >> /root/tempf ; then
+		if ps -ax | grep '/usr/local/libexec/Xorg' | grep -v grep ; then
 			_display=$(pgrep -fl Xorg | sed -En "s/.*Xorg (:[0-9]+) .*/\1/p")
 
 			DISPLAY="$_display" xpra attach --audio=no --notifications=no \
@@ -2270,7 +2269,7 @@ cleanup_vm() {
 	# If it's a dispVM then get the template, and reclone it
 	[ "$(get_jail_parameter -es CLASS $_VM)" = "dispVM" ] && [ -z "$_template" ] \
 		&& ! _template=$(get_jail_parameter -e TEMPLATE $_VM) && eval $_R1
-	reclone_zusr "$_VM" "$_template"
+	[ -n "$_template" ] && reclone_zusr "$_VM" "$_template"
 
 	# Remove the /tmp files
 	rm "${QTMP}/qb-bhyve_${_VM}" 2> /dev/null
