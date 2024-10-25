@@ -3,7 +3,7 @@ When back on normal setup, fix the i3gen.conf to match QubesTricks
 
 Maybe should look up the resolv.conf of the gateway at jail start and copy it
 
-new pf file location is fucking qb-hostnet - maybe this is a good case for all file names always being variables defined in get_global_variables
+ALL file names should ALWAYS be variables defined in get_global_variables
 
 rc.conf -nmdm cuse and dbus specifically, I dont know if I need them or what for
 
