@@ -42,8 +42,8 @@ main() {
 	remove_interfaces
 	rm -r $LOCKF
 
-	# Prevents error for wg-quick changing resolv.conf
-	chflags -R noschg ${M_ZUSR}/${JAIL}/etc/resolv.conf 2> /dev/null
+	# /rw system files might be schg, but needed by rc.shutdown. Prevent warning line on removal 
+	chflags -R noschg ${M_ZUSR}/${JAIL}/rw 2> /dev/null
 }
 
 get_global_variables
