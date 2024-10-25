@@ -795,7 +795,7 @@ select_snapshot() {
 		[ -z "$_rootsnap" ] && get_msg $_qz -m _e32_1 -- "$_jail" "$_rootenv" && eval $_R1
 
 	# Latest ROOTENV snapshot unimportant for stops, and prefer not to clutter ROOTENV snaps.
-	elif [ -z "${0##*exec-prepare}" ] || [ -z "${0##*qb-stop}" ] ; then
+	elif [ -z "${0##*exec-release}" ] || [ -z "${0##*qb-stop}" ] ; then
 		# The jail is running, meaning there's a ROOTENV snapshot available (no error/chks needed)
 		local _rootsnap=$(zfs list -t snapshot -Ho name $_rootzfs | tail -1)
 
@@ -2056,7 +2056,7 @@ define_ipv4_convention() {
 
 	# Combo of function caller and JAIL/VM determine which IP form to use
 	case $_type in
-		ADHOC) # Temporary, adhoc connections have the form: 10.99.x.2/30
+		ADHOC) # Temporary, adhoc connections have the form: 10.88.x.2/30
 			_ip1=88 ; _subnet=29 ;;
 		SSH) # Control jails operate on 10.99.x.0/30
 			_ip1=99 ; _subnet=30 ;;
