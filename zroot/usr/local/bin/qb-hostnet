@@ -14,7 +14,8 @@ get_options() {
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	TIMEOUT="${TIMEOUT:=300}"
-	PF_PASS="/etc/pf_pass.conf"
+	PF_PASS="/usr/local/etc/quBSD/pf_pass.conf"
+	PF_BLOCK="/usr/local/etc/quBSD/pf.conf"
 }
 
 get_parameters() {
@@ -40,7 +41,7 @@ connection_down() {
 	done
 
 	# Set pf.conf, which is simply: "block all"
-	pfctl -f /etc/pf.conf
+	pfctl -f $PF_BLOCK 
 }
 
 cron_down() {
@@ -88,7 +89,7 @@ main() {
 		sed -i '' -E "s@JIP[[:blank:]]*=.*@JIP = \"${IPV4}\"@" $PF_PASS
 
 		# Change pf to file that passes internet from host to outside.
-		pfctl -f /etc/pf_pass.conf
+		pfctl -f $PF_PASS 
 
 		# Restart ntpd. One problem with host being offline is that it loses time sync
 		service ntpd restart > /dev/null 2>&1
