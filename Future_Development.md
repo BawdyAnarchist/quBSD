@@ -1,11 +1,3 @@
-Audit/rework the qubsd/zusr directory
-	- qb-ivpn isnt synced on my system and the repo. Not even synced between my jails and $ubin
-	- net-vpn/rw/usr/local/etc/dhcpd.conf needs better clarity on the IP addy convention. Not critical but standardization needed
-		-- I think the right thing is to put it on a 10.77.x.1,2/30 standard, to signify that it's giving dhcp to another jail.
-
-The detection for changes for zroot/qubsd for rootjails isnt working properly anymore, and doesnt create temporary snapshots
-
-qb-ivpn - needs copied over to 0net or something. idk, this is more personal
 
 When back on normal setup, fix the i3gen.conf to match QubesTricks
 
@@ -63,6 +55,10 @@ I2P Gateway
 
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
+
+qb-ivpn
+	the ivpn server directory info needs its own directory for correctness, not stuffed in wireguard	
+	also, it is isnt synced on my system and the repo. Not even synced between my jails and $ubin
 
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
