@@ -1,5 +1,19 @@
+Audit/rework the qubsd/zusr directory
+	- qb-ivpn isnt synced on my system and the repo. Not even synced between my jails and $ubin
+	- net-vpn/rw/usr/local/etc/dhcpd.conf needs better clarity on the IP addy convention. Not critical but standardization needed
+		-- I think the right thing is to put it on a 10.77.x.1,2/30 standard, to signify that it's giving dhcp to another jail.
+
+The detection for changes for zroot/qubsd for rootjails isnt working properly anymore, and doesnt create temporary snapshots
+
+qb-ivpn - needs copied over to 0net or something. idk, this is more personal
 
 When back on normal setup, fix the i3gen.conf to match QubesTricks
+
+Maybe should look up the resolv.conf of the gateway at jail start and copy it
+
+new pf file location is fucking qb-hostnet - maybe this is a good case for all file names always being variables defined in get_global_variables
+
+rc.conf -nmdm cuse and dbus specifically, I dont know if I need them or what for
 
 ntpd - ongoing
 	1. Modified /etc/ntp.conf

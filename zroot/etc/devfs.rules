@@ -9,8 +9,8 @@ add include $devfsrules_unhide_login
 add include $devfsrules_jail
 add path pf unhide
 add path 'tun*' unhide
-# For tcpdump in netjail, unhide bpf and restart devfs
-#add path 'bpf*' unhide
+# dhclient and tcpdump need bpf (net-firewall) 
+add path 'bpf*' unhide
 # apparently ssh needs tty to function properly
 add path 'tty*' unhide 
 

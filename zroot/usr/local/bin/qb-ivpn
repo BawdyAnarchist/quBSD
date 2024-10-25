@@ -353,8 +353,9 @@ main() {
 		modify_ivpn
 
 	else
-		# Copy qb-ivpn to ensure jail is operating off the most recent version
-		cp /usr/local/bin/qb-ivpn "${M_QROOT}/${JAIL}/usr/local/bin/qb-ivpn"
+		# Use ls to check for file, coz [ -e <file> ] fails for linked files 
+		ls "${M_QROOT}/${JAIL}/usr/local/bin/qb-ivpn" > /dev/null 2>&1 \
+			|| cp /usr/local/bin/qb-ivpn "${M_QROOT}/${JAIL}/usr/local/bin/qb-ivpn"
 
 		# Re-run script in jail to modify ivpn
 		jexec -l -U root $JAIL /usr/local/bin/qb-ivpn -x -p $PORT
