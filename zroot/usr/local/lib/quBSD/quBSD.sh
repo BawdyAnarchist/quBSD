@@ -787,7 +787,7 @@ select_snapshot() {
 			_rootsnaps=$(echo "$_rootsnaps" | sed '$ d')
 			[ -n "$_rootsnaps" ] \
 				&& _snapdate=$(echo "$_rootsnaps" | tail -1 | xargs -I@ zfs list -Ho creation @ \
-													| xargs -I@ date -j -f "%a %b %d %H:%M %Y" @ +"%s")
+					| xargs -I@ date -j -f "%a %b %d %H:%M %Y" @ +"%s")
 		done
 
 		# If no _rootsnap older than the rootenv pid was found, return error
@@ -2595,6 +2595,9 @@ exec_vm_coordinator() {
 
 	_VM="$1"
 
+	# Depending on which program called the VM launch, might not have network vars
+	get_networking_variables
+
 	# Ensure that there's nothing lingering from this VM before trying to start it
 	cleanup_vm $_norun $_qs "$_VM"
 
@@ -2646,6 +2649,3 @@ setlog2() {
 	rm /root/debug2 > /dev/null 2>&1
 	exec > /root/debug2 2>&1
 }
-
-
-
