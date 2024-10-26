@@ -48,7 +48,7 @@ check_and_adjust() {
 		none@*@none@none)
 
 			# Check if it's a parameter
-			awk '{print $2}' $QCONF | grep -Eqsi " $POS1 " && PARAM="$POS1"
+			awk '{print $2}' $QCONF | grep -Eqsi "[[:blank:]]$POS1[[:blank:]]" && PARAM="$POS1"
 
 			# Check if it's an entry in QCONF
 			grep -Eqs "^${POS1}[[:blank:]]+" $QCONF && JAIL="$POS1"
