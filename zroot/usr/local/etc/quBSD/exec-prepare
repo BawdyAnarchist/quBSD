@@ -19,7 +19,7 @@ get_parameters() {
 
 preparation_actions() {
 	# Sometimes bridge module unloads
-	kldstat -q -m if_bridge || kldload -q if_bridge
+	kldload -n if_bridge
 
 	# The control jail should always be on. The function will return immediately if already on
 	[ ! "$CLASS" = "cjail" ] && start_jail "$CONTROL"
