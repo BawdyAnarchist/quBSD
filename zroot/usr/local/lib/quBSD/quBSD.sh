@@ -127,7 +127,7 @@ get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
 
 	# Define variables for files
-	JCONF_D="/etc/jail.conf.d"	
+	JCONF_D="/etc/jail.conf.d"
 	QBDIR="/usr/local/etc/quBSD"
 	QCONF="${QBDIR}/qubsd.conf"
 	QBLOG="/var/log/quBSD/quBSD.log"
@@ -1234,7 +1234,7 @@ chk_avail_jailname() {
 	if chk_valid_zfs "${R_ZFS}/$_jail" || \
 		chk_valid_zfs "${U_ZFS}/$_jail"  || \
 		grep -Eq "^${_jail}[[:blank:]]+" $QCONF || \
-		[ -e "${JCONF_D}/${_jail}" ] || \
+		[ -e "${JCONF_D}/${_jail}" ] ; then
 		get_msg $_qa -m _e13_2 -- "$_jail" && eval $_R1
 	fi
 
@@ -1312,7 +1312,7 @@ chk_valid_jail() {
 		&& get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
 	# Jails must have an entry in JCONF_D
-	! chk_isvm -c $_class && [ ! -e "${JCONF_D}/${_jail}" ] && \
+	! chk_isvm -c $_class "$_value" && [ ! -e "${JCONF_D}/${_value}" ] \
 			&& get_msg $_qv -m _e7 -- "$_value" && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
 	case $_class in
