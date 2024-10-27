@@ -71,8 +71,6 @@ ENDOFMSG
 	_m14) cat << ENDOFMSG
 
 SYSTEM FILES WERE MODIFIED. Your originals were saved as: <file>_qubsd_bak
-  /etc/jail.conf     -->   /etc/jail.conf_qubsd_bak
-    - Completely replaced by quBSD
   /etc/rc.conf       -->   /etc/rc.conf_qubsd_bak
     - Some lines might be commented out. quBSD required lines at the bottom
   /etc/devfs.rules   -->   /etc/devfs.rules_qubsd_bak

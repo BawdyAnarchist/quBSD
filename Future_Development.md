@@ -3,8 +3,6 @@ I'm realizing now that almost all of the connection scripts for netjails actuall
 
 There's probably a good case to be made to externalize the fstab from the jails entirely, probably to the top level /zusr/$jail level itself
 
-In fact, maybe I shouldnt touch their jail.conf at all.
-
 When back on normal setup, fix the i3gen.conf to match QubesTricks
 
 ALL file names should ALWAYS be variables defined in get_global_variables

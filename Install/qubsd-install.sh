@@ -236,6 +236,10 @@ modify_qubsdjail_conf() {
 	# Modify qubsd.conf with path for rootjails
 	sed -i '' -E "s:(#NONE[[:blank:]]+jails_zfs[[:blank:]]+)zroot/qubsd:\1$jails_zfs:" $Q_CONF
 
+	# Must .include JCONF_D in jail.conf
+	echo -e "\n#QUBSD ADDED" >> /etc/jail.conf
+	echo -e '.include "/etc/jail.conf.d/*";' >> /etc/jail.conf
+
 	# Modify JCONF_D's with correct paths and devfs rulenums
 	for _jail in "${JCONF_D}"/* ; do 
 		[ -f "$_jail" ] || continue
