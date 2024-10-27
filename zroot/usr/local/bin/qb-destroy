@@ -85,7 +85,7 @@ main() {
 
 	# Modify Files
 	sed -i '' -E "/^${JAIL}[[:blank:]]/d" $QCONF
-	sed -i '' -E "/^${JAIL}(\{|[[:blank:]])/,/^}/d" $JCONF
+	rm ${JCONF_D}/${JAIL}
 }
 
 

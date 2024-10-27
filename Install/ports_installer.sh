@@ -31,13 +31,15 @@ copy_repo() {
 	[ -e /usr/local/etc/rc.d ]  || mkdir -p /usr/local/etc/rc.d   
 	[ -e /boot/loader.conf.d ]  || mkdir -p /boot/loader.conf.d
 	[ -e /etc/cron.d ]          || mkdir -p /etc/cron.d
+	[ -e /etc/jail.conf.d ]     || mkdir -p /etc/jail.conf.d
 
 	# Copy files to their directories 
-	cp -a ${REPO}/zroot/usr/local/etc/quBSD/* /usr/local/etc/quBSD/
-	cp -a ${REPO}/zroot/usr/local/bin/*       /usr/local/bin/
-	cp -a ${REPO}/zroot/usr/local/lib/quBSD/* /usr/local/lib/quBSD/
-	cp -a ${REPO}/zroot/usr/local/etc/rc.d/*  /usr/local/etc/rc.d/
-	cp -a ${REPO}/zroot/boot/loader.conf.d/*  /boot/loader.conf.d/
+	cp -a ${REPO}/zroot/usr/local/etc/quBSD/ /usr/local/etc/quBSD/
+	cp -a ${REPO}/zroot/usr/local/bin/       /usr/local/bin/
+	cp -a ${REPO}/zroot/usr/local/lib/quBSD/ /usr/local/lib/quBSD/
+	cp -a ${REPO}/zroot/usr/local/etc/rc.d/  /usr/local/etc/rc.d/
+	cp -a ${REPO}/zroot/boot/loader.conf.d/  /boot/loader.conf.d/
+	cp -a ${REPO}/zroot/etc/jail.conf.d/     /etc/jail.conf.d/
 }
 
 modify_files() {

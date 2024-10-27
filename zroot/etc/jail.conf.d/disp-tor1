@@ -1,0 +1,26 @@
+disp-tor1 {
+	# Standard Settings
+	host.hostname="$name";
+	path="/qubsd/$name";
+	persist;
+
+	# File System
+	allow.mount.nullfs;
+	mount.devfs;
+	devfs_ruleset="GUIRULENUM2";
+
+	# Networking
+	vnet;
+
+	# Startup/Shutdown Scripts
+	exec.clean;
+	exec.prepare="/usr/local/etc/quBSD/exec-prepare $name";
+	exec.prestart="/usr/local/etc/quBSD/exec-prestart $name";
+	exec.created="/usr/local/etc/quBSD/exec-created $name"; 
+	# Startup scripts can pollute stdout. Send to null. 
+	exec.start="sh /etc/rc > /dev/null 2>&1"; 
+	exec.poststart="/usr/local/etc/quBSD/exec-poststart $name";
+	exec.prestop="/usr/local/etc/quBSD/exec-prestop $name";
+	exec.stop="sh /etc/rc.shutdown"; 
+	exec.release="/usr/local/etc/quBSD/exec-release $name";
+}

@@ -5,7 +5,7 @@ define_vars() {
 	XINIT="/usr/local/etc/X11/xinit/xinitrc"
 	QLOAD="/boot/loader.conf.d/qubsd_loader.conf"
 	Q_CONF="/usr/local/etc/quBSD/qubsd.conf"
-	QJ_CONF="${REPO}/zroot/etc/jail.conf"
+	JCONF_D="/etc/jail.conf.d"
 	QRC_CONF="${REPO}/zroot/etc/rc.conf"
 	QLOG="/var/log/quBSD/install.log"
 
@@ -170,10 +170,6 @@ create_datasets() {
 
 	zfs list $zusr_zfs > /dev/null 2>&1	|| zfs create $zusr_zfs
 	zfs set mountpoint="$zusr_mount"  qubsd:autosnap=true $zusr_zfs
-
-	# Modify qubsd.conf and jail.conf with path for rootjails
-	sed -i '' -E "s:(#NONE[[:blank:]]+jails_zfs[[:blank:]]+)zroot/qubsd:\1$jails_zfs:" $Q_CONF
-	sed -i '' -E "s:(^path=/)qubsd:\1${jails_mount}:" $QJ_CONF
 }
 
 modify_pptdevs() {
@@ -191,6 +187,18 @@ modify_pptdevs() {
 	sysrc -f $QLOAD "$devsnum"+="$ppt_nics $ppt_usbs"
 }
 
+discover_devfs_rulenums() {
+	# Check /etc/devfs.rules, and search for two consecutive unused rule numbers
+	_lastnum=$(sed -n "s/^\[devfsrules.*=//p ; s/\]//p" /etc/devfs.rules | tail -1)
+	[ -z "$_lastnum" ] && _lastnum=0
+	while : ; do
+		rulenum1=$(( _lastnum + 1 ))
+		rulenum2=$(( _lastnum + 2 ))
+		! grep -Eqs "^\[devfsrules.*=${rulenum1}" /etc/devfs.rules \
+			&& ! grep -Eqs "^\[devfsrules.*=${rulenum2}" /etc/devfs.rules && break
+	done
+}
+
 modify_devfs_rules() {
 	# /etc/devfs.rules is modified here and not at pkg install,
 	# because it requires changing a file outside of /usr/local
@@ -204,21 +212,9 @@ modify_devfs_rules() {
 	tmp_devfs=$(mktemp /tmp/qubsd_devfs)
 	cp -a $REPO/zroot/etc/devfs.rules $tmp_devfs
 
-	# Check /etc/devfs.rules, and search for two consecutive unused rule numbers
-	_lastnum=$(sed -n "s/^\[devfsrules.*=//p ; s/\]//p" /etc/devfs.rules | tail -1)
-	[ -z "$_lastnum" ] && _lastnum=0
-	while : ; do
-		rulenum1=$(( _lastnum + 1 ))
-		rulenum2=$(( _lastnum + 2 ))
-			! grep -Eqs "^\[devfsrules.*=${rulenum1}" /etc/devfs.rules \
-				&& ! grep -Eqs "^\[devfsrules.*=${rulenum2}" /etc/devfs.rules && break
-	done
-
-	# Add the discovered rule numbers to quBSD devfs and jail.conf
+	# Add the discovered rule numbers to quBSD devfs
 	sed -i '' -E "s/(^\[devfsrules_qubsd_netjail=)/\1$rulenum1/" $tmp_devfs
 	sed -i '' -E "s/(^\[devfsrules_qubsd_guijail=)/\1$rulenum2/" $tmp_devfs
-	sed -i '' -E "s/NETRULENUM1/$rulenum1/g" $QJ_CONF
-	sed -i '' -E "s/GUIRULENUM2/$rulenum2/g" $QJ_CONF
 
 	# Check for all GPUs in pciconf, and uncomment/unhide based on vendor(s)
 	for _dev in $(pciconf -l | sed -En "/class=0x03/s/(^[[:alnum:]]+).*/\1/p") ; do
@@ -236,9 +232,17 @@ modify_devfs_rules() {
 	rm $tmp_devfs
 }
 
-modify_jail_conf() {
-	[ -e "/etc/jail.conf" ] && cp -a /etc/jail.conf /etc/jail.conf_qubsd_bak
-	cp -a ${QJ_CONF} /etc/jail.conf
+modify_qubsdjail_conf() {
+	# Modify qubsd.conf with path for rootjails
+	sed -i '' -E "s:(#NONE[[:blank:]]+jails_zfs[[:blank:]]+)zroot/qubsd:\1$jails_zfs:" $Q_CONF
+
+	# Modify JCONF_D's with correct paths and devfs rulenums
+	for _jail in "${JCONF_D}"/* ; do 
+		[ -f "$_jail" ] || continue
+		sed -i '' -E "s:(^path=/)qubsd:\1${jails_mount}:" ${JCONF_D}/${_jail}
+		sed -i '' -E "s/NETRULENUM1/$rulenum1/g" $JCONF_D
+		sed -i '' -E "s/GUIRULENUM2/$rulenum2/g" $JCONF_D
+	done
 }
 
 modify_rc_conf() {
@@ -364,9 +368,10 @@ main() {
 	# SYSTEM INSTALLATION
 	create_datasets
 	modify_pptdevs
+	discover_devfs_rulenums
 	modify_devfs_rules
+	modify_qubsdjail_conf
 	modify_rc_conf
-	modify_jail_conf
 	add_gui_pkgs
 
 	# JAILS/VM INSTALLATION

@@ -90,7 +90,7 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e7) cat << ENDOFMSG
-   < $1 > is missing from /etc/jail.conf
+   < $1 > is missing from $JCONF_D 
 ENDOFMSG
 	;;
 	_e8) cat << ENDOFMSG
@@ -125,7 +125,7 @@ ENDOFMSG
 	;;
 	_e13_2) cat << ENDOFMSG
    JAILNAME < $1 > has an entry in at least one of the following:
-   jail.conf, QCONF, or zfs dataset at $U_ZFS or $R_ZFS
+   $JCONF_D, $QCONF , $U_ZFS, or $R_ZFS
    Destroy/remove all occurrences with:  qb-destroy $1
 ENDOFMSG
 	;;

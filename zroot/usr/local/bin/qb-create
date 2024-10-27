@@ -170,7 +170,7 @@ checks_parameters() {
 		if echo "$_PARAMS" | grep -Eqs "$_PAR" ; then
 
 			# For INSTALL CLASS and ROOTENV dont exist yet for testing. Skip checks.
-			if ! ([ "$INSTALL" ] && ( [ "$_PAR" = "CLASS" ] || [ "$_PAR" = "ROOTENV" ] )) ; then
+			if ! { [ "$INSTALL" ] && { [ "$_PAR" = "CLASS" ] || [ "$_PAR" = "ROOTENV" ] ;};} ; then
 				# for-loop takes care of cases of multiple values for _PAR
 				for _val in $_VAL ; do
 					eval "chk_valid_${_par}" '--' "$_val" || get_msg2 -Em _e4 "$_PAR"
@@ -510,37 +510,20 @@ change_datasets() {
 
 change_jconf() {
 
-	# Make a tmp file for /etc/jail.conf edits
-	_TMP_JCONF="${QTMP}/qb_create_jconf"
-	mktemp $_TMP_JCONF > /dev/null
-
 	# This is a bit ineligant, but [-Z] with an appjail, TEMPLATE needs converted to the ROOTENV;
 	# and the fstab probably tries to link zusr/rw/etc/fstab instead of /qubsd/<jail>/etc/fstab
 	if [ "$CLASS" = "rootjail" ] ; then
 		TEMPLATE="$ROOTENV"
-		chflags -R noschg ${M_QROOT}/${NEWJAIL}/etc
 
-		# You can't just copy over linked file. Must remove it
-		rm -f ${M_QROOT}/${NEWJAIL}/etc/fstab
-		cp -a "${M_QROOT}/0base/etc/fstab" "${M_QROOT}/${NEWJAIL}/etc"
+		# Just in case the clone caused schg. rm in case it was a symlink
+		chflags -R noschg ${M_QROOT}/${NEWJAIL}/etc/fstab
+		rm -rf ${M_QROOT}/${NEWJAIL}/etc/fstab
+		echo "#Device  Mountpoint  FStype Options Dump Pass#" > ${M_QROOT}/${NEWJAIL}/etc/fstab
 	fi
 
-	# Modify /etc/jail.conf
-	sed -nE "/^${TEMPLATE}[[:blank:]]*\{/,/\}/p" $JCONF >> $_TMP_JCONF
-	sed -i '' -E "s/${TEMPLATE}/${NEWJAIL}/" $_TMP_JCONF
-
-	if [ "$CLASS" = "rootjail" ] ; then
-		sed -i '' -e "/# Rootjails/r $_TMP_JCONF" $JCONF
-
-	elif [ -z "${NEWJAIL##net-*}" ] ; then
-		sed -i '' -e "/# Net Jails/r $_TMP_JCONF" $JCONF
-
-	elif [ "$CLASS" = "dispjail" ] ; then
-		sed -i '' -e "/# Disp Jails/r $_TMP_JCONF" $JCONF
-
-	else
-		sed -i '' -e "/# Production Jails/r $_TMP_JCONF" $JCONF
-	fi
+	# Create NEWJAIL JCONF_D Careful to only replace the opening stanza
+	sed -E "s/^[[:blank:]]*${TEMPLATE}[[:blank:]]*\{/${NEWJAIL} \{/" ${JCONF_D}/${TEMPLATE} \
+		> ${JCONF_D}/${NEWJAIL}
 }
 
 guided_mode() {
@@ -641,7 +624,7 @@ cleanup_finished() {
 	# Once complete, only certain temporary items need removed.
 
 	# Remove the TMP files if they exist (ignore if they dont)
-	rm $_TMP_WARN $_TMP_PARAMS $_TMP_JCONF > /dev/null 2>&1
+	rm $_TMP_WARN $_TMP_PARAMS > /dev/null 2>&1
 
 	# Remove the snapshots if they exist (ignore if they dont)
 	[ "$R_SNAP" ] && zfs destroy $R_SNAP > /dev/null 2>&1
@@ -660,7 +643,7 @@ cleanup_finished() {
 	trap 'rm_errfiles' INT TERM HUP QUIT EXIT
 
 	# INSTALL has further actions. But if _exit was set to 1, it was trapped. Either way, exit.
-	( [ "$_exit" = "1" ] || [ -z "$INSTALL" ] ) && eval exit "$_exit"
+	{ [ "$_exit" = "1" ] || [ -z "$INSTALL" ] ;} && eval exit "$_exit"
 }
 
 cleanup_trapped() {
@@ -669,7 +652,7 @@ cleanup_trapped() {
 	zfs destroy -rRf "${U_ZFS}/${NEWJAIL}" > /dev/null 2>&1
 
    sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QCONF > /dev/null 2>&1
-	sed -i '' -E "/^${NEWJAIL}(\{|[[:blank:]])/,/^}/d" $JCONF > /dev/null 2>&1
+	rm ${JCONF_D}/$NEWJAIL > /dev/null 2>&1
 
 	# Items above should only be removed if the operation was incomplete
 	# Items below should be removed regardless of complete/incomplete

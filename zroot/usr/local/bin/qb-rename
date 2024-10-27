@@ -61,9 +61,10 @@ rename_common() {
 }
 
 rename_jail() {
-
-	# Modify /etc/jail.conf
-	sed -i '' -E "s/^${JAIL}[[:blank:]]+\{/${NEWNAME} \{/g" $JCONF
+	# Create NEWJAIL JCONF_D Careful to only replace the opening stanza
+	sed -E "s/^[[:blank:]]*${JAIL}[[:blank:]]*\{/${NEWNAME} \{/" ${JCONF_D}/${JAIL} \
+		> ${JCONF_D}/${NEWNAME}
+	rm ${JCONF_D}/${JAIL}
 
 	# Flags down to modify directory names and fstab (if they exist)
 	chflags -R noschg ${M_ZUSR}/${JAIL}  >  /dev/null 2>&1

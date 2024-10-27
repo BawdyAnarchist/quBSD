@@ -181,25 +181,7 @@ modify_jconf_devfs() {
 
 	# First convert the to just the numerical value if the user entered the long format
 	VALUE=$(echo "$VALUE" | grep -Eo '[[:digit:]]+$')
-
-# Hey, it's better than creating temp files to handle it. To explain what's going on here:
-# 1) search for: '^JAIL {'  which is the opening stanza for the jail
-# 2) :n  acts as a pointer, a way to loop over the same commands within sed
-# 3) N tells sed to load the next line (into the pattern space)
-# 4) Check the new line for ending curly '}' which would indicate end of jail entry in JCONF
-#    in which case branch to :z , end of function, to prevent changing some other jail
-# 5) If the line does not match .*devfs_rulset.* then branch to :n (loop)
-# 6) Finally replace the line with the desired $value
-
-sed -i '' -E "/^${JAIL}[[:blank:]]*\{/ {
-:n
-N
-/\}/bz
-/.*devfs_ruleset.*/!bn
-s/(devfs_ruleset).*/\1=\"${VALUE}\";/
-
-:z
-}" $JCONF
+	sed -i '' -E "s/(.*devfs_ruleset=).*/\1\"${VALUE}\";/" ${JCONF_D}/${JAIL}
 }
 
 handle_restarts() {

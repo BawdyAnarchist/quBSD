@@ -127,7 +127,7 @@ get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
 
 	# Define variables for files
-	JCONF="/etc/jail.conf"
+	JCONF_D="/etc/jail.conf.d"	
 	QBDIR="/usr/local/etc/quBSD"
 	QCONF="${QBDIR}/qubsd.conf"
 	QBLOG="/var/log/quBSD/quBSD.log"
@@ -1209,7 +1209,7 @@ chk_isvm() {
 
 chk_avail_jailname() {
 	# Checks that the proposed new jailname does not have any entries or partial entries
-	# in JCONF, QCONF, and ZFS datasets
+	# in JCONF_D, QCONF, and ZFS datasets
 	# Return 0 jailname available, return 1 for any failure
 	local _fn="chk_avail_jailname" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
@@ -1234,7 +1234,7 @@ chk_avail_jailname() {
 	if chk_valid_zfs "${R_ZFS}/$_jail" || \
 		chk_valid_zfs "${U_ZFS}/$_jail"  || \
 		grep -Eq "^${_jail}[[:blank:]]+" $QCONF || \
-		grep -Eq "^${_jail}[[:blank:]]*\{" $JCONF ; then
+		[ -e "${JCONF_D}/${_jail}" ] || \
 		get_msg $_qa -m _e13_2 -- "$_jail" && eval $_R1
 	fi
 
@@ -1287,7 +1287,7 @@ chk_valid_zfs() {
 }
 
 chk_valid_jail() {
-	# Checks that jail has JCONF, QCONF, and corresponding ZFS dataset
+	# Checks that jail has JCONF_D, QCONF, and corresponding ZFS dataset
 	# Return 0 for passed all checks, return 1 for any failure
 	local _fn="chk_valid_jail" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
@@ -1311,8 +1311,8 @@ chk_valid_jail() {
 		&& get_msg $_qv $_V -m _e2 -- "$_value" "ROOTENV" \
 		&& get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
-	# Jails must have an entry in JCONF
-	! chk_isvm -c $_class && ! grep -Eqs "^${_value}[[:blank:]]*\{" $JCONF \
+	# Jails must have an entry in JCONF_D
+	! chk_isvm -c $_class && [ ! -e "${JCONF_D}/${_jail}" ] && \
 			&& get_msg $_qv -m _e7 -- "$_value" && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
 	case $_class in

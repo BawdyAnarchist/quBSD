@@ -56,7 +56,7 @@ cleanup_disps() {
 
 	# Remove anything that starts with ^EPHM in qconf and jail.conf
    sed -i '' -E "/^EPHM/d" $QCONF
-	sed -i '' -E "/^EPHM.*(\{|[[:blank:]])/,/^}/d" $JCONF
+	ls $JCONF_D | grep -E '^EPHM'| xargs rm > /dev/null 2>&1
 }
 
 qb_cleanup_stop() {

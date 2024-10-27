@@ -3,7 +3,6 @@ I'm realizing now that almost all of the connection scripts for netjails actuall
 
 There's probably a good case to be made to externalize the fstab from the jails entirely, probably to the top level /zusr/$jail level itself
 
-There's also another good case to be made for a minimal /etc/jail.conf file, and using jail.conf.d/$jail, an individual file for each jail.
 In fact, maybe I shouldnt touch their jail.conf at all.
 
 When back on normal setup, fix the i3gen.conf to match QubesTricks
@@ -30,6 +29,8 @@ When you restore, the datasets dont inherit their qubsd:autosnap properties
 
 consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-in-freebsds-vnet-jails/
 	- It's for vnet jails and NAT. Disables hardware checksums for virtual interfaces, and extra filtering on bridges
+
+There is some question now as to the dispjails and their templates, and the devfs in jail.conf. 
 
 
 ### UPGRADES
