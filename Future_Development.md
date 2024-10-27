@@ -1,8 +1,6 @@
 
 When back on normal setup, fix the i3gen.conf to match QubesTricks
 
-Maybe should look up the resolv.conf of the gateway at jail start and copy it
-
 ALL file names should ALWAYS be variables defined in get_global_variables
 
 rc.conf -nmdm cuse and dbus specifically, I dont know if I need them or what for
@@ -84,6 +82,7 @@ qb-backup - Add ssh option
 qb-stat
 	- Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
 	- Give a popup option that can be closed with any key (quickview kinda stuff)
+	- Add a column for worspace location of active windows
 
 
 

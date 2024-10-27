@@ -30,12 +30,10 @@ modify_dhcpd() {
 	# If wireguard is enabled, DNS should come from wg0.conf. Otherwise, use /etc/resolv.conf
 	if grep -Eq 'wireguard_enable="YES"' $JRC ; then
 		_DNS=$(sed -En "s/^DNS.*=[[:blank:]]*([0-9]+.*[0-9]+)[[:blank:]]*\$/\1;/p" $JWG)
-
 	else
 		# Get the DNS entries from resolv.conf, and use those for the dhcpd server
-		_DNS=$(sed -En "s/^nameserver (.*[0-9]+)[[:blank:]]*\$/\1,/p" \
-														"${J_ZUSR}/rw/etc/resolv.conf")
-		_DNS=$(echo $_DNS | sed -E "s/,\$/;/")
+		_DNS=$(sed -En "s/^nameserver (.*[0-9]+)[[:blank:]]*\$/\1,/p" 
+			"${J_ZUSR}/rw/etc/resolv.conf" | sed -E "s/,\$/;/")
 	fi
 
 	# Modify dhcpd with new DNS
@@ -68,6 +66,12 @@ modify_files() {
 			&& sed -i '' -e "s@WGPORTS[[:blank:]]*=.*@WGPORTS = \"${WG_PORTS}\"@" $JPF
 	fi
 
+	# If jail has no resolv.conf, use zusr/gateway's, or if that fails, rootenv/gateway's
+	# Note: symlinks are referenced internal to jail, so cp -L doesnt work here from host
+	[ ! -e "${M_ZUSR}/${JAIL}/rw/etc/resolv.conf" ] \
+		&& cp ${M_ZUSR}/${GATEWAY}/rw/etc/resolv.conf ${M_QROOT}/${JAIL}/etc > /dev/null 2>&1 \
+		|| cp ${M_QROOT}/${GATEWAY}/etc/resolv.conf ${M_QROOT}/${JAIL}/etc > /dev/null 2>&1
+
 	# Make sure the MTU matches qconf
 	[ "$MTU" ] && [ -e "$JWG" ] \
 						&& sed -i '' -E "s/^MTU.*/MTU = ${MTU}/" $JWG
@@ -85,7 +89,7 @@ assemble_wgports() {
 	for _jail in $(get_info -e _CLIENTS $JAIL) ; do
 		[ -e "${M_ZUSR}/${_jail}/${WIREGRD}" ] \
 			&& WG_PORTS="$WG_PORTS $(sed -nE "s/^ENDPOINT[[:blank:]]*=.*:(.*)[[:blank:]]*/\1/p" \
-																					${M_ZUSR}/${_jail}/${WG0CONF})"
+				${M_ZUSR}/${_jail}/${WG0CONF})"
 	done
 
 	# Remove duplicates and leading/trailing blanks
