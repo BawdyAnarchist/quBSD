@@ -1,4 +1,11 @@
 
+I'm realizing now that almost all of the connection scripts for netjails actually belongs as a startup script inside of the net-jails themselves, probably to be run pre pf and networking. This is more properly correct for how my system is designed.
+
+There's probably a good case to be made to externalize the fstab from the jails entirely, probably to the top level /zusr/$jail level itself
+
+There's also another good case to be made for a minimal /etc/jail.conf file, and using jail.conf.d/$jail, an individual file for each jail.
+In fact, maybe I shouldnt touch their jail.conf at all.
+
 When back on normal setup, fix the i3gen.conf to match QubesTricks
 
 ALL file names should ALWAYS be variables defined in get_global_variables
@@ -20,6 +27,9 @@ Maybe should do the fstab inside the rootjail, and only fstab in /rw when necess
 with NIC, make qb-edit so that a new NIC also updates loader.conf.
 There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
 When you restore, the datasets dont inherit their qubsd:autosnap properties
+
+consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-in-freebsds-vnet-jails/
+	- It's for vnet jails and NAT. Disables hardware checksums for virtual interfaces, and extra filtering on bridges
 
 
 ### UPGRADES
