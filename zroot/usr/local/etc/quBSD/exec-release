@@ -32,10 +32,13 @@ main() {
 			chk_valid_zfs "${U_ZFS}/${TEMPLATE}" && ! reclone_zusr "$JAIL" "$TEMPLATE" \
 				&& get_msg2 -Em _e3 "$JAIL" "$ROOTENV"
 		;;
+		rootjail)
+			# Rootenv flags stay down for convenience, but can be long op. fork and silence 
+			[ -e ${M_QROOT}/${JAIL} ] && (exec chflags -R noschg ${M_QROOT}/${JAIL} > /dev/null 2>&1)
 	esac
 
-	# Flags come down after stopping.
-	[ -e ${M_ZUSR}/${JAIL} ] && chflags -R noschg ${M_ZUSR}/${JAIL}
+	# Flags come down after stopping, but fork process and silence, to reduce user lag
+	[ -e ${M_ZUSR}/${JAIL} ] && (exec chflags -R noschg ${M_ZUSR}/${JAIL} > /dev/null 2>&1)
 
 	# Re-encrypt the dataset, if applicable
 	[ ! "$(zfs list -Ho encryption ${U_ZFS}/${JAIL})" = "off" ] \
