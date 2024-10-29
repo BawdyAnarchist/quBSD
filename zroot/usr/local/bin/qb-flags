@@ -31,7 +31,8 @@ checks() {
 	fi
 
 	# Check for valid jail, exit if invalid
-	chk_valid_jail -- "$JAIL" || get_msg2 -Eu
+# Actually, maybe this doesnt matter. No jail ops, just file ops
+#	chk_valid_jail -- "$JAIL" || get_msg2 -Eu
 }
 
 main() {
@@ -53,7 +54,7 @@ main() {
 		# Jails might have different chflag settings if started or stopped
 		chk_isrunning "$JAIL" \
 									&& ${QBDIR}/exec-poststart $JAIL \
-																|| ${QBDIR}/exec-poststop $JAIL
+																|| ${QBDIR}/exec-release $JAIL
 	fi
 }
 
