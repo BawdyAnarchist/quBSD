@@ -32,7 +32,7 @@ modify_dhcpd() {
 		_DNS=$(sed -En "s/^DNS.*=[[:blank:]]*([0-9]+.*[0-9]+)[[:blank:]]*\$/\1;/p" $JWG)
 	else
 		# Get the DNS entries from resolv.conf, and use those for the dhcpd server
-		_DNS=$(sed -En "s/^nameserver (.*[0-9]+)[[:blank:]]*\$/\1,/p" 
+		_DNS=$(sed -En "s/^nameserver (.*[0-9]+)[[:blank:]]*\$/\1,/p" \
 			"${J_ZUSR}/rw/etc/resolv.conf" | sed -E "s/,\$/;/")
 	fi
 
@@ -44,7 +44,6 @@ modify_dhcpd() {
 }
 
 modify_files() {
-
 	# Numerous variables need to be modified for pf.conf
 	if grep -Eqs 'pf_enable="YES"' $JRC && [ -e "$JPF" ] ; then
 
