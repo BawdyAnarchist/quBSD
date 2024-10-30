@@ -1,7 +1,10 @@
 
 I'm realizing now that almost all of the connection scripts for netjails actually belongs as a startup script inside of the net-jails themselves, probably to be run pre pf and networking. This is more properly correct for how my system is designed.
+	connect_gateway_to_client 
+		dhclient kill and restart for the interface in question
 
 There's probably a good case to be made to externalize the fstab from the jails entirely, probably to the top level /zusr/$jail level itself
+	- Actually now that I think about it, the zfs decryption wasnt working quite right. I need to recheck it
 
 When back on normal setup, fix the i3gen.conf to match QubesTricks
 
@@ -22,6 +25,7 @@ generalize the schg to being able to list specific files, and not my preselected
 Maybe should do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
 
 with NIC, make qb-edit so that a new NIC also updates loader.conf.
+
 There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
 When you restore, the datasets dont inherit their qubsd:autosnap properties
 
@@ -29,6 +33,8 @@ consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-i
 	- It's for vnet jails and NAT. Disables hardware checksums for virtual interfaces, and extra filtering on bridges
 
 There is some question now as to the dispjails and their templates, and the devfs in jail.conf. 
+
+go through all my personal fstabs and make the #Devices with no spaces so you can column -t all of them
 
 
 ### UPGRADES
@@ -73,6 +79,7 @@ qb-create
 	- It needs further and more extensive testing 
 	- -z dirs recreated files too, not just directories
 	- qb-create removal of achi-hd might not be working. I dunno I changed it to hd so maybe that was why
+	- There needs to be a template for parameters, and a template for zusr
 
 qb_ssh [[actually it's likely I dont need this now that I'm gonna go to fat32 zfs volumes for new VMs)
 	- Probably can remove the FreeBSD parts of it. Maybe the Net/Open ones as well 
