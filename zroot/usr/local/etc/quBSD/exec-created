@@ -21,28 +21,6 @@ get_parameters() {
 	JWG="${J_ZUSR}/rw/usr/local/etc/wireguard/wg0.conf"
 }
 
-modify_dhcpd() {
-
-	DHCPD=$(sed -En 's#dhcpd_conf="(.*)\"#\1#p' $JRC)
-
-	[ -e "$DHCPD" ] || return 0
-
-	# If wireguard is enabled, DNS should come from wg0.conf. Otherwise, use /etc/resolv.conf
-	if grep -Eq 'wireguard_enable="YES"' $JRC ; then
-		_DNS=$(sed -En "s/^DNS.*=[[:blank:]]*([0-9]+.*[0-9]+)[[:blank:]]*\$/\1;/p" $JWG)
-	else
-		# Get the DNS entries from resolv.conf, and use those for the dhcpd server
-		_DNS=$(sed -En "s/^nameserver (.*[0-9]+)[[:blank:]]*\$/\1,/p" \
-			"${J_ZUSR}/rw/etc/resolv.conf" | sed -E "s/,\$/;/")
-	fi
-
-	# Modify dhcpd with new DNS
-	[ -n "$_DNS" ] && sed -i '' -E "s/(option domain-name-servers ).*/\1${_DNS}/g" $DHCPD
-
-	# Set MTU in the config file
-	[ -n "$MTU" ] && sed -i '' -E "s/(option interface-mtu ).*/\1${MTU};/g" "$DHCPD"
-}
-
 modify_files() {
 	# Numerous variables need to be modified for pf.conf
 	if grep -Eqs 'pf_enable="YES"' $JRC && [ -e "$JPF" ] ; then
@@ -107,9 +85,6 @@ resource_control() {
 }
 
 main() {
-	# If dhcpd is enabled, then modify the config with MTU and DNS
-	grep -Eq 'dhcpd_enable="YES"' $JRC && modify_dhcpd
-
 	if [ ! "$CLASS" = "cjail" ] ; then
 		# Connect JAIL to 0control SSH
 		chk_isrunning "$CONTROL" && connect_client_to_gateway -c "$JAIL" "$CONTROL"
