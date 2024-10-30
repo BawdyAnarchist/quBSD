@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# PROVIDE: dhcpd_dns_sync 
+# REQUIRE: FILESYSTEMS
+# BEFORE: netif routing wireguard isc-dhcpd
+
+. /etc/rc.subr
+
+name="dhcpd_dns_sync"
+rcvar="dhcpd_dns_sync_enable"
+start_cmd="${name}_start"
+stop_cmd=":"
+
+dhcpd_dns_sync_start() {
+	# Only run if dhcpd is enabled 
+	checkyesno dhcpd_enable || return 0
+
+	# Prefer DNS/MTU from wg0.conf if appropriate
+	wg_conf="/usr/local/etc/wireguard/wg0.conf"
+	if checkyesno wireguard_enable && [ -f "$wg_conf" ] ; then
+		DNS="$(sed -En "s/^[[:blank:]]*DNS[[:blank:]]*=[[:blank:]]*(.*[0-9]+).*/\1/p" $wg_conf)"
+		MTU="$(sed -En "s/^[[:blank:]]*MTU[[:blank:]]*=[[:blank:]]*([0-9]+).*/\1/p" $wg_conf)"
+	else
+		# Conservative MTU if not found in wg0
+		MTU=${MTU:-1420}
+	fi
+
+	# Get DNS from resolv.conf if wg not enabled/available
+	[ -z "$DNS" ] && [ -f "/etc/resolv.conf" ] \
+		&& DNS="$(sed -En "s/^[[:blank:]]*nameserver (.*[0-9]+)/\1/p" /etc/resolv.conf)"
+
+	# Modify dhcpd.conf only if a DNS value was found for wg0 or resolv.conf
+	dhcpd_conf=${dhcpd_conf:-"/usr/local/etc/dhcpd.conf"}
+	echo "$DNS $MTU" > /var/temprcc
+	if [ -n "$DNS" ] && [ -f "$dhcpd_conf" ] ; then
+		sed -i '' -E "s/(option domain-name-servers ).*/\1${DNS};/g" "$(readlink -f "$dhcpd_conf")"
+		sed -i '' -E "s/(option interface-mtu ).*/\1${MTU};/g"  "$(readlink -f "$dhcpd_conf")"
+	fi
+
+}
+
+load_rc_config $name
+run_rc_command "$1"
