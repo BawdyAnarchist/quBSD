@@ -1435,7 +1435,7 @@ chk_valid_class() {
 	# Valid inputs are: appjail | rootjail | cjail | dispjail | appVM | rootVM
 	case $_value in
 		'') get_msg $_q -m _e0 -- "CLASS" && eval $_R1 ;;
-		appjail|dispjail|rootjail|cjail|rootVM|appVM|dispVM) eval $_R0 ;;
+		host|appjail|dispjail|rootjail|cjail|rootVM|appVM|dispVM) eval $_R0 ;;
 		*) get_msg $_q -m _e15 && get_msg $_q -m _e1 -- "$_value" "CLASS" && eval $_R1 ;;
 	esac
 }
@@ -1957,15 +1957,11 @@ connect_client_to_gateway() {
 	# Further resolution for quBSD IP assignment.
 	local ipv4=$(get_jail_parameter -de IPV4 $_client)
 
-	# Regardless of networking mode, resolv.conf likely needs modified. Make sure flags are down 
-	[ -e "${M_ZUSR}/${_client}/rw/etc/resolv.conf" ] \
-		&& chflags noschg "${M_ZUSR}/${_client}/rw/etc/resolv.conf" \
-		|| { touch ${M_QROOT}/${_client}/etc/resolv.conf && \
-				chflags noschg "${M_QROOT}/${_client}/etc/resolv.conf" > /dev/null 2>&1 ;}
-
 	# Handle various VM/jail gateway/client combos
 	case "${_cl_gw}_${_cl_cl}" in
-		*VM_*jail) # Configuring VM gateway is outside the scope of quBSD automation
+		*VM_*jail|*VM_host) # Configuring VM gateway is outside the scope of quBSD automation
+			# Jails need the jexec prefix for network commands later 
+			[ "$_cl_cl" = "host" ] || _jexec="jexec -l -U root $_client"
 			_vif_cl=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_gateway}") 
 			
 			# auto (discover_ip) makes no sense for for VM_jail. Assume user intends "it just works" 
@@ -1976,9 +1972,12 @@ connect_client_to_gateway() {
 			_vif_gw=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_client}") 
 			configure_gateway_network
 		;;
-		*jail_*jail) # Order matters. If client is DHCP, it needs a configured gateway	
+		*jail_*jail|*jail_host) # Order matters. If client is DHCP, it needs a configured gateway	
+			# Jails need the jexec prefix for network commands later 
 			_vif_gw=$(ifconfig epair create)
 			_vif_cl="${_vif_gw%?}b"
+			[ ! "$_cl_cl" = "host" ] \
+				&&  _jexec="jexec -l -U root $_client" && ifconfig $_vif_cl vnet $_client
 			configure_gateway_network
 			configure_client_network
 		;;
@@ -1992,7 +1991,14 @@ connect_client_to_gateway() {
 configure_client_network() {
 	local _fn="configure_client_network" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
-	ifconfig $_vif_cl vnet $_client
+	# Regardless of IPV4, resolv.conf likely needs modified. Make sure flags are down 
+	if [ -e "${M_ZUSR}/${_client}/rw/etc/resolv.conf" ] ; then
+		chflags noschg "${M_ZUSR}/${_client}/rw/etc/resolv.conf"
+	elif [ -e "${M_QROOT}/${_client}/etc/" ] ; then
+		touch ${M_QROOT}/${_client}/etc/resolv.conf
+		chflags noschg "${M_QROOT}/${_client}/etc/resolv.conf" > /dev/null 2>&1
+	fi
+
 	# DHCP configuration of IP and DNS; vs ; manual configuration
 	if [ "$ipv4" = "DHCP" ] || [ "$_type" = "SSH" ] ; then
 		# qubsd_dhcp daemon runs internally to each jail monitoring for new dhcp interfaces
@@ -2004,8 +2010,8 @@ configure_client_network() {
 		_mtu="${_mtu:=$(get_jail_parameter -de MTU $_client)}"
 
 		# Add the IP and default route
-		jexec -l -U root $_client ifconfig $_vif_cl inet $_cl_ip mtu $_mtu up
-		jexec -l -U root $_client route add default "${_cl_ip%.*/*}.1" > /dev/null 2>&1
+		eval $_jexec ifconfig $_vif_cl inet $_cl_ip mtu $_mtu up
+		eval $_jexec route add default "${_cl_ip%.*/*}.1" > /dev/null 2>&1
 
 		# pf control and resolv.conf
 		modify_network_files
@@ -2095,6 +2101,7 @@ discover_open_ipv4() {
 
 modify_network_files() {
 	local _fn="modify_network_files" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+	[ "$_cl_cl" = "host" ] && eval $_R0
 
 	# If _gateway is a VM, this will silently fail
 	[ ! -e "${M_ZUSR}/${_client}/rw/etc/resolv.conf" ] \

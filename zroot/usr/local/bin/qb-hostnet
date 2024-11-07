@@ -25,9 +25,7 @@ get_parameters() {
 	# Check validity of timeout provided
 	chk_integer -g 0 -v "[-t <timeout>]" -- $TIMEOUT
 
-	# Must get host network parameters.
 	get_jail_parameter -d GATEWAY "host" || exit 1
-	get_jail_parameter -d IPV4    "host" || exit 1
 }
 
 connection_down() {
@@ -69,7 +67,6 @@ revert_connection() {
 }
 
 main() {
-
 	# Terminate any other instances of qb-hostnet that might be running (waiting for TIMEOUT)
 	pkill -f '/bin/sh /usr/local/bin/qb-hostnet'
 
@@ -78,24 +75,13 @@ main() {
 
 	# Bring up host network connection
 	if [ "$_CMD" = "up" ] ; then
-
-		# start_jail command handles most error messages
+		# Start the gateway, connect host, modify pf 
 		start_jail "$GATEWAY" ||  get_msg2 -Em _e3
-
-		_VIF=$(connect_client_to_gateway -ei "$IPV4" "host" "$GATEWAY")
-
-      # Modify pf_pass with the cu
-		sed -i '' -E "s@EXT_IF[[:blank:]]*=.*@EXT_IF = \"${_VIF}\"@" $PF_PASS
-		sed -i '' -E "s@JIP[[:blank:]]*=.*@JIP = \"${IPV4}\"@" $PF_PASS
-
-		# Change pf to file that passes internet from host to outside.
+		connect_client_to_gateway "host" "$GATEWAY"
 		pfctl -f $PF_PASS 
 
-		# Restart ntpd. One problem with host being offline is that it loses time sync
-		service ntpd restart > /dev/null 2>&1
-
+		# Loop until specified timeout, then revert connection
 		revert_connection &
-		exit 0
 	fi
 }
 
@@ -107,5 +93,5 @@ get_parameters
 
 main
 
-
+exit 0
 
