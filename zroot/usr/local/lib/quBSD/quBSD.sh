@@ -619,9 +619,10 @@ stop_jail() {
 		# Attempt normal removal [-r]. If failure, then remove forcibly [-R].
 		elif ! jail -vr "$_jail"  >> ${QBLOG}_${_jail} 2>&1 ; then
 			if chk_isrunning "$_jail" ; then
-				# -(R)emove jail, rerun exec-release to make sure it's in a clean ending state
+				# Manually run exec-prestop, then forcibly remove jail, and run exec-release
+				/bin/sh ${QBDIR}/exec-prestop "$_jail" > /dev/null 2>&1
 				jail -vR "$_jail"  >> ${QBLOG}_${_jail} 2>&1
-				/bin/sh ${QBDIR}/exec-release "$_jail"
+				/bin/sh ${QBDIR}/exec-release "$_jail" > /dev/null 2>&1
 
 				if chk_isrunning "$_jail" ; then
 					# Warning about failure to forcibly remove jail
@@ -2320,7 +2321,6 @@ prep_bhyve_options() {
 	_gateway=$(get_jail_parameter -dez GATEWAY "$_VM")     || eval $_R1
 	_clients=$(get_info -e _CLIENTS "$_VM")
 	_control=$(get_jail_parameter -de  CONTROL "$_VM")     || eval $_R1
-	_ipv4=$(get_jail_parameter -derz IPV4 "$_VM")          || eval $_R1
 	_memsize=$(get_jail_parameter -de MEMSIZE "$_VM")      || eval $_R1
 	_wiremem=$(get_jail_parameter -de WIREMEM "$_VM")      || eval $_R1
 	_bhyveopts=$(get_jail_parameter -de BHYVEOPTS "$_VM")  || eval $_R1
