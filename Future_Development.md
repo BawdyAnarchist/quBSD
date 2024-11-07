@@ -1,15 +1,10 @@
 
 NEW CHANGES
 		
-	IPV4 and _ipv4 in VMs need examined
-	Check how much `jail -R` cleans up (forcible jail removal). Like control netmap /qubsd/$JAIL/tmp/qubsd_dhcp
-
 	LINGERING
-		With rootjails on shutdown, they need their symlinks deleted on release to prevent annoyances of lingering symlinks	
 		review if named needs restarted, it might
 		chk_valid_ipv4 
 		chk_isqubsd_ipv4 --> latter appears unused, as [-x] for get_jail_parameter -x IVP4 is never specified anywhere
-		qb-hostnet --> make sure it's generalized as well, or just hand jam it
 		qb-connect, qb-start
 		control_netmap still looks like its not removing jails. Culd just be my aggressive testing
 		syncronize the jail.conf.d's
