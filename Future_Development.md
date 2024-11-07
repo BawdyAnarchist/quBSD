@@ -1,7 +1,33 @@
 
-I'm realizing now that almost all of the connection scripts for netjails actually belongs as a startup script inside of the net-jails themselves, probably to be run pre pf and networking. This is more properly correct for how my system is designed.
-	connect_gateway_to_client 
-		dhclient kill and restart for the interface in question
+NEW CHANGES
+		
+	IPV4 and _ipv4 in VMs need examined
+	Check how much `jail -R` cleans up (forcible jail removal). Like control netmap /qubsd/$JAIL/tmp/qubsd_dhcp
+
+	LINGERING
+		With rootjails on shutdown, they need their symlinks deleted on release to prevent annoyances of lingering symlinks	
+		review if named needs restarted, it might
+		chk_valid_ipv4 
+		chk_isqubsd_ipv4 --> latter appears unused, as [-x] for get_jail_parameter -x IVP4 is never specified anywhere
+		qb-hostnet --> make sure it's generalized as well, or just hand jam it
+		qb-connect, qb-start
+		control_netmap still looks like its not removing jails. Culd just be my aggressive testing
+		syncronize the jail.conf.d's
+		QCONF
+			control
+		syncronize all relevant files across your system and your repo
+		INSTALLER (notes below)
+
+	TESTING
+		qb-start
+
+### INSTALLER SCRIPT CHANGES ###
+roots
+	mkdir /usr/local/bin && cp qubsd_dhcp
+	mkdir /usr/local/etc/rc.d && cp qubsd_dhcp
+	/etc/rc.conf qubsd_dhcp_enable="YES"
+	
+
 
 There's probably a good case to be made to externalize the fstab from the jails entirely, probably to the top level /zusr/$jail level itself
 	- Actually now that I think about it, the zfs decryption wasnt working quite right. I need to recheck it
@@ -21,7 +47,8 @@ ntpd - ongoing
 	# had a problem with schg and seclvl of firewall when launching ntp
 
 Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
-generalize the schg to being able to list specific files, and not my preselected ones
+generalize the schg to being able to list specific files, and not my preselected ones. Overall pf and everything needs examined/revised
+
 Maybe should do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
 
 with NIC, make qb-edit so that a new NIC also updates loader.conf.
