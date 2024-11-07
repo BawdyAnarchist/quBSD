@@ -827,8 +827,8 @@ configure_ssh_control() {
 	# In the case of a restart of the control jail, use [-f] to make sure flags are restored
 
 	getopts f _opts && local _flags="true" && shift
-	local _control="$1"
-	local _client="$2"
+	local _client="$1"
+	local _control="$2"
 
 	# Lift flags for edits, create the .ssh directory if not there, and copy the files
 	chflags -R noschg ${M_QROOT}/${_client}/root
@@ -2019,7 +2019,7 @@ configure_client_network() {
 	fi
 
 	# If connection is for a client/control pair, make sure client has sshd configured for access 
-	[ "$_type" = "SSH" ] && configure_ssh_control "$CONTROL" "$JAIL" 
+	[ "$_type" = "SSH" ] && configure_ssh_control "$_client" "$_gateway" 
 
 	eval $_R0
 }
