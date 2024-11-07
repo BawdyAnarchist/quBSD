@@ -8,9 +8,9 @@ add include $devfsrules_unhide_basic
 add include $devfsrules_unhide_login
 add include $devfsrules_jail
 add path pf unhide
-add path 'tun*' unhide
-# dhclient and tcpdump need bpf (net-firewall) 
+# dhclient requires bpf 
 add path 'bpf*' unhide
+add path 'tun*' unhide
 # apparently ssh needs tty to function properly
 add path 'tty*' unhide 
 
@@ -21,6 +21,8 @@ add include $devfsrules_hide_all
 add include $devfsrules_unhide_basic
 add include $devfsrules_unhide_login
 add include $devfsrules_jail
+# dhclient requires bpf 
+add path 'bpf*' unhide
 add path 'mixer*' unhide
 add path 'dsp*' unhide
 add path 'video*' unhide

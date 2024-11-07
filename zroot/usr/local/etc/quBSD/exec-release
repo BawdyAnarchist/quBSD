@@ -4,7 +4,6 @@
 
 get_parameters() {
 	JAIL="$1"
-
 	# Get jail parameters.
 	get_jail_parameter CLASS   "$JAIL" || get_msg2 -Em _e
 	get_jail_parameter ROOTENV "$JAIL" || get_msg2 -Em _e
@@ -34,15 +33,19 @@ main() {
 		;;
 		rootjail)
 			# Rootenv flags stay down for convenience, but can be long op. fork and silence 
-			[ -e ${M_QROOT}/${JAIL} ] && (exec chflags -R noschg ${M_QROOT}/${JAIL} > /dev/null 2>&1)
+			[ -e ${M_QROOT}/${JAIL} ] && (exec chflags -fR noschg ${M_QROOT}/${JAIL})
 	esac
 
 	# Flags come down after stopping, but fork process and silence, to reduce user lag
-	[ -e ${M_ZUSR}/${JAIL} ] && (exec chflags -R noschg ${M_ZUSR}/${JAIL} > /dev/null 2>&1)
+	[ -e ${M_ZUSR}/${JAIL} ] && (exec chflags -fR noschg ${M_ZUSR}/${JAIL})
 
 	# Re-encrypt the dataset, if applicable
 	[ ! "$(zfs list -Ho encryption ${U_ZFS}/${JAIL})" = "off" ] \
 		&& zfs umount -u ${U_ZFS}/${JAIL}
+
+	# If dhcp is never found for, exec-poststart runs forever, and stays even after jail -r 
+	# Neither pkill -15 nor -9 nor kill -15 work here. Only kill -9 
+	kill -9 $(pgrep -f "exec-poststart $JAIL") > /dev/null 2>&1
 
 	return 0
 }

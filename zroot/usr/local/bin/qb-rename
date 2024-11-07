@@ -67,7 +67,7 @@ rename_jail() {
 	rm ${JCONF_D}/${JAIL}
 
 	# Flags down to modify directory names and fstab (if they exist)
-	chflags -R noschg ${M_ZUSR}/${JAIL}  >  /dev/null 2>&1
+	chflags -fR noschg ${M_ZUSR}/${JAIL}
 
 	# Modify fstab (appjails/dispjails only)
 	[ -e "${M_ZUSR}/${NEWNAME}/rw/etc/fstab" ] \

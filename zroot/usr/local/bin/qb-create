@@ -480,7 +480,7 @@ change_datasets() {
 
 	# Jail types (or VMs) that don't need the edits below, have already exited the function.
 	# Make sure flags are down for rw/etc directory
-	chflags -R noschg ${M_ZUSR}/${NEWJAIL}/rw/etc > /dev/null 2>&1
+	chflags -fR noschg ${M_ZUSR}/${NEWJAIL}/rw/etc
 
    # Fix fstab
 	if [ -e "${M_ZUSR}/${NEWJAIL}/rw/etc/fstab" ] ; then

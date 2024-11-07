@@ -47,7 +47,7 @@ main() {
 
 		# Cycle through directories above and recursively schg
 	   for _dir in $jdir; do
-			chflags -R schg "${M_QROOT}/${JAIL}/${_dir}" > /dev/null 2>&1
+			chflags -fR schg "${M_QROOT}/${JAIL}/${_dir}"
 		done
 
 	elif [ "$RESTORE" ] ; then

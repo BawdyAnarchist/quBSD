@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# PROVIDE: qubsd_netsync
+# REQUIRE: FILESYSTEMS
+# BEFORE: netif routing wireguard isc-dhcpd
+
+. /etc/rc.subr
+. /etc/rc.conf
+
+name="qubsd_netsync"
+desc="Syncronizes wg0, pf, and dhcpd configurations values for DNS, MTU, and wireguard Enpoint:Port"
+rcvar="${name}_enable"
+start_cmd="${name}_start"
+stop_cmd=":"
+
+qubsd_netsync_start() {
+	wg_conf="/rw/usr/local/etc/wireguard/wg0.conf"
+
+	# Prefer wireguard values for DNS and MTU
+	if checkyesno wireguard_enable && [ -f "$wg_conf" ] ; then
+		DNS="$(sed -En "s/^[[:blank:]]*DNS[[:blank:]]*=[[:blank:]]*(.*[0-9]+).*/\1/p" $wg_conf)"
+		MTU="$(sed -En "s/^[[:blank:]]*MTU[[:blank:]]*=[[:blank:]]*([0-9]+).*/\1/p" $wg_conf)"
+		EP="$(sed -En "s/.*Endpoint.*=[[:blank:]]*([^[:blank:]]+):.*/\1/p" $wg_conf)"
+		WGP="$(sed -En "s/.*Endpoint.*=[[:blank:]]*[0-9].*:([[:digit:]]+)/\1/p" $wg_conf)"
+	fi
+
+	# Modify pf.conf if values were acquired
+	if checkyesno pf_enable && [ -f "/rw/$pf_rules" ] ; then
+		[ -n "$EP" ]  && sed -i '' -E "s/(.*table.*EP.*persist.*\{).*/\1 $EP \}/" /rw/$pf_rules
+		[ -n "$WGP" ] && sed -i '' -E "s/(.*WGPORTS.*=).*/\1 \"$WGP\"/" /rw/$pf_rules
+	fi
+
+	# If DNS/MTU were not acquired, then use alternate values for dhcpd.conf, and modify the file.
+	if checkyesno dhcpd_enable && [ -f "/rw/$dhcpd_conf" ] ; then
+		MTU=${MTU:-1420}
+		DNS="${DNS:-$(sed -En "s/^[[:blank:]]*nameserver (.*[0-9]+)/\1/p" /etc/resolv.conf)}"
+
+		sed -i '' -E "s/(option interface-mtu ).*/\1${MTU};/g" /rw/$dhcpd_conf)
+		[ -n "$DNS" ] && sed -i '' -E "s/(option domain-name-servers ).*/\1${DNS};/g" /rw/$dhcpd_conf)
+	fi
+}
+
+load_rc_config $name
+run_rc_command "$1"

@@ -2,113 +2,42 @@
 
 . /usr/local/lib/quBSD/quBSD.sh
 
-get_parameters() {
+get_options() {
 	JAIL="$1"
-
-	# Get parameters. Class was already verified, so skip checks.
-	get_jail_parameter -qs CLASS   "$JAIL" || get_msg2 -Em _e
-	get_jail_parameter -dr IPV4    "$JAIL" || get_msg2 -Em _e
-	get_jail_parameter -d  GATEWAY "$JAIL" || get_msg2 -Em _e
-	get_jail_parameter -d  MAXMEM  "$JAIL" || get_msg2 -Em _e
-	get_jail_parameter -d  CPUSET  "$JAIL" || get_msg2 -Em _e
-	get_jail_parameter -d  CONTROL "$JAIL" || get_msg2 -Em _e
-
-	# MTU only with valid IP. Quiet messages (MTU is not critical)
-	[ $GATEWAY = "none" ] && IPV4="none" || get_jail_parameter -d MTU "$JAIL"
-
-	J_ZUSR="${M_ZUSR}/${JAIL}"
-	JRC="${J_ZUSR}/rw/etc/rc.conf"
-	JWG="${J_ZUSR}/rw/usr/local/etc/wireguard/wg0.conf"
-}
-
-modify_files() {
-	# Numerous variables need to be modified for pf.conf
-	if grep -Eqs 'pf_enable="YES"' $JRC && [ -e "$JPF" ] ; then
-
-		# For gateways that serve other gateways, get all the WGPORTS of those gateways
-		assemble_wgports
-
-		# Make sure flags are down
-		chflags -R noschg "${J_ZUSR}/rw/etc"
-
-		# $VIF was assigned during the connect_client_to_gateway func. Modify pf.conf
-		sed -i '' -E "s@EXT_IF[[:blank:]]*=.*@EXT_IF = \"${_VIF}\"@" $JPF
-		sed -i '' -E "s@JIP[[:blank:]]*=.*@JIP = \"${IPV4}\"@" $JPF
-
-		# net-jail internal wireguard parameters
-		[ -n "$WG_ENDPT" ] \
-			&& sed -i '' -e "s@ENDPOINT[[:blank:]]*=.*@ENDPOINT = \"${WG_ENDPT}\"@" $JPF
-
-		[ -n "$WG_PORTS" ] \
-			&& sed -i '' -e "s@WGPORTS[[:blank:]]*=.*@WGPORTS = \"${WG_PORTS}\"@" $JPF
-	fi
-
-	# If jail has no resolv.conf, use zusr/gateway's, or if that fails, rootenv/gateway's
-	# Note: symlinks are referenced internal to jail, so cp -L doesnt work here from host
-	[ ! -e "${M_ZUSR}/${JAIL}/rw/etc/resolv.conf" ] \
-		&& cp ${M_ZUSR}/${GATEWAY}/rw/etc/resolv.conf ${M_QROOT}/${JAIL}/etc > /dev/null 2>&1 \
-		|| cp ${M_QROOT}/${GATEWAY}/etc/resolv.conf ${M_QROOT}/${JAIL}/etc > /dev/null 2>&1
-
-	# Make sure the MTU matches qconf
-	[ "$MTU" ] && [ -e "$JWG" ] \
-						&& sed -i '' -E "s/^MTU.*/MTU = ${MTU}/" $JWG
-
-	# SSHD needs to be configured so the control jail can access
-	if [ "$CONTROL" ] && [ ! "$CONTROL" = "none" ] ; then
-		sed -i '' -E 's/#*(PermitRootLogin).*/\1 yes/' ${M_QROOT}/${JAIL}/etc/ssh/sshd_config
-		sysrc -f ${M_QROOT}/${JAIL}/rw/etc/rc.conf sshd_enable="YES"
-	fi
-}
-
-assemble_wgports() {
-	# All clients with a wg port, should be added to the gateway pf.conf WGPORTS
-
-	for _jail in $(get_info -e _CLIENTS $JAIL) ; do
-		[ -e "${M_ZUSR}/${_jail}/${WIREGRD}" ] \
-			&& WG_PORTS="$WG_PORTS $(sed -nE "s/^ENDPOINT[[:blank:]]*=.*:(.*)[[:blank:]]*/\1/p" \
-				${M_ZUSR}/${_jail}/${WG0CONF})"
-	done
-
-	# Remove duplicates and leading/trailing blanks
-	WG_PORTS=$(echo "$WG_PORTS" \
-			| awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s", $i, FS)}' \
-			| sed -E 's/^[[:blank:]]*//' | sed -E 's/[[:blank:]]*$//')
-}
-
-resource_control() {
-	# Remove any existing rules for the jail
-	rctl -r jail:${JAIL}:: > /dev/null 2>&1
-
-	# Establish max memory allocaiton and jail CPUs
-	[ "$MAXMEM" = "none" ] || rctl -a jail:${JAIL}:memoryuse:deny=${MAXMEM}
-	[ "$CPUSET" = "none" ] || cpuset -j $JAIL -cl $CPUSET
+	get_jail_parameter -dqs CLASS   "$JAIL" || get_msg2 -m _e
+	get_jail_parameter -d   CONTROL "$JAIL" || get_msg2 -Em _e
+	get_jail_parameter -d   GATEWAY "$JAIL" || get_msg2 -Em _e
 }
 
 main() {
-	if [ ! "$CLASS" = "cjail" ] ; then
-		# Connect JAIL to 0control SSH
-		chk_isrunning "$CONTROL" && connect_client_to_gateway -c "$JAIL" "$CONTROL"
+	# First establish connections to the upstream gateway and control jail
+	connect_client_to_gateway -d "$JAIL" "$GATEWAY"
+	connect_client_to_gateway -dt SSH "$JAIL" "$CONTROL"
 
-		# Copy the ssh pubkey from control jail to JAIL.
-		chk_isrunning "$CONTROL" && copy_control_keys "$CONTROL" "$JAIL"
+	# If this jail is also a gateway, connect it to downstream clients.
+	for _cli in $(get_info -e _CLIENTS "$JAIL") ; do
+		chk_isrunning "$_cli" && connect_client_to_gateway "$_cli" "$JAIL"
+	done
 
-		# Connect jail to its gateway, retrieving the VIF assigned
-		chk_isrunning "$GATEWAY" && _VIF=$(connect_client_to_gateway -ei $IPV4 "$JAIL" "$GATEWAY")
-
-		modify_files
+	# If this is a cjail, check all the onjails to see if this is their control jail. 
+	if [ "$CLASS" = "cjail" ] ; then 
+		for _onj in $(get_info -e _ONJAILS | grep -v $JAIL) ; do
+			# Does _onj have an explicit cjail in QCONF? If not, is $JAIL the QCONF #default? 
+			! grep -Eqs "^${_onj}[[:blank:]]+CONTROL[[:blank:]]+${JAIL}" $QCONF \
+				&& ! grep -Eqs "^${_onj}[[:blank:]]+CONTROL[[:blank:]]+"  $QCONF \
+				&& ! grep -Eqs "^#default[[:blank:]]+CONTROL[[:blank:]]+${JAIL}" $QCONF \
+				&& continue			
+			connect_client_to_gateway -t SSH "$_onj" "$JAIL"
+		done
 	fi
-
-	connect_gateway_to_clients "$JAIL"
-
-	resource_control
 }
+
 
 get_global_variables
 
-get_parameters "$@"
-
-get_networking_variables
+get_options "$@"
 
 main
 
 exit 0
+

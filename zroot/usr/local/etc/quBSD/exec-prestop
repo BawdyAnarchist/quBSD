@@ -2,54 +2,22 @@
 # Cleanly remove and destroy epairs before shutdown
 
 . /usr/local/lib/quBSD/quBSD.sh
-
-get_script_variables() {
-	JAIL="$1"
-	NETMAP="${QTMP}/control_netmap"
-	TAPS=$(jexec -l -U root $JAIL ifconfig -g tap)
-	EPAIRS=$(jexec -l -U root $JAIL ifconfig -g epair)
-	LOCKF="${QTMP}/.lock.control_netmap"
-}
-
-remove_interfaces() {
-	for _tap in $TAPS; do
-		ifconfig $_tap -vnet $JAIL
-		ifconfig $_tap down
-		sed -i '' -E "/${_tap}/d" $NETMAP
-	done
-
-	for _epair in $EPAIRS ; do
-		ifconfig $_epair -vnet $JAIL
-		ifconfig $_epair destroy
-		sed -i '' -E "/^${JAIL} epair/d" $NETMAP
-	done
-}
-
-lock_netmap() {
-	local _start=$(date +%-s)
-	while ! mkdir "$LOCKF" 2>/dev/null ; do
-		sleep 0.1
-		[ "$(date +%-s)" -gt "$(( _start + 5 ))" ] && break
-	done
-}
-
-main() {
-	# Record stop attempt to log file
-	echo "$(date "+%Y-%m-%d_%H:%M") exec-prestop: STOPPING: $JAIL" >> ${QBLOG} ${QBLOG}_$JAIL
-
-	# lock file required, since sed doesn't get queued by kernel like echo "" >>
-	lock_netmap
-	remove_interfaces
-	rm -r $LOCKF
-
-	# /rw system files might be schg, but needed by rc.shutdown. Prevent warning line on removal 
-	chflags -R noschg ${M_ZUSR}/${JAIL}/rw 2> /dev/null
-}
+JAIL="$1"
 
 get_global_variables
 
-get_script_variables "$@"
+# Record stop attempt to log file
+echo "$(date "+%Y-%m-%d_%H:%M") exec-prestop: STOPPING: $JAIL" >> ${QBLOG} ${QBLOG}_$JAIL
+#setlog2
+# Remove interfaces and handle files modification for those interfaces 
+INTFS=$(jexec -l -U root $JAIL ifconfig -g tap ; jexec -l -U root $JAIL ifconfig -g epair)
+for _intf in $INTFS; do
+	# If interface is an epair, pass [-d] destroy
+	[ -z "${_intf##epair*}" ] && _d='-d' || unset _d 
+	remove_interface $_d "$_intf" "$JAIL"	
+done
 
-main
+# /rw system files might be schg, but needed by rc.shutdown.
+chflags -fR noschg ${M_ZUSR}/${JAIL}/rw
 
 exit 0

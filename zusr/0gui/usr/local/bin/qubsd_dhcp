@@ -1,0 +1,97 @@
+#!/bin/sh
+
+# Interfaces can be dynamically assigned/reassigned for both endpoint and gateway jails
+# /tmp/qubsd_dhcp is used to communicate which interfaces should have dhclient auto managed
+
+subtrap() {
+	# If the interface disappears, assume host removed it, and delete from the /tmp file 
+	ifconfig $_intf > /dev/null 2>&1 \
+		|| sed -i '' -E "/(^|[[:blank:]]+)${_intf}($|[[:blank:]]+)/d" /tmp/qubsd_dhcp.interfaces
+
+	# Remove IP from pf tables if it's there
+	if [ -n "$_pf" ] ; then
+		[ -n "$ipNEW" ] && pfctl -t JIP -T delete $ipNEW > /dev/null 2>&1
+		[ -n "$ipOLD" ] && pfctl -t JIP -T delete $ipOLD > /dev/null 2>&1
+	fi
+
+	# Remove the lock file and reset any possible management of the interface
+	rm /tmp/qubsd_dhcp.${_intf}.lock > /dev/null 2>&1
+	reset_interface
+}
+
+write_dhclient_conf() {
+cat << EOF
+timeout 60;
+retry 1;
+initial-interval 1;
+backoff-cutoff 5;
+EOF
+}
+
+reset_interface() {
+	# Force intf into starting state. Edgecases dhclient hangs, pkill doesnt work. Dunno why
+	pkill -15 -f "dhclient.*${_intf}([[:blank:]]|$)" > /dev/null 2>&1
+	sleep .2
+	kill -9 $(pgrep -f "dhclient.*${_intf}([[:blank:]]|$)") > /dev/null 2>&1
+	ifconfig $_intf -alias
+}
+
+configure_new_intf() {
+	# Lock file prevents overlapping loops for the same interface 
+	touch "/tmp/qubsd_dhcp.${_intf}.lock"
+
+	# If this process exits, remove the interface from pf tables, and the lock file
+	trap 'subtrap' INT TERM HUP QUIT EXIT
+
+	# Make sure interface is in a starting state with no attachments
+	reset_interface
+
+	# If the pidfile or interface disappear, qubsd_dhcp should trap and exit 
+	while ifconfig $_intf > /dev/null 2>&1 && [ -f "$pidfile" ] ; do
+
+		# If dhclient for the interface is not detected, then try to bring it up
+		! pgrep -qfl "dhclient.*$_intf" && dhclient -bc /tmp/qubsd_dhclient.conf $_intf
+
+		# pf enabled jails will need to update the JIP pf table for a new DHCP IP address 
+		if [ -n "$_pf" ] ; then
+			_ipOLD="$_ipNEW"	
+			_ipNEW="$(ifconfig $_intf | sed -En "s/inet ([^[:blank:]]+) .*/\1/p")"
+			if [ ! "$_ipOLD" = "$_ipNEW" ] ; then 
+				[ -n "$_ipOLD" ] && pfctl -t JIP -T delete $_ipOLD
+				[ -n "$_ipNEW" ] && pfctl -t JIP -T add $_ipNEW
+		fi fi
+		sleep 2
+	done
+	exit 0
+}
+
+main() {
+	# Edge cases, lock file can remain after exit, preventing an intf from being handled 
+	trap 'rm /tmp/qubsd_dhcp.*.lock > /dev/null 2>&1' INT TERM HUP QUIT EXIT
+
+	# Write aggressive dhclient settings since these are virtual intfs in jails on host 
+	write_dhclient_conf > /tmp/qubsd_dhclient.conf
+
+	# We need the status of pf to decide whether or not to modify pf tables later	
+	service pf status > /dev/null 2>&1 && _pf="true"
+
+	# Monitor for new interfaces added to the tmp file. rc communicates via pidfile for exit
+	while [ -f "$pidfile" ] ; do
+		# Check for new interfaces, and launch detached process if found
+		_intfOLD="$_intfNEW"
+		_intfNEW="$(cat /tmp/qubsd_dhcp.interfaces)"
+		for _intf in $_intfNEW ; do
+			# Sleep prevents dhclient locking resolv.conf if there's multiple interfaces
+			! echo $_intfOLD | grep -Eqs $_intf \
+				&& [ ! -f "/tmp/qubsd_dhcp.${_intf}.lock" ] \
+				&& (configure_new_intf &) \
+				&& sleep 1 
+		done
+		sleep 2
+	done
+}
+
+pidfile="$1"
+
+main
+exit 0

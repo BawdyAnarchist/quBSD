@@ -214,6 +214,8 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e28) cat << ENDOFMSG
+   Couldnt connect client < $1 > to gateway < $2 >
+   because the gateway was off. 
 ENDOFMSG
 	;;
 	_e29) cat << ENDOFMSG
