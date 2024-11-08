@@ -1,5 +1,6 @@
 
 NEW CHANGES
+control_netmap not properly removing jails on shutdown
 		
 	LINGERING
 		review if named needs restarted, it might
