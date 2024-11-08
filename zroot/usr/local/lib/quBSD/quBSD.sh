@@ -1995,8 +1995,7 @@ configure_client_network() {
 	# Regardless of IPV4, resolv.conf likely needs modified. Make sure flags are down 
 	if [ -e "${M_ZUSR}/${_client}/rw/etc/resolv.conf" ] ; then
 		chflags noschg "${M_ZUSR}/${_client}/rw/etc/resolv.conf"
-	elif [ -e "${M_QROOT}/${_client}/etc/" ] ; then
-		touch ${M_QROOT}/${_client}/etc/resolv.conf
+	else
 		chflags noschg "${M_QROOT}/${_client}/etc/resolv.conf" > /dev/null 2>&1
 	fi
 
