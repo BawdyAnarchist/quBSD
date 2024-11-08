@@ -1,4 +1,4 @@
-#### quBSD is a FreeBSD jails/bhyve wrapper which emulates a Qubes inspired containerization schema. Written in shell, based on zfs, and uses the underlying FreeBSD tools.
+#### quBSD is a FreeBSD jails/bhyve wrapper which implements a Qubes inspired containerization schema. Written in shell, based on zfs, and uses the underlying FreeBSD tools.
 
 ### Summary of Default Features: 
 
@@ -14,19 +14,19 @@ Streamlined configuration/editing:
 - create/destroy/rename/edit/list
 
 ### Security Schema
-*Rootjails* maintain a pristine root environment for launching appjails.
-*Appjails* clone a designated rootjail at every start, destroyed at shutdown.
-- Persistent /home directory lives in a separate zfs dataset
-- Can specify persistent system files like rc.conf, pwd.db, pf.conf, etc ...
-*Dispjails* have no persistent data. Completely destroyed at jail shutdown.
-*Ephemeral* jails can be cloned from any existing jail.
-- Open untrusted files/attachments
-- Test experimental operations on a clone, before performing in appjail
-*RootVMs* maintain a pristine root environment on which to base appVMs.
-*AppVMs* clone a designated rootVM same as appjail, with persistent /home.
-*DispVMs* No persistent data. Completely destroyed upon VM shutdown.
+*Rootjails* maintain a pristine root environment for launching appjails.   
+*Appjails* clone a designated rootjail at every start, destroyed at shutdown.   
+&nbsp;&nbsp;- Persistent /home directory lives in a separate zfs dataset   
+&nbsp;&nbsp;- Can specify persistent system files like rc.conf, pwd.db, pf.conf, etc ...   
+*Dispjails* have no persistent data. Completely destroyed at jail shutdown.   
+*Ephemeral* jails clone the exact state of a running jail.   
+&nbsp;&nbsp;- Open untrusted files/attachments    
+&nbsp;&nbsp;- Test experimental operations on a clone, before performing in appjail   
+*RootVMs* maintain a pristine root environment on which to base appVMs.   
+*AppVMs* clone a designated rootVM same as appjail, with persistent /home.   
+*DispVMs* No persistent data. Completely destroyed upon VM shutdown.   
 
-Host remains offline, except for updates.
+Host remains offline, except for updates.    
 Physical network card and USBs are isolated in VMs (nicvm and usbvm)
 
 ### Additional Features
