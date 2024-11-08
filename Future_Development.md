@@ -1,21 +1,12 @@
 
-NEW CHANGES
-control_netmap not properly removing jails on shutdown
-		
-	LINGERING
-		review if named needs restarted, it might
-		chk_valid_ipv4 
-		chk_isqubsd_ipv4 --> latter appears unused, as [-x] for get_jail_parameter -x IVP4 is never specified anywhere
-		qb-connect, qb-start
-		control_netmap still looks like its not removing jails. Culd just be my aggressive testing
-		syncronize the jail.conf.d's
-		QCONF
-			control
-		syncronize all relevant files across your system and your repo
-		INSTALLER (notes below)
+zfs decryption wasnt working quite right. I need to recheck it
 
-	TESTING
-		qb-start
+When back on normal setup, fix the i3gen.conf to match QubesTricks
+
+qb-start
+	- Needs updated with new networking functions in mind
+	- Simultaneous starts of clients could mess up wireguard restarting
+
 
 ### INSTALLER SCRIPT CHANGES ###
 roots
@@ -23,17 +14,9 @@ roots
 	mkdir /usr/local/etc/rc.d && cp qubsd_dhcp
 	/etc/rc.conf qubsd_dhcp_enable="YES"
 	touch /qubsd/0base/etc/resolv.conf
-	
+	dbus added to host when GUI option is selected 
 
-
-There's probably a good case to be made to externalize the fstab from the jails entirely, probably to the top level /zusr/$jail level itself
-	- Actually now that I think about it, the zfs decryption wasnt working quite right. I need to recheck it
-
-When back on normal setup, fix the i3gen.conf to match QubesTricks
-
-ALL file names should ALWAYS be variables defined in get_global_variables
-
-rc.conf -nmdm cuse and dbus specifically, I dont know if I need them or what for
+rc.conf -nmdm cuse , I dont know if I need them or what for
 
 ntpd - ongoing
 	1. Modified /etc/ntp.conf
@@ -46,10 +29,6 @@ ntpd - ongoing
 Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
 generalize the schg to being able to list specific files, and not my preselected ones. Overall pf and everything needs examined/revised
 
-Maybe should do the fstab inside the rootjail, and only fstab in /rw when necessary. Maybe rc.conf and pf.conf too
-
-with NIC, make qb-edit so that a new NIC also updates loader.conf.
-
 There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
 When you restore, the datasets dont inherit their qubsd:autosnap properties
 
@@ -57,8 +36,6 @@ consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-i
 	- It's for vnet jails and NAT. Disables hardware checksums for virtual interfaces, and extra filtering on bridges
 
 There is some question now as to the dispjails and their templates, and the devfs in jail.conf. 
-
-go through all my personal fstabs and make the #Devices with no spaces so you can column -t all of them
 
 
 ### UPGRADES
@@ -93,9 +70,18 @@ I2P Gateway
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
 
+qb-edit
+	- chk_isqubsd_ipv4 - [-x] isnt used anywhere, but a check for quBSD IP convention would be a good addon 
+	- Make changing of parameters without jail restarts, like for gateway. Use the new/improved functions.
+	- with NIC, make qb-edit so that a new NIC also updates loader.conf.
+
 qb-ivpn
-	the ivpn server directory info needs its own directory for correctness, not stuffed in wireguard	
-	also, it is isnt synced on my system and the repo. Not even synced between my jails and $ubin
+	- no need to restart jail, simply pfctl the EP 
+	- the ivpn server directory info needs its own directory for correctness, not stuffed in wireguard	
+	- also, it is isnt synced on my system and the repo. Not even synced between my jails and $ubin
+
+qb-connect
+	- Needs reviewed and reworked based on new networking functions
 
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
@@ -129,6 +115,8 @@ qb-stat
 
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP
 
+ALL file names should ALWAYS be variables defined in get_global_variables
+
 0control qb-copy is SLOW af alot of times
 
 /etc/devfs.rules
@@ -137,14 +125,8 @@ qb-stat
 
 Take another hack at the recording device problems
 
-Check HDAC - I think my sound board is now supported.
-
 Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file and code.
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
-
-Generalize net-firewall
-	[ "${_class_of_gateway##*VM}" ] and also maybe _class_of_client
-	- chk_isqubsd_ipv4 - define_ipv4_convention - discover_open_ipv4
 
 Crons - No crons running. Probably something long term security that should be integrated and automated.
 
