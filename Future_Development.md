@@ -104,6 +104,7 @@ qb-create
 	- -z dirs recreated files too, not just directories
 	- qb-create removal of achi-hd might not be working. I dunno I changed it to hd so maybe that was why
 	- There needs to be a template for parameters, and a template for zusr
+	- You can in install a brand new rootjail via tar base.txz, and this should be an opt coz of the little qubSD required adjustments 
 
 qb_ssh [[actually it's likely I dont need this now that I'm gonna go to fat32 zfs volumes for new VMs)
 	- Probably can remove the FreeBSD parts of it. Maybe the Net/Open ones as well 
