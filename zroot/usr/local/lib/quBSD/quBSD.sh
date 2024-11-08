@@ -1960,39 +1960,40 @@ connect_client_to_gateway() {
 
 	# Handle various VM/jail gateway/client combos
 	case "${_cl_gw}_${_cl_cl}" in
-		*VM_*jail|*VM_host) # Configuring VM gateway is outside the scope of quBSD automation
-			# Jails need the jexec prefix for network commands later 
-			[ "$_cl_cl" = "host" ] || _jexec="jexec -l -U root $_client"
-			_vif_cl=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_gateway}") 
+		*VM_*jail|*VM_host) # Configuring a VM gateway is outside the scope of quBSD automation
+			# Get vif from vmtaps tracker and manage jail vs host client
+			_vif_cl=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_gateway}")
+			[ ! "$_cl_cl" = "host" ] \
+				&&  _jexec="jexec -l -U root $_client" && ifconfig $_vif_cl vnet $_client
 			
-			# auto (discover_ip) makes no sense for for VM_jail. Assume user intends "it just works" 
+			# auto (discover_ip) makes no sense for for VM_jail. Assume user intends "it just works"
 			[ "$ipv4" = "auto" ] && ipv4="DHCP"
 			configure_client_network
 		;;
-		*jail_*VM) # Assume client VM is always using DHCP 
-			_vif_gw=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_client}") 
+		*jail_*VM) # Assume client VM is always using DHCP
+			_vif_gw=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_client}")
 			configure_gateway_network
 		;;
-		*jail_*jail|*jail_host) # Order matters. If client is DHCP, it needs a configured gateway	
-			# Jails need the jexec prefix for network commands later 
+		*jail_*jail|*jail_host) # Order matters. DHCP clients expect an already configured gateway
+			# Get create/assign epairs and manage jail vs host client
 			_vif_gw=$(ifconfig epair create)
 			_vif_cl="${_vif_gw%?}b"
 			[ ! "$_cl_cl" = "host" ] \
 				&&  _jexec="jexec -l -U root $_client" && ifconfig $_vif_cl vnet $_client
+
 			configure_gateway_network
 			configure_client_network
 		;;
 		*VM_*VM) # Future expansion, create promisc bridge in net-firewall and connect vifs
 		;;
 	esac
-	
 	eval $_R0
 }
 
 configure_client_network() {
 	local _fn="configure_client_network" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
-	# Regardless of IPV4, resolv.conf likely needs modified. Make sure flags are down 
+	# Regardless of IPV4, resolv.conf likely needs modified. Make sure flags are down
 	if [ -e "${M_ZUSR}/${_client}/rw/etc/resolv.conf" ] ; then
 		chflags noschg "${M_ZUSR}/${_client}/rw/etc/resolv.conf"
 	else
