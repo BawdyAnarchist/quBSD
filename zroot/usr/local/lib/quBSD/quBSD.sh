@@ -1596,8 +1596,8 @@ chk_isqubsd_ipv4() {
 	# $_a0 - $_a4 vars are needed later. Check that they're all here, or get them.
 	echo "${_a0}#${_a1}#${_a2}#${_a3}#${_a4}" | grep -q "##" && chk_valid_ipv4 -q -- "$_value"
 
-	# Assigns global variables that will be used here for checks.
-	define_ipv4_convention "$_jail"
+# Assigns global variables that will be used here for checks.
+#define_ipv4_convention "$_jail"
 
 	# Assigning an IP of 'none' to a jail with clients, should throw a warning.
 	[ "$_value" = "none" ] && [ -n "$(get_info -e CLIENTS $_jail)" ] \
@@ -2004,6 +2004,8 @@ configure_client_network() {
 	if [ "$ipv4" = "DHCP" ] || [ "$_type" = "SSH" ] ; then
 		# qubsd_dhcp daemon runs internally to each jail monitoring for new dhcp interfaces
 		mkdir -p ${M_QROOT}/${_client}/tmp > /dev/null 2>&1
+#Not sure if this is needed. Keep as a comment for now in case of issues with dup interfaces 
+#grep -Eqs "$_vif_cl" ${M_QROOT}/${_client}/tmp/qubsd_dhcp.interfaces || \
 		echo "$_vif_cl" >> ${M_QROOT}/${_client}/tmp/qubsd_dhcp.interfaces
 	else
 		# No _gw_ip implies ipv4 is the statically assigned IP in QCONF. Otherwise, rely on _gw_ip
@@ -2069,7 +2071,7 @@ discover_open_ipv4() {
 			*) get_msg -m _e9 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
-	local _client="$1" ; _ip0=10 ; _ip2=1 ; _ip3=${_ip3:=2} ; _subnet=30 ; local _ip_test
+	local _client="$1" ; local _ip0=10 ; local _ip2=1 ; local _ip3=${_ip3:=2} ; local _subnet=30
 
 	# The quBSD IP conventions for various use cases.
 	case "$_type" in
@@ -2084,7 +2086,7 @@ discover_open_ipv4() {
 	get_info _USED_IPS
 	while [ $_ip2 -le 255 ] ; do
 		# Compare against QCONF, and the IPs already in use, including the temp file.
-		_ip_test="${_ip0}.${_ip1}.${_ip2}"
+		local _ip_test="${_ip0}.${_ip1}.${_ip2}"
 		if grep -Fq "$_ip_test" $QCONF || echo "$_USED_IPS" | grep -Fq "$_ip_test" \
 				|| grep -Fqs "$_ip_test" "$_TMP_IP" ; then
 
