@@ -1932,7 +1932,7 @@ chk_valid_x11() {
 connect_client_to_gateway() {
 	# Unified function for connecting two jails.
 		# [-d] Indicates the need for restarting isc-dhcpd in the gateway
-		# [-t] separates SSH (cjail) from NET (regular gateway) 
+		# [-t] separates SSH (cjail) from NET (regular gateway)
 	local _fn="connect_client_to_gateway" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
 	while getopts dqt:V opts ; do case $opts in
@@ -1965,7 +1965,7 @@ connect_client_to_gateway() {
 			_vif_cl=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_gateway}")
 			[ ! "$_cl_cl" = "host" ] \
 				&&  _jexec="jexec -l -U root $_client" && ifconfig $_vif_cl vnet $_client
-			
+
 			# auto (discover_ip) makes no sense for for VM_jail. Assume user intends "it just works"
 			[ "$ipv4" = "auto" ] && ipv4="DHCP"
 			configure_client_network
@@ -2018,8 +2018,8 @@ configure_client_network() {
 		modify_network_files
 	fi
 
-	# If connection is for a client/control pair, make sure client has sshd configured for access 
-	[ "$_type" = "SSH" ] && configure_ssh_control "$_client" "$_gateway" 
+	# If connection is for a client/control pair, make sure client has sshd configured for access
+	[ "$_type" = "SSH" ] && configure_ssh_control "$_client" "$_gateway"
 
 	eval $_R0
 }
@@ -2032,7 +2032,7 @@ configure_gateway_network() {
 		&& _gw_ip="${ipv4%.*/*}.1/${ipv4#*/}" \
 		|| _gw_ip=$(discover_open_ipv4 -g -t "$_type" -- "$_client" "$_gateway")
 
-	# Use _client QCONF MTU, but dont sub the default. If there is none, use gateway lowest MTU 
+	# Use _client QCONF MTU, but dont sub the default. If there is none, use gateway lowest MTU
 	_mtu="${MTU:=$(get_jail_parameter -e MTU $_client)}"
 	_mtu="${_mtu:=$(jexec -l -U root $_gateway ifconfig \
 		| sed -En "s/.*mtu ([^[:blank:]]+)/\1/p" | sort -n | head -1)}"
@@ -2062,7 +2062,7 @@ discover_open_ipv4() {
 	while getopts cgqt:TV opts ; do case $opts in
 			g) _ip3="1" ;;  # [-g] Returns the gateway IP ending in .1, instead of client IP of .2
 			q) _qi="-q" ;;
-			t) local _type="$OPTARG" ;;  
+			t) local _type="$OPTARG" ;;
 			T) # This function is used in IP deconflictin by qb-start. Create TMP file
 				_TMP_IP="${_TMP_IP:=${QTMP}/.qb-start_temp_ip}" ;;
 			V) local _V="-V" ;;
@@ -2075,7 +2075,7 @@ discover_open_ipv4() {
 	case "$_type" in
 		ADHOC) _ip1=88  ; _subnet=29 ;;
 		SSH)   _ip1=255 ;;
-		NET|*) # If the jail has clients, go with 99. Otherwise, it's an endpoint or server  
+		NET|*) # If the jail has clients, go with 99. Otherwise, it's an endpoint or server
 				[ -n "$(get_info -e _CLIENTS $_client)" ] && _ip1=99 \
 					|| { [ -z "${_client##serv-*}" ] && _ip1=128 || _ip1=1 ;} ;;
 	esac
@@ -2088,7 +2088,7 @@ discover_open_ipv4() {
 		if grep -Fq "$_ip_test" $QCONF || echo "$_USED_IPS" | grep -Fq "$_ip_test" \
 				|| grep -Fqs "$_ip_test" "$_TMP_IP" ; then
 
-			# Increment and continue, or return 1 if unable to find an IP in the available range 
+			# Increment and continue, or return 1 if unable to find an IP in the available range
 			_ip2=$(( _ip2 + 1 ))
 			[ $_ip2 -gt 255 ] \
 				&& get_msg $_qi -m _e30 -- "$_client" "${_ip0}.${_ip1}.X.${_ip3}" && eval $_R1
@@ -2109,8 +2109,8 @@ modify_network_files() {
 		&& cp ${M_ZUSR}/${_gateway}/rw/etc/resolv.conf ${M_QROOT}/${_client}/etc > /dev/null 2>&1 \
 		|| cp ${M_QROOT}/${_gateway}/etc/resolv.conf ${M_QROOT}/${_client}/etc > /dev/null 2>&1
 
-	if jexec -l -U root $_client service pf status > /dev/null 2>&1 ; then 
-		# Running gateways might be schg or seclvl=3. Restore flags after ops 
+	if jexec -l -U root $_client service pf status > /dev/null 2>&1 ; then
+		# Running gateways might be schg or seclvl=3. Restore flags after ops
 		local _schg=$(ls -alo ${M_QROOT}/${_client}/etc/pf.conf | awk '{print $5}' | sed -E "s/,.*//")
 		chflags noschg ${M_ZUSR}/${_client}/rw/etc/pf.conf
 		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_intf\"/" ${M_ZUSR}/${_client}/rw/etc/pf.conf
@@ -2118,7 +2118,7 @@ modify_network_files() {
 
 		_schg=$(ls -alo ${M_QROOT}/${_client}/etc/pf_jip.table | awk '{print $5}' | sed -E "s/,.*//")
 		chflags noschg ${M_QROOT}/${_client}/etc/pf_jip.table
-		echo "$_cl_ip" > ${M_QROOT}/${_client}/etc/pf_jip.table 
+		echo "$_cl_ip" > ${M_QROOT}/${_client}/etc/pf_jip.table
 		chflags $_schg ${M_QROOT}/${_client}/etc/pf_jip.table
 
 		# restart || use pfctl
@@ -2127,9 +2127,9 @@ modify_network_files() {
 	else
 		# PF is not running, just bring down flags and change files. Jail's rc will do the rest
 		chflags noschg ${M_QROOT}/${_client}/etc/pf_jip.table
-		echo "$_cl_ip" > ${M_QROOT}/${_client}/etc/pf_jip.table 
+		echo "$_cl_ip" > ${M_QROOT}/${_client}/etc/pf_jip.table
 
-		# NAT can only be done on an interface, necessitating macro'd EXT_IF for non-wg gateways 
+		# NAT can only be done on an interface, necessitating macro'd EXT_IF for non-wg gateways
 		chflags noschg ${M_ZUSR}/${_client}/rw/etc/pf.conf
 		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_intf\"/" ${M_ZUSR}/${_client}/rw/etc/pf.conf
 	fi
@@ -2145,7 +2145,7 @@ remove_interface() {
 	local _fn="remove_interface" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
 	while getopts d opts ; do case $opts in
-		d) local _action="destroy" ;; 
+		d) local _action="destroy" ;;
 		*) get_msg -m _e9 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
@@ -2153,7 +2153,7 @@ remove_interface() {
 	local _intf="$1"  ;  local _jail="$2" ; local _action="${_action:=down}"
 
 	if ifconfig "$_intf" > /dev/null 2>&1 ; then
-		# First check if it's already on host 
+		# First check if it's already on host
 		ifconfig "$_intf" $_action
 
 	elif [ -n "$_jail" ] && jexec -l -U root $_jail ifconfig -l | grep -Eqs "$_intf" ; then
@@ -2170,9 +2170,9 @@ remove_interface() {
 		done
 	fi
 
-	# Keep tracking files in a state consistent with availability of taps/epairs 
+	# Keep tracking files in a state consistent with availability of taps/epairs
 	(modify_intf_trackers $_intf $_jail &)
-	eval $_R0	
+	eval $_R0
 }
 
 modify_intf_trackers() {
@@ -2187,7 +2187,7 @@ modify_intf_trackers() {
 	sed -i '' -E "/${_intf%?}.b([[:blank:]]+|\$)/d" /qubsd/${_jail}/tmp/qubsd_dhcp > /dev/null 2>&1
 
 	# Simultaneous stops can race for the control_netmap file. Use a .lock and loop to manage it.
-	while : ; do 
+	while : ; do
 		# If the file is available, lock it, modify it, unlock it, break
 		if [ ! -f "${QTMP}/.control_netmap.lock" ] ; then
 			touch "${QTMP}/.control_netmap.lock"
@@ -2195,8 +2195,8 @@ modify_intf_trackers() {
 			rm "${QTMP}/.control_netmap.lock"
 			break
 		fi
-		# Dont let the loop go infinitely on host. Something went wrong if 30secs and no unlock 
-		[ "$(date +%-s)" -gt "$(( _start + 30 ))" ] && break 
+		# Dont let the loop go infinitely on host. Something went wrong if 30secs and no unlock
+		[ "$(date +%-s)" -gt "$(( _start + 30 ))" ] && break
 		sleep 0.5
 	done
 	eval $_R0
@@ -2223,8 +2223,8 @@ cleanup_vm() {
 	[ -z "$_VM" ] && get_msg $_qcv -m _e0 && eval $_R1
 
 	# Bring all recorded taps back to host, and destroy. Skip checks for speed (non-essential)
-	local _ct=$(get_jail_parameter -des CONTROL $_VM)	
-	local _gw=$(get_jail_parameter -des GATEWAY $_VM)	
+	local _ct=$(get_jail_parameter -des CONTROL $_VM)
+	local _gw=$(get_jail_parameter -des GATEWAY $_VM)
 	for _tap in $(sed -E 's/ .*$//' "${QTMP}/vmtaps_${_VM}" 2> /dev/null) ; do
 			grep -Eqs "$_tap SSH" && _gw="$_ct" || unset _gw
 			grep -Eqs "$_tap NET" && _gw="$_gw" || unset _gw
@@ -2545,11 +2545,11 @@ finish_vm_connections() {
 		[ "$_count" -ge 15 ] && get_msg -m _e4_2 -- "$_VM" && eval $_R1
 	done
 
-	# Connect to control jail and gateway 
+	# Connect to control jail and gateway
 	connect_client_to_gateway -dt NET -- "$_VM" "$_gateway" > /dev/null
 	connect_client_to_gateway -dt SSH -- "$_VM" "$_control" > /dev/null
 
-	# Connect VM to all of it's clients (if there are any 
+	# Connect VM to all of it's clients (if there are any
 	for _cli in $(get_info -e _CLIENTS "$_VM") ; do
 		chk_isrunning "$_cli" && connect_client_to_gateway "$_cli" "$JAIL"
 	done
