@@ -14,17 +14,17 @@ Streamlined configuration/editing:
 - create/destroy/rename/edit/list
 
 ### Security Schema
-*Rootjails* maintain a pristine root environment for launching appjails.   
-*Appjails* clone a designated rootjail at every start, destroyed at shutdown.   
+***Rootjails*** maintain a pristine root environment for launching appjails.   
+***Appjails*** clone a designated rootjail at every start, destroyed at shutdown.   
 &nbsp;&nbsp;- Persistent /home directory lives in a separate zfs dataset   
 &nbsp;&nbsp;- Can specify persistent system files like rc.conf, pwd.db, pf.conf, etc ...   
-*Dispjails* have no persistent data. Completely destroyed at jail shutdown.   
-*Ephemeral* jails clone the exact state of a running jail.   
+***Dispjails*** have no persistent data. Completely destroyed at jail shutdown.   
+***Ephemeral*** jails clone the exact state of a running jail.   
 &nbsp;&nbsp;- Open untrusted files/attachments    
 &nbsp;&nbsp;- Test experimental operations on a clone, before performing in appjail   
-*RootVMs* maintain a pristine root environment on which to base appVMs.   
-*AppVMs* clone a designated rootVM same as appjail, with persistent /home.   
-*DispVMs* No persistent data. Completely destroyed upon VM shutdown.   
+***RootVMs*** maintain a pristine root environment on which to base appVMs.   
+***AppVMs*** clone a designated rootVM same as appjail, with persistent /home.   
+***DispVMs*** No persistent data. Completely destroyed upon VM shutdown.   
 
 Host remains offline, except for updates.    
 Physical network card and USBs are isolated in VMs (nicvm and usbvm)
@@ -35,4 +35,4 @@ i3wm integration (still usable with other window managers)
 Control jail is used with ssh for file transfers between VMs.
 
 ### Install to host
-`pkg install qubsd`
+NOTE: NOT READY YET, NOT ADDED TO PORTS `pkg install qubsd`
