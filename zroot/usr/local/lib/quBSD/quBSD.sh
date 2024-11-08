@@ -2183,7 +2183,7 @@ modify_intf_trackers() {
 	[ -f "${QTMP}/vmtaps_${_VM}" ] && rm "${QTMP}/vmtaps_${_VM}"
 
 	# Make sure the interface is removed from jail-internal qubsd_dhcp daemon
-	sed -i '' -E "/${_intf}([[:blank:]]+|\$)/d" /qubsd/${_jail}/tmp/qubsd_dhcp > /dev/null 2>&1
+	sed -i '' -E "/${_intf%?}.b([[:blank:]]+|\$)/d" /qubsd/${_jail}/tmp/qubsd_dhcp > /dev/null 2>&1
 
 	# Simultaneous stops can race for the control_netmap file. Use a .lock and loop to manage it.
 	while : ; do 
