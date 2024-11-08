@@ -1,14 +1,13 @@
 #!/bin/sh
-# Cleanly remove and destroy epairs before shutdown
 
 . /usr/local/lib/quBSD/quBSD.sh
-JAIL="$1"
 
+JAIL="$1"
 get_global_variables
 
 # Record stop attempt to log file
 echo "$(date "+%Y-%m-%d_%H:%M") exec-prestop: STOPPING: $JAIL" >> ${QBLOG} ${QBLOG}_$JAIL
-#setlog2
+
 # Remove interfaces and handle files modification for those interfaces 
 INTFS=$(jexec -l -U root $JAIL ifconfig -g tap ; jexec -l -U root $JAIL ifconfig -g epair)
 for _intf in $INTFS; do
