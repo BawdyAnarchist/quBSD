@@ -22,6 +22,7 @@ roots
 	mkdir /usr/local/bin && cp qubsd_dhcp
 	mkdir /usr/local/etc/rc.d && cp qubsd_dhcp
 	/etc/rc.conf qubsd_dhcp_enable="YES"
+	touch /qubsd/0base/etc/resolv.conf
 	
 
 
