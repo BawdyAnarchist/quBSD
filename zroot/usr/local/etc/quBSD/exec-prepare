@@ -24,8 +24,8 @@ preparation_actions() {
 	# The control jail should always be on. The function will return immediately if already on
 	[ ! "$CLASS" = "cjail" ] && start_jail "$CONTROL"
 
-	# Prefer to start gateways here; as jail.conf dependencies can limit versatility
-	start_jail "$GATEWAY"
+	# MUST redirect to null, otherwise VM here will hang the script .. coz .. file descriptors?
+	start_jail "$GATEWAY" > /dev/null 2>&1
 
 	# Double check to unmount any parts of <jail> before destroy/recreating the dataset
 	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
