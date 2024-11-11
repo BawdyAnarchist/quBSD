@@ -1,4 +1,11 @@
 
+timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
+
+control_netmap is in fact failing to have epairs and such removed, well at least with qb-stop.
+
+when shutting down social:
+	/etc/rc.shutdown: WARNING: $qubsd_dhcp_enable is not set properly - see rc.conf(5).
+
 zfs decryption wasnt working quite right. I need to recheck it
 
 When back on normal setup, fix the i3gen.conf to match QubesTricks
@@ -86,6 +93,7 @@ qb-connect
 qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
 
 qb-create
+	- [-z dupl] still needs to create and copy the fstab of the template jail, and maybe the rc.conf too. 
 	- It needs further and more extensive testing 
 	- -z dirs recreated files too, not just directories
 	- qb-create removal of achi-hd might not be working. I dunno I changed it to hd so maybe that was why
