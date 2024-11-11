@@ -2010,7 +2010,7 @@ configure_client_network() {
 	else
 		# No _gw_ip implies ipv4 is the statically assigned IP in QCONF. Otherwise, rely on _gw_ip
 		[ -z "$_gw_ip" ] && _cl_ip="$ipv4" || _cl_ip="${_gw_ip%.*/*}.2/${_gw_ip#*/}"
-		_mtu="${_mtu:=$(get_jail_parameter -de MTU $_client)}"
+		_mtu="${_mtu:=$(get_jail_parameter -dez MTU $_client)}"
 
 		# Add the IP and default route
 		eval $_jexec ifconfig $_vif_cl inet $_cl_ip mtu $_mtu up
@@ -2035,7 +2035,7 @@ configure_gateway_network() {
 		|| _gw_ip=$(discover_open_ipv4 -g -t "$_type" -- "$_client" "$_gateway")
 
 	# Use _client QCONF MTU, but dont sub the default. If there is none, use gateway lowest MTU
-	_mtu="${MTU:=$(get_jail_parameter -e MTU $_client)}"
+	_mtu="${MTU:=$(get_jail_parameter -ez MTU $_client)}"
 	_mtu="${_mtu:=$(jexec -l -U root $_gateway ifconfig \
 		| sed -En "s/.*mtu ([^[:blank:]]+)/\1/p" | sort -n | head -1)}"
 
@@ -2046,7 +2046,7 @@ configure_gateway_network() {
 	# If dhcpd is running, restart it (otherwise it'll start on its own later)
 	[ -n "$_dhcp" ] && jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
 
-	[ "$_type" = "SSH" ] && echo "$_client $_vif_cl ${_gw_ip%%/*}" >> ${QTMP}/control_netmap
+	[ "$_type" = "SSH" ] && echo "$_client $_vif_gw ${_gw_ip%%/*}" >> ${QTMP}/control_netmap
 	eval $_R0
 }
 
@@ -2185,7 +2185,7 @@ modify_intf_trackers() {
 	# Remove the taps tracker file if it exists
 	[ -f "${QTMP}/vmtaps_${_VM}" ] && rm "${QTMP}/vmtaps_${_VM}"
 
-	# Make sure the interface is removed from jail-internal qubsd_dhcp daemon
+	# Remove interface from jail-internal qubsd_dhcp daemon
 	sed -i '' -E "/${_intf%?}.b([[:blank:]]+|\$)/d" /qubsd/${_jail}/tmp/qubsd_dhcp > /dev/null 2>&1
 
 	# Simultaneous stops can race for the control_netmap file. Use a .lock and loop to manage it.
@@ -2193,7 +2193,7 @@ modify_intf_trackers() {
 		# If the file is available, lock it, modify it, unlock it, break
 		if [ ! -f "${QTMP}/.control_netmap.lock" ] ; then
 			touch "${QTMP}/.control_netmap.lock"
-			sed -i '' -E "/(^|[[:blank:]]+)${_intf}($|[[:blank:]]+)/d" ${QTMP}/control_netmap
+			sed -i '' -E "/(^|[[:blank:]]+)${_intf}(\$|[[:blank:]]+)/d" ${QTMP}/control_netmap
 			rm "${QTMP}/.control_netmap.lock"
 			break
 		fi
@@ -2626,6 +2626,11 @@ setlog2() {
 	set -x
 	rm /root/debug2 > /dev/null 2>&1
 	exec > /root/debug2 2>&1
+}
+setlog3() {
+	set -x
+	rm /root/debug3 > /dev/null 2>&1
+	exec > /root/debug3 2>&1
 }
 
 
