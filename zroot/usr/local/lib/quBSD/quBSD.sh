@@ -2113,7 +2113,6 @@ modify_network_files() {
 		# Running gateways might be schg or seclvl=3. Restore flags after ops
 		local _schg=$(ls -alo ${M_QROOT}/${_client}/etc/pf.conf | awk '{print $5}' | sed -E "s/,.*//")
 		chflags noschg ${M_ZUSR}/${_client}/rw/etc/pf.conf
-echo 1: $gateway $client $_vif_cl
 		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_vif_cl\"/" ${M_ZUSR}/${_client}/rw/etc/pf.conf
 		chflags $_schg ${M_ZUSR}/${_client}/rw/etc/pf.conf
 
@@ -2132,7 +2131,6 @@ echo 1: $gateway $client $_vif_cl
 
 		# NAT can only be done on an interface, necessitating macro'd EXT_IF for non-wg gateways
 		chflags noschg ${M_ZUSR}/${_client}/rw/etc/pf.conf
-echo 2: $gateway $client $_vif_cl
 		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_vif_cl\"/" ${M_ZUSR}/${_client}/rw/etc/pf.conf
 	fi
 
