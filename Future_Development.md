@@ -1,7 +1,7 @@
 
-timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
+Simultaneous jail starts cause multiple dhcp restarts, and I think hangs some of the interfaces permanently in the gateway until restared 
 
-control_netmap is in fact failing to have epairs and such removed, well at least with qb-stop.
+timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
 
 when shutting down social:
 	/etc/rc.shutdown: WARNING: $qubsd_dhcp_enable is not set properly - see rc.conf(5).
