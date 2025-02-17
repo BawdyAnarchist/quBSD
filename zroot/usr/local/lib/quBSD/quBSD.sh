@@ -2015,13 +2015,11 @@ configure_client_network() {
 		# Add the IP and default route
 		eval $_jexec ifconfig $_vif_cl inet $_cl_ip mtu $_mtu up
 		eval $_jexec route add default "${_cl_ip%.*/*}.1" > /dev/null 2>&1
-
-		# pf control and resolv.conf
-		modify_network_files
 	fi
 
-	# If connection is for a client/control pair, make sure client has sshd configured for access
-	[ "$_type" = "SSH" ] && configure_ssh_control "$_client" "$_gateway"
+	# If connection is control/client, client needs sshd. Non ssh (gateway/client), modify files 
+	[ "$_type" = "SSH" ] && configure_ssh_control "$_client" "$_gateway" \
+		|| modify_network_files
 
 	eval $_R0
 }
@@ -2115,7 +2113,8 @@ modify_network_files() {
 		# Running gateways might be schg or seclvl=3. Restore flags after ops
 		local _schg=$(ls -alo ${M_QROOT}/${_client}/etc/pf.conf | awk '{print $5}' | sed -E "s/,.*//")
 		chflags noschg ${M_ZUSR}/${_client}/rw/etc/pf.conf
-		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_intf\"/" ${M_ZUSR}/${_client}/rw/etc/pf.conf
+echo 1: $gateway $client $_vif_cl
+		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_vif_cl\"/" ${M_ZUSR}/${_client}/rw/etc/pf.conf
 		chflags $_schg ${M_ZUSR}/${_client}/rw/etc/pf.conf
 
 		_schg=$(ls -alo ${M_QROOT}/${_client}/etc/pf_jip.table | awk '{print $5}' | sed -E "s/,.*//")
@@ -2133,7 +2132,8 @@ modify_network_files() {
 
 		# NAT can only be done on an interface, necessitating macro'd EXT_IF for non-wg gateways
 		chflags noschg ${M_ZUSR}/${_client}/rw/etc/pf.conf
-		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_intf\"/" ${M_ZUSR}/${_client}/rw/etc/pf.conf
+echo 2: $gateway $client $_vif_cl
+		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_vif_cl\"/" ${M_ZUSR}/${_client}/rw/etc/pf.conf
 	fi
 
 	# Reload wireguard if it's running
