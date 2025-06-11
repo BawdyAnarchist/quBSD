@@ -47,12 +47,7 @@ get_stat_variables() {
 	mic=$(service virtual_oss onestatus | grep -o "virtual_oss is running")
 
 	# Host connected
-	interfaces=$(ifconfig -l | sed "s/lo0//g")
-	[ -z "$interfaces" ] && hostnet=""
-
-	for _intf in $interfaces ; do
-		$(ifconfig $_intf inet | grep -Eqs "^[[:blank:]]*inet") && hostnet="true" || hostnet=""
-	done
+	pfctl -s rules | grep -Eqs "anchor.*ntp_only" || hostnet=true
 }
 
 get_jails_loop() {

@@ -1,7 +1,25 @@
 
-Simultaneous jail starts cause multiple dhcp restarts, and I think hangs some of the interfaces permanently in the gateway until restared 
+NTP PLAN
+  host: $jmap/pf.conf - allow udp port 123 ;;  rc.conf - ntpd at boot
 
-timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
+  script corrections
+    "host is network connected" - only when pf_pass is loaded - Use the anchor
+  installer
+    add ntp.conf to the proper location, and change the rc.conf 
+    update the jmap/pf.conf with the upd 123 permission 
+
+
+# NEW June 2025
+  A single zusr dataset is hardset but .. why?? Just make it another parameter to know where to look for the jail. I thought I might need a separate ssd, vdev, zpool, but couldnt integrate it properly. All jails' zusr data should be able to exist anywhere. Probably same with zroot/qubsd
+
+  You also need to constrain the memory and CPU that the jails "see." Because the faggots who make browsers and programs are fat fucking swine who will consume resources that you tell them exist. This might no shit require a kernel change to intercept the sysctl call for jails.
+/END NEW
+
+qb-edit - < GATEWAY > isnt valid for CLASS: host. Valid params are:
+
+TIMEOUT overhaul - timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
+
+Simultaneous jail starts cause multiple dhcp restarts, and I think hangs some of the interfaces permanently in the gateway until restared 
 
 when shutting down social:
 	/etc/rc.shutdown: WARNING: $qubsd_dhcp_enable is not set properly - see rc.conf(5).
@@ -14,6 +32,8 @@ qb-start
 	- Needs updated with new networking functions in mind
 	- Simultaneous starts of clients could mess up wireguard restarting
 
+You still have never successfully finished the automated networking problems when a gateway turns off/on and reconnects many separate clients
+
 
 ### INSTALLER SCRIPT CHANGES ###
 roots
@@ -24,14 +44,6 @@ roots
 	dbus added to host when GUI option is selected 
 
 rc.conf -nmdm cuse , I dont know if I need them or what for
-
-ntpd - ongoing
-	1. Modified /etc/ntp.conf
-	2. Modified qb-hostnet -c to copy /var/db/ntpd.drift from net-firewall
-	3. Modified net-firewall rc.conf to enable ntp 
-	# still need to modify firwall pf
-	# installer should modify ntp.conf of host, or replace with its own
-	# had a problem with schg and seclvl of firewall when launching ntp
 
 Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
 generalize the schg to being able to list specific files, and not my preselected ones. Overall pf and everything needs examined/revised
@@ -47,7 +59,6 @@ There is some question now as to the dispjails and their templates, and the devf
 
 ### UPGRADES
 
-PUT XORG and i3 in a jail - At least try it. Might work?
 
 CREATE MANPAGES:  /usr/local/man/man1/qb-scripts
 	- Replaces /share/quBSD
@@ -128,8 +139,8 @@ ALL file names should ALWAYS be variables defined in get_global_variables
 0control qb-copy is SLOW af alot of times
 
 /etc/devfs.rules
-	- I probably have the mixer being added, but jails don't need it.
-	- the new one for webcam
+  - I probably have the mixer being added, but jails don't need it.
+  - the new one for webcam
 
 Take another hack at the recording device problems
 
@@ -137,8 +148,6 @@ Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file a
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
 
 Crons - No crons running. Probably something long term security that should be integrated and automated.
-
-qme-firefox needs fixed (personal note)
 
 I think `jail` caches fstab before completion of exec.prepare which edits it. Need to prove/submit bug. Need dtrace
 
@@ -148,3 +157,8 @@ I think `jail` caches fstab before completion of exec.prepare which edits it. Ne
 This was a comment on 0net in the installer, but maybe it's old by now. Delete this line if there's no problems later
 # ??change /rc.d/wireguard to remove the kldunload??
 
+
+### FAILURES - DO NOT TRY AGAIN
+
+PUT XORG and i3 in a jail
+  - Sounds nice, but after you launch X11, you're permanently in the jail.

@@ -1133,7 +1133,7 @@ chk_isrunning() {
 	# Return 0 if jail/VM is running; return 1 if not.
 	local _jail="$1"
 	[ -z "$_jail" ] && return 1
-
+   [ "$_jail" = "host" ] && return 0
 	jls -j "$1" > /dev/null 2>&1  && return 0
 	pgrep -xqf "bhyve: $_jail" > /dev/null 2>&1  && return 0
 
@@ -1935,8 +1935,9 @@ connect_client_to_gateway() {
 		# [-t] separates SSH (cjail) from NET (regular gateway)
 	local _fn="connect_client_to_gateway" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
-	while getopts dqt:V opts ; do case $opts in
+	while getopts di:qt:V opts ; do case $opts in
 		d) local _dhcp='true' ;;
+		i) local  ipv4="$OPTARG";;
 		q) local _q='-q' ;;
 		t) local _type="$OPTARG" ; _t="-t";;
 		V) local _V="-V" ;;
@@ -1956,7 +1957,7 @@ connect_client_to_gateway() {
 	_cl_gw=$(get_jail_parameter -e CLASS $_gateway)
 
 	# Further resolution for quBSD IP assignment.
-	local ipv4=$(get_jail_parameter -de IPV4 $_client)
+	[ -z "$ipv4" ] && local ipv4=$(get_jail_parameter -de IPV4 $_client)
 
 	# Handle various VM/jail gateway/client combos
 	case "${_cl_gw}_${_cl_cl}" in
@@ -1978,8 +1979,9 @@ connect_client_to_gateway() {
 			# Get create/assign epairs and manage jail vs host client
 			_vif_gw=$(ifconfig epair create)
 			_vif_cl="${_vif_gw%?}b"
-			[ ! "$_cl_cl" = "host" ] \
-				&&  _jexec="jexec -l -U root $_client" && ifconfig $_vif_cl vnet $_client
+
+			[ "$_cl_cl" = "host" ] && unset _jexec \
+				||  _jexec="jexec -l -U root $_client" && ifconfig $_vif_cl vnet $_client
 
 			configure_gateway_network
 			configure_client_network

@@ -70,18 +70,16 @@ main() {
 	# Terminate any other instances of qb-hostnet that might be running (waiting for TIMEOUT)
 	pkill -f '/bin/sh /usr/local/bin/qb-hostnet'
 
-	# Remove all interfaces, to ensure that host network is in a known good state
-	connection_down
-
-	# Bring up host network connection
 	if [ "$_CMD" = "up" ] ; then
-		# Start the gateway, connect host, modify pf 
-		start_jail "$GATEWAY" ||  get_msg2 -Em _e3
-		connect_client_to_gateway "host" "$GATEWAY"
+		# Start gateway, modify pf 
+		start_jail "$GATEWAY" || get_msg2 -Em _e3
 		pfctl -f $PF_PASS 
-
 		# Loop until specified timeout, then revert connection
 		revert_connection &
+
+	elif [ "$_CMD" = "down" ] ; then
+		# Set pf to the restrictive file
+		pfctl -f $PF_BLOCK
 	fi
 }
 
