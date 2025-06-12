@@ -1,14 +1,4 @@
 
-NTP PLAN
-  host: $jmap/pf.conf - allow udp port 123 ;;  rc.conf - ntpd at boot
-
-  script corrections
-    "host is network connected" - only when pf_pass is loaded - Use the anchor
-  installer
-    add ntp.conf to the proper location, and change the rc.conf 
-    update the jmap/pf.conf with the upd 123 permission 
-
-
 # NEW June 2025
   A single zusr dataset is hardset but .. why?? Just make it another parameter to know where to look for the jail. I thought I might need a separate ssd, vdev, zpool, but couldnt integrate it properly. All jails' zusr data should be able to exist anywhere. Probably same with zroot/qubsd
 
@@ -19,7 +9,7 @@ qb-edit - < GATEWAY > isnt valid for CLASS: host. Valid params are:
 
 TIMEOUT overhaul - timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
 
-Simultaneous jail starts cause multiple dhcp restarts, and I think hangs some of the interfaces permanently in the gateway until restared 
+Simultaneous jail starts cause multiple dhcp restarts and other services, and I think hangs some of the interfaces permanently in the gateway until restared 
 
 when shutting down social:
 	/etc/rc.shutdown: WARNING: $qubsd_dhcp_enable is not set properly - see rc.conf(5).

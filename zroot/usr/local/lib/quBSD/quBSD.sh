@@ -827,33 +827,30 @@ configure_ssh_control() {
 	# In the case of a restart of the control jail, use [-f] to make sure flags are restored
 
 	getopts f _opts && local _flags="true" && shift
-	local _client="$1"
-	local _control="$2"
+	local _client="$1" ; local _control="$2"
+	local _chome="${M_QROOT}/${_client}/home/${_client}" ; local _croot="${M_QROOT}/${_client}/root"
 
 	# Lift flags for edits, create the .ssh directory if not there, and copy the files
-	chflags -R noschg ${M_QROOT}/${_client}/root
-	[ ! -d "${M_QROOT}/${_client}/root/.ssh" ] && mkdir ${M_QROOT}/${_client}/root/.ssh
-	cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub ${M_QROOT}/${_client}/root/.ssh/authorized_keys
+	chflags -R noschg ${_croot}
+	[ ! -d "${_croot}/.ssh" ] && mkdir ${_croot}/.ssh
+	cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub ${_croot}/.ssh/authorized_keys
 
 	# Change ownership and permissions of all files, then bring up flags
-	chmod 700 ${M_QROOT}/${_client}/root/.ssh
-	chmod 600 ${M_QROOT}/${_client}/root/.ssh/authorized_keys
-	chflags -R schg ${M_QROOT}/${_client}/root/.ssh
+	chmod 700 ${_croot}/.ssh
+	chmod 600 ${_croot}/.ssh/authorized_keys
+	chflags -R schg ${_croot}/.ssh
 
 	# Repeat all the same steps if there is an unprivileged user
-	if [ -d "${M_QROOT}/${_client}/home/${_client}" ] ; then
+	if [ -d "${_chome}" ] ; then
+		chflags -R noschg ${_chome}
+		[ ! -d "${_chome}/.ssh" ] && mkdir ${_chome}/.ssh
+		chflags -R noschg ${_chome}/.ssh
+		cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub ${_chome}/.ssh/authorized_keys
 
-		chflags -R noschg ${M_QROOT}/${_client}/home/${_client}
-		[ ! -d "${M_QROOT}/${_client}/home/${_client}/.ssh" ] \
-			&& mkdir ${M_QROOT}/${_client}/home/${_client}/.ssh
-		chflags -R noschg ${M_QROOT}/${_client}/home/${_client}/.ssh
-		cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub \
-			${M_QROOT}/${_client}/home/${_client}/.ssh/authorized_keys
-
-		chmod 700 ${M_QROOT}/${_client}/home/${_client}/.ssh
-		chmod 600 ${M_QROOT}/${_client}/home/${_client}/.ssh/authorized_keys
-		chown -R 1001:1001 ${M_QROOT}/${_client}/home/${_client}/.ssh
-		chflags -R schg ${M_QROOT}/${_client}/home/${_client}/.ssh
+		chmod 700 ${_chome}/.ssh
+		chmod 600 ${_chome}/.ssh/authorized_keys
+		chown -R 1001:1001 ${_chome}/.ssh
+		chflags -R schg ${_chome}/.ssh
 	fi
 
 	[ "$_flags" ] && /usr/local/bin/qb-flags -r $_client &
@@ -1932,13 +1929,17 @@ chk_valid_x11() {
 connect_client_to_gateway() {
 	# Unified function for connecting two jails.
 		# [-d] Indicates the need for restarting isc-dhcpd in the gateway
+		# [-i] Provide an exact IPV4 address
+		# [-q] Quiet error message
+		# [-s] Suppress services restart (for gateways with multiple clients
 		# [-t] separates SSH (cjail) from NET (regular gateway)
 	local _fn="connect_client_to_gateway" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
-	while getopts di:qt:V opts ; do case $opts in
-		d) local _dhcp='true' ;;
+	while getopts di:qst:V opts ; do case $opts in
+		d) local _d='true' ;;
 		i) local  ipv4="$OPTARG";;
 		q) local _q='-q' ;;
+		s) local _s='-s' ;;
 		t) local _type="$OPTARG" ; _t="-t";;
 		V) local _V="-V" ;;
 		*) get_msg -m _e9 ;;
@@ -1969,26 +1970,30 @@ connect_client_to_gateway() {
 
 			# auto (discover_ip) makes no sense for for VM_jail. Assume user intends "it just works"
 			[ "$ipv4" = "auto" ] && ipv4="DHCP"
-			configure_client_network
+			local _flags=$(configure_client_network) && _w="-w"
 		;;
 		*jail_*VM) # Assume client VM is always using DHCP
 			_vif_gw=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_client}")
-			configure_gateway_network
+			configure_gateway_network && [ -n "$_dhcp" ] && _D="-D"
 		;;
 		*jail_*jail|*jail_host) # Order matters. DHCP clients expect an already configured gateway
 			# Get create/assign epairs and manage jail vs host client
 			_vif_gw=$(ifconfig epair create)
 			_vif_cl="${_vif_gw%?}b"
+			[ "$_cl_cl" = "host" ] && unset _jexec ||  _jexec="jexec -l -U root $_client"
 
-			[ "$_cl_cl" = "host" ] && unset _jexec \
-				||  _jexec="jexec -l -U root $_client" && ifconfig $_vif_cl vnet $_client
-
-			configure_gateway_network
-			configure_client_network
+			ifconfig $_vif_cl vnet $_client
+			configure_gateway_network && [ -n "$_d" ] && _D="-D"
+			local _flags=$(configure_client_network) && _w="-w"
 		;;
 		*VM_*VM) # Future expansion, create promisc bridge in net-firewall and connect vifs
 		;;
 	esac
+
+	# Coordinated services restart
+	_p="${_flags%:*}" ; _cl_ip="${_flags#:*}"
+	restart_services $_D $_p $_q $_s $_V $_w "$_cl_ip"
+
 	eval $_R0
 }
 
@@ -2006,7 +2011,7 @@ configure_client_network() {
 	if [ "$ipv4" = "DHCP" ] || [ "$_type" = "SSH" ] ; then
 		# qubsd_dhcp daemon runs internally to each jail monitoring for new dhcp interfaces
 		mkdir -p ${M_QROOT}/${_client}/tmp > /dev/null 2>&1
-#Not sure if this is needed. Keep as a comment for now in case of issues with dup interfaces 
+#Not sure if this is needed. Keep as a comment for now in case of issues with dup interfaces
 #grep -Eqs "$_vif_cl" ${M_QROOT}/${_client}/tmp/qubsd_dhcp.interfaces || \
 		echo "$_vif_cl" >> ${M_QROOT}/${_client}/tmp/qubsd_dhcp.interfaces
 	else
@@ -2019,10 +2024,12 @@ configure_client_network() {
 		eval $_jexec route add default "${_cl_ip%.*/*}.1" > /dev/null 2>&1
 	fi
 
-	# If connection is control/client, client needs sshd. Non ssh (gateway/client), modify files 
-	[ "$_type" = "SSH" ] && configure_ssh_control "$_client" "$_gateway" \
-		|| modify_network_files
+	# If connection is control/client, client needs sshd. Non ssh (gateway/client), modify files
+	[ "$_type" = "SSH" ] \
+		&& configure_ssh_control "$_client" "$_gateway" \
+		|| local _flags=$(modify_network_files)
 
+	echo $_flags
 	eval $_R0
 }
 
@@ -2042,9 +2049,6 @@ configure_gateway_network() {
 	# Configure the interface
 	ifconfig $_vif_gw vnet $_gateway
 	jexec -l -U root $_gateway ifconfig $_vif_gw inet $_gw_ip mtu $_mtu up
-
-	# If dhcpd is running, restart it (otherwise it'll start on its own later)
-	[ -n "$_dhcp" ] && jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
 
 	[ "$_type" = "SSH" ] && echo "$_client $_vif_gw ${_gw_ip%%/*}" >> ${QTMP}/control_netmap
 	eval $_R0
@@ -2104,41 +2108,70 @@ discover_open_ipv4() {
 
 modify_network_files() {
 	local _fn="modify_network_files" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+	local _etc_root="${M_QROOT}/${_client}/etc" ; local _etc_zusr="${M_ZUSR}/${_client}/rw/etc"
 	[ "$_cl_cl" = "host" ] && eval $_R0
 
 	# If _gateway is a VM, this will silently fail
-	[ ! -e "${M_ZUSR}/${_client}/rw/etc/resolv.conf" ] \
-		&& cp ${M_ZUSR}/${_gateway}/rw/etc/resolv.conf ${M_QROOT}/${_client}/etc > /dev/null 2>&1 \
-		|| cp ${M_QROOT}/${_gateway}/etc/resolv.conf ${M_QROOT}/${_client}/etc > /dev/null 2>&1
+	[ ! -e "${_etc_zusr}/resolv.conf" ] \
+		&& cp ${M_ZUSR}/${_gateway}/rw/etc/resolv.conf ${_etc_root} > /dev/null 2>&1 \
+		|| cp ${M_QROOT}/${_gateway}/etc/resolv.conf ${_etc_root} > /dev/null 2>&1
 
 	if jexec -l -U root $_client service pf status > /dev/null 2>&1 ; then
 		# Running gateways might be schg or seclvl=3. Restore flags after ops
-		local _schg=$(ls -alo ${M_QROOT}/${_client}/etc/pf.conf | awk '{print $5}' | sed -E "s/,.*//")
-		chflags noschg ${M_ZUSR}/${_client}/rw/etc/pf.conf
-		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_vif_cl\"/" ${M_ZUSR}/${_client}/rw/etc/pf.conf
-		chflags $_schg ${M_ZUSR}/${_client}/rw/etc/pf.conf
+		local _schg=$(ls -alo ${_etc_root}/pf.conf | awk '{print $5}' | sed -E "s/,.*//")
+		chflags noschg ${_etc_zusr}/pf.conf
+		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_vif_cl\"/" ${_etc_zusr}/pf.conf
+		chflags $_schg ${_etc_zusr}/pf.conf
 
-		_schg=$(ls -alo ${M_QROOT}/${_client}/etc/pf_jip.table | awk '{print $5}' | sed -E "s/,.*//")
-		chflags noschg ${M_QROOT}/${_client}/etc/pf_jip.table
-		echo "$_cl_ip" > ${M_QROOT}/${_client}/etc/pf_jip.table
-		chflags $_schg ${M_QROOT}/${_client}/etc/pf_jip.table
+		_schg=$(ls -alo ${_etc_root}/pf_jip.table | awk '{print $5}' | sed -E "s/,.*//")
+		chflags noschg ${_etc_root}/pf_jip.table
+		echo "$_cl_ip" > ${_etc_root}/pf_jip.table
+		chflags $_schg ${_etc_root}/pf_jip.table
 
-		# restart || use pfctl
-		jexec -l -U root $_client service pf restart > /dev/null 2>&1 \
-			|| jexec -l -U root $_client pfctl -t JIP -T replace $_cl_ip > /dev/null 2>&1
+		# Propagates to connect_client, then passes as option to restart_services
+		echo "-p:${_cl_ip}"
 	else
 		# PF is not running, just bring down flags and change files. Jail's rc will do the rest
-		chflags noschg ${M_QROOT}/${_client}/etc/pf_jip.table
-		echo "$_cl_ip" > ${M_QROOT}/${_client}/etc/pf_jip.table
+      [ -e "${_etc_root}/pf_jip.table" ] \
+			&& chflags noschg ${_etc_root}/pf_jip.table \
+			&& echo "$_cl_ip" > ${_etc_root}/pf_jip.table
 
 		# NAT can only be done on an interface, necessitating macro'd EXT_IF for non-wg gateways
-		chflags noschg ${M_ZUSR}/${_client}/rw/etc/pf.conf
-		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_vif_cl\"/" ${M_ZUSR}/${_client}/rw/etc/pf.conf
+		[ -e "${_etc_zusr}/pf.conf" ] \
+			&& chflags noschg ${_etc_zusr}/pf.conf \
+			&& sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_vif_cl\"/" ${_etc_zusr}/pf.conf
+	fi
+	eval $_R0
+}
+
+restart_services() {
+	local _fn="restart_services" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	while getopts DqsVw _opts ; do case $_opts in
+		D) local _dhcp='true' ;;
+		p) local _pf='true' ;;
+		q) local _q='-q' ;;
+		s) local _skip='true' ;;
+		V) local _V="-V" ;;
+		w) local _wireguard='true' ;;
+	esac ; done ; shift $(( OPTIND - 1))
+
+	[ -z "$_skip" ] || eval $_R0
+
+	# If dhcpd is running, restart it (otherwise it'll start on its own later)
+	[ -n "$_dhcp" ] && jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
+
+	# restart || use pfctl (depends on seclvl of the jail)
+	if [ -n "$_pf" ] && ! jexec -l -U root $_client service pf restart > /dev/null 2>&1 ; then
+		local _ip="$1"
+		[ -n "$_ip" ] && jexec -l -U root $_client pfctl -t JIP -T replace $_ip > /dev/null 2>&1
 	fi
 
 	# Reload wireguard if it's running
-	jexec -l -U root $_client service wireguard status > /dev/null 2>&1  \
+	[ -n "$_wireguard" ] \
+		&& jexec -l -U root $_client service wireguard status  > /dev/null 2>&1 \
 		&& jexec -l -U root $_client service wireguard restart > /dev/null 2>&1
+
 	eval $_R0
 }
 
