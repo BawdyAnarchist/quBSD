@@ -1,4 +1,5 @@
 
+
 # NEW June 2025
   A single zusr dataset is hardset but .. why?? Just make it another parameter to know where to look for the jail. I thought I might need a separate ssd, vdev, zpool, but couldnt integrate it properly. All jails' zusr data should be able to exist anywhere. Probably same with zroot/qubsd
 
@@ -152,3 +153,12 @@ This was a comment on 0net in the installer, but maybe it's old by now. Delete t
 
 PUT XORG and i3 in a jail
   - Sounds nice, but after you launch X11, you're permanently in the jail.
+
+
+
+### GENERIC SHELL LIBRARY FUNCTIONS
+exists_then_copy "<file>" "<location>"
+check_yesno
+get_user_response
+
+

@@ -258,6 +258,13 @@ get_parameter_lists() {
 	eval $_R0
 }
 
+exists_then_copy() {
+	# Checks if the file exists, then copies it
+	local _file="$1" ; local _dest="$2"
+	{ [ -z "$_file" ] || [ -z "$_dest" ] ;} && return 1
+	[ -e "$_file" ] && cp "$_file" "$_dest" && return 0
+}
+
 get_user_response() {
 	# Exits successfully if response is y or yes
 	# Optional $1 input - `severe' ; which requires a user typed `yes'
@@ -2111,11 +2118,20 @@ modify_network_files() {
 	local _etc_root="${M_QROOT}/${_client}/etc" ; local _etc_zusr="${M_ZUSR}/${_client}/rw/etc"
 	[ "$_cl_cl" = "host" ] && eval $_R0
 
-	# If _gateway is a VM, this will silently fail
-	[ ! -e "${_etc_zusr}/resolv.conf" ] \
-		&& cp ${M_ZUSR}/${_gateway}/rw/etc/resolv.conf ${_etc_root} > /dev/null 2>&1 \
-		|| cp ${M_QROOT}/${_gateway}/etc/resolv.conf ${_etc_root} > /dev/null 2>&1
+	# resolv.conf . If _gateway is a VM, this will silently fail
+	if [ ! -e "${_etc_zusr}/resolv.conf" ] ; then
+		if sysrc -f ${M_ZUSR}/${_gateway}/rw/etc/rc.conf wireguard_enable | grep -q "YES" ; then
+			local _dns_ip=$(sed -En \
+				"s/^[[:blank:]]*DNS[[:blank:]]*=[[:blank:]]*([^[:blank:]]+)[[:blank:]]*\$/\1/p" \
+				${M_ZUSR}/${_gateway}/rw/usr/local/etc/wireguard/wg0.conf)
+			echo "nameserver $_dns_ip" > ${_etc_root}/resolv.conf
+		else
+			exists_then_copy ${M_ZUSR}/${_gateway}/rw/etc/resolv.conf ${_etc_root} \
+				|| exists_then_copy ${M_QROOT}/${_gateway}/etc/resolv.conf ${_etc_root}
+		fi
+	fi
 
+	# pf.conf
 	if jexec -l -U root $_client service pf status > /dev/null 2>&1 ; then
 		# Running gateways might be schg or seclvl=3. Restore flags after ops
 		local _schg=$(ls -alo ${_etc_root}/pf.conf | awk '{print $5}' | sed -E "s/,.*//")
@@ -2147,7 +2163,7 @@ modify_network_files() {
 restart_services() {
 	local _fn="restart_services" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
-	while getopts DqsVw _opts ; do case $_opts in
+	while getopts DpqsVw _opts ; do case $_opts in
 		D) local _dhcp='true' ;;
 		p) local _pf='true' ;;
 		q) local _q='-q' ;;
