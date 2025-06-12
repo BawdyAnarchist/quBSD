@@ -1989,7 +1989,7 @@ connect_client_to_gateway() {
 			_vif_cl="${_vif_gw%?}b"
 			[ "$_cl_cl" = "host" ] && unset _jexec ||  _jexec="jexec -l -U root $_client"
 
-			ifconfig $_vif_cl vnet $_client
+			[ ! "$_client" = "host" ] && ifconfig $_vif_cl vnet $_client
 			configure_gateway_network && [ -n "$_d" ] && _D="-D"
 			local _flags=$(configure_client_network) && _w="-w"
 		;;
