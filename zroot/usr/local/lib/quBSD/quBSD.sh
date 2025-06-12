@@ -1998,7 +1998,7 @@ connect_client_to_gateway() {
 	esac
 
 	# Coordinated services restart
-	_p="${_flags%:*}" ; _cl_ip="${_flags#:*}"
+	_p="${_flags%%:*}" ; _cl_ip="${_flags##*:}"
 	restart_services $_D $_p $_q $_s $_V $_w "$_cl_ip"
 
 	eval $_R0
@@ -2134,10 +2134,10 @@ modify_network_files() {
 	# pf.conf
 	if jexec -l -U root $_client service pf status > /dev/null 2>&1 ; then
 		# Running gateways might be schg or seclvl=3. Restore flags after ops
-		local _schg=$(ls -alo ${_etc_root}/pf.conf | awk '{print $5}' | sed -E "s/,.*//")
-		chflags noschg ${_etc_zusr}/pf.conf
+		local _schg=$(ls -alo ${_etc_zusr} | awk '{print $5}' | sed -E "s/,.*//")
+		chflags -R noschg ${_etc_zusr}
 		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_vif_cl\"/" ${_etc_zusr}/pf.conf
-		chflags $_schg ${_etc_zusr}/pf.conf
+		chflags -R $_schg ${_etc_zusr}
 
 		_schg=$(ls -alo ${_etc_root}/pf_jip.table | awk '{print $5}' | sed -E "s/,.*//")
 		chflags noschg ${_etc_root}/pf_jip.table
@@ -2172,11 +2172,6 @@ restart_services() {
 		w) local _wireguard='true' ;;
 	esac ; done ; shift $(( OPTIND - 1))
 
-	[ -z "$_skip" ] || eval $_R0
-
-	# If dhcpd is running, restart it (otherwise it'll start on its own later)
-	[ -n "$_dhcp" ] && jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
-
 	# restart || use pfctl (depends on seclvl of the jail)
 	if [ -n "$_pf" ] && ! jexec -l -U root $_client service pf restart > /dev/null 2>&1 ; then
 		local _ip="$1"
@@ -2187,6 +2182,9 @@ restart_services() {
 	[ -n "$_wireguard" ] \
 		&& jexec -l -U root $_client service wireguard status  > /dev/null 2>&1 \
 		&& jexec -l -U root $_client service wireguard restart > /dev/null 2>&1
+
+	# If dhcpd is running, restart it (otherwise it'll start on its own later)
+	[ -z "$_skip" ] && jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
 
 	eval $_R0
 }
