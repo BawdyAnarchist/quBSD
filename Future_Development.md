@@ -1,29 +1,15 @@
 
-
-# NEW June 2025
-  A single zusr dataset is hardset but .. why?? Just make it another parameter to know where to look for the jail. I thought I might need a separate ssd, vdev, zpool, but couldnt integrate it properly. All jails' zusr data should be able to exist anywhere. Probably same with zroot/qubsd
-
-  You also need to constrain the memory and CPU that the jails "see." Because the faggots who make browsers and programs are fat fucking swine who will consume resources that you tell them exist. This might no shit require a kernel change to intercept the sysctl call for jails.
-/END NEW
+qb-start
+	- Needs updated with new networking functions in mind
+	- Simultaneous starts of clients could mess up wireguard restarting
 
 qb-edit - < GATEWAY > isnt valid for CLASS: host. Valid params are:
 
 TIMEOUT overhaul - timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
 
-Simultaneous jail starts cause multiple dhcp restarts and other services, and I think hangs some of the interfaces permanently in the gateway until restared 
-
-when shutting down social:
-	/etc/rc.shutdown: WARNING: $qubsd_dhcp_enable is not set properly - see rc.conf(5).
-
 zfs decryption wasnt working quite right. I need to recheck it
 
 When back on normal setup, fix the i3gen.conf to match QubesTricks
-
-qb-start
-	- Needs updated with new networking functions in mind
-	- Simultaneous starts of clients could mess up wireguard restarting
-
-You still have never successfully finished the automated networking problems when a gateway turns off/on and reconnects many separate clients
 
 
 ### INSTALLER SCRIPT CHANGES ###
@@ -37,6 +23,7 @@ roots
 rc.conf -nmdm cuse , I dont know if I need them or what for
 
 Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
+
 generalize the schg to being able to list specific files, and not my preselected ones. Overall pf and everything needs examined/revised
 
 There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
@@ -50,6 +37,9 @@ There is some question now as to the dispjails and their templates, and the devf
 
 ### UPGRADES
 
+Make jail locations just another parameter. Example: I almost needed a separate vdev for data 
+
+Constrain the memory and CPU that the jails "see." This might require a kernel change to intercept the sysctl call for jails.
 
 CREATE MANPAGES:  /usr/local/man/man1/qb-scripts
 	- Replaces /share/quBSD
@@ -141,12 +131,6 @@ https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
 Crons - No crons running. Probably something long term security that should be integrated and automated.
 
 I think `jail` caches fstab before completion of exec.prepare which edits it. Need to prove/submit bug. Need dtrace
-
-
-##### qubsd installer #######
-
-This was a comment on 0net in the installer, but maybe it's old by now. Delete this line if there's no problems later
-# ??change /rc.d/wireguard to remove the kldunload??
 
 
 ### FAILURES - DO NOT TRY AGAIN
