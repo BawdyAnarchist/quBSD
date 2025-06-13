@@ -4,9 +4,10 @@
 . /usr/local/lib/quBSD/msg-hostnet.sh
 
 get_options() {
-	while getopts cdht:u opts ; do case $opts in
+	while getopts cdhkt:u opts ; do case $opts in
 		c) cron_down ; exit 0 ;;
 		d) _CMD="down" ;;
+		k) _CMD="kill" ;;
 		h) get_msg2 -eu ;;
 		t) TIMEOUT="$OPTARG" ;;
 		u) [ -z "$_CMD" ] && _CMD="up" || get_msg2 -Eum _e1 ;;
@@ -49,6 +50,18 @@ cron_down() {
 	done
 }
 
+check_and_manage_connection() {
+	# Check if connection is up (try twice just in case one is down)
+	host freebsd.org > /dev/null 2>&1 && return 0
+	host 0.CC.pool.ntp.org > /dev/null 2>&1 && return 0
+
+	# Bring host back to a baseline state with no connection
+	connection_down
+
+	# Bring connection up
+	connect_client_to_gateway "host" "$GATEWAY"
+}
+
 revert_connection() {
 	# User opted out of the <timeout> feature
 	[ "$TIMEOUT" -eq 0 ] && get_msg2 -em _w1
@@ -61,8 +74,8 @@ revert_connection() {
 		sleep 10
 	done
 
-	# Then bring down connection and exit
-	connection_down
+	# Change pf back to NTP (123) only 
+	pfctl -f $PF_BLOCK 
 	exit 0
 }
 
@@ -73,13 +86,16 @@ main() {
 	if [ "$_CMD" = "up" ] ; then
 		# Start gateway, modify pf 
 		start_jail "$GATEWAY" || get_msg2 -Em _e3
+		check_and_manage_connection	
 		pfctl -f $PF_PASS 
 		# Loop until specified timeout, then revert connection
 		revert_connection &
-
 	elif [ "$_CMD" = "down" ] ; then
 		# Set pf to the restrictive file
 		pfctl -f $PF_BLOCK
+	elif [ "$_CMD" = "kill" ] ; then
+		# Set pf to the restrictive file
+		connection_down
 	fi
 }
 

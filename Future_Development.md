@@ -1,4 +1,6 @@
 
+control_netmap is borked and constantly double lists
+
 qb-start
 	- Needs updated with new networking functions in mind
 	- Simultaneous starts of clients could mess up wireguard restarting

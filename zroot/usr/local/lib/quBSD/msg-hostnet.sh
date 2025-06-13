@@ -25,9 +25,11 @@ qb-hostnet: Connect host to outside internet.
 
 Usage: hostnet [-h][-d|-u][-t <time_in_seconds>]
    -h: (h)elp. Outputs this help message
-   -d: (d)own. Remove connectivity; set pf to block all
+   -d: (d)own. pf block ports except 123 & 53 (NTP & DNS),
+       but maintains the epair/tap interface to gateway.
+   -k: (k)ill. Destroy connection to gateway by destroying 
+       epairs, and removing IP address from taps.
    -u: (u)p. Brings up connectivity as specified in QCONF
-
    -t: (t)ime before connection is automatically removed.
        Default is 300 secs (5 min). Two exceptions where
        where connection will persist beyond <timeout>:
