@@ -1,4 +1,10 @@
 
+Remove fstabs entirely. This is insanity and should all exist in jail.conf.d:
+  mount += "/zusr/$name/rw/   $path/rw/            nullfs  rw  0  0";
+  mount += "/zusr/$name/home  $path/home/          nullfs  rw  0  0";
+  mount += "/tmp/.X11-unix    $path/tmp/.X11-unix  nullfs  rw  0  0";
+
+
 control_netmap is borked and constantly double lists
 
 qb-start

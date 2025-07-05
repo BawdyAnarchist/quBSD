@@ -728,6 +728,7 @@ reclone_zusr() {
 
 	[ -z "$_jail" ] && get_msg $_qr -m _e0 -- "jail" && eval $_R1
 	[ -z "$_template" ] && get_msg $_qr -m _e0 -- "template" && eval $_R1
+  ! chk_valid_zfs "$templzfs" && get_msg $_qr -m _e0 -- "template" && eval $_R1
 
 	# `zfs-diff` from other jails causes a momentary snapshot which the reclone operation
 	if chk_valid_zfs "$_presnap" ; then
