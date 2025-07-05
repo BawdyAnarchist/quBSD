@@ -19,4 +19,4 @@ done
 # /rw system files might be schg, but needed by rc.shutdown.
 chflags -fR noschg ${M_ZUSR}/${JAIL}/rw
 
-exit 0
+exit 0   # Script exits success, to not abort jail shutdown.

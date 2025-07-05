@@ -27,4 +27,4 @@ get_global_variables
 
 main "$@"
 
-exit 0
+exit 0   # Script exits success, to not abort jail startup

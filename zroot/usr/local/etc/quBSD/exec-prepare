@@ -28,18 +28,6 @@ preparation_actions() {
 	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
 }
 
-handle_fstab() {
-	# Use the JAIL's fstab to create the directories necessary for mountpoints
-	_DIRS=$(tail -n +2 ${M_ZUSR}/${JAIL}/rw/etc/fstab | awk '!/^[[:blank:]]*#/{print $2}')
-
-	for _dir in $_DIRS ; do
-		[ -d "$_dir" ] || mkdir -p $_dir > /dev/null 2>&1
-	done
-
-	# Manually mount, caz `jail` expects any fstab in jail.conf to exist, before exec-prepare
-	mount -aF ${M_ZUSR}/${JAIL}/rw/etc/fstab
-}
-
 main() {
   # If exec script fails and jail start aborts, make sure to clean up the mounts
   trap '/usr/local/etc/qubsd/exec-release $JAIL'
@@ -65,9 +53,6 @@ main() {
 			reclone_zusr "$JAIL" "$TEMPLATE" || get_msg2 -Em _e1_4 "$JAIL" "$TEMPLATE"
 		;;
 	esac
-
-	handle_fstab
-
 	return 0
 }
 
@@ -77,4 +62,4 @@ get_parameters "$@"
 
 main
 
-exit 0
+exit 0   # Script exits success, to not abort jail startup
