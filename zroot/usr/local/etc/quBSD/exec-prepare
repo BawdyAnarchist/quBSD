@@ -18,9 +18,6 @@ get_parameters() {
 }
 
 preparation_actions() {
-	# Sometimes bridge module unloads
-	kldload -n if_bridge
-
 	# The control jail should always be on. The function will return immediately if already on
 	[ ! "$CLASS" = "cjail" ] && start_jail "$CONTROL"
 
@@ -44,6 +41,9 @@ handle_fstab() {
 }
 
 main() {
+  # If exec script fails and jail start aborts, make sure to clean up the mounts
+  trap '/usr/local/etc/qubsd/exec-release $JAIL'
+
 	# Misc things to do/check before recloning the datasets
 	preparation_actions
 
@@ -62,8 +62,7 @@ main() {
 
 			# Dispjails also reclone the zusr portion from template (if it exists)
 			get_jail_parameter -d TEMPLATE "$JAIL" || get_msg2 -Em _e
-			chk_valid_zfs "${U_ZFS}/${TEMPLATE}" && reclone_zusr "$JAIL" "$TEMPLATE" \
-				|| get_msg2 -Em _e1_4 "$JAIL" "$TEMPLATE"
+			reclone_zusr "$JAIL" "$TEMPLATE" || get_msg2 -Em _e1_4 "$JAIL" "$TEMPLATE"
 		;;
 	esac
 
