@@ -1,2 +1,0 @@
-# Device            Mountpoint           FStype  Options Dump Pass#
-/zusr/net-vpn/rw/   /qubsd/net-vpn/rw/   nullfs  rw      0    0	

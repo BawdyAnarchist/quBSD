@@ -1,4 +1,0 @@
-#Device                            Mountpoint                         FStype Options Dump Pass#
-/zusr/net-tor/rw/                 /qubsd/net-tor/rw/                 nullfs rw      0    0	
-/zusr/net-tor/var/db/tor          /qubsd/net-tor/var/db/tor          nullfs rw      0    0	
-/zusr/net-tor/usr/local/share/tor /qubsd/net-tor/usr/local/share/tor nullfs rw      0    0	
