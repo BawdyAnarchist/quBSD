@@ -521,6 +521,16 @@ create_popup() {
 	fi
 }
 
+set_xauthority() {
+	_jail="$1"
+	_file="${M_ZUSR}/${_jail}/home/${_jail}/.Xauthority"
+  _xauth=$(xauth list | grep -Eo ":0.*")
+	[ -e "$_file" ] && rm $_file
+	touch $_file && chown 1001:1001 $_file
+	eval "jexec -l -U $_jail $_jail /usr/local/bin/xauth add $_xauth"
+	chmod 400 $_file
+}
+
 calculate_sizes() {
 	# Get vertical resolution of primary display for calculating popup dimensions
 	local _res=$(xrandr | sed -En "s/.*connected primary.*x([0-9]+).*/\1/p")
