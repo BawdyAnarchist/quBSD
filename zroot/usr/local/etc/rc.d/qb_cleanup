@@ -18,7 +18,7 @@ qb_cleanup_start() {
 	get_global_variables
 
 	# Dont need the trap set by get_global_variables, coz we're removing /tmp/qubsd
-	trap '' HUP INT TERM QUIT EXIT
+	trap - HUP INT TERM QUIT EXIT
 
 	cleanup_files
 

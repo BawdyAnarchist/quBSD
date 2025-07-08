@@ -201,7 +201,7 @@ get_msg2() {
 		_m*|_w*) [ -z "$_q" ] && eval "$_msg" "$@" ;;
 		_e*)
 			if [ -z "$_force" ] ; then
-				# Place final ERROR message into a variable.
+				# Place final ERROR message into a variable. $ERR1 (tmp) enables func tracing
 				_ERROR="$(echo "ERROR: $_call" ; "$_msg" "$@" ; [ -s "$ERR1" ] && cat $ERR1)"
 				echo -e "$_ERROR\n" > $ERR2
 
@@ -2542,7 +2542,7 @@ EOF
 			$_BLK_ZUSR $_BHYVE_CUSTM $_PPT $_VTNET $_FBUF $_TAB $_LPC $_BOOT $_STDIO $_VM $_TMUX2"
 
 	# unset the trap
-	trap ":" INT TERM HUP QUIT EXIT
+	trap - INT TERM HUP QUIT EXIT
 
 	eval $_R0
 }
