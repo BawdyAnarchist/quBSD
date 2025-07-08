@@ -205,7 +205,7 @@ main() {
 	_MONITOR_PID="$!"
 
 	# Unset trap, coz otherwise it runs 2x if monitor_startstop times out.
-	trap "" INT TERM HUP QUIT EXIT
+	trap - INT TERM HUP QUIT EXIT
 
 	# Wait for stops to finish. If TIMEOUT, monitor_startstop will kill -15 this script
 	if ps -p $_WF_PIDS > /dev/null 2>&1 ; then
