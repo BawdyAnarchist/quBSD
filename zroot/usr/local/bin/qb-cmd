@@ -6,49 +6,134 @@
 . /usr/local/lib/quBSD/msg-cmd.sh
 
 get_options() {
-	while getopts hnNprtu:vV opts ; do case $opts in
-		h) get_msg2 -eu ;;
-		n) _NEWWIND="xterm -e" ;;
-		N) _NORUN="exit 0" ; _VERBOSE="true" ;;
-     	p) _POPUP="true" ;;
-     	r) _USER="root" ;;
+	while getopts dhHNpqrtu:x opts ; do case $opts in
+		d) _DETACH="true" ;;
+		h) get_msg2 -eu   ;;
+		H) _NOX11="true"  ;;
+		N) _NORUN="true"  ;;
+		p) _POPUP="true"  ;;
+		q) _REDIRECT=' > /dev/null 2>&1 &' ; _REDIRECT2='-o /dev/null' ;;
+		r) _USER="root"   ;;
 		u) _USER="${OPTARG}" ;;
-		v) _REDIRECT='' ; _VERBOSE="true" ;;
+		x) _NEWWIND="true" ; [ -n "$_NOX11" ] && get_msg2 -Em _e10  ;;
 		*) exit 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-	JAIL="$1" ; shift
+	_JAIL="$1" ; shift
 	_CMD="$@"
 }
 
 parse_jail_vars() {
-	# Check /zusr/JAIL/rw/etc first; then ROOTENV user, then ROOTENV root. Returns var: $SHELL
-	get_jail_shell "$JAIL"
+	# Lib function orders shell priority. Default _CMD is $_SHELL.
+	_SHELL=$(get_jail_shell -e "$_JAIL")
+	[ -z "$_CMD" ] && _CMD="${_CMD:=$_SHELL}"
 
-	# Default _CMD is $SHELL. If [-v] keep REDIRECT null, ${parameter-word}, otherwise dev/null
-	[ -z "$_CMD" ] && _CMD="${_CMD:=$SHELL}" || _REDIRECT="${_REDIRECT- > /dev/null 2>&1 &}"
-
-	# If X is running, get the jailname of the active window
+	# If X is running, get the jailname of the active window, and note that host is X111
 	if pgrep -q Xorg ; then
-		# Jailname of the active window is assigned to: $_XJAIL
 		get_info _XJAIL
+		host_X11='true'
 	fi
 
 	# Unless already specified, JAIL and USER should be set to the active window
-	JAIL="${JAIL:=$_XJAIL}"
-	_USER="${_USER:=$JAIL}"
+	_JAIL="${_JAIL:=$_XJAIL}"
+	_USER="${_USER:=$_JAIL}"
+}
+
+chk_app_X11() {
+  _cmd=$(echo "$_CMD" | awk '{print $1}')
+  export _cmd
+  chroot "${M_QROOT}/${_JAIL}" /bin/sh -s << 'EOF'
+		_pkg=$(pkg info -E $_cmd 2>/dev/null) || exit 3
+		[ -z "$_pkg" ] && exit 3
+		pkg info -d $_pkg | grep -Eqs 'libX11|libxcb' && exit 0
+EOF
+  return $?
+}
+
+launch_xephyr() {
+	# Use the JID+_int to find a unique socket name
+	jid=$(jls -j $_JAIL -n jid | sed "s/jid=//")
+  _int=0
+	while [ $_int -le 99 ] ; do
+		display="${jid}${_int}"
+		[ -e "/tmp/.X11-unix/X${display}" ] && _int=$(( _int + 1 )) || break
+	done || get_msg2 -Em _e9           # Error and exit if nothing found
+
+	# Launch/check Xephyr
+	Xephyr -resizeable -terminate :$display > /dev/null 2>&1 &
+	xephyr_pid=$!  &&  sleep 0.2       # Give a moment for Xephyr session to launch
+	! ps -p "$xephyr_pid" > /dev/null 2>&1 && get_msg2 -Em _e8 
+
+	# The Xephyr window_id is needed for monitoring/cleanup
+	winlist=$(xprop -root _NET_CLIENT_LIST | sed 's/.*# //' | tr ',' '\n' | tail -r)
+	for wid in $winlist; do
+		xprop -id "$wid" | grep -Eqs "WM_NAME.*Xephyr.*:$display" \
+			&& window_id="$wid" && break
+	done
+
+	export QTMP _JAIL _USER display window_id xephyr_pid
+	daemon -o /dev/null sh -c '
+    echo "2.1: $(date +%s | grep -Eo "...\$")" >> /root/temp3
+		jexec -l -U $_USER $_JAIL env DISPLAY=:$display bspwm -c /usr/local/etc/X11/bspwmrc &
+		bspwm_pid="$!"
+		socat \
+			UNIX-LISTEN:${QTMP}/${_JAIL}/.X11-unix/X${display},fork,unlink-close,mode=0666 \
+			UNIX-CONNECT:/tmp/.X11-unix/X${display} &
+		socat_pid="$!"
+    echo "2.2: $(date +%s | grep -Eo "...\$")" >> /root/temp3
+		while sleep 3 ; do
+			xprop -id "$window_id" | grep -Eqs ".*Xephyr.*:$display" || break
+		done
+    echo "2.3: $(date +%s | grep -Eo "...\$")" >> /root/temp3
+		kill -15 "$socat_pid"
+		kill -15 "$bspwm_pid"
+		kill -15 "$xephyr_pid"
+		exit 0
+	' &
+
+	return 0
+}
+
+run_jail_command() {
+	# Make sure the user has a home directory
+	[ ! "$_USER" = "root" ] && [ ! -d "${M_QROOT}/${_JAIL}/home/${_USER}" ] \
+		&& get_msg2 -Epm _e7
+
+	# If [-p] popup was passed, create the popup and get the _CMD to be run
+	[ "$_POPUP" ] \
+		&& _CMD=$(create_popup -im "Enter command for $_JAIL\\\n${_USER}@${_JAIL}: # ")
+
+	# If host and jail'd app are both X11, then trigger window isolation via Xephyr
+	if [ "$host_X11" = "true" ] && [ -z "$_NOX11" ] ; then
+		if mount | grep $_JAIL | grep -Eqs "/qubsd/${_JAIL}/tmp/\.X11-unix" ; then
+			jail_socket="true"
+			if chk_app_X11 || [ -n "$_NEWWIND" ] ; then 
+				launch_xephyr
+				_DISPLAY="env DISPLAY=:$display"
+				_DETACH="true"
+			fi
+		fi
+	fi
+
+	# Run the jexec command 
+	rm_errfiles	; trap - HUP INT TERM QUIT EXIT
+	if [ -z "$_DETACH" ] ; then
+		eval "jexec -l -U $_USER $_JAIL $_DISPLAY $_SHELL -c '$_CMD'" $_REDIRECT
+	else
+		eval "jexec -l -U $_USER $_JAIL $_SHELL -c 'env DISPLAY=:$display $_CMD'" > /dev/null 2>&1 &
+	fi
 }
 
 connect_vm_session() {
 	# Pull the qconf parameters for VM attachment
-	get_jail_parameter -d TMUX $JAIL || get_msg2 -Epm _e2 TMUX "$JAIL"
-	get_jail_parameter -d VNC  $JAIL || get_msg2 -Epm _e2 VNC  "$JAIL"
+	get_jail_parameter -d TMUX $_JAIL || get_msg2 -Epm _e2 TMUX "$_JAIL"
+	get_jail_parameter -d VNC  $_JAIL || get_msg2 -Epm _e2 VNC  "$_JAIL"
 
 	# Handle the vnc viewer port
 	if [ ! "$VNC" = "false" ] ; then
 		# Sometimes it can take 5-15 secs for a VM to launch (if ppt is bad). Wait
 		_count=0
-		while ! _vmpid=$(pgrep -fx "bhyve: $JAIL") ; do
+		while ! _vmpid=$(pgrep -fx "bhyve: $_JAIL") ; do
 			# Wait 3 secs before message, to avoid unnecesary clutter
 			[ "$_count" = 3 ] && get_msg2 -m _m2
 			[ "$_count" -gt 15 ] && get_msg2 -Epm _e3
@@ -63,7 +148,7 @@ connect_vm_session() {
 			_novnc="true"
 		else
 			# Remove errfiles before permanent new program launches
-			rm_errfiles ; trap '' HUP INT TERM QUIT EXIT
+			rm_errfiles ; trap - HUP INT TERM QUIT EXIT
 			vncviewer 0.0.0.0:$_vncport > /dev/null 2>&1 &
 		fi
 	else
@@ -73,8 +158,8 @@ connect_vm_session() {
 	# Launch TMUX if available
 	if [ "$TMUX" = "true" ] ; then
 		# Remove errfiles before permanent new program launches
-		rm_errfiles ; trap '' HUP INT TERM QUIT EXIT
-		! tmux attach -t $JAIL && get_msg2 -Epm _e4
+		rm_errfiles ; trap - HUP INT TERM QUIT EXIT
+		! tmux attach -t $_JAIL && get_msg2 -Epm _e4
 	else
 		# Error message for nothing to connect to
 		[ "$_novnc" ] && get_msg2 -Epm _e5
@@ -85,39 +170,24 @@ main() {
 	parse_jail_vars
 
 	# Launch host xterm. Replace current shell with new one (exec).
-	[ "$JAIL" = "host" ] && rm_errfiles && trap '' HUP INT TERM QUIT EXIT && exec xterm
+	[ "$_JAIL" = "host" ] && rm_errfiles && trap - HUP INT TERM QUIT EXIT && exec xterm
 
-	# Switch for VMs vs jails
-	if chk_isvm "$JAIL" ; then
-		# Either show errors in trying to create the bhyve cmd, or print & exit
-		if [ "$_NORUN" ] ; then
-			get_msg2 -m _m1
-			start_jail -n "$JAIL" || get_msg2 -m _e6
-			exit 0
+	if [ "$_NORUN" ] ; then
+		get_msg2 -m _m1
+		if chk_isvm "$_JAIL" ; then
+			start_jail -n "$_JAIL" || get_msg2 -m _e6
+		else
+			echo "jexec -l -U $_USER $_JAIL $_SHELL -c '$_CMD'" $_REDIRECT
 		fi
-		# Launch VM and connect the session
-		! start_jail "$JAIL" && get_msg2 -Epm _enone
+		exit 0
+	fi
+
+	# Make sure the jail is running
+	! start_jail "$_JAIL" && get_msg2 -Epm _enone
+	if chk_isvm "$_JAIL" ; then
 		connect_vm_session
 	else
-		if [ "$_NORUN" ] ; then
-			get_msg2 -m _m1
-			echo $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT"
-			exit 0
-		fi
-
-		! start_jail $JAIL && get_msg2 -Epm _enone
-
-		# Make sure the user has a home directory, and remove errfiles before jexec to new prog.
-		[ ! "$_USER" = "root" ] && [ ! -d "${M_QROOT}/${JAIL}/home/${_USER}" ] \
-			&& get_msg2 -Epm _e7
-
-		# If [-p] popup was passed, create the popup and return _CMD to be run
-		[ "$_POPUP" ] \
-			&& _CMD=$(create_popup -im "Enter command for $JAIL\\\n${_USER}@${JAIL}: # ")
-
-		rm_errfiles	; trap '' HUP INT TERM QUIT EXIT
-
-		eval $_NORUN $_NEWWIND "jexec -l -U $_USER $JAIL $SHELL -c '$_CMD' $_REDIRECT"
+		run_jail_command		
 	fi
 }
 
@@ -128,4 +198,3 @@ get_options "$@"
 main
 
 exit 0
-
