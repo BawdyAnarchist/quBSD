@@ -60,7 +60,7 @@ launch_xephyr() {
 	done || get_msg2 -Em _e9           # Error and exit if nothing found
 
 	# Launch/check Xephyr
-	Xephyr -resizeable -terminate :$display > /dev/null 2>&1 &
+	Xephyr -resizeable -terminate -no-host-grab :$display > /dev/null 2>&1 &
 	xephyr_pid=$!  &&  sleep 0.2       # Give a moment for Xephyr session to launch
 	! ps -p "$xephyr_pid" > /dev/null 2>&1 && get_msg2 -Em _e8 
 
