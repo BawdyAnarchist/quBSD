@@ -266,7 +266,7 @@ modify_rc_conf() {
 
 add_gui_pkgs() {
 	# Install pkgs
-	[ "$GUI" = "true" ] && _pkgs="xorg Xephyr socat tigervnc-viewer"
+	[ "$GUI" = "true" ] && _pkgs="xorg Xephyr socat autocutsel virtualgl tigervnc-viewer"
 	[ "$i3wm" = "true" ] && _pkgs="$_pkgs i3 i3lock i3status"
 	msg_installer "_m10"
 	pkg install -y $_pkgs $nvidia >> $QLOG
@@ -317,7 +317,7 @@ install_rootjails() {
 	for _jail in 0net $rootjails ; do
 		case $_jail in
 			0net) _pkgs="vim jq wireguard-tools isc-dhcp44-server bind918" ;;
-			0gui) _pkgs="vim xorg bspwm $nvidia $guipkgs" ;;
+			0gui) _pkgs="vim xorg bspwm virtualgl $nvidia $guipkgs" ;;
 			0serv) _pkgs="vim $serverpkgs" ;;
 		esac
 
