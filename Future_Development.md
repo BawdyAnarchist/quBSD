@@ -1,9 +1,7 @@
 
-Remove fstabs entirely. This is insanity and should all exist in jail.conf.d:
-  mount += "/zusr/$name/rw/   $path/rw/            nullfs  rw  0  0";
-  mount += "/zusr/$name/home  $path/home/          nullfs  rw  0  0";
-  mount += "/tmp/.X11-unix    $path/tmp/.X11-unix  nullfs  rw  0  0";
-
+You exported scripts with /tmp and all that nonsense should all be replaced with daemon
+  - And you should use: export relevant variables ... and then single quotes to avoid \$variables
+  - What you've done thus far is too confusing, and causes extra steps.
 
 control_netmap is borked and constantly double lists
 

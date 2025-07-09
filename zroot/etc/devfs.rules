@@ -1,35 +1,49 @@
 
 ## QUBSD ADDITIONS ##
-# quBSD net-jails need specific devices
+# quBSD basic GUI jails
 #
-[devfsrules_qubsd_netjail=]
+[devfsrules_qubsd_basic_gui=]
 add include $devfsrules_hide_all
 add include $devfsrules_unhide_basic
 add include $devfsrules_unhide_login
 add include $devfsrules_jail
-add path pf unhide
-# dhclient requires bpf 
-add path 'bpf*' unhide
-add path 'tun*' unhide
-# apparently ssh needs tty to function properly
-add path 'tty*' unhide 
+add path 'bpf*' unhide      # dhclient requires bpf
+add path 'dsp*' unhide      # Basic sound/playback
+## END QUBSD ##
 
-# quBSD GUI jail specifics
+# quBSD GPU GUI jails 
 #
-[devfsrules_qubsd_guijail=]
+[devfsrules_qubsd_gpu_gui=]
 add include $devfsrules_hide_all
 add include $devfsrules_unhide_basic
 add include $devfsrules_unhide_login
 add include $devfsrules_jail
-# dhclient requires bpf 
-add path 'bpf*' unhide
-add path 'mixer*' unhide
-add path 'dsp*' unhide
-add path 'video*' unhide
-# Graphics card specific devices
-#add path 'nvidia*' unhide
+add include $devfsrules_basic_gui  
+# Graphics devices
+add path 'nvidia*' unhide
 #add path dri unhide
 #add path 'dri/card*' unhide
 #add path drm unhide
 #add path 'drm/*' unhide
 ## END QUBSD ##
+
+# quBSD media jails, video, mixing, additional access
+#
+[devfsrules_qubsd_mediajail=]
+add include $devfsrules_hide_all
+add include $devfsrules_unhide_basic
+add include $devfsrules_unhide_login
+add include $devfsrules_jail
+add include $devfsrules_basic_gui
+# Review carefully what you actually need 
+add path 'mixer*' unhide
+add path 'sndstat' unhide   # Shows attached sound drivers
+add path 'video*' unhide    # Webcam and "Video-for-Linux-2"
+# Graphics card specific devices
+add path 'nvidia*' unhide
+#add path dri unhide
+#add path 'dri/card*' unhide
+#add path drm unhide
+#add path 'drm/*' unhide
+## END QUBSD ##
+
