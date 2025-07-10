@@ -1,5 +1,10 @@
 # quBSD:  THESE ARE RECOMMENDATIONS / IDEAS FOR INCORPORATION INTO YOUR OWN I3 CONFIG
 
+# quBSD: ($mod+Alt) Required for the ability to paste between windows
+# Flow:  Source: ctrl+c ; mod+Alt+c ; --> Destination: mod+Alt+v ; ctrl+v
+bindsym $mod+Mod1+c exec "/usr/local/bin/qubsd_xclip copy"
+bindsym $mod+Mod1+v exec "/usr/local/bin/qubsd_xclip paste"
+
 # quBSD: HIGHLY RECOMMEND. Opens xterm on host, or in jail, depending on active window
 bindsym $mod+Return exec qb-cmd -n 
 
