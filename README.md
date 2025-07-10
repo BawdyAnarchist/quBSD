@@ -2,8 +2,8 @@
 
 ### Summary of Default Features: 
 
-X11 GUI Jails, with a cloneable template.
-Network gateway jails/VMs for firewall, VPNs, and Tor.
+X11 GUI Jails, with X11-Xephyr compartmentalization!
+Network gateway jails/VMs for NIC, firewall, VPNs, and Tor.
 Disposable/ephemeral jails/VMs. 
 Automatic rolling zfs snapshots, with thinning.
 Streamlined configuration/editing:
@@ -26,7 +26,7 @@ Streamlined configuration/editing:
 ***AppVMs*** clone a designated rootVM same as appjail, with persistent /home.   
 ***DispVMs*** No persistent data. Completely destroyed upon VM shutdown.   
 
-Host remains offline, except for updates.    
+Host heavily firewalled except for NTP and updates 
 Physical network card and USBs are isolated in VMs (nicvm and usbvm)
 
 ### Additional Features
