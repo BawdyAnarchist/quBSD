@@ -1,5 +1,7 @@
 
-You exported scripts with /tmp and all that nonsense should all be replaced with daemon
+MTU is not being honored and now some jails (no VPN, connect to firewall) are failing to put resolv.conf correctly
+
+You EOF scripts with /tmp and all that nonsense should all be replaced with daemon
   - And you should use: export relevant variables ... and then single quotes to avoid \$variables
   - What you've done thus far is too confusing, and causes extra steps.
 
