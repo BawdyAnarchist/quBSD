@@ -73,18 +73,18 @@ launch_xephyr() {
 
 	export QTMP _JAIL _USER display window_id xephyr_pid
 	daemon -o /dev/null sh -c '
-    echo "2.1: $(date +%s | grep -Eo "...\$")" >> /root/temp3
+    echo "2.1: $(date +%s | grep -Eo "...\$")"
 		jexec -l -U $_USER $_JAIL env DISPLAY=:$display bspwm -c /usr/local/etc/X11/bspwmrc &
 		bspwm_pid="$!"
 		socat \
 			UNIX-LISTEN:${QTMP}/${_JAIL}/.X11-unix/X${display},fork,unlink-close,mode=0666 \
 			UNIX-CONNECT:/tmp/.X11-unix/X${display} &
 		socat_pid="$!"
-    echo "2.2: $(date +%s | grep -Eo "...\$")" >> /root/temp3
+    echo "2.2: $(date +%s | grep -Eo "...\$")"
 		while sleep 3 ; do
 			xprop -id "$window_id" | grep -Eqs ".*Xephyr.*:$display" || break
 		done
-    echo "2.3: $(date +%s | grep -Eo "...\$")" >> /root/temp3
+    echo "2.3: $(date +%s | grep -Eo "...\$")"
 		kill -15 "$socat_pid"
 		kill -15 "$bspwm_pid"
 		kill -15 "$xephyr_pid"
