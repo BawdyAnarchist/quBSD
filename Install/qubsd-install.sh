@@ -266,7 +266,7 @@ modify_rc_conf() {
 
 add_gui_pkgs() {
 	# Install pkgs
-	[ "$GUI" = "true" ] && _pkgs="xorg Xephyr socat autocutsel virtualgl tigervnc-viewer"
+	[ "$GUI" = "true" ] && _pkgs="xorg Xephyr socat virtualgl tigervnc-viewer"
 	[ "$i3wm" = "true" ] && _pkgs="$_pkgs i3 i3lock i3status"
 	msg_installer "_m10"
 	pkg install -y $_pkgs $nvidia >> $QLOG
