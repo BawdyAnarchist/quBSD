@@ -40,10 +40,11 @@ parse_jail_vars() {
 }
 
 chk_app_X11() {
+  # Have to use some gymnastics to be certain we're at the actual pkg name, not just the binary
   _cmd=$(echo "$_CMD" | awk '{print $1}')
   export _cmd
   chroot "${M_QROOT}/${_JAIL}" /bin/sh -s << 'EOF'
-		_pkg=$(pkg info -E $_cmd 2>/dev/null) || exit 3
+		_pkg=$(which $_cmd | xargs pkg which | sed -En "s/.*( [^[:blank:]]+\$)/\1/p")
 		[ -z "$_pkg" ] && exit 3
 		pkg info -d $_pkg | grep -Eqs 'libX11|libxcb' && exit 0
 EOF
@@ -90,7 +91,6 @@ launch_xephyr() {
 		kill -15 "$xephyr_pid"
 		exit 0
 	' &
-
 	return 0
 }
 
