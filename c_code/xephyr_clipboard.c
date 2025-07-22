@@ -1,15 +1,15 @@
-/*  
+/*
  * xephyr_clipboard – secure, event-driven clipboard broker for Xephyr instances
- *  
+ *
  * Build example (debug build; creates /tmp/xephyr_clipboard.log):
- *   cc -DDEBUG -Wall -Wextra -Werror -std=c11 $(pkg-config --cflags x11 xi xfixes) \
- *      xephyr_clipboard.c $(pkg-config --libs x11 xi xfixes) -o xephyr_clipboard
+ *   cc -DDEBUG -Wall -Wextra -Werror -std=c11 -g -I/usr/local/include xephyr_clipboard.c \
+ *      -L/usr/local/lib -lX11 -lXi -lXfixes -o xephyr_clipboard
  *
  * Build example (quiet release build):
- *   cc -Wall -Wextra -Werror -std=c11 $(pkg-config --cflags x11 xi xfixes) \
- *      xephyr_clipboard.c $(pkg-config --libs x11 xi xfixes) -o xephyr_clipboard
- */         
-        
+ *   cc -O2 -pipe -Wall -Wextra -std=c11 -I/usr/local/include xephyr_clipboard.c \
+ *      -L/usr/local/lib -lX11 -lXi -lXfixes -o xephyr_clipboard
+ */
+
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
@@ -34,12 +34,12 @@
 #ifdef DEBUG
   static FILE *dlog_fp = NULL;
   static inline void dlog_init(void)
-  {         
+  {
       if (!dlog_fp) {
           dlog_fp = fopen("/tmp/xephyr_clipboard.log", "a");
           if (dlog_fp) setvbuf(dlog_fp, NULL, _IOLBF, 0);
       }
-  }         
+  }
   #define DLOG(...)                         \
       do {                                  \
           struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); \
@@ -70,7 +70,7 @@ typedef struct {
     Display *dpy;
     int      fd;
     int      xfixes_base;     // XEvent uses numeric IDs + this_offset, per window
-    Atom     atom_clipboard;  // X11 uses different atom IDs for each display 
+    Atom     atom_clipboard;  // X11 uses different atom IDs for each display
     Atom     atom_targets;    // atom target IDs are also unique for each display
     Window   proxy;           // daemon owned window - our proxy into the display
 } Nest;
@@ -97,7 +97,7 @@ static int     host_shift_l_keycode = 0;
 static int     host_shift_r_keycode = 0;
 static int     host_insert_keycode  = 0;
 static int     ctrl_is_down = 0;         // 0 = up, 1 = down
-static int     host_v_keycode = 0; 
+static int     host_v_keycode = 0;
 static int     shift_is_down        = 0;
 static Display *host_dpy = NULL;      // X11 calls are always made from host display
 static Atom    host_atom_active_win;  // The `atom` of _NET_ACTIVE_WINDOW for host display
@@ -181,7 +181,7 @@ void initialize_host_x_connection(void)
                             .mask_len = sizeof(xi_mask_bytes), .mask = xi_mask_bytes };
     XISetMask(xi_mask.mask, XI_RawKeyPress);
     XISetMask(xi_mask.mask, XI_RawKeyRelease);
-    XISetMask(xi_mask.mask, XI_RawButtonPress); 
+    XISetMask(xi_mask.mask, XI_RawButtonPress);
     XISelectEvents(host_dpy, DefaultRootWindow(host_dpy), &xi_mask, 1);
 
     // Get the host atom for the active window, and set Notify events
@@ -279,7 +279,7 @@ static void add_display(const char *name)
     Display *d = XOpenDisplay(name);                 // Open display
     if (!d) { DLOG("skip %s\n",name); return; }
 
-    // Initialize the nest's properties 
+    // Initialize the nest's properties
     Nest *n = &nests[idx];
     memset(n, 0, sizeof *n);                         // wipe old contents
     snprintf(n->name, sizeof(n->name), "%s", name);  // mark active
@@ -435,7 +435,7 @@ static void handle_focus_change(void)
     g_clip.focused = new_focus;
 
     // Grab clipboard ownership of new focus
-    if (XGetSelectionOwner(new_focus->dpy, new_focus->atom_clipboard) != new_focus->proxy 
+    if (XGetSelectionOwner(new_focus->dpy, new_focus->atom_clipboard) != new_focus->proxy
             && new_focus != g_clip.source) {
         XSetSelectionOwner(new_focus->dpy, new_focus->atom_clipboard, new_focus->proxy, CurrentTime);
         XFlush(new_focus->dpy);
@@ -458,7 +458,7 @@ static void create_new_lease(Nest *n, XFixesSelectionNotifyEvent *ev)
     /* This function intentionally blocks for 200ms to get targets, to prevent any possibility
        of unexpected interactions of races with other incoming XI2 or kevent signals.*/
 
-    // Wipe previous targets before getting new ones 
+    // Wipe previous targets before getting new ones
     if (ev->owner == n->proxy || ev->owner == None || ev->selection != n->atom_clipboard) return;
     for (int i = 0; i < g_clip.n_targets; i++) {
         free(g_clip.targets[i]);
@@ -516,7 +516,7 @@ static void create_new_lease(Nest *n, XFixesSelectionNotifyEvent *ev)
 static void service_selection_request(Nest *n, XSelectionRequestEvent *req)
 {
     /* This function blocks for 200ms after serving targets to destination, waiting for response; and
-       again to wait for source data. Prevents unexpected interactions/races with other events.*/ 
+       again to wait for source data. Prevents unexpected interactions/races with other events.*/
 
     // Pre filters: Fast-deny invalid / insecure requests
     struct timespec ts_now;
@@ -690,7 +690,7 @@ static void process_x_events(Nest *n, XEvent *event)
             XGenericEventCookie *c = &event->xcookie;
             if (c->extension != host_xi_opcode || !XGetEventData(n->dpy, c)) break;
             XIRawEvent *re = (XIRawEvent *)c->data;
-            if (c->evtype == XI_RawKeyPress) {          // Raw Keypress detected 
+            if (c->evtype == XI_RawKeyPress) {          // Raw Keypress detected
                 /* Track modifier state -------------------------------------- */
                 if (re->detail == host_ctrl_l_keycode || re->detail == host_ctrl_r_keycode) {
                     ctrl_is_down = 1;
