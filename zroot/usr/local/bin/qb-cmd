@@ -6,8 +6,9 @@
 . /usr/local/lib/quBSD/msg-cmd.sh
 
 get_options() {
-	while getopts dhHNpqrtu:x opts ; do case $opts in
+	while getopts dD:hHNpqrtu:x opts ; do case $opts in
 		d) _DETACH="true" ;;
+		D) _DPI="${OPTARG}" ;;
 		h) get_msg2 -eu   ;;
 		H) _NOX11="true"  ;;
 		N) _NORUN="true"  ;;
@@ -60,6 +61,12 @@ launch_xephyr() {
 		[ -e "/tmp/.X11-unix/X${display}" ] && _int=$(( _int + 1 )) || break
 	done || get_msg2 -Em _e9           # Error and exit if nothing found
 
+	# Apply a baseline Xresources
+  _xresources="${M_ZUSR}/${_JAIL}/home/${_JAIL}/.Xresources"
+	[ -f "$_xresources" ] || _xresources="${M_ZUSR}/0gui/home/0gui/.Xresources"
+	[ -f "$_xresources" ] || _xresources="${HOME}/.Xresources"
+	[ -f "$_xresources" ] || unset _xresources
+
 	# Launch/check Xephyr
 	Xephyr -resizeable -terminate -no-host-grab :$display > /dev/null 2>&1 &
 	xephyr_pid=$!  &&  sleep 0.2       # Give a moment for Xephyr session to launch
@@ -72,20 +79,19 @@ launch_xephyr() {
 			&& window_id="$wid" && break
 	done
 
-	export QTMP _JAIL _USER display window_id xephyr_pid
+	export QTMP _JAIL _USER _DPI display window_id xephyr_pid _xresources
 	daemon -o /dev/null sh -c '
-    echo "2.1: $(date +%s | grep -Eo "...\$")"
 		jexec -l -U $_USER $_JAIL env DISPLAY=:$display bspwm -c /usr/local/etc/X11/bspwmrc &
 		bspwm_pid="$!"
 		socat \
 			UNIX-LISTEN:${QTMP}/${_JAIL}/.X11-unix/X${display},fork,unlink-close,mode=0666 \
 			UNIX-CONNECT:/tmp/.X11-unix/X${display} &
 		socat_pid="$!"
-    echo "2.2: $(date +%s | grep -Eo "...\$")"
+    [ -n "$_xresources" ] && env DISPLAY=:$display xrdb -merge $_xresources
+    [ -n "$_DPI" ] && echo "Xft.dpi: $_DPI" | env DISPLAY=:$display xrdb -merge
 		while sleep 3 ; do
 			xprop -id "$window_id" | grep -Eqs ".*Xephyr.*:$display" || break
 		done
-    echo "2.3: $(date +%s | grep -Eo "...\$")"
 		kill -15 "$socat_pid"
 		kill -15 "$bspwm_pid"
 		kill -15 "$xephyr_pid"
@@ -106,7 +112,6 @@ run_jail_command() {
 	# If host and jail'd app are both X11, then trigger window isolation via Xephyr
 	if [ "$host_X11" = "true" ] && [ -z "$_NOX11" ] ; then
 		if mount | grep $_JAIL | grep -Eqs "/qubsd/${_JAIL}/tmp/\.X11-unix" ; then
-			jail_socket="true"
 			if chk_app_X11 || [ -n "$_NEWWIND" ] ; then 
 				launch_xephyr
 				_DISPLAY="env DISPLAY=:$display"
