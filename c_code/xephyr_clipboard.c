@@ -23,6 +23,7 @@
 #include <time.h>
 #include <dirent.h>
 #include <errno.h>
+#include <ctype.h>
 #include <signal.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -106,6 +107,7 @@ static const struct timespec kevent_timeout_ts =
     { .tv_sec = 0, .tv_nsec = 500000000L };     // blocking time in main kevent
 
 /* ----------------- prototype forward declarations ---------------- */
+static int   check_host_display(void);
 static void  reset_g_clip(int mode);
 static void  initialize_host_x_connection(void);
 static void  initialize_displays(void);
@@ -136,7 +138,7 @@ static int dbg_xerr(Display *d, XErrorEvent *e)
 /* ------------------------ startup functions ---------------------- */
 void reset_g_clip(int mode)
 {
-    if (mode == 1 && g_clip.t_copy != 0) {          // mode 1 (lease check) actions
+    if (mode == 1 && g_clip.t_copy != 0) {            // mode 1 (lease check) actions
         struct timespec ts_now;
         clock_gettime(CLOCK_MONOTONIC, &ts_now);
         if (TIMESPEC_MS(ts_now) < (g_clip.t_copy + (COPY_TTL_SEC * 1000))) return;
@@ -160,22 +162,59 @@ void reset_g_clip(int mode)
     g_clip.n_targets  = 0;
 }
 
+static int check_host_display(void)
+{
+    char disp[8] = {0};
+    if (getenv("DISPLAY") && *getenv("DISPLAY")) {    // Keep existing DISPLAY if it works
+        Display *t = XOpenDisplay(NULL);
+        if (t) { XCloseDisplay(t); return 0; }
+    }
+
+    FILE *fp = popen("ps -axo command | grep -E '(^|/)Xorg( |$)' | head -n1","r");
+    if (fp) {                                         // Otherwise take :N from first running Xorg
+        char line[512] = {0};
+        if (fgets(line, sizeof line, fp)) {
+            char *p = strchr(line, ':');
+            if (p && isdigit((unsigned char)p[1])) {
+                int n = atoi(p + 1);
+                if (n >= 0 && n < 100) snprintf(disp, sizeof disp, ":%d", n);
+            }
+        }
+        pclose(fp);
+    }
+
+    if (!disp[0]) {                                   // Fallback: lowest socket in /tmp/.X11-unix
+        DIR *d = opendir("/tmp/.X11-unix");
+        if (d) {
+            struct dirent *de; int low = -1;
+            while ((de = readdir(d))) {
+                if (de->d_name[0] == 'X') {
+                    long n = strtol(de->d_name + 1, NULL, 10);
+                    if (n >= 0 && (low == -1 || n < low)) low = (int)n;
+                }
+            }
+            closedir(d);
+            if (low != -1) snprintf(disp, sizeof disp, ":%d", low);
+        }
+    }
+    if (disp[0]) setenv("DISPLAY", disp, 1);
+    return getenv("DISPLAY") && *getenv("DISPLAY") ? 0 : -1;
+}
+
 void initialize_host_x_connection(void)
 {
     // Open connection to the host display. Check, then set fd.
+    if (check_host_display() < 0) die("Could not select host display");
     host_dpy = XOpenDisplay(NULL);
-    if (!host_dpy) {
-        die("initialize_host_x_connection: Failed to open host display");
-    }
+    if (!host_dpy) die("initialize_host_x_connection: Failed to open host display");
+    XSetErrorHandler(dbg_xerr);                       // Set custom X error handler
 
-    XSetErrorHandler(dbg_xerr);                         // Set custom X error handler
     // XI2 raw-event subscription (Ctrl-V & Button2 only)
     int xi_evt, xi_err;
     if (!XQueryExtension(host_dpy, "XInputExtension", &host_xi_opcode, &xi_evt, &xi_err))
         die("XInput2 not available on host display");
     int xi_major = 2, xi_minor = 0;
     XIQueryVersion(host_dpy, &xi_major, &xi_minor);   // require ≥2.0
-
     unsigned char xi_mask_bytes[2] = {0};
     XIEventMask xi_mask = { .deviceid = XIAllMasterDevices,
                             .mask_len = sizeof(xi_mask_bytes), .mask = xi_mask_bytes };
