@@ -1,0 +1,9 @@
+XTerm*faceName: Monospace
+XTerm*faceSize: 17
+XTerm*metaSendsEscape: true
+XTerm*background: #222222	
+XTerm*foreground: lightgray
+XTerm*color4: #6666ff
+XTerm*selectToClipboard: true
+XTerm*saveLines: 100000
+Xft.dpi: 96
