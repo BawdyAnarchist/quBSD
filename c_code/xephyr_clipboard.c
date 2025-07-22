@@ -54,8 +54,8 @@
 #endif
 
 /* --------------------------- Tunables ---------------------------- */
-#define  _POSIX_C_SOURCE  200809L
-#define  _XOPEN_SOURCE    700                  // for usleep(), daemon()
+#define _POSIX_C_SOURCE   200809L
+#define _XOPEN_SOURCE     700                  // for usleep(), daemon()
 #define MAX_NESTS         512
 #define MAX_TARGETS       128
 #define COPY_TTL_SEC      10
@@ -70,7 +70,6 @@ typedef struct {
     Display *dpy;
     int      fd;
     int      xfixes_base;     // XEvent uses numeric IDs + this_offset, per window
-    Atom     atom_primary;    // Merge treatment of PRIMARY as synonymous with clipboard
     Atom     atom_clipboard;  // X11 uses different atom IDs for each display 
     Atom     atom_targets;    // atom target IDs are also unique for each display
     Window   proxy;           // daemon owned window - our proxy into the display
@@ -83,21 +82,23 @@ typedef struct {              // Unambigous daemon-view of the clipboard state
     long long t_copy;         // monotonic time of last copy event (ms)
     long long t_owned;        // monotonic time of clipboard ownership acquisition (ms)
     long long t_paste;        // monotonic time of raw ctrl-v detection (ms)
-    long long t_middle;       // monotonic time of middle-click detection (ms)
     int      n_targets;       // number of active targets
-    int      is_primary;      // 1=PRIMARY, 0=CLIPBOARD, for functionality duplication
     char    *targets[MAX_TARGETS];  // Available clipboard formats (atoms as text)
 } Clip;
 
-static int     kq_fd = -1;            // kqueue file descriptor for init, cleanup, kevents
-static Nest    nests[MAX_NESTS];      // Arbitrary but needs a number. Will dynamically compact
+static int     kq_fd = -1;               // kqueue file descriptor for init, cleanup, kevents
+static Nest    nests[MAX_NESTS];         // Arbitrary but needs a number. Will dynamically compact
 static int     n_nests = 0;
 static Clip    g_clip;
-static int     host_xi_opcode = 0;    // XI2 opcode
-static int     ctrl_is_down = 0;          /* 0 = up, 1 = down */
+static int     host_xi_opcode = 0;       // XI2 vars. We want to replicate all ctrl-c actions
 static int     host_ctrl_l_keycode = 0;
 static int     host_ctrl_r_keycode = 0;
+static int     host_shift_l_keycode = 0;
+static int     host_shift_r_keycode = 0;
+static int     host_insert_keycode  = 0;
+static int     ctrl_is_down = 0;         // 0 = up, 1 = down
 static int     host_v_keycode = 0; 
+static int     shift_is_down        = 0;
 static Display *host_dpy = NULL;      // X11 calls are always made from host display
 static Atom    host_atom_active_win;  // The `atom` of _NET_ACTIVE_WINDOW for host display
 static volatile sig_atomic_t quit_flag = 0;
@@ -141,8 +142,7 @@ void reset_g_clip(int mode)
         if (TIMESPEC_MS(ts_now) < (g_clip.t_copy + (COPY_TTL_SEC * 1000))) return;
 
         if (g_clip.owned) {                           // Clear ownership of the clipboard
-            Atom sel = g_clip.is_primary ? g_clip.owned->atom_primary : g_clip.owned->atom_clipboard;
-            XSetSelectionOwner(g_clip.owned->dpy, sel, None, CurrentTime);
+            XSetSelectionOwner(g_clip.owned->dpy, g_clip.owned->atom_clipboard, None, CurrentTime);
             XFlush(g_clip.owned->dpy);
         }
         for (int i = 0; i < g_clip.n_targets; i++) {  // Clear targets memory
@@ -157,9 +157,7 @@ void reset_g_clip(int mode)
     g_clip.t_copy     = 0;
     g_clip.t_owned    = 0;
     g_clip.t_paste    = 0;
-    g_clip.t_middle   = 0;
     g_clip.n_targets  = 0;
-    g_clip.is_primary = 0;
 }
 
 void initialize_host_x_connection(void)
@@ -183,7 +181,7 @@ void initialize_host_x_connection(void)
                             .mask_len = sizeof(xi_mask_bytes), .mask = xi_mask_bytes };
     XISetMask(xi_mask.mask, XI_RawKeyPress);
     XISetMask(xi_mask.mask, XI_RawKeyRelease);
-    XISetMask(xi_mask.mask, XI_RawButtonPress);
+    XISetMask(xi_mask.mask, XI_RawButtonPress); 
     XISelectEvents(host_dpy, DefaultRootWindow(host_dpy), &xi_mask, 1);
 
     // Get the host atom for the active window, and set Notify events
@@ -193,6 +191,9 @@ void initialize_host_x_connection(void)
     host_v_keycode = XKeysymToKeycode(host_dpy, XStringToKeysym("v"));
     host_ctrl_l_keycode = XKeysymToKeycode(host_dpy, XStringToKeysym("Control_L"));
     host_ctrl_r_keycode = XKeysymToKeycode(host_dpy, XStringToKeysym("Control_R"));
+    host_shift_l_keycode = XKeysymToKeycode(host_dpy, XStringToKeysym("Shift_L"));
+    host_shift_r_keycode = XKeysymToKeycode(host_dpy, XStringToKeysym("Shift_R"));
+    host_insert_keycode  = XKeysymToKeycode(host_dpy, XStringToKeysym("Insert"));
 
     DLOG("Host X connection initialized (display: %s, fd: %d). Ctrl+V grab installed.\n",
           DisplayString(host_dpy), ConnectionNumber(host_dpy));
@@ -209,12 +210,10 @@ void initialize_displays(void)
     int ev_base, err_base;
     XFixesQueryExtension(host_dpy, &ev_base, &err_base);
     nests[0].xfixes_base = ev_base;
-    nests[0].atom_primary   = XInternAtom(host_dpy, "PRIMARY",   False);
     nests[0].atom_clipboard = XInternAtom(host_dpy, "CLIPBOARD", False);
     nests[0].atom_targets   = XInternAtom(host_dpy, "TARGETS",   False);
+
     /* same XFixes subscriptions the other nests get */
-    XFixesSelectSelectionInput(host_dpy, DefaultRootWindow(host_dpy),
-                               nests[0].atom_primary,   XFixesSetSelectionOwnerNotifyMask);
     XFixesSelectSelectionInput(host_dpy, DefaultRootWindow(host_dpy),
                                nests[0].atom_clipboard, XFixesSetSelectionOwnerNotifyMask);
     // we already called XSelectInput() and the grabs on host_dpy earlier
@@ -290,13 +289,10 @@ static void add_display(const char *name)
     XFixesQueryExtension(d, &ev_base, &err_base);
     n->xfixes_base = ev_base;          /* store event-base offset */
     (void)err_base;                    /* Silence -Werror for unused variable */
-    n->atom_primary   = XInternAtom(d,"PRIMARY",False);
     n->atom_clipboard = XInternAtom(d,"CLIPBOARD",False);
     n->atom_targets   = XInternAtom(d,"TARGETS",False);
 
     // Get X11 event notifications for selection and paste events
-    XFixesSelectSelectionInput(d,DefaultRootWindow(d),
-                               n->atom_primary,XFixesSetSelectionOwnerNotifyMask);
     XFixesSelectSelectionInput(d,DefaultRootWindow(d),
                                n->atom_clipboard,XFixesSetSelectionOwnerNotifyMask);
     XFlush(d);
@@ -428,38 +424,48 @@ static Nest *fetch_focused_display(void)
 
 static void handle_focus_change(void)
 {
-    DLOG("Entering handle_focus_change\n");
+    if (g_clip.t_copy == 0) return;           // No active lease, nothing to transfer
 
-    // Record old ownership, fetch and record newly focused display
+    // Determine displays
+    Nest *old_focus = g_clip.focused;
     Nest *old_owned = g_clip.owned;
     Nest *new_focus = fetch_focused_display();
-DLOG("Claiming %s on %s\n", g_clip.is_primary ? "PRIMARY" : "CLIPBOARD", new_focus->name);
     if (!new_focus) return;
+    if (new_focus == old_focus) return;       // Display did not actually change
     g_clip.focused = new_focus;
 
-    // Request ownership of the newly focused display, update g_clip
-    XSetSelectionOwner(new_focus->dpy, new_focus->atom_clipboard, new_focus->proxy, CurrentTime);
-    XSetSelectionOwner(new_focus->dpy, new_focus->atom_primary,   new_focus->proxy, CurrentTime);
-    XFlush(new_focus->dpy);
+    // Grab clipboard ownership of new focus
+    if (XGetSelectionOwner(new_focus->dpy, new_focus->atom_clipboard) != new_focus->proxy 
+            && new_focus != g_clip.source) {
+        XSetSelectionOwner(new_focus->dpy, new_focus->atom_clipboard, new_focus->proxy, CurrentTime);
+        XFlush(new_focus->dpy);
+    }
     g_clip.owned = new_focus;
-    struct timespec ts_now;
-    clock_gettime(CLOCK_MONOTONIC, &ts_now);
+    struct timespec ts_now; clock_gettime(CLOCK_MONOTONIC, &ts_now);
     g_clip.t_owned = TIMESPEC_MS(ts_now);
 
-    // Relinquish ownership of the old owned display
-    if (old_owned && new_focus != old_owned) {
+    // Relinquish on previous display
+    if (old_owned && new_focus != old_owned && old_owned != g_clip.source
+                  && XGetSelectionOwner(old_owned->dpy, old_owned->atom_clipboard) == old_owned->proxy) {
         XSetSelectionOwner(old_owned->dpy, old_owned->atom_clipboard, None, CurrentTime);
-        XSetSelectionOwner(old_owned->dpy, old_owned->atom_primary,   None, CurrentTime);
         XFlush(old_owned->dpy);
     }
-
     DLOG("Focus change: %s is now focused\n", new_focus->name);
 }
 
 static void create_new_lease(Nest *n, XFixesSelectionNotifyEvent *ev)
 {
-    if (ev->owner == n->proxy) return;    // Ignore daemon generated events
-DLOG("Lease received: %s (%s)\n", n->name, ev->selection == n->atom_primary ? "PRIMARY" : "CLIPBOARD");
+    /* This function intentionally blocks for 200ms to get targets, to prevent any possibility
+       of unexpected interactions of races with other incoming XI2 or kevent signals.*/
+
+    // Wipe previous targets before getting new ones 
+    if (ev->owner == n->proxy || ev->owner == None || ev->selection != n->atom_clipboard) return;
+    for (int i = 0; i < g_clip.n_targets; i++) {
+        free(g_clip.targets[i]);
+        g_clip.targets[i] = NULL;
+    }
+    g_clip.source     = n;
+    g_clip.n_targets  = 0;
 
     // Request TARGETS from the new owner via proxy with blocking listen - 200ms timeout
     Atom atom_new = XInternAtom(n->dpy, "XC_CLIP_PROP", False);
@@ -494,13 +500,6 @@ DLOG("Lease received: %s (%s)\n", n->name, ev->selection == n->atom_primary ? "P
     if (!data || n_items == 0) { XFree(data); return; }
 
     // Update g_clip
-    g_clip.source     = n;
-    g_clip.is_primary = (ev->selection == n->atom_primary);
-    for (int i = 0; i < g_clip.n_targets; i++) {        // wipe previous TARGETS (prevent mem leak)
-        free(g_clip.targets[i]);
-        g_clip.targets[i] = NULL;
-    }
-    g_clip.n_targets = 0;
     Atom *targets_list = (Atom *)data;                  // Add new targets
     for (unsigned long i = 0; i < n_items && g_clip.n_targets < MAX_TARGETS; i++) {
         char *atom_name = XGetAtomName(n->dpy, targets_list[i]);
@@ -511,35 +510,24 @@ DLOG("Lease received: %s (%s)\n", n->name, ev->selection == n->atom_primary ? "P
     }
     XFree(data);
     g_clip.t_copy = TIMESPEC_MS(now);
-
-    DLOG("Copy Handled. Lease created. Source=%s, Targets=%d, TTL=%ds\n",
-          n->name, g_clip.n_targets, COPY_TTL_SEC);
+    DLOG("Lease created. Source=%s, Targets=%d, TTL=%ds\n", n->name, g_clip.n_targets, COPY_TTL_SEC);
 }
 
 static void service_selection_request(Nest *n, XSelectionRequestEvent *req)
 {
-DLOG("Begin service selection. Dest=%s, Actual Source=%s, Targets=%d\n",
-     n->name, g_clip.source ? g_clip.source->name : "NULL", g_clip.n_targets);
+    /* This function blocks for 200ms after serving targets to destination, waiting for response; and
+       again to wait for source data. Prevents unexpected interactions/races with other events.*/ 
 
     // Pre filters: Fast-deny invalid / insecure requests
     struct timespec ts_now;
     clock_gettime(CLOCK_MONOTONIC, &ts_now);
-    long long guard_ts = (req->selection == n->atom_clipboard) ? g_clip.t_paste : g_clip.t_middle;
-DLOG("Pre-filter: sel=%s guard_ts=%lld now=%lld  t_paste=%lld  t_middle=%lld\n", (req->selection == n->atom_clipboard) ? "CLIPBOARD" : "PRIMARY", guard_ts, TIMESPEC_MS(ts_now), g_clip.t_paste, g_clip.t_middle);
-
-    if (guard_ts == 0 || TIMESPEC_MS(ts_now) > guard_ts + PASTE_WINDOW_MS) {
+    if (req->selection != n->atom_clipboard) goto deny;
+    if (g_clip.t_paste == 0 || TIMESPEC_MS(ts_now) > g_clip.t_paste + PASTE_WINDOW_MS) {
         char *t_name = XGetAtomName(n->dpy, req->target);
-DLOG("DENY: paste window fail. guard_ts=%lld, target=%s\n", guard_ts, t_name ? t_name : "??");
         if (t_name) XFree(t_name);
         goto deny;
     }
-    if (n != g_clip.focused || n != g_clip.owned) {
-DLOG("DENY: focus/owner mismatch. event_nest=%s, focused=%s, owned=%s\n",
-     n->name, g_clip.focused ? g_clip.focused->name : "NULL",
-     g_clip.owned ? g_clip.owned->name : "NULL");
-        goto deny;
-    }
-    if (req->selection != n->atom_clipboard && req->selection != n->atom_primary) goto deny;
+    if (n != g_clip.focused || n != g_clip.owned) goto deny;
     // dest_prop must be valid for every success-path (incl. TARGETS branch)
     Atom dest_prop = req->property ? req->property : req->target;
 
@@ -571,7 +559,6 @@ DLOG("DENY: focus/owner mismatch. event_nest=%s, focused=%s, owned=%s\n",
                     next_req->selection == req->selection &&
                     next_req->target != n->atom_targets) {
                     *req = *next_req; // Overwrite original request with the real one
-DLOG("SR-FOLLOW: real target=%ld (%s) property=%ld\n", (long)req->target, XGetAtomName(n->dpy, req->target), (long)req->property);
                     dest_prop = next_req->property ? next_req->property : next_req->target;
                     break;
                 }
@@ -579,7 +566,6 @@ DLOG("SR-FOLLOW: real target=%ld (%s) property=%ld\n", (long)req->target, XGetAt
             }
             struct timespec now_wait; clock_gettime(CLOCK_MONOTONIC, &now_wait);
             if (TIMESPEC_MS(now_wait) - TIMESPEC_MS(start_wait) > 200) {
-DLOG("DENY: no follow-up request within 200ms timeout\n");
                 goto deny;
             }
             usleep(1000);
@@ -600,7 +586,7 @@ DLOG("DENY: no follow-up request within 200ms timeout\n");
     Atom source_target_atom = XInternAtom(source_nest->dpy, target_name, False);
     Atom prop_atom = XInternAtom(source_nest->dpy, "XC_CLIP_FETCH_PROP", False);
     XFree(target_name);
-    Atom sel = g_clip.is_primary ? source_nest->atom_primary : source_nest->atom_clipboard;
+    Atom sel = source_nest->atom_clipboard;
     XConvertSelection(source_nest->dpy, sel, source_target_atom, prop_atom, source_nest->proxy, req->time);
     XFlush(source_nest->dpy);
 
@@ -609,9 +595,12 @@ DLOG("DENY: no follow-up request within 200ms timeout\n");
     clock_gettime(CLOCK_MONOTONIC, &ts_now);
     long start_ms = TIMESPEC_MS(ts_now);
     while (1) {
-        if (XCheckTypedWindowEvent(source_nest->dpy, source_nest->proxy,
-                                   SelectionNotify, &event)) {
-            if (event.xselection.property == prop_atom) break;
+        if (XCheckTypedWindowEvent(source_nest->dpy, source_nest->proxy, SelectionNotify, &event)) {
+            if (event.xselection.property == prop_atom) {
+                break;                 // Correct event found, proceed.
+            } else {                   // Stray/old SelectionNotify. Put it back.
+                XPutBackEvent(source_nest->dpy, &event);
+            }
         }
         clock_gettime(CLOCK_MONOTONIC, &ts_now);
         if (TIMESPEC_MS(ts_now) - start_ms > 200) {
@@ -629,9 +618,9 @@ DLOG("DENY: no follow-up request within 200ms timeout\n");
     unsigned char *data = NULL;
     XGetWindowProperty(source_nest->dpy, source_nest->proxy, prop_atom, 0, MAX_CLIP_BYTES / 4, False,
                        AnyPropertyType, &type_ret, &fmt_ret, &n_items, &bytes_after, &data);
-DLOG("FETCH: source delivered %lu bytes (%ld leftover) for target=%ld to proxy=%s\n", n_items, bytes_after, (long)source_target_atom, source_nest->name);
     XDeleteProperty(source_nest->dpy, source_nest->proxy, prop_atom);
     if (!data || n_items == 0) { if (data) XFree(data); goto deny; }
+
     // Translate the property ‘type’ atom from source → dest
     char *type_name = XGetAtomName(source_nest->dpy, type_ret);
     Atom  dest_type = type_name ? XInternAtom(n->dpy, type_name, False) : type_ret; /* fallback */
@@ -639,9 +628,7 @@ DLOG("FETCH: source delivered %lu bytes (%ld leftover) for target=%ld to proxy=%
     XChangeProperty(n->dpy, req->requestor, dest_prop, dest_type,
                     fmt_ret, PropModeReplace, data, n_items);
     XFree(data);
-DLOG("Resetting timers: clearing t_paste/t_middle (was %lld / %lld)\n", g_clip.t_paste, g_clip.t_middle);
-DLOG("SR-POST: Sent %lu items (fmt=%d, type=%ld) to requestor=0x%lx on %s\n", n_items, fmt_ret, (long)type_ret, (unsigned long)req->requestor, n->name);
-    g_clip.t_paste = 0; g_clip.t_middle = 0;       // They served their purpose, now reset them
+    g_clip.t_paste = 0;
     XSelectionEvent se = {0};
     se.type = SelectionNotify;
     se.display = req->display;
@@ -653,15 +640,14 @@ DLOG("SR-POST: Sent %lu items (fmt=%d, type=%ld) to requestor=0x%lx on %s\n", n_
     XSendEvent(n->dpy, req->requestor, False, 0, (XEvent *)&se);
     XFlush(n->dpy);
     return;
-deny:   // On any failure, send a denial notification
-    {
+    deny: {                            // On any failure, send a denial notification
         XSelectionEvent se = {0};
         se.type = SelectionNotify;
         se.display = req->display;
         se.requestor = req->requestor;
         se.selection = req->selection;
         se.target = req->target;
-        se.property = None;                // Indicate failure
+        se.property = None;            // Indicate failure
         se.time = req->time;
         XSendEvent(n->dpy, req->requestor, False, 0, (XEvent *)&se);
         XFlush(n->dpy);
@@ -681,7 +667,6 @@ static void cleanup_resources(int kq)
         Nest *n = &nests[i];
         if (!n->dpy) continue;
         XSetSelectionOwner(n->dpy, n->atom_clipboard, None, CurrentTime);   // CLIPBOARD release
-        XSetSelectionOwner(n->dpy, n->atom_primary,   None, CurrentTime);   // PRIMARY release
         if (n->proxy) XDestroyWindow(n->dpy, n->proxy);
         XFlush(n->dpy);          // Destroy proxy window & flush
         XCloseDisplay(n->dpy);   // Close display connection
@@ -698,54 +683,55 @@ static void process_x_events(Nest *n, XEvent *event)
     switch (event->type) {
         case PropertyNotify:                            // Window focus
             if (g_clip.t_copy > 0 && n == &nests[0] && event->xproperty.atom == host_atom_active_win) {
-DLOG("PropertyNotify: focused=%s copytime=%lld source=%s event_nest=%s\n",
-    g_clip.focused ? g_clip.focused->name : "NULL", g_clip.t_copy,
-    g_clip.source  ? g_clip.source->name  : "NULL", n->name);
                 handle_focus_change();
             }
             break;
         case GenericEvent: {                            // XI2 raw input
-DLOG("GenericEvent: focused=%s copytime=%lld source=%s event_nest=%s\n",
-    g_clip.focused ? g_clip.focused->name : "NULL", g_clip.t_copy,
-    g_clip.source  ? g_clip.source->name  : "NULL", n->name);
             XGenericEventCookie *c = &event->xcookie;
             if (c->extension != host_xi_opcode || !XGetEventData(n->dpy, c)) break;
             XIRawEvent *re = (XIRawEvent *)c->data;
-            if (c->evtype == XI_RawKeyPress) {
+            if (c->evtype == XI_RawKeyPress) {          // Raw Keypress detected 
+                /* Track modifier state -------------------------------------- */
                 if (re->detail == host_ctrl_l_keycode || re->detail == host_ctrl_r_keycode) {
                     ctrl_is_down = 1;
+                } else if (re->detail == host_shift_l_keycode || re->detail == host_shift_r_keycode) {
+                    shift_is_down = 1;
+                /* Ctrl-V ---------------------------------------------------- */
                 } else if (re->detail == host_v_keycode && ctrl_is_down && g_clip.t_copy > 0) {
-                    if (g_clip.t_paste == 0) {          // Set timestamp only if not already set
+                    if (g_clip.t_paste == 0) {
                         struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
                         g_clip.t_paste = TIMESPEC_MS(ts);
-DLOG("Set t_paste=%lld on RawKeyPress (event_nest=%s)\n", g_clip.t_paste, n->name);
+                    }
+                /* Shift-Insert --------------------------------------------- */
+                } else if (re->detail == host_insert_keycode && shift_is_down && g_clip.t_copy > 0) {
+                    if (g_clip.t_paste == 0) {
+                        struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
+                        g_clip.t_paste = TIMESPEC_MS(ts);
                     }
                 }
-            } else if (c->evtype == XI_RawKeyRelease) {
+            } else if (c->evtype == XI_RawKeyRelease) {  // Reset after release
                 if (re->detail == host_ctrl_l_keycode || re->detail == host_ctrl_r_keycode) {
                     ctrl_is_down = 0;
+                } else if (re->detail == host_shift_l_keycode || re->detail == host_shift_r_keycode) {
+                    shift_is_down = 0;
                 }
-            } else if (c->evtype == XI_RawButtonPress) {
+            } else if (c->evtype == XI_RawButtonPress) { // Middle-click paste
                 if ((int)re->detail == Button2 && g_clip.t_copy > 0) {
-                    if (g_clip.t_middle == 0) {         // Set timestamp only if not already set 
+                    if (g_clip.t_paste == 0) {
                         struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
-                        g_clip.t_middle = TIMESPEC_MS(ts);
+                        g_clip.t_paste = TIMESPEC_MS(ts);
                     }
                 }
             }
             XFreeEventData(n->dpy, c);
             break;
         }
-        case SelectionRequest:                          // Window wants to paste from clipboard owner
-DLOG("Host Ctrl+V detected. Paste lease armed (t_paste=%lld)\n", g_clip.t_paste);
+        case SelectionRequest:  // Window wants to paste from clipboard owner
             if (g_clip.t_copy > 0 && g_clip.source != NULL) {
-DLOG("SelectionRequest: focused=%s copytime=%lld source=%s event_nest=%s\n",
-    g_clip.focused ? g_clip.focused->name : "NULL", g_clip.t_copy,
-    g_clip.source  ? g_clip.source->name  : "NULL", n->name);
                 service_selection_request(n, &event->xselectionrequest);
             }
             break;
-        default:          // X11 extension for owner change. Not a core-protocol ID, needs xfixes_base
+        default:                // X11 extension for owner change. Not a core-protocol ID, needs xfixes_base
             if (n->xfixes_base && event->type == n->xfixes_base + XFixesSelectionNotify)
                 create_new_lease(n, (XFixesSelectionNotifyEvent *)event);
             break;
