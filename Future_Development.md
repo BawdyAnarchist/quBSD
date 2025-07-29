@@ -1,4 +1,7 @@
 
+virtualgl - need to put the config into the install script 
+  /usr/local/VirtualGL/bin/vglserver_config -config +glx +egl +s +f -t 
+
 MTU is not being honored and now some jails (no VPN, connect to firewall) are failing to put resolv.conf correctly
 
 You EOF scripts with /tmp and all that nonsense should all be replaced with daemon
@@ -18,6 +21,14 @@ TIMEOUT overhaul - timeout is a real command that will exit a command after a ce
 zfs decryption wasnt working quite right. I need to recheck it
 
 When back on normal setup, fix the i3gen.conf to match QubesTricks
+
+
+### INSTALLER SCRIPT CHANGES ###
+Linuxulator upgrade - ubuntu full session
+  debootstrap jammy /qubsd/0gui/compat/ubuntu
+  Then set jconf mounts. Including a shared home directory
+    - This I will try for now, but might end up being problematic later? We'll see
+ 
 
 
 ### INSTALLER SCRIPT CHANGES ###
