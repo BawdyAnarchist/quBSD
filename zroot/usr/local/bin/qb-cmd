@@ -56,7 +56,7 @@ parse_jail_vars() {
 	# Ensure default values if the user didnt specify them
 	_shell=$(get_jail_shell -e "$_JAIL")        # Lib function orders shell priority
 	_SHELL=${_SHELL:=$_shell}
-	[ -z "$_CMD" ] && _CMD="${_CMD:=$_SHELL}"
+	[ -z "$_NEWWIND" ] && _CMD=${_CMD:=$_SHELL} || _CMD=${_CMD:="xterm"}
 }
 
 chk_app_X11() {
@@ -98,7 +98,7 @@ launch_xephyr() {
 	# Disabling XVideo prevents non-existent GPU overlay inside the Xephyr session
 	Xephyr -extension MIT-SHM -extension XVideo -extension XVideo-MotionCompensation \
 			-resizeable -terminate -no-host-grab :$display > /dev/null 2>&1 &
-	xephyr_pid=$!  &&  sleep 0.2       # Give a moment for Xephyr session to launch
+	xephyr_pid=$!  &&  sleep 0.1       # Give a moment for Xephyr session to launch
 	! ps -p "$xephyr_pid" > /dev/null 2>&1 && get_msg2 -Em _e8 
 
 	# The Xephyr window_id is needed for monitoring/cleanup
@@ -127,6 +127,7 @@ launch_xephyr() {
 		kill -15 "$xephyr_pid"
 		exit 0
 	' &
+  sleep 0.1   # Give another moment for the env to load in Xephyr
 	return 0
 }
 
@@ -154,7 +155,7 @@ run_jail_command() {
 	rm_errfiles	; trap - HUP INT TERM QUIT EXIT
 	case "${_COMPAT}_${_NEWWIND}" in
 		_)      eval "jexec -l -U $_USER $_JAIL /bin/sh -c '$_CMD'" $_REDIRECT ;;
-		_true)  eval "jexec -l -U $_USER $_JAIL /bin/sh -c '$_DISPLAY $_CMD'" > /dev/null 2>&1 & ;;
+		_true)	eval "jexec -l -U $_USER $_JAIL $_DISPLAY /bin/sh -c '$_CMD'" > /dev/null 2>&1 & ;;
 		*_)     eval "jexec -l -U root   $_JAIL chroot $_COMPAT $_SHELL $_CMDMOD" $_REDIRECT ;;
 		*_true) eval "jexec -l -U root   $_JAIL chroot $_COMPAT $_SHELL -c \
 										'su -c \"$_DISPLAY $_CMD\" $_JAIL'" > /dev/null 2>&1 & ;;
