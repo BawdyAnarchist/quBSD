@@ -390,12 +390,14 @@ get_info() {
 			;;
 		_XJAIL)  # Gets the jailname of the active window. Converts $HOSTNAME to: "host"
 			_xid=$(get_info -e _XID)
-			if [ "$_xid" = "0x0" ] || echo $_xid | grep -qs "not found" ; then
+			if [ "$_xid" = "0x0" ] \
+					|| xprop -id $_xid WM_CLIENT_MACHINE | grep -Eqs "$(hostname)" ; then
+				_value=host	 
 				_value=host
 			else
-				_value=$(xprop -id $(get_info -e _XID) WM_CLIENT_MACHINE \
-						| sed "s/WM_CLIENT_MACHINE(STRING) = \"//" | sed "s/.$//" \
-						| sed "s/$(hostname)/host/") || _value="host"
+				_xsock=$(xprop -id $_xid | sed -En "s/^WM_NAME.*:([0-9]+)\..*/\1/p")
+				_value=$(pgrep -fl "X11-unix/X${_xsock}" | head -1 | sed -En \
+								"s@.*tmp/quBSD/([[:alnum:]]+)/.X11-unix/X${_xsock}.*@\1@p")
 			fi
 			;;
 		_XNAME)  # Gets the name of the active window
@@ -717,7 +719,7 @@ reclone_zroot() {
 		pw -V ${M_QROOT}/${_jail}/etc/ useradd -n $_jail -u 1001 -d /home/${_jail} -s /bin/csh 2>&1
 		[ -d "${M_QROOT}/${_jail}/compat/ubuntu" ] \
 			&& chroot ${M_QROOT}/${_jail}/compat/ubuntu /bin/bash -c "
-					/usr/sbin/useradd -m -u 1001 -d /home/${_jail} -s /bin/bash ${_jail}
+					/usr/sbin/useradd -m -u 1001 -d /home/${_jail} -s /bin/bash ${_jail} 
 			"
 	fi
 	eval $_R0
