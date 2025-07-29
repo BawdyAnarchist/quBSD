@@ -45,7 +45,7 @@ chk_app_X11() {
   _cmd=$(echo "$_CMD" | awk '{print $1}')
   export _cmd
   chroot "${M_QROOT}/${_JAIL}" /bin/sh -s << 'EOF'
-		_pkg=$(which $_cmd | xargs pkg which | sed -En "s/.*( [^[:blank:]]+\$)/\1/p")
+		_pkg=$(which $_cmd | xargs pkg which -q)
 		[ -z "$_pkg" ] && exit 3
 		pkg info -d $_pkg | grep -Eqs 'libX11|libxcb' && exit 0
 EOF
@@ -67,8 +67,10 @@ launch_xephyr() {
 	[ -f "$_xresources" ] || _xresources="${HOME}/.Xresources"
 	[ -f "$_xresources" ] || unset _xresources
 
-	# Launch/check Xephyr
-	Xephyr -resizeable -terminate -no-host-grab :$display > /dev/null 2>&1 &
+	# Launch Xephyr. sysvshm cannot share Xephyr here and some apps will fail if we dont disable it at launch
+	# Disabling XVideo prevents non-existent GPU overlay inside the Xephyr session
+	Xephyr -extension MIT-SHM -extension XVideo -extension XVideo-MotionCompensation \
+			-resizeable -terminate -no-host-grab :$display > /dev/null 2>&1 &
 	xephyr_pid=$!  &&  sleep 0.2       # Give a moment for Xephyr session to launch
 	! ps -p "$xephyr_pid" > /dev/null 2>&1 && get_msg2 -Em _e8 
 
@@ -89,11 +91,12 @@ launch_xephyr() {
 		socat_pid="$!"
     [ -n "$_xresources" ] && env DISPLAY=:$display xrdb -merge $_xresources
     [ -n "$_DPI" ] && echo "Xft.dpi: $_DPI" | env DISPLAY=:$display xrdb -merge
-		while sleep 3 ; do
+		while sleep 2 ; do
 			xprop -id "$window_id" | grep -Eqs ".*Xephyr.*:$display" || break
+			jls | grep -Eqs "[[:blank:]]${_JAIL}[[:blank:]]" || break
 		done
-		kill -15 "$socat_pid"
 		kill -15 "$bspwm_pid"
+		kill -15 "$socat_pid"
 		kill -15 "$xephyr_pid"
 		exit 0
 	' &
