@@ -6,15 +6,17 @@
 . /usr/local/lib/quBSD/msg-cmd.sh
 
 get_options() {
-	while getopts dD:hHNpqrtu:x opts ; do case $opts in
-		d) _DETACH="true" ;;
-		D) _DPI="${OPTARG}" ;;
-		h) get_msg2 -eu   ;;
-		H) _NOX11="true"  ;;
-		N) _NORUN="true"  ;;
-		p) _POPUP="true"  ;;
+	while getopts d:hHlL:Npqrstu:x opts ; do case $opts in
+		d) _DPI="${OPTARG}" ;;
+		h) get_msg2 -eu ;;
+		H) _NOX11="true" ;;
+		l) _COMPAT="/compat/ubuntu" ;;
+		L) _COMPAT="${OPTARG}" ;;
+		N) _NORUN="true" ;;
+		p) _POPUP="true" ;;
 		q) _REDIRECT=' > /dev/null 2>&1 &' ; _REDIRECT2='-o /dev/null' ;;
-		r) _USER="root"   ;;
+		r) _USER="root" ;;
+		r) _SHELL="${OPTARG}" ;;
 		u) _USER="${OPTARG}" ;;
 		x) _NEWWIND="true" ; [ -n "$_NOX11" ] && get_msg2 -Em _e10  ;;
 		*) exit 1 ;;
@@ -25,10 +27,6 @@ get_options() {
 }
 
 parse_jail_vars() {
-	# Lib function orders shell priority. Default _CMD is $_SHELL.
-	_SHELL=$(get_jail_shell -e "$_JAIL")
-	[ -z "$_CMD" ] && _CMD="${_CMD:=$_SHELL}"
-
 	# If X is running, get the jailname of the active window, and note that host is X111
 	if pgrep -q Xorg ; then
 		get_info _XJAIL
@@ -38,6 +36,27 @@ parse_jail_vars() {
 	# Unless already specified, JAIL and USER should be set to the active window
 	_JAIL="${_JAIL:=$_XJAIL}"
 	_USER="${_USER:=$_JAIL}"
+
+	# Handle linux compat mods
+	if [ -n "$_COMPAT" ] ; then
+		_SHELL=${_SHELL:="/bin/bash"}   # Default to bash if user didnt specify a shell
+
+		# Cleanup user specified compat in case the didnt include "/compat"
+		! echo "$_COMPAT" | grep -qs "compat" && _COMPAT="/compat/${_COMPAT}"
+
+		# Robust/resilient for various combos of _USER_CMD, including default if not included
+		case "${_USER}_${_CMD}" in
+			'root_')	SHELL="/bin/bash" ; _CMDMOD='' ;;
+			'root_*') SHELL="/bin/bash" ; _CMDMOD="-c '$_CMD'" ;;
+			'*_')			SHELL="/bin/bash" ; _CMDMOD="-c 'su - $_USER'" ;;
+			'*_*')		SHELL="/bin/bash" ; _CMDMOD="-c 'su -c \"$_CMD\"' $_USER" ;;
+		esac
+	fi
+
+	# Ensure default values if the user didnt specify them
+	_shell=$(get_jail_shell -e "$_JAIL")        # Lib function orders shell priority
+	_SHELL=${_SHELL:=$_shell}
+	[ -z "$_CMD" ] && _CMD="${_CMD:=$_SHELL}"
 }
 
 chk_app_X11() {
@@ -118,18 +137,20 @@ run_jail_command() {
 			if chk_app_X11 || [ -n "$_NEWWIND" ] ; then 
 				launch_xephyr
 				_DISPLAY="env DISPLAY=:$display"
-				_DETACH="true"
+				_NEWWIND="true"
 			fi
 		fi
 	fi
 
 	# Run the jexec command 
 	rm_errfiles	; trap - HUP INT TERM QUIT EXIT
-	if [ -z "$_DETACH" ] ; then
-		eval "jexec -l -U $_USER $_JAIL $_DISPLAY $_SHELL -c '$_CMD'" $_REDIRECT
-	else
-		eval "jexec -l -U $_USER $_JAIL $_SHELL -c 'env DISPLAY=:$display $_CMD'" > /dev/null 2>&1 &
-	fi
+	case "${_COMPAT}_${_NEWWIND}" in
+		_)      eval "jexec -l -U $_USER $_JAIL /bin/sh -c '$_CMD'" $_REDIRECT ;;
+		_true)  eval "jexec -l -U $_USER $_JAIL /bin/sh -c '$_DISPLAY $_CMD'" > /dev/null 2>&1 & ;;
+		*_)     eval "jexec -l -U root   $_JAIL chroot $_COMPAT $_SHELL $_CMDMOD" $_REDIRECT ;;
+		*_true) eval "jexec -l -U root   $_JAIL chroot $_COMPAT $_SHELL -c \
+										'su -c \"$_DISPLAY $_CMD\" $_JAIL'" > /dev/null 2>&1 & ;;
+	esac
 }
 
 connect_vm_session() {
