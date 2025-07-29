@@ -6,7 +6,7 @@
 . /usr/local/lib/quBSD/msg-cmd.sh
 
 get_options() {
-	while getopts d:hHlL:Npqrstu:x opts ; do case $opts in
+	while getopts d:hHlL:Npqrs:tu:x opts ; do case $opts in
 		d) _DPI="${OPTARG}" ;;
 		h) get_msg2 -eu ;;
 		H) _NOX11="true" ;;
@@ -16,7 +16,7 @@ get_options() {
 		p) _POPUP="true" ;;
 		q) _REDIRECT=' > /dev/null 2>&1 &' ; _REDIRECT2='-o /dev/null' ;;
 		r) _USER="root" ;;
-		r) _SHELL="${OPTARG}" ;;
+		s) _SHELL="${OPTARG}" ;;
 		u) _USER="${OPTARG}" ;;
 		x) _NEWWIND="true" ; [ -n "$_NOX11" ] && get_msg2 -Em _e10  ;;
 		*) exit 1 ;;
@@ -60,15 +60,23 @@ parse_jail_vars() {
 }
 
 chk_app_X11() {
-  # Have to use some gymnastics to be certain we're at the actual pkg name, not just the binary
-  _cmd=$(echo "$_CMD" | awk '{print $1}')
-  export _cmd
-  chroot "${M_QROOT}/${_JAIL}" /bin/sh -s << 'EOF'
-		_pkg=$(which $_cmd | xargs pkg which -q)
-		[ -z "$_pkg" ] && exit 3
-		pkg info -d $_pkg | grep -Eqs 'libX11|libxcb' && exit 0
+	# Use libraries resolution to figure out if we're dealing with an X11 app
+
+  export _cmd=$(echo "$_CMD" | awk '{print $1}')
+	if [ -z "$_COMPAT" ] ; then
+		# Have to use some gymnastics to be certain we're at the actual pkg name, not just the binary
+		chroot "${M_QROOT}/${_JAIL}" /bin/sh -s << 'EOF'
+			_pkg=$(which $_cmd | xargs pkg which -q)
+			[ -z "$_pkg" ] && exit 3
+			pkg info -d $_pkg | grep -Eqs 'libX11|libxcb' && exit 0
 EOF
-  return $?
+		return $?
+	else
+		chroot "${M_QROOT}/${_JAIL}/${_COMPAT}" $_SHELL -s << 'EOF'
+		ldd "$(which $_cmd 2>/dev/null)" 2>/dev/null | grep -Eqs 'libX11\.so|libxcb\.so' && exit 0
+EOF
+		return $?
+	fi
 }
 
 launch_xephyr() {
