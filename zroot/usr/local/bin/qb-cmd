@@ -46,10 +46,10 @@ parse_jail_vars() {
 
 		# Robust/resilient for various combos of _USER_CMD, including default if not included
 		case "${_USER}_${_CMD}" in
-			'root_')	SHELL="/bin/bash" ; _CMDMOD='' ;;
-			'root_*') SHELL="/bin/bash" ; _CMDMOD="-c '$_CMD'" ;;
-			'*_')			SHELL="/bin/bash" ; _CMDMOD="-c 'su - $_USER'" ;;
-			'*_*')		SHELL="/bin/bash" ; _CMDMOD="-c 'su -c \"$_CMD\"' $_USER" ;;
+			root_)	SHELL="/bin/bash" ; _CMDMOD='' ;;
+			root_*) SHELL="/bin/bash" ; _CMDMOD="-c '$_CMD'" ;;
+			*_)			SHELL="/bin/bash" ; _CMDMOD="-c 'su - $_USER'" ;;
+			*_*)		SHELL="/bin/bash" ; _CMDMOD="-c 'su -c \"$_CMD\"' $_USER" ;;
 		esac
 	fi
 
