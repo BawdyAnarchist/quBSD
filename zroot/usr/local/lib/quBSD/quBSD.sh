@@ -714,8 +714,11 @@ reclone_zroot() {
 		get_jail_shell "$_jail"
 		# Drop the flags for etc directory and add the user for the jailname
 		chflags -R noschg ${M_QROOT}/${_jail}/etc/
-		pw -V ${M_QROOT}/${_jail}/etc/ \
-				useradd -n $_jail -u 1001 -d /home/${_jail} -s /bin/csh 2>&1
+		pw -V ${M_QROOT}/${_jail}/etc/ useradd -n $_jail -u 1001 -d /home/${_jail} -s /bin/csh 2>&1
+		[ -d "${M_QROOT}/${_jail}/compat/ubuntu" ] \
+			&& chroot ${M_QROOT}/${_jail}/compat/ubuntu /bin/bash -c "
+					/usr/sbin/useradd -m -u 1001 -d /home/${_jail} -s /bin/bash ${_jail}
+			"
 	fi
 	eval $_R0
 }
