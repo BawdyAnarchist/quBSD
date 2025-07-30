@@ -34,8 +34,20 @@ User: < $_USER > doesn't have a /home directory inside of jail.
 Use [-r] if you need to run as root inside of the jail.
 ENDOFMSG
 		;;
+	_e8) cat << ENDOFMSG
+Failed to launch Xephyr process for X11 related call.
+ENDOFMSG
+		;;
+	_e9) cat << ENDOFMSG
+Failed to find available X11 socket within 99 increments.
+ENDOFMSG
+		;;
+	_e10) cat << ENDOFMSG
+[-H and -x] are mutually exclusive.
+ENDOFMSG
+		;;
 	_m1) cat << ENDOFMSG
-The following bhyve command would be run:
+The following command would be run (does not include env DISPLAY for Xephyr):
 ENDOFMSG
 		;;
 	_m2) cat << ENDOFMSG
@@ -51,22 +63,25 @@ qb-cmd: Runs command in a jail, or connects to VM.
         both tmux and VNC if no option specified.
 
 Usage: qb-cmd <jail/VM>
-       qb-cmd [-n][-r|-u <user>][-v] <jail> <command>
-       qb-cmd [-N|-v] <VM>
+       qb-cmd [-N][-d][-H|x][-p][-q][-r|-u <user>] <jail> <command>
+       qb-cmd [-N] <VM>
 
+   -d: (d)pi. Set DPI of the Xephyr window to be launched.
    -h: (h)elp. Outputs this help message
-   -n: (n)ew window. Run command in new window. If jail is not
-       specified, default environment is the active window
+   -l: (l)inux default: /compat/ubuntu
+   -L: (L)inux user-specified: /compat/<your_linux_compat>
+   -H: (H)eadless. Explicitly prevent a new Xephyr instance.
    -N: (N)orun. Print the bhyve command that would be run,
        but do not launch. Only applies to VMs.
    -p: (p)opup. Receive command for <jail> via temporary popup. 
        Use this in combination with quick-key settings.
+   -q: (q)uiet. Stdout suppressed.
    -r: (r)oot. Run cmd as root. Default is unprivileged user
+   -s: (s)shell. Specify a shell to use. 
    -u: (u)ser. Run cmd as <user>. Default is unpriveleged
        user, which is the same name as the jail.
-   -v: (v)erbose. Output of <command> will print to stdio.
-       (Default behavior sends output to /dev/null).For VM,
-       this will print the bhyve command, and launch the VM.
+   -x: (x)ephyr. Explicitly launch a new X11 Xephyr instance.
+       If jail isnt specified, default is the active window.
 
 ENDOFUSAGE
 		;;
