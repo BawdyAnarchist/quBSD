@@ -81,7 +81,8 @@ Usage: qb-cmd <jail/VM>
    -u: (u)ser. Run cmd as <user>. Default is unpriveleged
        user, which is the same name as the jail.
    -x: (x)ephyr. Explicitly launch a new X11 Xephyr instance.
-       If jail isnt specified, default is the active window.
+       If jail isnt specified, default is the focused window.
+   -X: (X)ephyr. Launch app inside the focused Xephyr window.
 
 ENDOFUSAGE
 		;;

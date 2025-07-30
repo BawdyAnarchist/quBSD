@@ -50,7 +50,6 @@
 # configure_ssh_control- SSH keys for control jail are copied over to running env.
 # monitor_startstop    - Monitors whether qb-start or qb-stop is still alive
 # monitor_vm_stop      - Monitors whether qb-start or qb-stop is still alive
-# start_xpra           - Determines the status of X11 and starts xpra for GUI envs
 
 #################################  STATUS  CHECKS  #################################
 # chk_isblank          - Posix workaround: Variable is [-z <null> OR [[:blank:]]*]
@@ -390,9 +389,7 @@ get_info() {
 			;;
 		_XJAIL)  # Gets the jailname of the active window. Converts $HOSTNAME to: "host"
 			_xid=$(get_info -e _XID)
-			if [ "$_xid" = "0x0" ] \
-					|| xprop -id $_xid WM_CLIENT_MACHINE | grep -Eqs "$(hostname)" ; then
-				_value=host	 
+			if [ "$_xid" = "0x0" ] || xprop -id $_xid WM_CLIENT_MACHINE | grep -Eq $(hostname) ; then
 				_value=host
 			else
 				_xsock=$(xprop -id $_xid | sed -En "s/^WM_NAME.*:([0-9]+)\..*/\1/p")
@@ -403,8 +400,9 @@ get_info() {
 		_XNAME)  # Gets the name of the active window
 			_value=$(xprop -id $(get_info -e _XID) WM_NAME _NET_WM_NAME WM_CLASS)
 			;;
-		_XPRA_SOCKETS)  # Gets the name of the active window
-			_value=$(pgrep -fl "xpra start" | sed -En 's/.*xpra start :([0-9]+) .*/\1/p')
+		_XSOCK)  # Gets the socket number of the active window
+			_xid=$(get_info -e _XID)
+			_value=$(xprop -id $_xid | sed -En "s/^WM_NAME.*:([0-9]+)\..*/\1/p")
 			;;
 		_XPID)   # Gets the PID of the active window.
 			_value=$(xprop -id $(get_info -e _XID) _NET_WM_PID | grep -Eo "[[:alnum:]]+$")
@@ -981,162 +979,6 @@ monitor_vm_stop() {
 
 	# Fail for timeout
 	eval $_R1
-}
-
-discover_xpra_socket() {
-	# Finds an unused socket for xpra (technically DISPLAY, but socket feels more descriptve)
-	local _fn="discover_xpra_socket" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	local _socket
-	while getopts qV opts ; do case $opts in
-		q) _q='-q' ;;
-		V) local _V="-V" ;;
-		*) get_msg -m _e9 ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
-
-	local _jail="$1"
-
-	# See if the jail/socket combo is already allocated in _TMP_IP. Return if so.
-	[ -z "$_TMP_IP" ] && _TMP_IP="${QTMP}/.qb-start_temp_ip"
-	[ -e "$_TMP_IP" ] && _socket=$(sed -En "s/^${_jail} XPRA ([0-9]+)/\1/p" $_TMP_IP)
-	[ "$_socket" ] && echo "$_socket" && eval $_R0
-
-	# Initialize key variables if not already done
-	[ -z "$_XPRA_SOCKETS" ] && get_info _XPRA_SOCKETS
-	[ -z "$_socket" ] && _socket="100"
-
-	# If the socket is empty (nothing in _TMP_IP), then find an available socket
-	while : ; do
-		# Check the TMP_IP, and host ps for an unused xpra socket (DISPLAY) number
-		if grep -Eqs "XPRA $_socket" $_TMP_IP || echo "$_XPRA_SOCKETS" | grep -Eqs "$_socket" ; then
-			_socket=$(( _socket + 1 ))
-			# Error after arbitrary 200 cycles to prevent infinite loop
-			[ "$_socket" -gt 300 ] && get_msg $_q $_V -m _e && eval $_R1
-		else break
-		fi
-	done
-
-	echo $_socket
-	eval $_R0
-}
-
-start_xpra() {
-	# Starts the xpra server, then client
-	local _fn="start_xpra" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	while getopts qV opts ; do case $opts in
-		q) _q='-q' ;;
-		V) local _V="-V" ;;
-		*) get_msg -m _e9 ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
-
-	local _jail="$1"
-	[ -z "$_jail" ] && get_msg $_q -m _e0 -- "JAIL" && eval $_R1
-
-	# Check that Xpra is installed in the ROOTENV before continuing. Return 0 if not present
-	_rootenv=$(get_jail_parameter -deqs ROOTENV $_jail)
-	[ ! -e "${M_QROOT}/${_rootenv}/usr/local/bin/xpra" ] && eval $_R0
-
-	# Get an available xpra socket (DISPLAY) number
-	! _socket=$(discover_xpra_socket "$_jail") && get_msg $_q $_V -m _e && eval $_R1
-
-	if chk_isvm "$_jail" ; then
-		:
-	else
-		# Make sure things start in a clean state
-		rm -r ${M_ZUSR}/${_jail}/home/${_jail}/.xpra/* > /dev/null 2>&1
-
-		# Start the server inside the jail
-		jexec -l -U "$_jail" "$_jail" xpra start :${_socket} --socket-dir=/tmp/xpra --audio=no \
-			--notifications=no --tray=no --system-tray=no --opengl=force \
-			--mmap=/tmp/xpra --desktop-scaling=auto --clipboard=yes --clipboard-direction=both \
-			> /dev/null 2>&1 &
-
-		# Modify the login environment
-		_b='.profile .bash_profile .bashrc .bash_login .kshrc .shrc .zshrc .zshenv .zprofile .zlogin'
-		_c='.cshrc .tcshrc .login'
-		for _shell in $_b ; do
-			if [ -e "${M_ZUSR}/${_jail}/home/${_jail}/${_shell}" ] ; then
-				sed -i '' -E "/DISPLAY/d" ${M_ZUSR}/${_jail}/home/${_jail}/${_shell}
-				echo "export DISPLAY=:${_socket}" >> ${M_ZUSR}/${_jail}/home/${_jail}/${_shell}
-			fi
-		done
-		for _shell in $_c ; do
-			if [ -e "${M_ZUSR}/${_jail}/home/${_jail}/${_shell}" ] ; then
-				sed -i '' -E "/DISPLAY/d" ${M_ZUSR}/${_jail}/home/${_jail}/${_shell}
-				echo "setenv DISPLAY :${_socket}" >> ${M_ZUSR}/${_jail}/home/${_jail}/${_shell}
-			fi
-		done
-
-		# If Xorg is installed on host, begin loop (external to start script) to attach xpra.
-		pkg query %n Xorg > /dev/null 2>&1 && launch_xpra_loop &
-	fi
-	eval $_R0
-}
-
-launch_xpra_loop() {
-	# We dont want to hang the start script merely waiting for the host to attach to xpra.
-	# This function is started in a subshell, creates a script, then forks to new process.
-	local _fn="launch_xpra_loop" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	# Send the commands to a temp file
-	cat <<-ENDOFCMD > "${QTMP}/.wait_xpra_${_jail}"
-		#!/bin/sh
-		# New script wont know about caller functions. Need to source them again
-		. /usr/local/lib/quBSD/quBSD.sh
-		. /usr/local/lib/quBSD/msg-quBSD.sh
-
-		# Get globals, although errfiles arent needed
-		get_global_variables
-		rm_errfiles
-
-		# Launch the loop that waits for X11 or for the jail's xpra server to stop
-		connect_host_to_xpra "$_jail" "$_socket"
-ENDOFCMD
-
-	# Make the file executable, and fork to it
-	chmod +x "${QTMP}/.wait_xpra_${_jail}"
-	exec "${QTMP}/.wait_xpra_${_jail}"
-	eval $_R0
-}
-
-connect_host_to_xpra() {
-	# It takes a moment for xpra server to start; plus, host might not be in an Xorg session yet.
-	# /tmp script will manage the loop, waiting for host X11 to start, or jailed xpra server to stop
-
-	# Cleanup the temporary script
-	_jail="$1"
-	_socket="$2"
-	trap "rm ${QTMP}/.wait_xpra_${_jail}" TERM INT HUP QUIT EXIT
-
-	# Wait for the jailed xpra serve to be ready, before continuing to the host X11 wait loop
-	while : ; do
-		if xpra list --socket-dir="${M_QROOT}/${_jail}/tmp/xpra" 2>&1 \
-			| grep -Eqs "LIVE session at :${_socket}"
-		then break
-		else
-			# If xpra fails inside the jail, exit the wait script entirely. Otherwise, loop.
-			! pgrep -qflj ${_jail} xpra && exit 0
-			sleep .5
-		fi
-	done
-
-	while : ; do
-		# Parallel starts, multiple loops sometimes false positive the `pgreg Xorg`. Filter out pgrep
-		if ps -ax | grep '/usr/local/libexec/Xorg' | grep -v grep ; then
-			_display=$(pgrep -fl Xorg | sed -En "s/.*Xorg (:[0-9]+) .*/\1/p")
-
-			DISPLAY="$_display" xpra attach --audio=no --notifications=no \
-				--tray=no --system-tray=no --opengl=force --mmap=${Q_ROOT}/${_jail}/tmp/xpra \
-				--desktop-scaling=auto --clipboard=yes --clipboard-direction=both \
-				--socket-dir=${M_QROOT}/${_jail}/tmp/xpra > /dev/null 2>&1 &
-			break
-		else
-			# Check xpra server is still running inside jail. Otherwise no reason to continue loop.
-			! pgrep -flqj ${_jail} 'xpra start :' > /dev/null 2>&1 && break
-			sleep 1
-		fi
-	done
 }
 
 

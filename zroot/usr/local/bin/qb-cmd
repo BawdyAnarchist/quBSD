@@ -6,7 +6,7 @@
 . /usr/local/lib/quBSD/msg-cmd.sh
 
 get_options() {
-	while getopts d:hHlL:Npqrs:tu:x opts ; do case $opts in
+	while getopts d:hHlL:Npqrs:tu:xX opts ; do case $opts in
 		d) _DPI="${OPTARG}" ;;
 		h) get_msg2 -eu ;;
 		H) _NOX11="true" ;;
@@ -18,7 +18,8 @@ get_options() {
 		r) _USER="root" ;;
 		s) _SHELL="${OPTARG}" ;;
 		u) _USER="${OPTARG}" ;;
-		x) _NEWWIND="true" ; [ -n "$_NOX11" ] && get_msg2 -Em _e10  ;;
+		x) _NEWWIND="true"  ; _X11="true" ; [ -n "$_NOX11" ] && get_msg2 -Em _e10  ;;
+		X) _SAMEWIND="true" ; _X11="true" ; { [ -n "$_NOX11" ] || [ -n "$NEWWIND" ] ;} && get_msg2 -Em _e10 ;;
 		*) exit 1 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
@@ -29,6 +30,7 @@ get_options() {
 parse_jail_vars() {
 	# If X is running, get the jailname of the active window, and note that host is X111
 	if pgrep -q Xorg ; then
+		[ -n "$_SAMEWIND" ] && _DISPLAY="env DISPLAY=:$(get_info -e _XSOCK)"
 		get_info _XJAIL
 		host_X11='true'
 	fi
@@ -94,9 +96,10 @@ launch_xephyr() {
 	[ -f "$_xresources" ] || _xresources="${HOME}/.Xresources"
 	[ -f "$_xresources" ] || unset _xresources
 
-	# Launch Xephyr. sysvshm cannot share Xephyr here and some apps will fail if we dont disable it at launch
-	# Disabling XVideo prevents non-existent GPU overlay inside the Xephyr session
-	Xephyr -extension MIT-SHM -extension XVideo -extension XVideo-MotionCompensation \
+	# sysvshm cannot share Xephyr here. Some apps will fail if we dont disable it. XVideo prevents non-existent
+	# GPU overlay. We MUST stop GLX entirely (even iglx), as A) Xephyr implementation sucks (<1.4), and B) even
+	# if it didnt, Xephyr is launched from *host*, and the jail only sees an X socket, not the Xephyr process.
+	Xephyr -extension MIT-SHM -extension XVideo -extension XVideo-MotionCompensation -extension GLX \
 			-resizeable -terminate -no-host-grab :$display > /dev/null 2>&1 &
 	xephyr_pid=$!  &&  sleep 0.1       # Give a moment for Xephyr session to launch
 	! ps -p "$xephyr_pid" > /dev/null 2>&1 && get_msg2 -Em _e8 
@@ -143,17 +146,17 @@ run_jail_command() {
 	# If host and jail'd app are both X11, then trigger window isolation via Xephyr
 	if [ "$host_X11" = "true" ] && [ -z "$_NOX11" ] ; then
 		if mount | grep $_JAIL | grep -Eqs "/qubsd/${_JAIL}/tmp/\.X11-unix" ; then
-			if chk_app_X11 || [ -n "$_NEWWIND" ] ; then 
+			if [ -z "$_SAMEWIND" ] && { chk_app_X11 || [ -n "$_NEWWIND" ] ;} ; then
 				launch_xephyr
 				_DISPLAY="env DISPLAY=:$display"
-				_NEWWIND="true"
+				_X11="true"
 			fi
 		fi
 	fi
 
 	# Run the jexec command 
 	rm_errfiles	; trap - HUP INT TERM QUIT EXIT
-	case "${_COMPAT}_${_NEWWIND}" in
+	case "${_COMPAT}_${_X11}" in
 		_)      eval "jexec -l -U $_USER $_JAIL /bin/sh -c '$_CMD'" $_REDIRECT ;;
 		_true)	eval "jexec -l -U $_USER $_JAIL $_DISPLAY /bin/sh -c '$_CMD'" > /dev/null 2>&1 & ;;
 		*_)     eval "jexec -l -U root   $_JAIL chroot $_COMPAT $_SHELL $_CMDMOD" $_REDIRECT ;;
