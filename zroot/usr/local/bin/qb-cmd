@@ -58,7 +58,7 @@ parse_jail_vars() {
 	# Ensure default values if the user didnt specify them
 	_shell=$(get_jail_shell -e "$_JAIL")        # Lib function orders shell priority
 	_SHELL=${_SHELL:=$_shell}
-	_CMD=${_CMD:="xterm"}
+	[ -z "$_X11" ] && _CMD=${_CMD:="$SHELL"} || _CMD=${_CMD:="xterm"}
 }
 
 chk_app_X11() {
