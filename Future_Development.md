@@ -1,7 +1,4 @@
 
-virtualgl - need to put the config into the install script 
-  /usr/local/VirtualGL/bin/vglserver_config -config +glx +egl +s +f -t 
-
 MTU is not being honored and now some jails (no VPN, connect to firewall) are failing to put resolv.conf correctly
 
 You EOF scripts with /tmp and all that nonsense should all be replaced with daemon
