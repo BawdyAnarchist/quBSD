@@ -81,7 +81,7 @@ EOF
 	fi
 }
 
-launch_xephyr() {
+prepare_and_launch_xephyr() {
 	# Use the JID+_int to find a unique socket name
 	jid=$(jls -j $_JAIL -n jid | sed "s/jid=//")
   _int=0
@@ -96,41 +96,12 @@ launch_xephyr() {
 	[ -f "$_xresources" ] || _xresources="${HOME}/.Xresources"
 	[ -f "$_xresources" ] || unset _xresources
 
-	# sysvshm cannot share Xephyr here. Some apps will fail if we dont disable it. XVideo prevents non-existent
-	# GPU overlay. We MUST stop GLX entirely (even iglx), as A) Xephyr implementation sucks (<1.4), and B) even
-	# if it didnt, Xephyr is launched from *host*, and the jail only sees an X socket, not the Xephyr process.
-	Xephyr -extension MIT-SHM -extension XVideo -extension XVideo-MotionCompensation -extension GLX \
-			-resizeable -terminate -no-host-grab :$display > /dev/null 2>&1 &
-	xephyr_pid=$!  &&  sleep 0.1       # Give a moment for Xephyr session to launch
-	! ps -p "$xephyr_pid" > /dev/null 2>&1 && get_msg2 -Em _e8 
-
-	# The Xephyr window_id is needed for monitoring/cleanup
-	winlist=$(xprop -root _NET_CLIENT_LIST | sed 's/.*# //' | tr ',' '\n' | tail -r)
-	for wid in $winlist; do
-		xprop -id "$wid" | grep -Eqs "WM_NAME.*Xephyr.*:$display" \
-			&& window_id="$wid" && break
-	done
-
-	export QTMP _JAIL _USER _DPI display window_id xephyr_pid _xresources
-	daemon -o /dev/null sh -c '
-		jexec -l -U $_USER $_JAIL env DISPLAY=:$display bspwm -c /usr/local/etc/X11/bspwmrc &
-		bspwm_pid="$!"
-		socat \
-			UNIX-LISTEN:${QTMP}/${_JAIL}/.X11-unix/X${display},fork,unlink-close,mode=0666 \
-			UNIX-CONNECT:/tmp/.X11-unix/X${display} &
-		socat_pid="$!"
-    [ -n "$_xresources" ] && env DISPLAY=:$display xrdb -merge $_xresources
-    [ -n "$_DPI" ] && echo "Xft.dpi: $_DPI" | env DISPLAY=:$display xrdb -merge
-		while sleep 2 ; do
-			xprop -id "$window_id" | grep -Eqs ".*Xephyr.*:$display" || break
-			jls | grep -Eqs "[[:blank:]]${_JAIL}[[:blank:]]" || break
-		done
-		kill -15 "$bspwm_pid"
-		kill -15 "$socat_pid"
-		kill -15 "$xephyr_pid"
-		exit 0
-	' &
-  sleep 0.1   # Give another moment for the env to load in Xephyr
+	export QTMP _JAIL _USER _DPI display _xresources
+	daemon -t "Xephyr: $display, Jail: $_JAIL, Command: $_CMD, " -o /dev/null -- /bin/sh << 'EOF'
+	. /usr/local/lib/quBSD/quBSD.sh
+	launch_xephyr
+EOF
+  sleep .2   # Give another moment for the env to load in Xephyr
 	return 0
 }
 
@@ -147,7 +118,7 @@ run_jail_command() {
 	if [ "$host_X11" = "true" ] && [ -z "$_NOX11" ] ; then
 		if mount | grep $_JAIL | grep -Eqs "/qubsd/${_JAIL}/tmp/\.X11-unix" ; then
 			if [ -z "$_SAMEWIND" ] && { chk_app_X11 || [ -n "$_NEWWIND" ] ;} ; then
-				launch_xephyr
+				prepare_and_launch_xephyr
 				_DISPLAY="env DISPLAY=:$display"
 				_X11="true"
 			fi

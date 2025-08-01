@@ -389,7 +389,8 @@ get_info() {
 			;;
 		_XJAIL)  # Gets the jailname of the active window. Converts $HOSTNAME to: "host"
 			_xid=$(get_info -e _XID)
-			if [ "$_xid" = "0x0" ] || xprop -id $_xid WM_CLIENT_MACHINE | grep -Eq $(hostname) ; then
+			if [ "$_xid" = "0x0" ] || echo "$_xid" | grep -Eq "not found" \
+					|| xprop -id $_xid WM_CLIENT_MACHINE | grep -Eq $(hostname) ; then
 				_value=host
 			else
 				_xsock=$(xprop -id $_xid | sed -En "s/^WM_NAME.*:([0-9]+)\..*/\1/p")
@@ -980,6 +981,48 @@ monitor_vm_stop() {
 	# Fail for timeout
 	eval $_R1
 }
+
+launch_xephyr() {
+  # sysvshm cannot share Xephyr here. Some apps will fail if we dont disable it. XVideo prevents non-existent
+  # GPU overlay. We MUST stop GLX entirely (even iglx), as A) Xephyr implementation sucks (<1.4), and B) even
+  # if it didnt, Xephyr is launched from *host*, and the jail only sees an X socket, not the Xephyr process.
+  Xephyr -extension MIT-SHM -extension XVideo -extension XVideo-MotionCompensation -extension GLX \
+      -resizeable -terminate -no-host-grab :$display > /dev/null 2>&1 &
+
+  xephyr_pid=$!  &&  sleep 0.1       # Give a moment for Xephyr session to launch, trap it
+	trap "kill -15 $xephyr_pid" INT TERM HUP QUIT EXIT
+  ! ps -p "$xephyr_pid" > /dev/null 2>&1 && get_msg2 -Em _e8
+
+  # The Xephyr window_id is needed for monitoring/cleanup
+  winlist=$(xprop -root _NET_CLIENT_LIST | sed 's/.*# //' | tr ',' '\n' | tail -r)
+  for wid in $winlist; do
+    xprop -id "$wid" | grep -Eqs "WM_NAME.*Xephyr.*:$display" \
+      && window_id="$wid" && break
+  done
+	
+	# Launch a simple window manager for scaling/resizing to the full Xephyr size
+  jexec -l -U $_USER $_JAIL env DISPLAY=:$display bspwm -c /usr/local/etc/X11/bspwmrc &
+  bspwm_pid="$!"
+
+	# Link the sockets together
+  socat \
+    UNIX-LISTEN:${QTMP}/${_JAIL}/.X11-unix/X${display},fork,unlink-close,mode=0666 \
+    UNIX-CONNECT:/tmp/.X11-unix/X${display} &
+  socat_pid="$!"
+	trap "kill -15 $bspwm_pid $socat_pid $xephyr_pid" INT TERM HUP QUIT EXIT
+
+	# Push the Xresources and DPI to the Xephyr instance
+  [ -n "$_xresources" ] && env DISPLAY=:$display xrdb -merge $_xresources
+  [ -n "$_DPI" ] && echo "Xft.dpi: $_DPI" | env DISPLAY=:$display xrdb -merge
+
+	# Monitor both the window, and the existence of the jail, 
+  while sleep 1 ; do
+    xprop -id "$window_id" | grep -Eqs ".*Xephyr.*:$display" || exit 0 
+    jls | grep -Eqs "[[:blank:]]${_JAIL}[[:blank:]]" || exit 0 
+  done
+  exit 0
+}
+
 
 
 ########################################################################################
