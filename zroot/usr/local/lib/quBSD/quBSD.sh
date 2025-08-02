@@ -50,6 +50,7 @@
 # configure_ssh_control- SSH keys for control jail are copied over to running env.
 # monitor_startstop    - Monitors whether qb-start or qb-stop is still alive
 # monitor_vm_stop      - Monitors whether qb-start or qb-stop is still alive
+# launch_xephyr        - For qb-cmd, manages the lifecycle of Xephyr windows
 
 #################################  STATUS  CHECKS  #################################
 # chk_isblank          - Posix workaround: Variable is [-z <null> OR [[:blank:]]*]
@@ -96,7 +97,7 @@
 # cleanup_vm           - Cleans up network connections, and dataset after shutdown
 # return_ppt           - Set PPT devices back to original state before VM launch.
 # prep_bhyve_options   - Retrieves VM variables and handles related functions
-# launch_vm            - Launches the VM to a background subshell
+# launch_bhyve_vm      - Launches the VM to a background subshell
 # exec_vm_coordinator  - Coordinates the clean launching and teardown of VMs
 
 ##################################  DEBUG LOGGING  #################################
@@ -2437,49 +2438,28 @@ EOF
 	eval $_R0
 }
 
-launch_vm() {
-	# To ensure VM is completely detached from caller AND trapped after finish, a /tmp script runs
-	# the launch and monitoring. qb-start/stop can only have one instance running (for race/safety)
-	# but VMs launched by qb-start would otherwise persist in the process list with the VM.
+launch_bhyve_vm() {
+	# Need to detach the launch an monitoring of VMs completely from qb-cmd and qb-start 
 
-	local _fn="launch_vm" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+	# Get globals, although errfiles arent needed
+	get_global_variables
+	rm_errfiles
 
-	# Send the commands to a temp file
-	cat <<-ENDOFCMD > "${QTMP}/qb-bhyve_${_VM}"
-		#!/bin/sh
+	# Create trap for post VM exit
+	trap "cleanup_vm $_VM $_rootenv ; exit 0" INT TERM HUP QUIT EXIT
 
-		# New script wont know about caller functions. Need to source them again
-		. /usr/local/lib/quBSD/quBSD.sh
-		. /usr/local/lib/quBSD/msg-quBSD.sh
+	# Log the exact bhyve command being run
+	echo "\$(date "+%Y-%m-%d_%H:%M") Starting VM: $_VM" | tee -a $QBLOG ${QBLOG}_${_VM}
+	echo $_BHYVE_CMD >> ${QBLOG}_${_VM}
 
-		# Get globals, although errfiles arent needed
-		get_global_variables
-		rm_errfiles
+	# Launch the VM to background
+	eval $_BHYVE_CMD
+	sleep 3
 
-		# Create trap for post VM exit
-		trap "cleanup_vm $_VM $_rootenv ; exit 0" INT TERM HUP QUIT EXIT
-
-		# Log the exact bhyve command being run
-		echo "\$(date "+%Y-%m-%d_%H:%M") Starting VM: $_VM" | tee -a $QBLOG ${QBLOG}_${_VM}
-		echo $_BHYVE_CMD >> ${QBLOG}_${_VM}
-
-		# Launch the VM to background
-		eval $_BHYVE_CMD
-
-		sleep 3
-
-		# Monitor the VM, perform cleanup after done
-		while pgrep -xfq "bhyve: $_VM" ; do sleep 1 ; done
-		echo "\$(date "+%Y-%m-%d_%H:%M") VM: $_VM HAS ENDED." | tee -a $QBLOG ${QBLOG}_${_VM}
-ENDOFCMD
-
-	# Make the file executable
-	chmod +x "${QTMP}/qb-bhyve_${_VM}"
-
-	# Call the temp file with exec to separate it from the caller script
-	exec "${QTMP}/qb-bhyve_${_VM}"
-
-	eval $_R0
+	# Monitor the VM, perform cleanup after done
+	while pgrep -xfq "bhyve: $_VM" ; do sleep 1 ; done
+	echo "\$(date "+%Y-%m-%d_%H:%M") VM: $_VM HAS ENDED." | tee -a $QBLOG ${QBLOG}_${_VM}
+	exit 0
 }
 
 finish_vm_connections() {
@@ -2543,7 +2523,13 @@ exec_vm_coordinator() {
 
 	# Launch VM sent to background, so connections can be made (network, vnc, tmux)
 	get_msg -m _m1 -- "$_jail" | tee -a $QBLOG ${QBLOG}_${_VM}
-	launch_vm $_quiet &
+	export _BHYVE_CMD _VM _rootenv QBLOG
+	daemon -t "bhyve: $_jail" -o /dev/null -- /bin/sh << 'EOF'
+		. /usr/local/lib/quBSD/quBSD.sh
+		. /usr/local/lib/quBSD/msg-quBSD.sh
+		launch_bhyve_vm
+EOF
+
 
 	# Monitor to make sure that the bhyve command started running, then return 0
 	local _count=0 ; sleep .5
