@@ -98,8 +98,8 @@ prepare_and_launch_xephyr() {
 
 	export QTMP _JAIL _USER _DPI display _xresources
 	daemon -t "Xephyr: $display, Jail: $_JAIL, Command: $_CMD, " -o /dev/null -- /bin/sh << 'EOF'
-	. /usr/local/lib/quBSD/quBSD.sh
-	launch_xephyr
+		. /usr/local/lib/quBSD/quBSD.sh
+		launch_xephyr
 EOF
   sleep .2   # Give another moment for the env to load in Xephyr
 	return 0
