@@ -38,17 +38,14 @@ security_flags() {
 		[ -e "${M_QROOT}/${JAIL}${_d}" ] && chflags -fR schg "${M_QROOT}/${JAIL}${_d}"
 	done
 
-	# resolv is an exception to all schg, as DHCP needs the ability to modify it after start
-	[ -f "${M_QROOT}/${JAIL}/etc/resolv.conf" ] \
-		&& chflags noschg ${M_QROOT}/${JAIL}/etc/resolv.conf
+	# Slightly hacky but resolv is an exception to schg. DHCP needs the ability to modify it after start
+	[ -f "${M_QROOT}/${JAIL}/etc/resolv.conf" ] && chflags noschg ${M_QROOT}/${JAIL}/etc/resolv.conf
 
 	# exec-poststart is always sent to background. Don't report seclvl change
 	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL" > /dev/null 2>&1
 }
 
 main() {
-	#start_xpra $JAIL
-
 	resource_control
 
 	security_flags
