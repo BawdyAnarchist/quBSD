@@ -1837,7 +1837,7 @@ chk_valid_x11() {
 
 connect_client_to_gateway() {
 	# Unified function for connecting two jails.
-		# [-d] Indicates the need for restarting isc-dhcpd in the gateway
+		# [-d] Indicates the need for restarting isc-dhcpd in the gateway. Unused for now.
 		# [-i] Provide an exact IPV4 address
 		# [-q] Quiet error message
 		# [-s] Services restart  -- CURRENTLY UNUSED. Probably remove later
@@ -1881,11 +1881,11 @@ connect_client_to_gateway() {
 
 			# auto (discover_ip) makes no sense for for VM_jail. Assume user intends "it just works"
 			[ "$ipv4" = "auto" ] && ipv4="DHCP"
-			configure_client_network && _w="-w"
+			configure_client_network
 		;;
 		*jail_*VM)                # Assume client VM is always using DHCP
 			_vif_gw=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_client}")
-			configure_gateway_network && [ -n "$_dhcp" ] && _D="-D"
+			configure_gateway_network
 		;;
 		*jail_*jail|*jail_host)   # Order matters. DHCP clients expect an already configured gateway
 			_vif_gw=$(ifconfig epair create)
@@ -1894,8 +1894,8 @@ connect_client_to_gateway() {
 			[ "$_cl_cl" = "host" ] && unset _jexec ||  _jexec="jexec -l -U root $_client"
 			[ ! "$_client" = "host" ] && ifconfig $_vif_cl vnet $_client
 
-			configure_gateway_network && [ -n "$_d" ] && _D="-D"
-			configure_client_network && _w="-w"
+			configure_gateway_network
+			configure_client_network
 		;;
 		*VM_*VM)                  # Future expansion. Create promisc bridge in net-firewall VM<->VM
 		;;
@@ -1908,7 +1908,7 @@ configure_client_network() {
 	local _fn="configure_client_network" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
 	# Make sure flags dont prevent update inside the jail
-	_cl_root="${M_QROOT}/${_client}"
+	[ "$_client" = "host" ] && unset _cl_root || _cl_root="${M_QROOT}/${_client}"
 	chflags noschg -R ${_cl_root}/etc ${_cl_root}/etc/resolv.conf ${_cl_root}/etc/resolvconf.conf 2>/dev/null
 
 	# Control jail specific configs (sshd required)
@@ -1938,11 +1938,11 @@ configure_client_network() {
 	eval $_jexec ifconfig $_vif_cl group EXT_IF   # pf uses interface groups. Harmless for non pf jails
 
 	# DNS and pf management
-	if sysrc -nqj $_client dnscrypt_proxy_enable | grep -q "YES" ; then
+	if sysrc -nqj $_client dnscrypt_proxy_enable 2>/dev/null | grep -q "YES" ; then
 		# Using DoH, presumably for external-router connected (net-firewall) gateway
 		chroot ${_cl_root} /bin/sh -c 'ln -s /var/unbound/forward-doh.conf /var/unbound/forward.conf'
 
-	elif sysrc -nqj $_client wireguard_enable | grep -q "YES" ; then
+	elif sysrc -nqj $_client wireguard_enable 2>/dev/null | grep -q "YES" ; then
 		# Wireguard itself will update resolvconf, and thus, unbound
 		[ ! -L "${_cl_root}/var/unbound/forward.conf" ] && chroot \
 				${_cl_root} /bin/sh -c 'ln -s /var/unbound/forward-resolv.conf /var/unbound/forward.conf'
@@ -1958,14 +1958,14 @@ configure_client_network() {
 
 	else
 		# All other gateways use normal resolvconf mechanism
-		if sysrc -nqj $_client local_unbound_enable | grep -qs "YES" ; then
+		if sysrc -nqj $_client local_unbound_enable 2>/dev/null | grep -qs "YES" ; then
 			[ ! -L "${_cl_root}/var/unbound/forward.conf" ] && chroot ${_cl_root} /bin/sh -c \
 					'ln -s /var/unbound/forward-resolv.conf /var/unbound/forward.conf'
 		fi
 		if [ ! "$ipv4" = "DHCP" ] ; then      # Without DHCP, resolvconf doesnt know the assigned IP
 			_gw_name_server="name_servers_append=${_cl_ip%.*/*}.1"
-			grep -Eqs "$_gw_name_server" ${_cl_root}/etc/resolvconf.conf \
-				|| echo "$_gw_name_server" >> ${_cl_root}/etc/resolvconf.conf
+			sed -i '' -E "/name_servers_append/d" ${_cl_root}/etc/resolvconf.conf
+			echo "$_gw_name_server" >> ${_cl_root}/etc/resolvconf.conf
 			eval $_jexec resolvconf -u
 		fi
 	fi
