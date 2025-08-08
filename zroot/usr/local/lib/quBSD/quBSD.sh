@@ -153,24 +153,6 @@ get_global_variables() {
 	return 0
 }
 
-get_networking_variables() {
-	WIREGRD="/rw/usr/local/etc/wireguard"
-	WG0CONF="${WIREGRD}/wg0.conf"
-	PFCONF="/rw/etc/pf.conf"
-	JPF="${M_ZUSR}/${JAIL}/${PFCONF}"
-
-	# Get wireguard related variables
-   if [ -e "${M_ZUSR}/${JAIL}/${WG0CONF}" ] ; then
-
-		WG_ENDPT=$(sed -nE "s/^Endpoint[ \t]*=[ \t]*([^ \t]+):.*/\1/p" \
-				${M_ZUSR}/${JAIL}/${WG0CONF})
-		WG_PORTS=$(sed -nE "s/^Endpoint[ \t]*=.*:(.*)[ \t]*/\1/p" \
-				${M_ZUSR}/${JAIL}/${WG0CONF})
-		WG_MTU=$(sed -nE "s/^MTU[ \t]*=[ \t]*([[:digit:]]+)/\1/p" \
-				${M_ZUSR}/${JAIL}/${WG0CONF})
-	fi
-}
-
 rm_errfiles() {
 	rm $ERR1 $ERR2 > /dev/null 2>&1
 }
