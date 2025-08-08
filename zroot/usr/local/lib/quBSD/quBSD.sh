@@ -1946,7 +1946,7 @@ configure_client_network() {
 		fi
 		if [ ! "$ipv4" = "DHCP" ] ; then      # Without DHCP, resolvconf doesnt know the assigned IP
 			_gw_name_server="name_servers_append=${_cl_ip%.*/*}.1"
-			sed -i '' -E "/name_servers_append/d" ${_cl_root}/etc/resolvconf.conf
+			sed -i '' -E "/name_servers_append/d" ${_cl_root}/etc/resolvconf.conf 2>/dev/null
 			echo "$_gw_name_server" >> ${_cl_root}/etc/resolvconf.conf
 			eval $_jexec resolvconf -u
 		fi
