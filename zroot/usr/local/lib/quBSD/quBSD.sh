@@ -53,7 +53,7 @@
 # launch_xephyr        - For qb-cmd, manages the lifecycle of Xephyr windows
 
 #################################  STATUS  CHECKS  #################################
-# chk_isblank          - Posix workaround: Variable is [-z <null> OR [[:blank:]]*]
+# chk_isblank          - Posix workaround: Variable is [-z <null> OR [ \t]*]
 # chk_isrunning        - Searches jls -j for the jail
 # chk_truefalse        - When inputs must be either true or false
 # chk_integer          - Checks that a value is an integer, within a range
@@ -131,10 +131,10 @@ get_global_variables() {
 	QTMP="/tmp/quBSD"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
-	sed -i '' -E 's/[[:blank:]]*$//' $QCONF
+	sed -i '' -E 's/[ \t]*$//' $QCONF
 	# Get datasets, mountpoints; and define files.
-   R_ZFS=$(sed -nE "s:#NONE[[:blank:]]+jails_zfs[[:blank:]]+::p" $QCONF)
-   U_ZFS=$(sed -nE "s:#NONE[[:blank:]]+zusr_zfs[[:blank:]]+::p" $QCONF)
+   R_ZFS=$(sed -nE "s:#NONE[ \t]+jails_zfs[ \t]+::p" $QCONF)
+   U_ZFS=$(sed -nE "s:#NONE[ \t]+zusr_zfs[ \t]+::p" $QCONF)
 	[ -z "$R_ZFS" ] && get_msg -V -m "_e0_1" "jails_zfs" && exit 1
 	[ -z "$U_ZFS" ] && get_msg -V -m "_e0_1" "zusr_zfs" && exit 1
 	! chk_valid_zfs "$R_ZFS" && get_msg -V -m _e0_2 -- "jails_zfs" "$R_ZFS" && exit 1
@@ -162,11 +162,11 @@ get_networking_variables() {
 	# Get wireguard related variables
    if [ -e "${M_ZUSR}/${JAIL}/${WG0CONF}" ] ; then
 
-		WG_ENDPT=$(sed -nE "s/^Endpoint[[:blank:]]*=[[:blank:]]*([^[:blank:]]+):.*/\1/p" \
+		WG_ENDPT=$(sed -nE "s/^Endpoint[ \t]*=[ \t]*([^ \t]+):.*/\1/p" \
 				${M_ZUSR}/${JAIL}/${WG0CONF})
-		WG_PORTS=$(sed -nE "s/^Endpoint[[:blank:]]*=.*:(.*)[[:blank:]]*/\1/p" \
+		WG_PORTS=$(sed -nE "s/^Endpoint[ \t]*=.*:(.*)[ \t]*/\1/p" \
 				${M_ZUSR}/${JAIL}/${WG0CONF})
-		WG_MTU=$(sed -nE "s/^MTU[[:blank:]]*=[[:blank:]]*([[:digit:]]+)/\1/p" \
+		WG_MTU=$(sed -nE "s/^MTU[ \t]*=[ \t]*([[:digit:]]+)/\1/p" \
 				${M_ZUSR}/${JAIL}/${WG0CONF})
 	fi
 }
@@ -322,11 +322,11 @@ get_jail_parameter() {
 	[ -z "$_jail" ] && get_msg $_qp $_V -m _e0 -- "jail" && eval "$_sp $_R1"
 
 	# Get the <_value> from QCONF.
-	_value=$(sed -nE "s/^${_jail}[[:blank:]]+${_param}[[:blank:]]+//p" $QCONF)
+	_value=$(sed -nE "s/^${_jail}[ \t]+${_param}[ \t]+//p" $QCONF)
 
 	# Substitute <#default> values, so long as [-d] was not passed
 	[ -z "$_value" ] && [ -n "$_dp" ] \
-		&& _value=$(sed -nE "s/^#default[[:blank:]]+${_param}[[:blank:]]+//p" $QCONF)
+		&& _value=$(sed -nE "s/^#default[ \t]+${_param}[ \t]+//p" $QCONF)
 
 	# If still blank, check for -z or -s options. Otherwise err message and return 1
 	if [ -z "$_value" ] ; then
@@ -367,21 +367,21 @@ get_info() {
 
 	case $_info in
 		_CLIENTS)  # All _clients listed in QCONF, which depend on _jail as a gateway
-			_value=$(sed -nE "s/[[:blank:]]+GATEWAY[[:blank:]]+${_jail}//p" $QCONF)
+			_value=$(sed -nE "s/[ \t]+GATEWAY[ \t]+${_jail}//p" $QCONF)
 			;;
 		_CONTROLD)  # All _clients listed in QCONF, which depend on _jail as a gateway
-			_value=$(sed -nE "s/[[:blank:]]+CONTROL[[:blank:]]+${_jail}//p" $QCONF)
+			_value=$(sed -nE "s/[ \t]+CONTROL[ \t]+${_jail}//p" $QCONF)
 			;;
 		_ONJAILS)  # All jails/VMs that are currently running
 			_value=$(jls | sed "1 d" | awk '{print $2}' ; \
-						pgrep -fl 'bhyve: ' | sed -E "s/.*[[:blank:]]([^[:blank:]]+)\$/\1/")
+						pgrep -fl 'bhyve: ' | sed -E "s/.*[ \t]([^ \t]+)\$/\1/")
 			;;
 		_POPUP) # Determine if user is in interactive shell, or if popup is possible for inputs
 			tty | grep -qS 'ttyv' && pgrep -qx Xorg && _value="true"
 			;;
 		_USED_IPS) # List of ifconfig inet addresses for all running jails/VMs
 			for _onjail in $(jls | sed "1 d" | awk '{print $2}') ; do
-				_intfs=$(jexec -l -U root "$_onjail" ifconfig -a inet | grep -Eo "inet [^[:blank:]]+")
+				_intfs=$(jexec -l -U root "$_onjail" ifconfig -a inet | grep -Eo "inet [^ \t]+")
 				_value=$(printf "%b" "$_value" "\n" "$_intfs")
 			done
 			;;
@@ -442,7 +442,7 @@ compile_jlist() {
 
 		auto)
 			# Find jails tagged with autostart in QCONF.
-			_JLIST=$(grep -E "AUTOSTART[[:blank:]]+true" $QCONF | awk '{print $1}' | uniq)
+			_JLIST=$(grep -E "AUTOSTART[ \t]+true" $QCONF | awk '{print $1}' | uniq)
 		;;
 
 		all)
@@ -468,7 +468,7 @@ compile_jlist() {
 
 	# Remove any jail on EXLIST, from the JLIST
 	for _exlist in $_EXLIST ; do
-		_JLIST=$(echo "$_JLIST" | grep -Ev "^[[:blank:]]*${_exlist}[[:blank:]]*\$")
+		_JLIST=$(echo "$_JLIST" | grep -Ev "^[ \t]*${_exlist}[ \t]*\$")
 	done
 
 	[ -z "$_JLIST" ] && get_msg -m _e31_5 && eval $_R1
@@ -545,11 +545,11 @@ calculate_sizes() {
 	_i3mod="${_i3mod}, resize set $_w $_h"
 
 	# If there's a system font size set, use that at .75 size factor.
-	_fs=$(appres XTerm xterm | sed -En "s/XTerm.*faceSize:[[:blank:]]+([0-9]+).*/\1/p")
+	_fs=$(appres XTerm xterm | sed -En "s/XTerm.*faceSize:[ \t]+([0-9]+).*/\1/p")
 	if [ -z "$_fs" ] ; then
 		# If no set fs, then use the ratio of monitor DPI to system DPI to scale font size from 15.
-		local _dpi_mon=$(xdpyinfo | sed -En "s/[[:blank:]]+resolution.*x([0-9]+).*/\1/p")
-		local _dpi_sys=$(xrdb -query | sed -En "s/.*Xft.dpi:[[:blank:]]+([0-9]+)/\1/p")
+		local _dpi_mon=$(xdpyinfo | sed -En "s/[ \t]+resolution.*x([0-9]+).*/\1/p")
+		local _dpi_sys=$(xrdb -query | sed -En "s/.*Xft.dpi:[ \t]+([0-9]+)/\1/p")
 		[ -z "$_dpi_sys" ] && _dpi_sys=96
 
 		# 15 is a reference, since it's a sane value when both monitor and logical DPI is 96.
@@ -719,7 +719,7 @@ reclone_zroot() {
 		pw -V ${M_QROOT}/${_jail}/etc/ useradd -n $_jail -u 1001 -d /home/${_jail} -s /bin/csh 2>&1
 		[ -d "${M_QROOT}/${_jail}/compat/ubuntu" ] \
 			&& chroot ${M_QROOT}/${_jail}/compat/ubuntu /bin/bash -c "
-					/usr/sbin/useradd -m -u 1001 -d /home/${_jail} -s /bin/bash ${_jail} 
+					/usr/sbin/useradd -m -u 1001 -d /home/${_jail} -s /bin/bash ${_jail}
 			"
 	fi
 	eval $_R0
@@ -1000,7 +1000,7 @@ launch_xephyr() {
     xprop -id "$wid" | grep -Eqs "WM_NAME.*Xephyr.*:$display" \
       && window_id="$wid" && break
   done
-	
+
 	# Launch a simple window manager for scaling/resizing to the full Xephyr size
   jexec -l -U $_USER $_JAIL env DISPLAY=:$display bspwm -c /usr/local/etc/X11/bspwmrc &
   bspwm_pid="$!"
@@ -1016,10 +1016,10 @@ launch_xephyr() {
   [ -n "$_xresources" ] && env DISPLAY=:$display xrdb -merge $_xresources
   [ -n "$_DPI" ] && echo "Xft.dpi: $_DPI" | env DISPLAY=:$display xrdb -merge
 
-	# Monitor both the window, and the existence of the jail, 
+	# Monitor both the window, and the existence of the jail,
   while sleep 1 ; do
-    xprop -id "$window_id" | grep -Eqs ".*Xephyr.*:$display" || exit 0 
-    jls | grep -Eqs "[[:blank:]]${_JAIL}[[:blank:]]" || exit 0 
+    xprop -id "$window_id" | grep -Eqs ".*Xephyr.*:$display" || exit 0
+    jls | grep -Eqs "[ \t]${_JAIL}[ \t]" || exit 0
   done
   exit 0
 }
@@ -1140,7 +1140,7 @@ chk_avail_jailname() {
    # Checks that proposed jailname doesn't exist or partially exist
 	if chk_valid_zfs "${R_ZFS}/$_jail" || \
 		chk_valid_zfs "${U_ZFS}/$_jail"  || \
-		grep -Eq "^${_jail}[[:blank:]]+" $QCONF || \
+		grep -Eq "^${_jail}[ \t]+" $QCONF || \
 		[ -e "${JCONF_D}/${_jail}" ] ; then
 		get_msg $_qa -m _e13_2 -- "$_jail" && eval $_R1
 	fi
@@ -1214,7 +1214,7 @@ chk_valid_jail() {
 	[ -z "$_class" ] && _class=$(get_jail_parameter -eqs CLASS $_value)
 
 	# Must have a ROOTENV in QCONF.
-	! grep -Eqs "^${_value}[[:blank:]]+ROOTENV[[:blank:]]+[^[:blank:]]+" $QCONF \
+	! grep -Eqs "^${_value}[ \t]+ROOTENV[ \t]+[^ \t]+" $QCONF \
 		&& get_msg $_qv $_V -m _e2 -- "$_value" "ROOTENV" \
 		&& get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
@@ -1244,7 +1244,7 @@ chk_valid_jail() {
 				&& get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
 			# Dispjails can't reference other dispjails
-			local _templ_class=$(sed -nE "s/^${_template}[[:blank:]]+CLASS[[:blank:]]+//p" $QCONF)
+			local _templ_class=$(sed -nE "s/^${_template}[ \t]+CLASS[ \t]+//p" $QCONF)
 			[ "$_templ_class" = "dispjail" ] \
 				&& get_msg $_qv -m _e6_1 -- "$_value" "$_template" && eval $_R1
 
@@ -1363,7 +1363,7 @@ chk_valid_cpuset() {
 	_validcpuset=$(cpuset -g | sed "s/pid -1 mask: //" | sed "s/pid -1 domain.*//")
 
 	# Test for negative numbers and dashes in the wrong place
-	echo "$_value" | grep -Eq "(,,+|--+|,-|-,|,[[:blank:]]*-|^[^[:digit:]])" \
+	echo "$_value" | grep -Eq "(,,+|--+|,-|-,|,[ \t]*-|^[^[:digit:]])" \
 			&& get_msg $_q -m _e16 && get_msg $_q -m _e1 -- "$_value" "CPUSET" && eval $_R1
 
 	# Remove `-' and `,' to check that all numbers are valid CPU numbers
@@ -1390,7 +1390,7 @@ chk_valid_control() {
 	# 'none' is valid for control jail
 	[ "$_value" = "none" ] && eval $_R0
 
-	local _class=$(sed -nE "s/^${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QCONF)
+	local _class=$(sed -nE "s/^${_value}[ \t]+CLASS[ \t]+//p" $QCONF)
 	chk_valid_jail $_qt -c "$_class" -- "$_value" && eval $_R0
 	get_msg $_qt -m _e1 -- "$_value" "CONTROL" && eval $_R1
 }
@@ -1422,7 +1422,7 @@ chk_valid_gateway() {
 	[ "$_gw" = "none" ] && eval $_R0
 
 	# Nonlocal var, class of the gateway is important for jail startups
-	local _class_gw=$(sed -nE "s/^${_gw}[[:blank:]]+CLASS[[:blank:]]+//p" $QCONF)
+	local _class_gw=$(sed -nE "s/^${_gw}[ \t]+CLASS[ \t]+//p" $QCONF)
 
 	# Class of gateway should never be a ROOTENV
 	{ [ "$_class_gw" = "rootjail" ] || [ "$_class_gw" = "rootVM" ] ;} \
@@ -1668,7 +1668,7 @@ chk_valid_rootenv() {
 	[ -z "$_value" ] && get_msg $_q -m _e0 -- "CLASS" && eval $_R1
 
 	# Must be designated as a ROOTENV in QCONF
-	local _class=$(sed -nE "s/${_value}[[:blank:]]+CLASS[[:blank:]]+//p" $QCONF)
+	local _class=$(sed -nE "s/${_value}[ \t]+CLASS[ \t]+//p" $QCONF)
 	case $_class in
 		'') get_msg $_q -m _e2 -- "$_value" "CLASS"
 			 get_msg $_q -m _e1 -- "$_value" "ROOTENV" && eval $_R1
@@ -1774,7 +1774,7 @@ chk_valid_vcpus() {
 	[ -z "$_value" ] && get_msg $_q -m _e0 -- "VCPUS" && eval $_R1
 
 	# Get the number of CPUs on the system
-	_syscpus=$(cpuset -g | head -1 | grep -oE "[^[:blank:]]+\$")
+	_syscpus=$(cpuset -g | head -1 | grep -oE "[^ \t]+\$")
 	_syscpus=$(( _syscpus + 1 ))
 
 	# Ensure that the input is a number
@@ -1840,7 +1840,7 @@ connect_client_to_gateway() {
 		# [-d] Indicates the need for restarting isc-dhcpd in the gateway
 		# [-i] Provide an exact IPV4 address
 		# [-q] Quiet error message
-		# [-s] Suppress services restart (for gateways with multiple clients
+		# [-s] Services restart  -- CURRENTLY UNUSED. Probably remove later
 		# [-t] separates SSH (cjail) from NET (regular gateway)
 	local _fn="connect_client_to_gateway" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
@@ -1871,37 +1871,35 @@ connect_client_to_gateway() {
 
 	# Handle various VM/jail gateway/client combos
 	case "${_cl_gw}_${_cl_cl}" in
-		*VM_*jail|*VM_host) # Configuring a VM gateway is outside the scope of quBSD automation
+
+		*VM_*jail|*VM_host)       # Configuring VM gateway is outside scope of quBSD automation
 			# Get vif from vmtaps tracker and manage jail vs host client
 			_vif_cl=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_gateway}")
 			[ ! "$_cl_cl" = "host" ] \
-				&&  _jexec="jexec -l -U root $_client" && ifconfig $_vif_cl vnet $_client
+				&& _jexec="jexec -l -U root $_client" \
+				&& ifconfig $_vif_cl vnet $_client
 
 			# auto (discover_ip) makes no sense for for VM_jail. Assume user intends "it just works"
 			[ "$ipv4" = "auto" ] && ipv4="DHCP"
-			local _flags=$(configure_client_network) && _w="-w"
+			configure_client_network && _w="-w"
 		;;
-		*jail_*VM) # Assume client VM is always using DHCP
+		*jail_*VM)                # Assume client VM is always using DHCP
 			_vif_gw=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_client}")
 			configure_gateway_network && [ -n "$_dhcp" ] && _D="-D"
 		;;
-		*jail_*jail|*jail_host) # Order matters. DHCP clients expect an already configured gateway
-			# Get create/assign epairs and manage jail vs host client
+		*jail_*jail|*jail_host)   # Order matters. DHCP clients expect an already configured gateway
 			_vif_gw=$(ifconfig epair create)
 			_vif_cl="${_vif_gw%?}b"
-			[ "$_cl_cl" = "host" ] && unset _jexec ||  _jexec="jexec -l -U root $_client"
 
+			[ "$_cl_cl" = "host" ] && unset _jexec ||  _jexec="jexec -l -U root $_client"
 			[ ! "$_client" = "host" ] && ifconfig $_vif_cl vnet $_client
+
 			configure_gateway_network && [ -n "$_d" ] && _D="-D"
-			local _flags=$(configure_client_network) && _w="-w"
+			configure_client_network && _w="-w"
 		;;
-		*VM_*VM) # Future expansion, create promisc bridge in net-firewall and connect vifs
+		*VM_*VM)                  # Future expansion. Create promisc bridge in net-firewall VM<->VM
 		;;
 	esac
-
-	# Coordinated services restart
-	_p="${_flags%%:*}" ; _cl_ip="${_flags##*:}"
-	restart_services $_D $_p $_q $_s $_V $_w "$_cl_ip"
 
 	eval $_R0
 }
@@ -1909,36 +1907,68 @@ connect_client_to_gateway() {
 configure_client_network() {
 	local _fn="configure_client_network" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
-	# Regardless of IPV4, resolv.conf likely needs modified. Make sure flags are down
-	if [ -e "${M_ZUSR}/${_client}/rw/etc/resolv.conf" ] ; then
-		chflags noschg "${M_ZUSR}/${_client}/rw/etc/resolv.conf"
-	else
-		chflags noschg "${M_QROOT}/${_client}/etc/resolv.conf" > /dev/null 2>&1
+	# Make sure flags dont prevent update inside the jail
+	_cl_root="${M_QROOT}/${_client}"
+	chflags noschg -R ${_cl_root}/etc ${_cl_root}/etc/resolv.conf ${_cl_root}/etc/resolvconf.conf 2>/dev/null
+
+	# Control jail specific configs (sshd required)
+	if [ "$_type" = "SSH" ] ; then
+		mkdir -p ${_cl_root}/tmp > /dev/null 2>&1
+		echo "$_vif_cl" >> ${_cl_root}/tmp/qubsd_dhcp.interfaces
+		eval $_jexec ifconfig $_vif_cl group CJ_IF
+		configure_ssh_control "$_client" "$_gateway"
+		eval $_R0                 # SSH connections need no further modification
 	fi
 
-	# DHCP configuration of IP and DNS; vs ; manual configuration
-	if [ "$ipv4" = "DHCP" ] || [ "$_type" = "SSH" ] ; then
+	# Interface assignments
+	if [ "$ipv4" = "DHCP" ] ; then
 		# qubsd_dhcp daemon runs internally to each jail monitoring for new dhcp interfaces
-		mkdir -p ${M_QROOT}/${_client}/tmp > /dev/null 2>&1
-#Not sure if this is needed. Keep as a comment for now in case of issues with dup interfaces
-#grep -Eqs "$_vif_cl" ${M_QROOT}/${_client}/tmp/qubsd_dhcp.interfaces || \
-		echo "$_vif_cl" >> ${M_QROOT}/${_client}/tmp/qubsd_dhcp.interfaces
+		mkdir -p ${_cl_root}/tmp > /dev/null 2>&1
+		echo "$_vif_cl" >> ${_cl_root}/tmp/qubsd_dhcp.interfaces
+		[ "$_client" = "host" ] && dhclient $_vif_cl
 	else
 		# No _gw_ip implies ipv4 is the statically assigned IP in QCONF. Otherwise, rely on _gw_ip
 		[ -z "$_gw_ip" ] && _cl_ip="$ipv4" || _cl_ip="${_gw_ip%.*/*}.2/${_gw_ip#*/}"
-		_mtu="${_mtu:=$(get_jail_parameter -dez MTU $_client)}"
+		: ${_mtu:=$(get_jail_parameter -dez MTU $_client)}
 
 		# Add the IP and default route
 		eval $_jexec ifconfig $_vif_cl inet $_cl_ip mtu $_mtu up
 		eval $_jexec route add default "${_cl_ip%.*/*}.1" > /dev/null 2>&1
 	fi
+	eval $_jexec ifconfig $_vif_cl group EXT_IF   # pf uses interface groups. Harmless for non pf jails
 
-	# If connection is control/client, client needs sshd. Non ssh (gateway/client), modify files
-	[ "$_type" = "SSH" ] \
-		&& configure_ssh_control "$_client" "$_gateway" \
-		|| local _flags=$(modify_network_files)
+	# DNS and pf management
+	if sysrc -nqj $_client dnscrypt_proxy_enable | grep -q "YES" ; then
+		# Using DoH, presumably for external-router connected (net-firewall) gateway
+		chroot ${_cl_root} /bin/sh -c 'ln -s /var/unbound/forward-doh.conf /var/unbound/forward.conf'
 
-	echo $_flags
+	elif sysrc -nqj $_client wireguard_enable | grep -q "YES" ; then
+		# Wireguard itself will update resolvconf, and thus, unbound
+		[ ! -L "${_cl_root}/var/unbound/forward.conf" ] && chroot \
+				${_cl_root} /bin/sh -c 'ln -s /var/unbound/forward-resolv.conf /var/unbound/forward.conf'
+
+		# Endpoint IP
+		local _ep=$(sed -nE "s/[ \t]*Endpoint[ \t]*=[ \t]*([^[ \t]+):.*/\1/p" \
+				${M_ZUSR}/${_client}/rw/usr/local/etc/wireguard/wg0.conf)
+		chflags noschg ${_cl_root}/etc/pf-wg_ep.table 2>/dev/null
+		echo "$_ep" > ${_cl_root}/etc/pf-wg_ep.table
+
+		# Wireguard restart is required if its upstream gateway restarts. $_CLI comes from exec.created
+		[ "$_CLI" = "$_client" ] && eval $_jexec service wireguard restart
+
+	else
+		# All other gateways use normal resolvconf mechanism
+		if sysrc -nqj $_client local_unbound_enable | grep -qs "YES" ; then
+			[ ! -L "${_cl_root}/var/unbound/forward.conf" ] && chroot ${_cl_root} /bin/sh -c \
+					'ln -s /var/unbound/forward-resolv.conf /var/unbound/forward.conf'
+		fi
+		if [ ! "$ipv4" = "DHCP" ] ; then      # Without DHCP, resolvconf doesnt know the assigned IP
+			_gw_name_server="name_servers_append=${_cl_ip%.*/*}.1"
+			grep -Eqs "$_gw_name_server" ${_cl_root}/etc/resolvconf.conf \
+				|| echo "$_gw_name_server" >> ${_cl_root}/etc/resolvconf.conf
+			eval $_jexec resolvconf -u
+		fi
+	fi
 	eval $_R0
 }
 
@@ -1950,14 +1980,13 @@ configure_gateway_network() {
 		&& _gw_ip="${ipv4%.*/*}.1/${ipv4#*/}" \
 		|| _gw_ip=$(discover_open_ipv4 -g -t "$_type" -- "$_client" "$_gateway")
 
-	# Use _client QCONF MTU, but dont sub the default. If there is none, use gateway lowest MTU
-	_mtu="${MTU:=$(get_jail_parameter -ez MTU $_client)}"
-	_mtu="${_mtu:=$(jexec -l -U root $_gateway ifconfig \
-		| sed -En "s/.*mtu ([^[:blank:]]+)/\1/p" | sort -n | head -1)}"
+	# Use _client QCONF MTU, but dont sub the default. If there is none, use MTU of the EXT_IF
+	_mtu="$(get_jail_parameter -ez MTU $_client)"
+	: ${_mtu:=$(jexec -l -U root $_gateway ifconfig -ag EXT_IF | sed -En "s/.*mtu ([^ \t]+)/\1/p")}
 
 	# Configure the interface
 	ifconfig $_vif_gw vnet $_gateway
-	jexec -l -U root $_gateway ifconfig $_vif_gw inet $_gw_ip mtu $_mtu up
+	jexec -l -U root $_gateway ifconfig $_vif_gw inet $_gw_ip group CLIENTS mtu $_mtu up
 
 	[ "$_type" = "SSH" ] && echo "$_client $_vif_gw ${_gw_ip%%/*}" >> ${QTMP}/control_netmap
 	eval $_R0
@@ -2015,82 +2044,6 @@ discover_open_ipv4() {
 	eval $_R0
 }
 
-modify_network_files() {
-	local _fn="modify_network_files" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-	local _etc_root="${M_QROOT}/${_client}/etc" ; local _etc_zusr="${M_ZUSR}/${_client}/rw/etc"
-	[ "$_cl_cl" = "host" ] && eval $_R0
-
-	# resolv.conf . If _gateway is a VM, this will silently fail
-	if [ ! -e "${_etc_zusr}/resolv.conf" ] ; then
-		if sysrc -f ${M_ZUSR}/${_gateway}/rw/etc/rc.conf wireguard_enable | grep -q "YES" ; then
-			local _dns_ip=$(sed -En \
-				"s/^[[:blank:]]*DNS[[:blank:]]*=[[:blank:]]*([^[:blank:]]+)[[:blank:]]*\$/\1/p" \
-				${M_ZUSR}/${_gateway}/rw/usr/local/etc/wireguard/wg0.conf)
-			echo "nameserver $_dns_ip" > ${_etc_root}/resolv.conf
-		else
-			exists_then_copy ${M_ZUSR}/${_gateway}/rw/etc/resolv.conf ${_etc_root} \
-				|| exists_then_copy ${M_QROOT}/${_gateway}/etc/resolv.conf ${_etc_root}
-		fi
-	fi
-
-	# pf.conf
-	if jexec -l -U root $_client service pf status > /dev/null 2>&1 ; then
-		# Running gateways might be schg or seclvl=3. Restore flags after ops
-		local _schg=$(ls -alo ${_etc_zusr} | awk '{print $5}' | sed -E "s/,.*//")
-		chflags -R noschg ${_etc_zusr}
-		sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_vif_cl\"/" ${_etc_zusr}/pf.conf
-		chflags -R $_schg ${_etc_zusr}
-
-		_schg=$(ls -alo ${_etc_root}/pf_jip.table | awk '{print $5}' | sed -E "s/,.*//")
-		chflags noschg ${_etc_root}/pf_jip.table
-		echo "$_cl_ip" > ${_etc_root}/pf_jip.table
-		chflags $_schg ${_etc_root}/pf_jip.table
-
-		# Propagates to connect_client, then passes as option to restart_services
-		echo "-p:${_cl_ip}"
-	else
-		# PF is not running, just bring down flags and change files. Jail's rc will do the rest
-      [ -e "${_etc_root}/pf_jip.table" ] \
-			&& chflags noschg ${_etc_root}/pf_jip.table \
-			&& echo "$_cl_ip" > ${_etc_root}/pf_jip.table
-
-		# NAT can only be done on an interface, necessitating macro'd EXT_IF for non-wg gateways
-		[ -e "${_etc_zusr}/pf.conf" ] \
-			&& chflags noschg ${_etc_zusr}/pf.conf \
-			&& sed -i '' -E "s/(.*EXT_IF.*=).*/\1 \"$_vif_cl\"/" ${_etc_zusr}/pf.conf
-	fi
-	eval $_R0
-}
-
-restart_services() {
-	local _fn="restart_services" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	while getopts DpqsVw _opts ; do case $_opts in
-		D) local _dhcp='true' ;;
-		p) local _pf='true' ;;
-		q) local _q='-q' ;;
-		s) local _skip='true' ;;
-		V) local _V="-V" ;;
-		w) local _wireguard='true' ;;
-	esac ; done ; shift $(( OPTIND - 1))
-
-	# restart || use pfctl (depends on seclvl of the jail)
-	if [ -n "$_pf" ] && ! jexec -l -U root $_client service pf restart > /dev/null 2>&1 ; then
-		local _ip="$1"
-		[ -n "$_ip" ] && jexec -l -U root $_client pfctl -t JIP -T replace $_ip > /dev/null 2>&1
-	fi
-
-	# Reload wireguard if it's running
-	[ -n "$_wireguard" ] \
-		&& jexec -l -U root $_client service wireguard status  > /dev/null 2>&1 \
-		&& jexec -l -U root $_client service wireguard restart > /dev/null 2>&1
-
-	# If dhcpd is running, restart it (otherwise it'll start on its own later)
-	[ -z "$_skip" ] && jexec -l -U root $_gateway service isc-dhcpd restart > /dev/null 2>&1
-
-	eval $_R0
-}
-
 remove_interface() {
 	# Removes intf's from jails to host. Destroy or put down. Modify tracking files.
 	local _fn="remove_interface" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
@@ -2135,14 +2088,14 @@ modify_intf_trackers() {
 	[ -f "${QTMP}/vmtaps_${_VM}" ] && rm "${QTMP}/vmtaps_${_VM}"
 
 	# Remove interface from jail-internal qubsd_dhcp daemon
-	sed -i '' -E "/${_intf%?}.b([[:blank:]]+|\$)/d" /qubsd/${_jail}/tmp/qubsd_dhcp > /dev/null 2>&1
+	sed -i '' -E "/${_intf%?}.b([ \t]+|\$)/d" /qubsd/${_jail}/tmp/qubsd_dhcp > /dev/null 2>&1
 
 	# Simultaneous stops can race for the control_netmap file. Use a .lock and loop to manage it.
 	while : ; do
 		# If the file is available, lock it, modify it, unlock it, break
 		if [ ! -f "${QTMP}/.control_netmap.lock" ] ; then
 			touch "${QTMP}/.control_netmap.lock"
-			sed -i '' -E "/(^|[[:blank:]]+)${_intf}(\$|[[:blank:]]+)/d" ${QTMP}/control_netmap
+			sed -i '' -E "/(^|[ \t]+)${_intf}(\$|[ \t]+)/d" ${QTMP}/control_netmap
 			rm "${QTMP}/.control_netmap.lock"
 			break
 		fi
@@ -2290,8 +2243,8 @@ prep_bhyve_options() {
 	_BHOPTS="-${_bhyveopts}"
 
 	# Get wildcard bhyve option added by user
-	_bhyve_custm=$(sed -En "s/${_VM}[[:blank:]]+BHYVE_CUSTM[[:blank:]]+//p" $QCONF \
-						| sed -En "s/[[:blank:]]+/ /p")
+	_bhyve_custm=$(sed -En "s/${_VM}[ \t]+BHYVE_CUSTM[ \t]+//p" $QCONF \
+						| sed -En "s/[ \t]+/ /p")
 
 	# RAM and memory handling
 	_RAM="-m $_memsize"
@@ -2439,7 +2392,7 @@ EOF
 }
 
 launch_bhyve_vm() {
-	# Need to detach the launch an monitoring of VMs completely from qb-cmd and qb-start 
+	# Need to detach the launch an monitoring of VMs completely from qb-cmd and qb-start
 
 	# Get globals, although errfiles arent needed
 	get_global_variables
@@ -2535,7 +2488,7 @@ EOF
 	local _count=0 ; sleep .5
 
 	while ! { pgrep -xfq "bhyve: $_VM" \
-				|| pgrep -fl "bhyve" | grep -Eqs "^[[:digit:]]+ .* ${_VM}[[:blank:]]*\$" ;} ; do
+				|| pgrep -fl "bhyve" | grep -Eqs "^[[:digit:]]+ .* ${_VM}[ \t]*\$" ;} ; do
 	sleep .5 ; _count=$(( _count + 1 ))
 	[ "$_count" -ge 6 ] && get_msg -m _e4_1 -- "$_VM" && eval $_R1
 	done
