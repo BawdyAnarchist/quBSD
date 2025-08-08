@@ -15,14 +15,14 @@
 
 	# Startup/Shutdown Scripts
 	exec.clean;
-	exec.consolelog="/dev/null";
-	exec.prepare="/usr/local/etc/quBSD/exec-prepare $name";
-	exec.prestart="/usr/local/etc/quBSD/exec-prestart $name";
-	exec.created="/usr/local/etc/quBSD/exec-created $name";
-	exec.start="sh /etc/rc";
-	exec.poststart="/usr/local/etc/quBSD/exec-poststart $name &";
-	exec.prestop="/usr/local/etc/quBSD/exec-prestop $name";
-	exec.stop="sh /etc/rc.shutdown";
-	stop.timeout="5";
-	exec.release="/usr/local/etc/quBSD/exec-release $name";
+	stop.timeout=    "5";
+	exec.consolelog= "/dev/null";
+	exec.prepare=    "/usr/local/etc/quBSD/exec-prepare $name";
+	exec.prestart=   "/usr/local/etc/quBSD/exec-prestart $name";
+	exec.created=    "/usr/local/etc/quBSD/exec-created $name";
+	exec.start=      "sh /etc/rc";
+	exec.poststart=  "/usr/local/etc/quBSD/exec-poststart $name &";
+	exec.prestop=    "/usr/local/etc/quBSD/exec-prestop $name";
+	exec.stop=       "sh /etc/rc.shutdown";
+	exec.release=    "/usr/local/etc/quBSD/exec-release $name";
 }
