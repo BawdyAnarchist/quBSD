@@ -1,5 +1,11 @@
 
-MTU is not being honored and now some jails (no VPN, connect to firewall) are failing to put resolv.conf correctly
+figure out the control jail gateway_network ioctl ifconfig mtu error 
+Remove the useless get_networking_variables()
+
+Revisit if you want to make /var/unbound persistent nullfs in gateways for faster resolv
+
+Revisit /etc/dhclient-exit-hooks - I want to remove it, might not be possible
+    See if you cant get DHCP working properly as a function of the rc.conf
 
 control_netmap is borked and constantly double lists
 
@@ -17,14 +23,13 @@ When back on normal setup, fix the i3gen.conf to match QubesTricks
 
 
 ### INSTALLER SCRIPT CHANGES ###
-Linuxulator upgrade - ubuntu full session
-  debootstrap jammy /qubsd/0gui/compat/ubuntu
-  Then set jconf mounts. Including a shared home directory
-    - This I will try for now, but might end up being problematic later? We'll see
- 
+local unbound
+  chroot 0net && service local_unbound setup
+    - MODIFY THE chroot line to:  `chroot: ""`
+	 - include: /var/unbound/forward.conf
+  touch /var/unbound/foward.conf
+  copy the qubsd_server.conf file (should already be done)
 
-
-### INSTALLER SCRIPT CHANGES ###
 roots
 	mkdir /usr/local/bin && cp qubsd_dhcp
 	mkdir /usr/local/etc/rc.d && cp qubsd_dhcp
@@ -46,6 +51,23 @@ consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-i
 
 There is some question now as to the dispjails and their templates, and the devfs in jail.conf. 
 
+X11 segregation
+  install socat on host, bspwm in 0gui
+  copy the bspwmrc to 0gui /usr/local/etc/X11/ 
+  copy /etc/login.conf to 0gui, then chroot and cap_mkdb (for GLX etc problems and avoidance)
+
+Linuxulator:
+  install debootstrap to host
+  mkdir then debootstrap jammy /qubsd/0gui/compat/ubuntu
+  mkdir /qubsd/0gui/compat/ubuntu/tmp/.X11-unix
+  modify /etc/apt/sources.list
+  apt update && apt upgrade
+  /etc/bash.bashrc - PS1 you can add 'ubuntu ' in front of ${debian_...}
+    - same for /root/.bashrc
+    - this will help when you're the LINUX user/root in the jail, to show that clearly at terminal
+  /etc/environment - newline: `_JAVA_AWT_WM_NONREPARENTING=1`
+    - coz java refuses to honor bspwm
+  ?? Do I need to change the env for GUI programs in Linux as well?? Like with /etc/login.conf? Maybe.
 
 ### UPGRADES
 
@@ -94,7 +116,7 @@ qb-ivpn
 qb-connect
 	- Needs reviewed and reworked based on new networking functions
 
-qb-i3-launch - had problems with double launching windows that already existed (on fully opened setup)
+qb-i3-launch - overhauled now that I'm using Xephyr
 
 qb-create
 	- [-z dupl] still needs to create and copy the fstab of the template jail, and maybe the rc.conf too. 
@@ -131,18 +153,12 @@ ALL file names should ALWAYS be variables defined in get_global_variables
 
 0control qb-copy is SLOW af alot of times
 
-/etc/devfs.rules
-  - I probably have the mixer being added, but jails don't need it.
-  - the new one for webcam
-
 Take another hack at the recording device problems
 
 Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file and code.
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
 
 Crons - No crons running. Probably something long term security that should be integrated and automated.
-
-I think `jail` caches fstab before completion of exec.prepare which edits it. Need to prove/submit bug. Need dtrace
 
 
 ### FAILURES - DO NOT TRY AGAIN
