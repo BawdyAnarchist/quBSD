@@ -1,11 +1,7 @@
 
-figure out the control jail gateway_network ioctl ifconfig mtu error 
 Remove the useless get_networking_variables()
 
 Revisit if you want to make /var/unbound persistent nullfs in gateways for faster resolv
-
-Revisit /etc/dhclient-exit-hooks - I want to remove it, might not be possible
-    See if you cant get DHCP working properly as a function of the rc.conf
 
 control_netmap is borked and constantly double lists
 
@@ -20,6 +16,20 @@ TIMEOUT overhaul - timeout is a real command that will exit a command after a ce
 zfs decryption wasnt working quite right. I need to recheck it
 
 When back on normal setup, fix the i3gen.conf to match QubesTricks
+
+rc.conf -nmdm cuse , I dont know if I need them or what for
+
+Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
+
+generalize the schg to being able to list specific files, and not my preselected ones.
+
+There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
+When you restore, the datasets dont inherit their qubsd:autosnap properties
+
+consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-in-freebsds-vnet-jails/
+	- It's for vnet jails and NAT. Disables hardware checksums for virtual interfaces, and extra filtering on bridges
+
+There is some question now as to the dispjails and their templates, and the devfs in jail.conf. 
 
 
 ### INSTALLER SCRIPT CHANGES ###
@@ -36,20 +46,6 @@ roots
 	/etc/rc.conf qubsd_dhcp_enable="YES"
 	touch /qubsd/0base/etc/resolv.conf
 	dbus added to host when GUI option is selected 
-
-rc.conf -nmdm cuse , I dont know if I need them or what for
-
-Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
-
-generalize the schg to being able to list specific files, and not my preselected ones. Overall pf and everything needs examined/revised
-
-There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
-When you restore, the datasets dont inherit their qubsd:autosnap properties
-
-consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-in-freebsds-vnet-jails/
-	- It's for vnet jails and NAT. Disables hardware checksums for virtual interfaces, and extra filtering on bridges
-
-There is some question now as to the dispjails and their templates, and the devfs in jail.conf. 
 
 X11 segregation
   install socat on host, bspwm in 0gui
@@ -159,13 +155,6 @@ Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file a
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
 
 Crons - No crons running. Probably something long term security that should be integrated and automated.
-
-
-### FAILURES - DO NOT TRY AGAIN
-
-PUT XORG and i3 in a jail
-  - Sounds nice, but after you launch X11, you're permanently in the jail.
-
 
 
 ### GENERIC SHELL LIBRARY FUNCTIONS
