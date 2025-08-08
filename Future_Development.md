@@ -1,6 +1,4 @@
 
-Remove the useless get_networking_variables()
-
 Revisit if you want to make /var/unbound persistent nullfs in gateways for faster resolv
 
 control_netmap is borked and constantly double lists
