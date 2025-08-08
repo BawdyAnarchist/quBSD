@@ -1,11 +1,11 @@
-net-firewall {
+net-vpn {
 	# Standard Settings
 	host.hostname="$name";
 	path="/qubsd/$name";
 	persist;
 
 	# File System
-	devfs_ruleset="NETRULENUM1";
+	devfs_ruleset="6";
 	mount.devfs;
 	mount += "/zusr/$name/rw/  $path/rw/  nullfs  rw  0  0";
 
@@ -14,12 +14,14 @@ net-firewall {
 
 	# Startup/Shutdown Scripts
 	exec.clean;
+	exec.consolelog="/dev/null";
 	exec.prepare="/usr/local/etc/quBSD/exec-prepare $name";
 	exec.prestart="/usr/local/etc/quBSD/exec-prestart $name";
 	exec.created="/usr/local/etc/quBSD/exec-created $name"; 
-	exec.start="sh /etc/rc > /dev/null 2>&1";       # jail rc scripts pollute host stdout. Redir > null
+	exec.start="sh /etc/rc";
 	exec.poststart="/usr/local/etc/quBSD/exec-poststart $name &";
 	exec.prestop="/usr/local/etc/quBSD/exec-prestop $name";
 	exec.stop="sh /etc/rc.shutdown"; 
+	stop.timeout="5";
 	exec.release="/usr/local/etc/quBSD/exec-release $name";
 }

@@ -1,5 +1,4 @@
 
-
 control_netmap is borked and constantly double lists
 
 Revisit if you want to make /var/unbound persistent nullfs in gateways for faster resolv
@@ -11,6 +10,12 @@ qb-start
 	- Simultaneous starts of clients could mess up wireguard restarting
 
 qb-edit - < GATEWAY > isnt valid for CLASS: host. Valid params are:
+
+There are still demons in the xephyr-xclip daemon
+
+Why does Telegram freeze so much?
+
+Sound in Linuxulator?
 
 
 ### UPGRADES
