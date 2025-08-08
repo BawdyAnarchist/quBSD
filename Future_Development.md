@@ -1,7 +1,10 @@
 
-Revisit if you want to make /var/unbound persistent nullfs in gateways for faster resolv
 
 control_netmap is borked and constantly double lists
+
+Revisit if you want to make /var/unbound persistent nullfs in gateways for faster resolv
+
+zfs decryption wasnt working quite right. I need to recheck it
 
 qb-start
 	- Needs updated with new networking functions in mind
@@ -9,59 +12,6 @@ qb-start
 
 qb-edit - < GATEWAY > isnt valid for CLASS: host. Valid params are:
 
-TIMEOUT overhaul - timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
-
-zfs decryption wasnt working quite right. I need to recheck it
-
-When back on normal setup, fix the i3gen.conf to match QubesTricks
-
-rc.conf -nmdm cuse , I dont know if I need them or what for
-
-Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
-
-generalize the schg to being able to list specific files, and not my preselected ones.
-
-There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
-When you restore, the datasets dont inherit their qubsd:autosnap properties
-
-consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-in-freebsds-vnet-jails/
-	- It's for vnet jails and NAT. Disables hardware checksums for virtual interfaces, and extra filtering on bridges
-
-There is some question now as to the dispjails and their templates, and the devfs in jail.conf. 
-
-
-### INSTALLER SCRIPT CHANGES ###
-local unbound
-  chroot 0net && service local_unbound setup
-    - MODIFY THE chroot line to:  `chroot: ""`
-	 - include: /var/unbound/forward.conf
-  touch /var/unbound/foward.conf
-  copy the qubsd_server.conf file (should already be done)
-
-roots
-	mkdir /usr/local/bin && cp qubsd_dhcp
-	mkdir /usr/local/etc/rc.d && cp qubsd_dhcp
-	/etc/rc.conf qubsd_dhcp_enable="YES"
-	touch /qubsd/0base/etc/resolv.conf
-	dbus added to host when GUI option is selected 
-
-X11 segregation
-  install socat on host, bspwm in 0gui
-  copy the bspwmrc to 0gui /usr/local/etc/X11/ 
-  copy /etc/login.conf to 0gui, then chroot and cap_mkdb (for GLX etc problems and avoidance)
-
-Linuxulator:
-  install debootstrap to host
-  mkdir then debootstrap jammy /qubsd/0gui/compat/ubuntu
-  mkdir /qubsd/0gui/compat/ubuntu/tmp/.X11-unix
-  modify /etc/apt/sources.list
-  apt update && apt upgrade
-  /etc/bash.bashrc - PS1 you can add 'ubuntu ' in front of ${debian_...}
-    - same for /root/.bashrc
-    - this will help when you're the LINUX user/root in the jail, to show that clearly at terminal
-  /etc/environment - newline: `_JAVA_AWT_WM_NONREPARENTING=1`
-    - coz java refuses to honor bspwm
-  ?? Do I need to change the env for GUI programs in Linux as well?? Like with /etc/login.conf? Maybe.
 
 ### UPGRADES
 
@@ -96,6 +46,9 @@ I2P Gateway
 
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
+
+qubsd.conf
+   - generalize the schg to being able to list specific files, and not my preselected ones.
 
 qb-edit
 	- chk_isqubsd_ipv4 - [-x] isnt used anywhere, but a check for quBSD IP convention would be a good addon 
@@ -139,9 +92,23 @@ qb-stat
 	- Give a popup option that can be closed with any key (quickview kinda stuff)
 	- Add a column for worspace location of active windows
 
+consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-in-freebsds-vnet-jails/
+	- It's for vnet jails and NAT. Disables hardware checksums for virtual interfaces, and extra filtering on bridges
 
 
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP
+
+TIMEOUT overhaul - timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
+
+rc.conf -nmdm cuse , I dont know if I need them or what for
+
+When you restore, the datasets dont inherit their qubsd:autosnap properties
+
+Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
+
+There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
+
+There is some question now as to the dispjails and their templates, and the devfs in jail.conf. 
 
 ALL file names should ALWAYS be variables defined in get_global_variables
 
@@ -153,6 +120,40 @@ Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file a
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
 
 Crons - No crons running. Probably something long term security that should be integrated and automated.
+
+
+### INSTALLER SCRIPT CHANGES ###
+local unbound
+  chroot 0net && service local_unbound setup
+    - MODIFY THE chroot line to:  `chroot: ""`
+	 - include: /var/unbound/forward.conf
+  touch /var/unbound/foward.conf
+  copy the qubsd_server.conf file (should already be done)
+
+roots
+	mkdir /usr/local/bin && cp qubsd_dhcp
+	mkdir /usr/local/etc/rc.d && cp qubsd_dhcp
+	/etc/rc.conf qubsd_dhcp_enable="YES"
+	touch /qubsd/0base/etc/resolv.conf
+	dbus added to host when GUI option is selected 
+
+X11 segregation
+  install socat on host, bspwm in 0gui
+  copy the bspwmrc to 0gui /usr/local/etc/X11/ 
+  copy /etc/login.conf to 0gui, then chroot and cap_mkdb (for GLX etc problems and avoidance)
+
+Linuxulator:
+  install debootstrap to host
+  mkdir then debootstrap jammy /qubsd/0gui/compat/ubuntu
+  mkdir /qubsd/0gui/compat/ubuntu/tmp/.X11-unix
+  modify /etc/apt/sources.list
+  apt update && apt upgrade
+  /etc/bash.bashrc - PS1 you can add 'ubuntu ' in front of ${debian_...}
+    - same for /root/.bashrc
+    - this will help when you're the LINUX user/root in the jail, to show that clearly at terminal
+  /etc/environment - newline: `_JAVA_AWT_WM_NONREPARENTING=1`
+    - coz java refuses to honor bspwm
+  ?? Do I need to change the env for GUI programs in Linux as well?? Like with /etc/login.conf? Maybe.
 
 
 ### GENERIC SHELL LIBRARY FUNCTIONS
