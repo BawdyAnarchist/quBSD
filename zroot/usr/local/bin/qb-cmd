@@ -70,7 +70,7 @@ chk_app_X11() {
 		chroot "${M_QROOT}/${_JAIL}" /bin/sh -s << 'EOF'
 			_pkg=$(which $_cmd | xargs pkg which -q)
 			[ -z "$_pkg" ] && exit 3
-			pkg info -d $_pkg | grep -Eqs 'libX11|libxcb' && exit 0
+			pkg info -d $_pkg | grep -Eqs 'libX11|libxcb|qt5|libgtk|gui|x11' && exit 0
 EOF
 		return $?
 	else
