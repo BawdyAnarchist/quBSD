@@ -1980,9 +1980,10 @@ configure_gateway_network() {
 		&& _gw_ip="${ipv4%.*/*}.1/${ipv4#*/}" \
 		|| _gw_ip=$(discover_open_ipv4 -g -t "$_type" -- "$_client" "$_gateway")
 
-	# Use _client QCONF MTU, but dont sub the default. If there is none, use MTU of the EXT_IF
+	# MTU is tricky. Honor QCONF first. Then check for EXT_IF (do not exceed). Last, use default
 	_mtu="$(get_jail_parameter -ez MTU $_client)"
 	: ${_mtu:=$(jexec -l -U root $_gateway ifconfig -ag EXT_IF | sed -En "s/.*mtu ([^ \t]+)/\1/p")}
+	: ${_mtu:=$(get_jail_parameter -dez MTU $_client)}
 
 	# Configure the interface
 	ifconfig $_vif_gw vnet $_gateway
