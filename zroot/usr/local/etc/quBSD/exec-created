@@ -13,16 +13,16 @@ main() {
 	# If exec script fails and jail start aborts, make sure to clean up the mounts
 	trap '/usr/local/etc/qubsd/exec-release $JAIL'
 
-	# First establish connections to the upstream gateway and control jail
-	connect_client_to_gateway -d "$JAIL" "$GATEWAY"
-	connect_client_to_gateway -dt SSH "$JAIL" "$CONTROL"
+	# Establish connections to the jail's upstream gateway and control jail
+	connect_client_to_gateway -t SSH "$JAIL" "$CONTROL"
+	connect_client_to_gateway "$JAIL" "$GATEWAY"
 
 	# If this jail is also a gateway, connect it to downstream clients.
 	clients=$(get_info -e _CLIENTS "$JAIL" | tr '\n\t' ' ')
 	last_client=$(echo "$clients" | awk '{print $NF}')
-	for _cli in $clients ; do
-		[ "$_cli" = "$last_client" ] && unset _s || _s="-s"
-		chk_isrunning "$_cli" && connect_client_to_gateway $_s "$_cli" "$JAIL"
+	for _CLI in $clients ; do
+		[ "$_CLI" = "$last_client" ] && _s="-s"  # -s currently unused, keeping for now until starts are fixed
+		chk_isrunning "$_CLI" && connect_client_to_gateway $_s "$_CLI" "$JAIL"
 	done
 
 	# If this is a cjail, check all the onjails to see if this is their control jail. 
