@@ -6,6 +6,7 @@ qb-edit - < GATEWAY > isnt valid for CLASS: host. Valid params are:
    local-unbound vs named. Maybe I dont need named?
    0control doesnt need a special mount for IP addresses. Just print them directly to the jail's /tmp
    control_netmap is borked and constantly double lists
+	**update nicvm**
 
 zfs decryption wasnt working quite right. I need to recheck it
 
@@ -19,7 +20,6 @@ Why does Telegram freeze so much?
 
 Sound in Linuxulator?
 
-update nicvm
 
 
 ### UPGRADES
@@ -97,6 +97,7 @@ qb-update - Update rootjails, create snapshots
 qb-backup - Add ssh option
 
 qb-stat
+   - Monitor for unfocused CPU resource usage - Flag/Notify. For user
 	- Change hardcoded to more flexible setup: config file, col selector, RAM/CPU/DISK colorize
 	- Give a popup option that can be closed with any key (quickview kinda stuff)
 	- Add a column for worspace location of active windows

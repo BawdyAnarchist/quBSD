@@ -378,7 +378,7 @@ get_info() {
 			else
 				_xsock=$(xprop -id $_xid | sed -En "s/^WM_NAME.*:([0-9]+)\..*/\1/p")
 				_value=$(pgrep -fl "X11-unix/X${_xsock}" | head -1 | sed -En \
-								"s@.*tmp/quBSD/([[:alnum:]]+)/.X11-unix/X${_xsock}.*@\1@p")
+								"s@.*var/run/qubsd/X11/(.*)/.X11-unix/X${_xsock},.*@\1@p")
 			fi
 			;;
 		_XNAME)  # Gets the name of the active window
