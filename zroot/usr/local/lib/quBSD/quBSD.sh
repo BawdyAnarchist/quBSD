@@ -235,6 +235,7 @@ get_parameter_lists() {
 			dispVM) FILT_PARAMS="$COMN_PARAMS $VM_PARAMS $MULT_LN_PARAMS TEMPLATE" ;;
 			dispjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS TEMPLATE" ;;
 			appjail|rootjail|cjail) FILT_PARAMS="$COMN_PARAMS $JAIL_PARAMS" ;;
+			host) FILT_PARAMS="GATEWAY IPV4 MTU AUTOSNAP" ;;
 		esac
 	fi
 	eval $_R0

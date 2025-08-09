@@ -1,6 +1,4 @@
 
-qb-edit - < GATEWAY > isnt valid for CLASS: host. Valid params are:
-
 zfs decryption wasnt working quite right. I need to recheck it
 
 0control review and ... overhaul?

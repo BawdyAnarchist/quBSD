@@ -40,7 +40,6 @@ check_and_adjust() {
 	# Script is intended to be robust for the user. This function
 	# merges any positional parameters with -j and -p options, when able.
 
-	echo "${JAIL}@${POS1}@${PARAM}@${POS2}"
 	case "${JAIL}@${POS1}@${PARAM}@${POS2}" in
 		# No action. If POS1 wasnt assigned, then POS2 wasnt either
 		none@none@*|*@none@*@*) : ;;
