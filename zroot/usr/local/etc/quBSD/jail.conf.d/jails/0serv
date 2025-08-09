@@ -1,0 +1,8 @@
+0serv {
+	.include "/usr/local/etc/quBSD/jail.conf.d/base.conf";
+	devfs_ruleset="4";
+
+#	# EXAMPLE MOUNTS - Typical server directories. Coordinate with jail's /rw directory
+#	mount += "$zusr/usr/local/etc/  $path/usr/local/etc/  nullfs  rw  0  0";
+#	mount += "$zusr/usr/local/www/  $path/usr/local/www/  nullfs  rw  0  0";
+}

@@ -1,0 +1,5 @@
+disp-tor1 {
+	.include "/usr/local/etc/quBSD/jail.conf.d/base.conf";
+	.include "/usr/local/etc/quBSD/jail.conf.d/x11.conf";
+	devfs_ruleset="7";
+}

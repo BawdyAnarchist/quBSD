@@ -1,0 +1,8 @@
+0control {
+	.include "/usr/local/etc/quBSD/jail.conf.d/base.conf";
+	devfs_ruleset="6";
+
+	# 0control functionality to be revisisted later. For now leave as-is 
+	mount += "$zusr/usr/local/etc/namedb  $path/usr/local/etc/namedb/  nullfs  rw  0  0";
+	mount += "/var/run/quBSD                    $path/tmp/quBSD              nullfs  ro  0  0";
+}
