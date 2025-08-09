@@ -32,6 +32,9 @@ main() {
 			[ -e ${M_QROOT}/${JAIL} ] && (exec chflags -fR noschg ${M_QROOT}/${JAIL})
 	esac
 
+	# Clean up the jail's /var/run directory
+	rm -r ${QRUN}/${JAIL} 2>/dev/null
+
 	# Flags come down after stopping, but fork process and silence, to reduce user lag
 	[ -e ${M_ZUSR}/${JAIL} ] && (exec chflags -fR noschg ${M_ZUSR}/${JAIL})
 
