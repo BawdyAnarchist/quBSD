@@ -1,14 +1,14 @@
 
 qb-edit - < GATEWAY > isnt valid for CLASS: host. Valid params are:
 
+zfs decryption wasnt working quite right. I need to recheck it
+
 0control review and ... overhaul?
    remember that you turned it off in exec.created
    local-unbound vs named. Maybe I dont need named?
    0control doesnt need a special mount for IP addresses. Just print them directly to the jail's /tmp
    control_netmap is borked and constantly double lists
 	**update nicvm**
-
-zfs decryption wasnt working quite right. I need to recheck it
 
 qb-start
 	- Needs updated with new networking functions in mind

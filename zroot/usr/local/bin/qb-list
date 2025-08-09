@@ -40,6 +40,7 @@ check_and_adjust() {
 	# Script is intended to be robust for the user. This function
 	# merges any positional parameters with -j and -p options, when able.
 
+	echo "${JAIL}@${POS1}@${PARAM}@${POS2}"
 	case "${JAIL}@${POS1}@${PARAM}@${POS2}" in
 		# No action. If POS1 wasnt assigned, then POS2 wasnt either
 		none@none@*|*@none@*@*) : ;;
@@ -48,7 +49,7 @@ check_and_adjust() {
 		none@*@none@none)
 
 			# Check if it's a parameter
-			awk '{print $2}' $QCONF | grep -Eqsi "[[:blank:]]${POS1}[[:blank:]]" && PARAM="$POS1"
+			awk '{print $2}' $QCONF | grep -Eqsi "${POS1}" && PARAM="$POS1"
 
 			# Check if it's an entry in QCONF
 			grep -Eqs "^${POS1}[[:blank:]]+" $QCONF && JAIL="$POS1"
@@ -203,7 +204,7 @@ print_results() {
 }
 
 get_global_variables
-
+#setlog1
 get_options "$@"
 
 check_and_adjust
