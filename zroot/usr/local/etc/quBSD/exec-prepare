@@ -12,9 +12,6 @@ get_parameters() {
 	get_jail_parameter ROOTENV "$JAIL"    || get_msg2 -Em _e
 	get_jail_parameter -d GATEWAY "$JAIL" || get_msg2 -Em _e
 	get_jail_parameter -d CONTROL "$JAIL" || get_msg2 -Em _e
-
-	# Get all mounts related to the root mount: /qubsd/JAIL
-	JMOUNT=$(mount | grep -Eo "${M_QROOT}/${JAIL}/[^[:blank:]]+")
 }
 
 preparation_actions() {
@@ -25,6 +22,7 @@ preparation_actions() {
 	start_jail "$GATEWAY" > /dev/null 2>&1
 
 	# Double check to unmount any parts of <jail> before destroy/recreating the dataset
+	JMOUNT=$(mount | grep -Eo "${M_QROOT}/${JAIL}/[^[:blank:]]+")
 	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
 }
 
