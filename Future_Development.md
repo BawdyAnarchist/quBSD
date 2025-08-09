@@ -1,7 +1,14 @@
 
-control_netmap is borked and constantly double lists
+$qubsd/zroot/etc/rc.conf needs updated
+Push the jail.conf and /var/run changes
 
-Revisit if you want to make /var/unbound persistent nullfs in gateways for faster resolv
+0control review and ... overhaul?
+   remember that you turned it off in exec.created
+   local-unbound vs named. Maybe I dont need named?
+   0control doesnt need a special mount for IP addresses. Just print them directly to the jail's /tmp
+   control_netmap is borked and constantly double lists
+
+net-tor - data directories nullfs might be overkill. At least usr/local/share/tor
 
 zfs decryption wasnt working quite right. I need to recheck it
 
@@ -16,6 +23,8 @@ There are still demons in the xephyr-xclip daemon
 Why does Telegram freeze so much?
 
 Sound in Linuxulator?
+
+update nicvm
 
 
 ### UPGRADES
