@@ -124,11 +124,11 @@ get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
 
 	# Define variables for files
-	JCONF_D="/etc/jail.conf.d"
+	JCONF_D="/usr/local/etc/quBSD/jail.conf.d/jails"
 	QBDIR="/usr/local/etc/quBSD"
 	QCONF="${QBDIR}/qubsd.conf"
 	QBLOG="/var/log/quBSD/quBSD.log"
-	QTMP="/tmp/quBSD"
+	QRUN="/var/run/qubsd"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
 	sed -i '' -E 's/[ \t]*$//' $QCONF
@@ -145,9 +145,9 @@ get_global_variables() {
 	[ "$M_ZUSR" = "-" ]  && get_msg -V -m _e0_3 "$U_ZFS" && exit 1
 
 	# Set the files for error recording, and trap them
-	[ -d "$QTMP" ] || mkdir $QTMP
-	ERR1=$(mktemp -t quBSD/.${0##*/})
-	ERR2=$(mktemp -t quBSD/.${0##*/})
+	[ -d "$QRUN" ] || mkdir $QRUN
+	ERR1=$(mktemp ${QRUN}/err1_${0##*/}.XXXX)
+	ERR2=$(mktemp ${QRUN}/err2_${0##*/}.XXXX)
 	trap "rm_errfiles" HUP INT TERM QUIT EXIT
 
 	return 0
@@ -494,7 +494,7 @@ create_popup() {
 		eval $_R0
 	else
 		# Need to collect a variable, and use a tmp file to pull it from the subshell, to a variable.
-		local _poptmp=$(mktemp -t quBSD/.popup)
+		local _poptmp=$(mktemp ${QRUN}/popup.XXXX)
 		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
 			"eval \"$_i3mod\"; printf \"%b\" \"$_popmsg\"; read _INPUT; echo \"\$_INPUT\" > $_poptmp"
 
@@ -665,7 +665,7 @@ reclone_zroot() {
 	# Destroys the existing _rootenv clone of <_jail>, and replaces it
 	# Detects changes since the last snapshot, creates a new snapshot if necessary,
 	local _fn="reclone_zroot" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-	_tmpsnaps="${QTMP}/.tmpsnaps"
+	_tmpsnaps="${QRUN}/.tmpsnaps"
 
 	while getopts qV _opts ; do case $_opts in
 		q) local _qz='-q' ;;
@@ -771,7 +771,7 @@ select_snapshot() {
 	# Returns the best/latest snapshot for a given ROOTENV
 	local _fn="select_snapshot" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 	local _jlsdate ; local _rootsnaps ; local _snapdate ; local _newsnap
-	local _tmpsnaps="${QTMP}/.tmpsnaps"
+	local _tmpsnaps="${QRUN}/.tmpsnaps"
 	local _rootzfs="${R_ZFS}/${_rootenv}"
 
 	# For safety, running ROOTENV snapshot should be taken from before it was started
@@ -989,7 +989,7 @@ launch_xephyr() {
 
 	# Link the sockets together
   socat \
-    UNIX-LISTEN:${QTMP}/${_JAIL}/.X11-unix/X${display},fork,unlink-close,mode=0666 \
+    UNIX-LISTEN:${QRUN}/X11/${_JAIL}/.X11-unix/X${display},fork,unlink-close,mode=0666 \
     UNIX-CONNECT:/tmp/.X11-unix/X${display} &
   socat_pid="$!"
 	trap "kill -15 $bspwm_pid $socat_pid $xephyr_pid" INT TERM HUP QUIT EXIT
@@ -1856,7 +1856,7 @@ connect_client_to_gateway() {
 
 		*VM_*jail|*VM_host)       # Configuring VM gateway is outside scope of quBSD automation
 			# Get vif from vmtaps tracker and manage jail vs host client
-			_vif_cl=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_gateway}")
+			_vif_cl=$(sed -En "s/ ${_type}//p" "${QRUN}/vmtaps_${_gateway}")
 			[ ! "$_cl_cl" = "host" ] \
 				&& _jexec="jexec -l -U root $_client" \
 				&& ifconfig $_vif_cl vnet $_client
@@ -1866,7 +1866,7 @@ connect_client_to_gateway() {
 			configure_client_network
 		;;
 		*jail_*VM)                # Assume client VM is always using DHCP
-			_vif_gw=$(sed -En "s/ ${_type}//p" "${QTMP}/vmtaps_${_client}")
+			_vif_gw=$(sed -En "s/ ${_type}//p" "${QRUN}/vmtaps_${_client}")
 			configure_gateway_network
 		;;
 		*jail_*jail|*jail_host)   # Order matters. DHCP clients expect an already configured gateway
@@ -1971,7 +1971,7 @@ configure_gateway_network() {
 	ifconfig $_vif_gw vnet $_gateway
 	jexec -l -U root $_gateway ifconfig $_vif_gw inet $_gw_ip group CLIENTS mtu $_mtu up
 
-	[ "$_type" = "SSH" ] && echo "$_client $_vif_gw ${_gw_ip%%/*}" >> ${QTMP}/control_netmap
+	[ "$_type" = "SSH" ] && echo "$_client $_vif_gw ${_gw_ip%%/*}" >> ${QRUN}/control_netmap
 	eval $_R0
 }
 
@@ -1991,7 +1991,7 @@ discover_open_ipv4() {
 			q) _qi="-q" ;;
 			t) local _type="$OPTARG" ;;
 			T) # This function is used in IP deconflictin by qb-start. Create TMP file
-				_TMP_IP="${_TMP_IP:=${QTMP}/.qb-start_temp_ip}" ;;
+				_TMP_IP="${_TMP_IP:=${QRUN}/.qb-start_temp_ip}" ;;
 			V) local _V="-V" ;;
 			*) get_msg -m _e9 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
@@ -2068,7 +2068,7 @@ modify_intf_trackers() {
 	local _intf="$1" ; local _start=$(date +%-s)
 
 	# Remove the taps tracker file if it exists
-	[ -f "${QTMP}/vmtaps_${_VM}" ] && rm "${QTMP}/vmtaps_${_VM}"
+	[ -f "${QRUN}/vmtaps_${_VM}" ] && rm "${QRUN}/vmtaps_${_VM}"
 
 	# Remove interface from jail-internal qubsd_dhcp daemon
 	sed -i '' -E "/${_intf%?}.b([ \t]+|\$)/d" /qubsd/${_jail}/tmp/qubsd_dhcp > /dev/null 2>&1
@@ -2076,10 +2076,10 @@ modify_intf_trackers() {
 	# Simultaneous stops can race for the control_netmap file. Use a .lock and loop to manage it.
 	while : ; do
 		# If the file is available, lock it, modify it, unlock it, break
-		if [ ! -f "${QTMP}/.control_netmap.lock" ] ; then
-			touch "${QTMP}/.control_netmap.lock"
-			sed -i '' -E "/(^|[ \t]+)${_intf}(\$|[ \t]+)/d" ${QTMP}/control_netmap
-			rm "${QTMP}/.control_netmap.lock"
+		if [ ! -f "${QRUN}/.control_netmap.lock" ] ; then
+			touch "${QRUN}/.control_netmap.lock"
+			sed -i '' -E "/(^|[ \t]+)${_intf}(\$|[ \t]+)/d" ${QRUN}/control_netmap
+			rm "${QRUN}/.control_netmap.lock"
 			break
 		fi
 		# Dont let the loop go infinitely on host. Something went wrong if 30secs and no unlock
@@ -2112,7 +2112,7 @@ cleanup_vm() {
 	# Bring all recorded taps back to host, and destroy. Skip checks for speed (non-essential)
 	local _ct=$(get_jail_parameter -des CONTROL $_VM)
 	local _gw=$(get_jail_parameter -des GATEWAY $_VM)
-	for _tap in $(sed -E 's/ .*$//' "${QTMP}/vmtaps_${_VM}" 2> /dev/null) ; do
+	for _tap in $(sed -E 's/ .*$//' "${QRUN}/vmtaps_${_VM}" 2> /dev/null) ; do
 			grep -Eqs "$_tap SSH" && _gw="$_ct" || unset _gw
 			grep -Eqs "$_tap NET" && _gw="$_gw" || unset _gw
 			remove_interface -d "$_tap" "$_gw"
@@ -2137,7 +2137,7 @@ cleanup_vm() {
 	[ -n "$_template" ] && reclone_zusr "$_VM" "$_template"
 
 	# Remove the /tmp files
-	rm "${QTMP}/qb-bhyve_${_VM}" 2> /dev/null
+	rm "${QRUN}/qb-bhyve_${_VM}" 2> /dev/null
 	rm_errfiles
 	eval $_R0
 }
@@ -2356,10 +2356,10 @@ EOF
 
 		# Tracker file for which taps are related to which VM, and for which purpose (_vif tags)
 		case "$_cycle" in
-			0) echo "$_tap SSH" >> "${QTMP}/vmtaps_${_VM}"  ;;
-			1) echo "$_tap NET" >> "${QTMP}/vmtaps_${_VM}"  ;;
-			2) echo "$_tap X11" >> "${QTMP}/vmtaps_${_VM}"  ;;
-			3) echo "$_tap EXTRA_${_cycle}" >> "${QTMP}/vmtaps_${_VM}"  ;;
+			0) echo "$_tap SSH" >> "${QRUN}/vmtaps_${_VM}"  ;;
+			1) echo "$_tap NET" >> "${QRUN}/vmtaps_${_VM}"  ;;
+			2) echo "$_tap X11" >> "${QRUN}/vmtaps_${_VM}"  ;;
+			3) echo "$_tap EXTRA_${_cycle}" >> "${QRUN}/vmtaps_${_VM}"  ;;
 		esac
 		_cycle=$(( _cycle + 1 ))
 	done
