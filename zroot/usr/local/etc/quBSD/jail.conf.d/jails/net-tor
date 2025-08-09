@@ -2,7 +2,6 @@ net-tor {
 	.include "/usr/local/etc/quBSD/jail.conf.d/base.conf";
 	devfs_ruleset="6";
 
-	# SPECIALIZED MOUNTS - Tor persistent data directories - Might be overkill. Revisit later
-	mount += "$zusr/var/db/tor           $path/var/db/tor           nullfs  rw  0  0";
-	mount += "$zusr/usr/local/share/tor  $path/usr/local/share/tor  nullfs  rw  0  0";
+	# TOR - Persistent data required for the gateway
+	mount += "$zusr/var/db/tor  $path/var/db/tor  nullfs  rw  0 0";
 }

@@ -1,6 +1,5 @@
 
-$qubsd/zroot/etc/rc.conf needs updated
-Push the jail.conf and /var/run changes
+qb-edit - < GATEWAY > isnt valid for CLASS: host. Valid params are:
 
 0control review and ... overhaul?
    remember that you turned it off in exec.created
@@ -8,15 +7,11 @@ Push the jail.conf and /var/run changes
    0control doesnt need a special mount for IP addresses. Just print them directly to the jail's /tmp
    control_netmap is borked and constantly double lists
 
-net-tor - data directories nullfs might be overkill. At least usr/local/share/tor
-
 zfs decryption wasnt working quite right. I need to recheck it
 
 qb-start
 	- Needs updated with new networking functions in mind
 	- Simultaneous starts of clients could mess up wireguard restarting
-
-qb-edit - < GATEWAY > isnt valid for CLASS: host. Valid params are:
 
 There are still demons in the xephyr-xclip daemon
 
