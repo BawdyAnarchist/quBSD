@@ -68,7 +68,7 @@ run_command() {
 }
 
 monitor_ephm_windows() {
-	cat <<-ENDOFCMD > "${QTMP}/qb-${NEWJAIL}"
+	cat <<-ENDOFCMD > "${QRUN}/qb-${NEWJAIL}"
 	#!/bin/sh
 
 	# New script wont have the caller functions, or variables. Source them again
@@ -84,7 +84,7 @@ monitor_ephm_windows() {
 		zfs destroy -rRf $NEWSNAP > /dev/null 2>&1
 		sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QCONF
 		rm ${JCONF_D}/${NEWJAIL}
-		rm "${QTMP}/qb-${NEWJAIL}" > /dev/null 2>&1
+		rm "${QRUN}/qb-${NEWJAIL}" > /dev/null 2>&1
 		rm_errfiles
 		exit 0
 	}
@@ -102,8 +102,8 @@ monitor_ephm_windows() {
 ENDOFCMD
 
 	# Make executable and run. nohup prevents killing the process if host launch terminal closes
-	chmod +x "${QTMP}/qb-${NEWJAIL}"
-	nohup /bin/sh "${QTMP}/qb-${NEWJAIL}" > /dev/null 2>&1 &
+	chmod +x "${QRUN}/qb-${NEWJAIL}"
+	nohup /bin/sh "${QRUN}/qb-${NEWJAIL}" > /dev/null 2>&1 &
 }
 
 destroy_ephemeral() {
@@ -113,7 +113,7 @@ destroy_ephemeral() {
 	zfs destroy $NEWSNAP > /dev/null 2>&1
 	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QCONF
 	rm ${JCONF_D}/${NEWJAIL}
-	rm "${QTMP}/qb-ephm_${NEWJAIL}" > /dev/null 2>&1
+	rm "${QRUN}/qb-ephm_${NEWJAIL}" > /dev/null 2>&1
 	rm_errfiles
 	exit 0
 }

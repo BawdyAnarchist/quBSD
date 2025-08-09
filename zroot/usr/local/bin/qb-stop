@@ -23,9 +23,9 @@ get_options() {
 	# Trap function important for keeping the lock, timeout, and coordination files clean
 	trap "cleanup_trapped" INT TERM HUP QUIT EXIT
 
-	_TMP_LOCK="${QTMP}/.qb-startstop_lock"
-	_TMP_TIME="${QTMP}/.qb-startstop_timeout"
-	_TMP_SNAPS="${QTMP}/.tmpsnaps"
+	_TMP_LOCK="${QRUN}/.qb-startstop_lock"
+	_TMP_TIME="${QRUN}/.qb-startstop_timeout"
+	_TMP_SNAPS="${QRUN}/.tmpsnaps"
 
 	# _STOPS is used for calculating the TIMEOUT later on. Initialize to zero
 	_STOPS=0

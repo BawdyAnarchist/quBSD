@@ -19,10 +19,10 @@ get_options() {
 
 parse_config() {
 	# Create the tmp files for parsed i3gen.conf
-	GEN1=$(mktemp  -t "quBSD/i3-genconf1")
-	GEN2=$(mktemp  -t "quBSD/i3-genconf2")
-	_TMP=$(mktemp  -t "quBSD/i3-genconf3")
-	NEWCONF=$(mktemp -t "quBSD/i3-genconf_newconf")
+	GEN1=$(mktemp ${QRUN}/i3-genconf1.XXXX)
+	GEN2=$(mktemp ${QRUN}/i3-genconf2.XXXX)
+	_TMP=$(mktemp ${QRUN}/i3-genconf3.XXXX)
+	NEWCONF=$(mktemp ${QRUN}/i3-genconf_newconf.XXXX)
 
 	trap "rm $GEN1 $GEN2 $_TMP $NEWCONF ; rm_errfiles ; exit 0" INT TERM HUP QUIT EXIT
 

@@ -28,10 +28,10 @@ get_options() {
 	trap "cleanup_trapped ; rm_errfiles" INT HUP TERM QUIT EXIT
 
 	# Temp files for locking, timeouts, and IP resolution
-	_TMP_LOCK="${QTMP}/.qb-startstop_lock"
-	_TMP_TIME="${QTMP}/.qb-startstop_timeout"
-	_TMP_IP="${QTMP}/.qb-start_temp_ip"
-	_TMP_SNAPS="${QTMP}/.tmpsnaps"
+	_TMP_LOCK="${QRUN}/.qb-startstop_lock"
+	_TMP_TIME="${QRUN}/.qb-startstop_timeout"
+	_TMP_IP="${QRUN}/.qb-start_temp_ip"
+	_TMP_SNAPS="${QRUN}/.tmpsnaps"
 }
 
 checks() {

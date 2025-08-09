@@ -10,8 +10,8 @@ get_options() {
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Temp files for building the status report
-	TMP1=$(mktemp -t "quBSD/qb-stat1")
-	TMP2=$(mktemp -t "quBSD/qb-stat2")
+	TMP1=$(mktemp ${QRUN}/qb-stat1.XXXX)
+	TMP2=$(mktemp ${QRUN}/qb-stat2.XXXX)
 	COL="${COL:=6,6}"
 
 	# Error files are undesired for this script. Remove them (reduce clutter)
@@ -40,7 +40,7 @@ get_stat_variables() {
 	JAILS=$(sed -En "s/^([^[:blank:]]+)[[:blank:]]+CLASS.*/\1/p" $QCONF)
 
 	# Jailname of the active window is assigned to: $_XJAIL
-	get_info _XJAIL && echo "$_XJAIL  " > ${QTMP}/active_window
+	get_info _XJAIL && echo "$_XJAIL  " > ${QRUN}/active_window
 
 	# Input devices status
 	cam=$(service webcamd onestatus | grep -o "webcamd is running")

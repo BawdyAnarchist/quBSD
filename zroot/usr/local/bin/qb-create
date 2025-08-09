@@ -14,7 +14,7 @@ get_options() {
 		c) CLASS="$OPTARG" ;;
 		e) get_msg2 -em _examples ;;
 		E) _ZCRYPT="-o encryption=on -o keyformat=passphrase -o pbkdf2iters=1000000"
-			_ZCRYPT2="$_ZCRYPT -o keylocation=file:///${QTMP}/qb-create_tempkey"
+			_ZCRYPT2="$_ZCRYPT -o keylocation=file:///${QRUN}/qb-create_tempkey"
 			;;
 		G) GUIDED="true" ;;
 		h) get_msg2 -eu ;;
@@ -32,7 +32,7 @@ get_options() {
 	NEWJAIL="$1"
 
 	# Need to track the resuls of assignements. Use a temp file
-	_TMP_WARN="${QTMP}/qb_create_warn"  ;  _TMP_PARAMS="${QTMP}/qb_create_params"
+	_TMP_WARN="${QRUN}/qb_create_warn"  ;  _TMP_PARAMS="${QRUN}/qb_create_params"
 	[ -e "$_TMP_WARN" ]   && rm "$_TMP_WARN"
 	[ -e "$_TMP_PARAMS" ] && rm "$_TMP_PARAMS"
 	mktemp "$_TMP_WARN"   > /dev/null
@@ -423,12 +423,12 @@ change_datasets() {
 				# The parent dataset is unencrypted, and being sent to an encrypted dataset
 
 				# Cant input password, due to stdin alread in use. Use keyfile, then change
-				dd if=/dev/urandom of=${QTMP}/qb-create_tempkey bs=32 count=1 > /dev/null 2>&1
+				dd if=/dev/urandom of=${QRUN}/qb-create_tempkey bs=32 count=1 > /dev/null 2>&1
 
 				zfs send -v $U_SNAP | zfs recv $_ASNAP $_MOUNTS $_ZCRYPT2 ${U_ZFS}/${NEWJAIL}
 
 				zfs change-key -o keylocation=prompt ${U_ZFS}/${NEWJAIL}
-				rm $QTMP/qb-create_tempkey
+				rm $QRUN/qb-create_tempkey
 			else
 				zfs send -wvP "$U_SNAP" | zfs recv $_ASNAP $_MOUNTPOINT ${U_ZFS}/${NEWJAIL}
 			fi
