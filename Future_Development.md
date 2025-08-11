@@ -1,5 +1,5 @@
 
-zfs decryption wasnt working quite right. I need to recheck it
+qb-ephm needs updated with new screen stuff for Xephyr.
 
 0control review and ... overhaul?
    remember that you turned it off in exec.created
@@ -13,6 +13,8 @@ qb-start
 	- Simultaneous starts of clients could mess up wireguard restarting
 
 There are still demons in the xephyr-xclip daemon
+   - Pretty sure they're all related to the closing of windows. It gets corrupted or something when I close windows. probably I'm not sufficiently detecting all possible events -- Like, maybe the disappearance of a socket is still problematic or something?
+   - You need to kill the clipboard ownership inside the source as well after releasing. Otherwise you get inconsistent waffling on lease expiry, where what FEELS like stale clipboard then can still paste if you're inside the same socket for a window. Causes problems
 
 Why does Telegram freeze so much?
 
