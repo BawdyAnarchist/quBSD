@@ -16,7 +16,7 @@ get_parameters() {
 
 preparation_actions() {
 	# The control jail should always be on. The function will return immediately if already on
-	[ ! "$CLASS" = "cjail" ] && start_jail "$CONTROL"
+#	[ ! "$CLASS" = "cjail" ] && start_jail "$CONTROL"
 
 	# MUST redirect to null, otherwise VM here will hang the script .. coz .. file descriptors?
 	start_jail "$GATEWAY" > /dev/null 2>&1
@@ -24,6 +24,15 @@ preparation_actions() {
 	# Double check to unmount any parts of <jail> before destroy/recreating the dataset
 	JMOUNT=$(mount | grep -Eo "${M_QROOT}/${JAIL}/[^[:blank:]]+")
 	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
+
+	# Make sure the zusr dataset is mounted. [-l load-key] for encrypted datasets
+	if [ ! "$(zfs list -Ho mounted ${U_ZFS}/${JAIL})" = "yes" ] ; then
+		if [ "$(get_info -e _NEEDPOP)" = "true" ] ; then
+			create_popup -c "zfs mount -l ${U_ZFS}/${JAIL}"
+		else
+			zfs mount -l ${U_ZFS}/${JAIL}
+		fi
+	fi
 }
 
 main() {
@@ -35,10 +44,6 @@ main() {
 
 	case $CLASS in
 		appjail|cjail)
-			# Make sure the zusr dataset is mounted. [-l load-key] for encrypted datasets
-			[ ! "$(zfs list -Ho mounted ${U_ZFS}/${JAIL})" = "yes" ] \
-				&& zfs mount -l ${U_ZFS}/${JAIL}
-
 			# Reclone the root filesystem for JAIL
 			reclone_zroot "$JAIL" "$ROOTENV" || get_msg2 -Em _e2 "$JAIL" "$ROOTENV"
 		;;
