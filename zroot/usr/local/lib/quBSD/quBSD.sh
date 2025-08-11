@@ -177,7 +177,7 @@ get_msg2() {
 	[ -z "${_call##exec-*}" ] && local _msg="msg_exec" || _msg="msg_${0##*-}"
 
 	# Determine if popup should be used or not
-	get_info _POPUP
+	get_info _NEEDPOP
 
 	case $_message in
 		_m*|_w*) [ -z "$_q" ] && eval "$_msg" "$@" ;;
@@ -192,7 +192,7 @@ get_msg2() {
 
 				# Send the error message
 				if [ -z "$_q" ] && [ "$_ERROR" ] ; then
-					{ [ "$_popup" ] && [ "$_POPUP" ] && create_popup -f "$ERR2" ;} || echo "$_ERROR"
+					{ [ "$_popup" ] && [ "$_NEEDPOP" ] && create_popup -f "$ERR2" ;} || echo "$_ERROR"
 				fi
 			fi ;;
 	esac
@@ -359,8 +359,8 @@ get_info() {
 			_value=$(jls | sed "1 d" | awk '{print $2}' ; \
 						pgrep -fl 'bhyve: ' | sed -E "s/.*[ \t]([^ \t]+)\$/\1/")
 			;;
-		_POPUP) # Determine if user is in interactive shell, or if popup is possible for inputs
-			tty | grep -qS 'ttyv' && pgrep -qx Xorg && _value="true"
+		_NEEDPOP) # Determine if process is detached, but Xorg is running (needs a popup) 
+			! ps -p $$ -o state | grep -qs -- '+' && pgrep -fq Xorg && _value="true"
 			;;
 		_USED_IPS) # List of ifconfig inet addresses for all running jails/VMs
 			for _onjail in $(jls | sed "1 d" | awk '{print $2}') ; do
@@ -482,12 +482,16 @@ create_popup() {
 	# If a file was passed, set the msg equal to the contents of the file
 	[ "$_popfile" ] && _popmsg=$(cat $_popfile)
 
+	# Might've been launched from quick-key or without an environment. Get the host DISPLAY
+	[ -z "$DISPLAY" ] && export DISPLAY=$(pgrep -fl Xorg | grep -Eo ":[0-9]+")
+
 	# Equalizes popup size and fonts between systems of different resolution and DPI settings.
 	calculate_sizes
 
 	# Execute popup depending on if input is needed or not
 	if [ "$_cmd" ] ; then
-		xterm -fa Monospace -fs $_fs -e /bin/sh -c "$_i3mod ; eval $_cmd"
+	echo $DISPLAY >> /root/temp
+		xterm -fa Monospace -fs $_fs -e /bin/sh -c "eval \"$_i3mod\" ; eval \"$_cmd\" ; "
 	elif [ -z "$_input" ] ; then
 		# Simply print a message, and return 0
 		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
@@ -504,16 +508,6 @@ create_popup() {
 		rm $_poptmp > /dev/null 2>&1
 		echo "$_input"
 	fi
-}
-
-set_xauthority() {
-	_jail="$1"
-	_file="${M_ZUSR}/${_jail}/home/${_jail}/.Xauthority"
-  _xauth=$(xauth list | grep -Eo ":0.*")
-	[ -e "$_file" ] && rm $_file
-	touch $_file && chown 1001:1001 $_file
-	eval "jexec -l -U $_jail $_jail /usr/local/bin/xauth add $_xauth"
-	chmod 400 $_file
 }
 
 calculate_sizes() {
@@ -574,12 +568,20 @@ start_jail() {
 					&& get_msg $_qs -m _e4 -- "$_jail" && eval $_R1
 			else
 				[ "$_norun" ] && return 0
+
+				# Have to use tmpfile to grab the error message while still allowing for user zfs -l
 				get_msg -m _m1 -- "$_jail" | tee -a $QBLOG ${QBLOG}_${_jail}
-				# Slightly hacky/convoluted err messaging, but it aint easy combining qb-cmd, qb-start
-				_jailout=$(jail -vc "$_jail") \
-					&& { echo "$_jailout" >> ${QBLOG}_${_jail} ;} \
-					|| { echo "$_jailout" > $ERR1 && echo "$_jailout" > ${QBLOG}_${_jail} \
-							&& get_msg $_qs -m _e4 -- "$_jail" && eval $_R1 ;}
+				_jailout=$(mktemp ${QRUN}/start_jail${0##*/}.XXXX)
+
+				if jail -vc "$_jail" | tee -a $_jailout ; then
+					cat $_jailout >> ${QBLOG}_${_jail}
+					rm $_jailout 2>/dev/null
+				else
+					cat $_jailout > $ERR1
+					cat $_jailout > ${QBLOG}_${_jail}
+					rm $_jailout 2>/dev/null
+					get_msg $_qs -m _e4 -- "$_jail" && eval $_R1
+				fi
 			fi
 		else # Jail was invalid
 			return 1
