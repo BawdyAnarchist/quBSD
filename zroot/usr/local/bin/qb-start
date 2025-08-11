@@ -86,22 +86,6 @@ climb_hierarchy() {
 	_CLIMBED=$(echo "$_CLIMBED" | sed -E "s/^(${_JAIL})\$/\1 ${_starts}/")
 }
 
-encryption_and_mounts(){
-   # Load key if necessary, with popup switch
-	if [ "$(zfs list -Ho keystatus ${U_ZFS}/${_jail})" = "unavailable" ] ; then
-		if [ "$_POPUP" ] ; then
-			xterm -e csh -c "/bin/csh -c 'zfs load-key ${U_ZFS}/${_jail}'"
-		else
-			zfs load-key ${U_ZFS}/${_jail}
-		fi
-	fi
-
-	# Volumes do not get mounted
-	[ "$(zfs list -Ho type ${U_ZFS}/${_jail})" = "filesystem" ] \
-		&& [ "$(zfs list -Ho mounted ${U_ZFS}/${_jail})" = "no" ] \
-		&& zfs mount ${U_ZFS}/${_jail}
-}
-
 ips_and_xpra() {
 	# Only get IP addrs and Xpra sockets for off jails
 	if ! chk_isrunning "$_jail" ; then
@@ -192,11 +176,7 @@ main() {
 	_socket=100
 
 	# Things that need to be checked/coordinated for each jail that must be started
-	get_info _POPUP
 	for _jail in $_FULLIST ; do
-		# Some jails/VMs might be encrypted. They need to decrypted now, before waterfall
-		chk_valid_zfs "${U_ZFS}/${_jail}" && encryption_and_mounts
-
 		# Coordinate ROOTENV and TEMPLATE snapshots to avoid races during reclone functions
 		_rootenv=$(get_jail_parameter -eq ROOTENV $_jail)
 		! echo_grep "$_ROOTENVS" "$_rootenv" && _ROOTENVS="$_ROOTENVS $_rootenv"
