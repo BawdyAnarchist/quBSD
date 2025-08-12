@@ -1,7 +1,4 @@
 
-Left qb-list -s social zusr/social@[[:digits:]]+ ... make sure it gets auto cleaned.
-   Come to think of it, maybe I should embed some autocleaning into the start/stop for reclone zusr.
-
 It sounds like I still need magic cookies because some jails will still have opt to be on nullfs on host x11-unix
 
 0control review and ... overhaul?
