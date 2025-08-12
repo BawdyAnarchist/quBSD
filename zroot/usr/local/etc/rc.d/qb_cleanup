@@ -17,8 +17,8 @@ qb_cleanup_start() {
 	# Source the global variables
 	get_global_variables
 
-	# Dont need the trap set by get_global_variables, coz we're removing /tmp/qubsd
-	trap - HUP INT TERM QUIT EXIT
+	# Dont need the trap set by get_global_variables, coz we're removing QRUN directory 
+	trap '' HUP INT TERM QUIT EXIT
 
 	cleanup_files
 
@@ -26,9 +26,9 @@ qb_cleanup_start() {
 }
 
 cleanup_files() {
-	# Remove and replace the quBSD /tmp directory
-	rm -r /tmp/quBSD > /dev/null 2>&1
-	mkdir /tmp/quBSD > /dev/null 2>&1
+	# Remove and replace the runtime directory
+	rm -r $QRUN > /dev/null 2>&1
+	mkdir $QRUN > /dev/null 2>&1
 
 	# Empty the contents of the quBSD log directory
 	rm -r $(dirname $QBLOG) > /dev/null 2>&1
@@ -56,7 +56,7 @@ cleanup_disps() {
 
 	# Remove anything that starts with ^EPHM in qconf and jail.conf
    sed -i '' -E "/^EPHM/d" $QCONF
-	ls $JCONF_D | grep -E '^EPHM'| xargs rm > /dev/null 2>&1
+	ls $JCONF | grep -E '^EPHM'| xargs rm > /dev/null 2>&1
 }
 
 qb_cleanup_stop() {
