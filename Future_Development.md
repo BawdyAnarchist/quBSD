@@ -1,4 +1,6 @@
 
+It sounds like I still need magic cookies because some jails will still have opt to be on nullfs on host x11-unix
+
 qb-ephm needs updated with new screen stuff for Xephyr.
 
 0control review and ... overhaul?

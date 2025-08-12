@@ -1,6 +1,6 @@
 0gui {
 	.include "/usr/local/etc/quBSD/jail.conf.d/base.conf";
-	#.include "/usr/local/etc/quBSD/jail.conf.d/x11.conf";    # Uncomment this for actual GUI jails
+	#.include "/usr/local/etc/quBSD/jail.conf.d/xephyr.conf";    # Uncomment this for actual GUI jails
 	.include "/usr/local/etc/quBSD/jail.conf.d/ubuntu.conf";  # Uncommented so you can install Ubuntu stuff
 	devfs_ruleset="7";
 }
