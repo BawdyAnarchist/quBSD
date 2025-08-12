@@ -61,10 +61,10 @@ rename_common() {
 }
 
 rename_jail() {
-	# Create NEWJAIL JCONF_D Careful to only replace the opening stanza
-	sed -E "s/^[[:blank:]]*${JAIL}[[:blank:]]*\{/${NEWNAME} \{/" ${JCONF_D}/${JAIL} \
-		> ${JCONF_D}/${NEWNAME}
-	rm ${JCONF_D}/${JAIL}
+	# Create NEWJAIL JCONF Careful to only replace the opening stanza
+	sed -E "s/^[[:blank:]]*${JAIL}[[:blank:]]*\{/${NEWNAME} \{/" ${JCONF}/${JAIL} \
+		> ${JCONF}/${NEWNAME}
+	rm ${JCONF}/${JAIL}
 
 	# Flags down to modify directory names and fstab (if they exist)
 	chflags -fR noschg ${M_ZUSR}/${JAIL}

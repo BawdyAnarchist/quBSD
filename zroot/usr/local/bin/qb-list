@@ -150,8 +150,8 @@ get_zresult() {
 
 get_devfs_result() {
 	local _jail="$1"
-	# Get the rule number from JCONF_D (this will just be blank for VMs)
-	_rulenum=$(sed -En "s/.*devfs_ruleset=\"([[:digit:]]+).*/\1/p" ${JCONF_D}/${_jail})
+	# Get the rule number from JCONF (this will just be blank for VMs)
+	_rulenum=$(sed -En "s/.*devfs_ruleset=\"([[:digit:]]+).*/\1/p" ${JCONF}/${_jail})
 
 	# Then get the full name of the rulenumber from devfs.rules
 	if [ -n "$_rulenum" ] ; then

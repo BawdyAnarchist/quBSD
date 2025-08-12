@@ -521,9 +521,9 @@ change_jconf() {
 		echo "#Device  Mountpoint  FStype Options Dump Pass#" > ${M_QROOT}/${NEWJAIL}/etc/fstab
 	fi
 
-	# Create NEWJAIL JCONF_D Careful to only replace the opening stanza
-	sed -E "s/^[[:blank:]]*${TEMPLATE}[[:blank:]]*\{/${NEWJAIL} \{/" ${JCONF_D}/${TEMPLATE} \
-		> ${JCONF_D}/${NEWJAIL}
+	# Create NEWJAIL JCONF Careful to only replace the opening stanza
+	sed -E "s/^[[:blank:]]*${TEMPLATE}[[:blank:]]*\{/${NEWJAIL} \{/" ${JCONF}/${TEMPLATE} \
+		> ${JCONF}/${NEWJAIL}
 }
 
 guided_mode() {
@@ -652,7 +652,7 @@ cleanup_trapped() {
 	zfs destroy -rRf "${U_ZFS}/${NEWJAIL}" > /dev/null 2>&1
 
    sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QCONF > /dev/null 2>&1
-	rm ${JCONF_D}/$NEWJAIL > /dev/null 2>&1
+	rm ${JCONF}/$NEWJAIL > /dev/null 2>&1
 
 	# Items above should only be removed if the operation was incomplete
 	# Items below should be removed regardless of complete/incomplete

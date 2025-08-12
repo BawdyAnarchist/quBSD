@@ -181,7 +181,7 @@ modify_jconf_devfs() {
 
 	# First convert the to just the numerical value if the user entered the long format
 	VALUE=$(echo "$VALUE" | grep -Eo '[[:digit:]]+$')
-	sed -i '' -E "s/(.*devfs_ruleset=).*/\1\"${VALUE}\";/" ${JCONF_D}/${JAIL}
+	sed -i '' -E "s/(.*devfs_ruleset=).*/\1\"${VALUE}\";/" ${JCONF}/${JAIL}
 }
 
 handle_restarts() {
