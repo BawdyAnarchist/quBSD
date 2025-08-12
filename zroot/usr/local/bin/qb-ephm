@@ -20,17 +20,15 @@ get_options() {
 }
 
 parse_jail_vars() {
-	# Default _CMD is $SHELL
-	[ -z "$_CMD" ] && _CMD="${_CMD:=$SHELL}" || _REDIRECT=" > /dev/null 2>&1 &"
-
 	# If X is running, get the jailname of the active window
 	if pgrep -q Xorg ; then
 		# Jailname of the active window is assigned to: $_XJAIL
 		get_info _XJAIL
 	fi
 
-	# Unless already specified, set JAIL to the active window, and check valid
-	JAIL="${JAIL:=$_XJAIL}"
+	# Get a default SHELL, _CMD, and JAIL (if not already specified)
+	${_CMD:=$(get_jail_shell -e $_XJAIL)}
+	: ${JAIL:=$_XJAIL}
 	chk_valid_jail -- "$JAIL" || get_msg2 -Eum _e2
 
 	# Make name visually easy to identify. Cycle to find available name if in use
@@ -66,57 +64,6 @@ run_command() {
 	fi
 }
 
-monitor_ephm_windows() {
-	cat <<-ENDOFCMD > "${QRUN}/qb-${NEWJAIL}"
-	#!/bin/sh
-
-	# New script wont have the caller functions, or variables. Source them again
-	. /usr/local/lib/quBSD/quBSD.sh
-	. /usr/local/lib/quBSD/msg-quBSD.sh
-	get_global_variables
-
-	destroy_ephemeral() {
-		# Destroy sequence
-		stop_jail "$NEWJAIL"
-		zfs destroy -rRf ${R_ZFS}/$NEWJAIL > /dev/null 2>&1
-		zfs destroy -rRf ${U_ZFS}/$NEWJAIL > /dev/null 2>&1
-		zfs destroy -rRf $NEWSNAP > /dev/null 2>&1
-		sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QCONF
-		rm ${JCONF_D}/${NEWJAIL}
-		rm "${QRUN}/qb-${NEWJAIL}" > /dev/null 2>&1
-		rm_errfiles
-		exit 0
-	}
-
-	trap 'destroy_ephemeral' INT TERM HUP QUIT EXIT
-
-	# X11 windows can take a moment launch. Ineligant solution, but wait 3 secs before check-loop
-	sleep 3
-
-	# ps -o tt tty -> is associated with terminals/windows. Keepalive until all are gone
-	while : ; do
-		ps -axJ ${NEWJAIL} -o tt -o command | tail -n +2 | grep -v 'dbus' | grep -qv ' -' || break
-		sleep 1
-	done
-ENDOFCMD
-
-	# Make executable and run. nohup prevents killing the process if host launch terminal closes
-	chmod +x "${QRUN}/qb-${NEWJAIL}"
-	nohup /bin/sh "${QRUN}/qb-${NEWJAIL}" > /dev/null 2>&1 &
-}
-
-destroy_ephemeral() {
-	stop_jail "$NEWJAIL"
-	zfs destroy -rRf ${R_ZFS}/$NEWJAIL > /dev/null 2>&1
-	zfs destroy -rRf ${U_ZFS}/$NEWJAIL > /dev/null 2>&1
-	zfs destroy $NEWSNAP > /dev/null 2>&1
-	sed -i '' -E "/^${NEWJAIL}[[:blank:]]/d" $QCONF
-	rm ${JCONF_D}/${NEWJAIL}
-	rm "${QRUN}/qb-ephm_${NEWJAIL}" > /dev/null 2>&1
-	rm_errfiles
-	exit 0
-}
-
 main() {
 
 	parse_jail_vars
@@ -126,12 +73,15 @@ main() {
 	start_jail $NEWJAIL
 
 	# Monitor for any EPHM ps TT that are open, with detached script. Will destroy EPHM after.
+	export NEWJAIL
+	daemon -t "Ephemeral: $NEWJAIL" -o /dev/null -- /bin/sh << 'EOF'
+	. /usr/local/lib/quBSD/quBSD.sh
 	monitor_ephm_windows
+EOF
 
 	# Unset the the trap command, now that the detached monitoring script has executed.
 	trap 'rm_errfiles' INT TERM HUP QUIT EXIT
-
-	run_command
+	exec qb-cmd -u $_USER $NEWJAIL $_CMD
 }
 
 get_global_variables

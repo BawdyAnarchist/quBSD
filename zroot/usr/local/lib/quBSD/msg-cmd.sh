@@ -50,6 +50,10 @@ ENDOFMSG
 Failed to qb-create ephmjail: $EPHMJAIL from template: $_JAIL
 ENDOFMSG
 		;;
+	_e12) cat << ENDOFMSG
+The host /tmp/.X11-unix directory is not nullfs mounted in jail.conf.d/$_JAIL 
+ENDOFMSG
+		;;
 	_m1) cat << ENDOFMSG
 The following command would be run (does not include env DISPLAY for Xephyr):
 ENDOFMSG
@@ -58,6 +62,11 @@ ENDOFMSG
 ALERT:  $0
 < $JAIL > is tagged for VNC in QCONF, but the FBUF device hasn't
 been detected yet. Waiting 12 more seconds before quitting.
+ENDOFMSG
+		;;
+	_m3) cat << ENDOFMSG
+WARNING: Running < $_JAIL > command: < $_CMD > on host .X11-unix socket.
+         This jail/app has access to all Xorg/Xephyr windows on host. 
 ENDOFMSG
 		;;
 	usage) cat << ENDOFUSAGE

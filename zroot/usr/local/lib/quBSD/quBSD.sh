@@ -124,7 +124,7 @@ get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
 
 	# Define variables for files
-	JCONF_D="/usr/local/etc/quBSD/jail.conf.d/jails"
+	JCONF="/usr/local/etc/quBSD/jail.conf.d/jails"
 	QBDIR="/usr/local/etc/quBSD"
 	QCONF="${QBDIR}/qubsd.conf"
 	QBLOG="/var/log/quBSD/quBSD.log"
@@ -509,6 +509,16 @@ create_popup() {
 		echo "$_input"
 	fi
 }
+
+set_xauthority() {
+	_jail="$1"
+	_file="${M_ZUSR}/${_jail}/home/${_jail}/.Xauthority"
+	_xauth=$(xauth list | grep -Eo ":0.*")
+	[ -e "$_file" ] && rm $_file
+	touch $_file && chown 1001:1001 $_file
+	eval "jexec -l -U $_jail $_jail /usr/local/bin/xauth add $_xauth"
+	chmod 400 $_file
+}  
 
 calculate_sizes() {
 	# Get vertical resolution of primary display for calculating popup dimensions
@@ -968,6 +978,10 @@ monitor_vm_stop() {
 	eval $_R1
 }
 
+launch_hostx11() {
+
+}
+
 launch_xephyr() {
   # sysvshm cannot share Xephyr here. Some apps will fail if we dont disable it. XVideo prevents non-existent
   # GPU overlay. We MUST stop GLX entirely (even iglx), as A) Xephyr implementation sucks (<1.4), and B) even
@@ -1007,6 +1021,28 @@ launch_xephyr() {
     jls | grep -Eqs "[ \t]${_JAIL}[ \t]" || exit 0
   done
   exit 0
+}
+
+monitor_ephm_windows() {
+	get_global_variables
+
+	# X11 windows can take a moment launch. Ineligant solution, but wait 3 secs before check-loop
+	sleep 3
+	
+	# ps -o tt tty -> is associated with terminals/windows. Keepalive until all are gone
+	while sleep 1 ; do
+		ps -axJ ${EPHMJAIL} -o tt -o command | tail -n +2 | grep -v 'dbus' | grep -qv ' -' || break
+	done
+	
+	# Destroy sequence
+	stop_jail "$EPHMJAIL" > /dev/null 2>&1
+	zfs destroy -rRf ${R_ZFS}/$EPHMJAIL > /dev/null 2>&1
+	zfs destroy -rRf ${U_ZFS}/$EPHMJAIL > /dev/null 2>&1
+#	zfs destroy -rRf $EPHMSNAP > /dev/null 2>&1
+	sed -i '' -E "/^${EPHMJAIL}[[:blank:]]/d" $QCONF
+	rm ${JCONF}/${EPHMJAIL}
+	rm_errfiles
+	exit 0
 }
 
 
@@ -1101,7 +1137,7 @@ chk_isvm() {
 
 chk_avail_jailname() {
 	# Checks that the proposed new jailname does not have any entries or partial entries
-	# in JCONF_D, QCONF, and ZFS datasets
+	# in JCONF, QCONF, and ZFS datasets
 	# Return 0 jailname available, return 1 for any failure
 	local _fn="chk_avail_jailname" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
@@ -1126,7 +1162,7 @@ chk_avail_jailname() {
 	if chk_valid_zfs "${R_ZFS}/$_jail" || \
 		chk_valid_zfs "${U_ZFS}/$_jail"  || \
 		grep -Eq "^${_jail}[ \t]+" $QCONF || \
-		[ -e "${JCONF_D}/${_jail}" ] ; then
+		[ -e "${JCONF}/${_jail}" ] ; then
 		get_msg $_qa -m _e13_2 -- "$_jail" && eval $_R1
 	fi
 
@@ -1179,7 +1215,7 @@ chk_valid_zfs() {
 }
 
 chk_valid_jail() {
-	# Checks that jail has JCONF_D, QCONF, and corresponding ZFS dataset
+	# Checks that jail has JCONF, QCONF, and corresponding ZFS dataset
 	# Return 0 for passed all checks, return 1 for any failure
 	local _fn="chk_valid_jail" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
@@ -1203,8 +1239,8 @@ chk_valid_jail() {
 		&& get_msg $_qv $_V -m _e2 -- "$_value" "ROOTENV" \
 		&& get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
-	# Jails must have an entry in JCONF_D
-	! chk_isvm -c $_class "$_value" && [ ! -e "${JCONF_D}/${_value}" ] \
+	# Jails must have an entry in JCONF
+	! chk_isvm -c $_class "$_value" && [ ! -e "${JCONF}/${_value}" ] \
 			&& get_msg $_qv -m _e7 -- "$_value" && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
 
 	case $_class in

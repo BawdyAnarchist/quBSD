@@ -6,10 +6,11 @@
 . /usr/local/lib/quBSD/msg-cmd.sh
 
 get_options() {
-	while getopts d:hHlL:Npqrs:tu:xX opts ; do case $opts in
+	while getopts d:ehHlL:Npqrs:tu:yxX opts ; do case $opts in
 		d) _DPI="${OPTARG}" ;;
+		e) _EPHM="true" ;;
 		h) get_msg2 -eu ;;
-		H) _NOX11="true" ;;
+		H) _HOSTX11="true" ;;
 		l) _COMPAT="/compat/ubuntu" ;;
 		L) _COMPAT="${OPTARG}" ;;
 		N) _NORUN="true" ;;
@@ -18,6 +19,7 @@ get_options() {
 		r) _USER="root" ;;
 		s) _SHELL="${OPTARG}" ;;
 		u) _USER="${OPTARG}" ;;
+		y) _NOX11="true" ;;  # Option must come before [x|X] for proper checks
 		x) _NEWWIND="true"  ; _X11="true" ; [ -n "$_NOX11" ] && get_msg2 -Em _e10  ;;
 		X) _SAMEWIND="true" ; _X11="true" ; { [ -n "$_NOX11" ] || [ -n "$NEWWIND" ] ;} && get_msg2 -Em _e10 ;;
 		*) exit 1 ;;
@@ -32,12 +34,12 @@ parse_jail_vars() {
 	if pgrep -q Xorg ; then
 		[ -n "$_SAMEWIND" ] && _DISPLAY="env DISPLAY=:$(get_info -e _XSOCK)"
 		get_info _XJAIL
-		host_X11='true'
+		XORG_AVAIL='true'
 	fi
 
 	# Unless already specified, JAIL and USER should be set to the active window
-	_JAIL="${_JAIL:=$_XJAIL}"
-	_USER="${_USER:=$_JAIL}"
+	: "${_JAIL:=$_XJAIL}"
+	: "${_USER:=$_JAIL}"
 
 	# Handle linux compat mods
 	if [ -n "$_COMPAT" ] ; then
@@ -48,17 +50,49 @@ parse_jail_vars() {
 
 		# Robust/resilient for various combos of _USER_CMD, including default if not included
 		case "${_USER}_${_CMD}" in
-			root_)	SHELL="/bin/bash" ; _CMDMOD='' ;;
+			root_)  SHELL="/bin/bash" ; _CMDMOD='' ;;
 			root_*) SHELL="/bin/bash" ; _CMDMOD="-c '$_CMD'" ;;
-			*_)			SHELL="/bin/bash" ; _CMDMOD="-c 'su - $_USER'" ;;
-			*_*)		SHELL="/bin/bash" ; _CMDMOD="-c 'su -c \"$_CMD\"' $_USER" ;;
+			*_)     SHELL="/bin/bash" ; _CMDMOD="-c 'su - $_USER'" ;;
+			*_*)    SHELL="/bin/bash" ; _CMDMOD="-c 'su -c \"$_CMD\"' $_USER" ;;
 		esac
 	fi
 
 	# Ensure default values if the user didnt specify them
 	_shell=$(get_jail_shell -e "$_JAIL")        # Lib function orders shell priority
 	_SHELL=${_SHELL:=$_shell}
-	[ -z "$_X11" ] && _CMD=${_CMD:="$SHELL"} || _CMD=${_CMD:="xterm"}
+	[ -z "$_X11" ] && : ${_CMD:="$SHELL"} || : ${_CMD:="xterm"}
+}
+
+create_ephmjail() {
+	# Constants necessary for ephemeral jail	
+#	DATETIME=$(date +%b%d_%H%M)
+#	EPHMSNAP="${U_ZFS}/${JAIL}@EPHM${DATETIME}"
+
+	EPHMJAIL="EPHM-${_JAIL}"  ;  _cycle=0
+	while ! chk_avail_jailname -- "$EPHMJAIL" ; do    # Fine an available jail name
+		_cycle=$(( _cycle + 1 ))
+		EPHMJAIL="EPHM-${_JAIL}_${_cycle}"
+	done
+
+#	# New snapshot ensures the most up-to-date version of the template jail
+#	zfs snapshot $EPHMSNAP
+#	# Trap destroy snapshot and anything else that might exist after qb-create
+#	trap 'destroy_ephemeral' INT TERM HUP QUIT EXIT
+echo TESTING: $EPHMJAIL	
+	# Create dispjail and disable the no_destroy protection
+	if /usr/local/bin/qb-create -y -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false \
+			-p AUTOSNAP=false -c dispjail -t $_JAIL $EPHMJAIL > /dev/null 2>&1 ; then
+		_JAIL="$EPHMJAIL"
+	else
+		get_msg2 -Em _e11
+	fi
+	
+	# Monitor for any EPHM ps TT that are open, with detached script. Will destroy EPHM after.
+	export EPHMJAIL
+	daemon -t "Ephemeral: $EPHMJAIL" -o /dev/null -- /bin/sh << 'EOF'
+		. /usr/local/lib/quBSD/quBSD.sh
+		monitor_ephm_windows
+EOF
 }
 
 chk_app_X11() {
@@ -101,7 +135,7 @@ prepare_and_launch_xephyr() {
 		. /usr/local/lib/quBSD/quBSD.sh
 		launch_xephyr
 EOF
-  sleep .2   # Give another moment for the env to load in Xephyr
+	sleep .2   # Give another moment for the env to load in Xephyr
 	return 0
 }
 
@@ -113,9 +147,8 @@ run_jail_command() {
 	# If [-p] popup was passed, create the popup and get the _CMD to be run
 	[ "$_POPUP" ] \
 		&& _CMD=$(create_popup -im "Enter command for $_JAIL\\\n${_USER}@${_JAIL}: # ")
-
-	# If host and jail'd app are both X11, then trigger window isolation via Xephyr
-	if [ "$host_X11" = "true" ] && [ -z "$_NOX11" ] ; then
+	# Prefer Xephyr, but ensure that: it's possible, and it wasnt rejected by user-options
+	if [ "$XORG_AVAIL" = "true" ] && [ -z "$_NOX11" ] && [ -z "$_HOSTX11" ] ; then
 		if mount | grep $_JAIL | grep -Eqs "/qubsd/${_JAIL}/tmp/\.X11-unix" ; then
 			if [ -z "$_SAMEWIND" ] && { chk_app_X11 || [ -n "$_NEWWIND" ] ;} ; then
 				prepare_and_launch_xephyr
@@ -123,13 +156,23 @@ run_jail_command() {
 				_X11="true"
 			fi
 		fi
+	# Dangerous option. User needs to explicitly flag for running on host Xorg socket  
+	elif [ "$XORG_AVAIL" ] && [ -z "$_NOX11" ] && [ -n "$_HOSTX11" ] ; then
+		# Make sure there's a nullfs mount to leverage
+		grep -Ev "^[[:blank:]]*#" ${JCONF}/${_JAIL} | grep -qs "host_x11.conf" || get_msg2 -Em _e12
+
+		# Set display as host root (usually :0) if the switch was given
+		display=$(pgrep -fl Xorg | grep -Eo ":[0-9]+" | grep -Eo "[0-9]+")
+		_DISPLAY="env DISPLAY=:$display"
+		_X11="true"
+		get_msg2 -m _m3
 	fi
 
 	# Run the jexec command 
 	rm_errfiles	; trap - HUP INT TERM QUIT EXIT
 	case "${_COMPAT}_${_X11}" in
 		_)      eval "jexec -l -U $_USER $_JAIL /bin/sh -c '$_CMD'" $_REDIRECT ;;
-		_true)	eval "jexec -l -U $_USER $_JAIL $_DISPLAY /bin/sh -c '$_CMD'" > /dev/null 2>&1 & ;;
+		_true)  eval "jexec -l -U $_USER $_JAIL $_DISPLAY /bin/sh -c '$_CMD'" > /dev/null 2>&1 & ;;
 		*_)     eval "jexec -l -U root   $_JAIL chroot $_COMPAT $_SHELL $_CMDMOD" $_REDIRECT ;;
 		*_true) eval "jexec -l -U root   $_JAIL chroot $_COMPAT $_SHELL -c \
 										'su -c \"$_DISPLAY $_CMD\" $_JAIL'" > /dev/null 2>&1 & ;;
@@ -193,6 +236,9 @@ main() {
 		fi
 		exit 0
 	fi
+
+	# Ephemeral jails live for a short timeframe, then die when stopped or left
+	[ -n "$_EPHM" ] && create_ephmjail
 
 	# Make sure the jail is running
 	! start_jail "$_JAIL" && get_msg2 -Epm _enone
