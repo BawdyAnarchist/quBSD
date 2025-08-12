@@ -46,6 +46,10 @@ ENDOFMSG
 [-H and -x] are mutually exclusive.
 ENDOFMSG
 		;;
+	_e11) cat << ENDOFMSG
+Failed to qb-create ephmjail: $EPHMJAIL from template: $_JAIL
+ENDOFMSG
+		;;
 	_m1) cat << ENDOFMSG
 The following command would be run (does not include env DISPLAY for Xephyr):
 ENDOFMSG
@@ -70,7 +74,7 @@ Usage: qb-cmd <jail/VM>
    -h: (h)elp. Outputs this help message
    -l: (l)inux default: /compat/ubuntu
    -L: (L)inux user-specified: /compat/<your_linux_compat>
-   -H: (H)eadless. Explicitly prevent a new Xephyr instance.
+   -H: (H)ost X11. Use the Xorg root on host instead of Xephyr 
    -N: (N)orun. Print the bhyve command that would be run,
        but do not launch. Only applies to VMs.
    -p: (p)opup. Receive command for <jail> via temporary popup. 
@@ -83,6 +87,7 @@ Usage: qb-cmd <jail/VM>
    -x: (x)ephyr. Explicitly launch a new X11 Xephyr instance.
        If jail isnt specified, default is the focused window.
    -X: (X)ephyr. Launch app inside the focused Xephyr window.
+   -y: Explicitly prevent a new Xephyr instance.
 
 ENDOFUSAGE
 		;;
