@@ -1023,24 +1023,21 @@ launch_xephyr() {
   exit 0
 }
 
-monitor_ephm_windows() {
-	get_global_variables
-
+monitor_ephmjail() {
 	# X11 windows can take a moment launch. Ineligant solution, but wait 3 secs before check-loop
-	sleep 3
+	sleep 5
 	
 	# ps -o tt tty -> is associated with terminals/windows. Keepalive until all are gone
 	while sleep 1 ; do
-		ps -axJ ${EPHMJAIL} -o tt -o command | tail -n +2 | grep -v 'dbus' | grep -qv ' -' || break
+		ps -axJ ${_JAIL} -o tt -o command | tail -n +2 | grep -v 'dbus' | grep -qv ' -' || break
 	done
 	
 	# Destroy sequence
-	stop_jail "$EPHMJAIL" > /dev/null 2>&1
-	zfs destroy -rRf ${R_ZFS}/$EPHMJAIL > /dev/null 2>&1
-	zfs destroy -rRf ${U_ZFS}/$EPHMJAIL > /dev/null 2>&1
-#	zfs destroy -rRf $EPHMSNAP > /dev/null 2>&1
-	sed -i '' -E "/^${EPHMJAIL}[[:blank:]]/d" $QCONF
-	rm ${JCONF}/${EPHMJAIL}
+	stop_jail "$_JAIL" > /dev/null 2>&1
+	zfs destroy -rRf ${R_ZFS}/$_JAIL > /dev/null 2>&1
+	zfs destroy -rRf ${U_ZFS}/$_JAIL > /dev/null 2>&1
+	sed -i '' -E "/^${_JAIL}[[:blank:]]/d" $QCONF
+	rm ${JCONF}/${_JAIL}
 	rm_errfiles
 	exit 0
 }

@@ -69,6 +69,10 @@ WARNING: Running < $_JAIL > command: < $_CMD > on host .X11-unix socket.
          This jail/app has access to all Xorg/Xephyr windows on host. 
 ENDOFMSG
 		;;
+	_m4) cat << ENDOFMSG
+Creating ephemeral jail < $_JAIL >. Please wait a moment.
+ENDOFMSG
+		;;
 	usage) cat << ENDOFUSAGE
 
 qb-cmd: Runs command in a jail, or connects to VM.
@@ -83,7 +87,8 @@ Usage: qb-cmd <jail/VM>
    -h: (h)elp. Outputs this help message
    -l: (l)inux default: /compat/ubuntu
    -L: (L)inux user-specified: /compat/<your_linux_compat>
-   -H: (H)ost X11. Use the Xorg root on host instead of Xephyr 
+   -H: (H)ost X11. Use host Xorg socket (typically DISPLAY :0)
+       !! Inherently dangerous. Requires jail.conf change !!
    -N: (N)orun. Print the bhyve command that would be run,
        but do not launch. Only applies to VMs.
    -p: (p)opup. Receive command for <jail> via temporary popup. 

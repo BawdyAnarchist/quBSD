@@ -41,6 +41,10 @@ parse_jail_vars() {
 	: "${_JAIL:=$_XJAIL}"
 	: "${_USER:=$_JAIL}"
 
+	# If [-p] popup was passed, create the popup and get the _CMD to be run
+	[ "$_POPUP" ] \
+		&& _CMD=$(create_popup -im "Enter command for $_JAIL\\\n${_USER}@${_JAIL}: # ")
+
 	# Handle linux compat mods
 	if [ -n "$_COMPAT" ] ; then
 		_SHELL=${_SHELL:="/bin/bash"}   # Default to bash if user didnt specify a shell
@@ -64,34 +68,32 @@ parse_jail_vars() {
 }
 
 create_ephmjail() {
-	# Constants necessary for ephemeral jail	
-#	DATETIME=$(date +%b%d_%H%M)
-#	EPHMSNAP="${U_ZFS}/${JAIL}@EPHM${DATETIME}"
+	# Must reassign the _JAIL and _USER names to the ephm, for later commands to work properly
+	[ "$_USER" = "$_JAIL" ] && _USER="EPHM-${_JAIL}" && cycle_user="true"
+	_TEMPL_JAIL="$_JAIL"
+	_JAIL="EPHM-${_JAIL}"
 
-	EPHMJAIL="EPHM-${_JAIL}"  ;  _cycle=0
-	while ! chk_avail_jailname -- "$EPHMJAIL" ; do    # Fine an available jail name
+	_cycle=0
+	while ! chk_avail_jailname -- "$_JAIL" ; do    # Find an available jail name
 		_cycle=$(( _cycle + 1 ))
-		EPHMJAIL="EPHM-${_JAIL}_${_cycle}"
+		_JAIL="${_JAIL}_${_cycle}"
+		[ -n "$cycle_user" ] && _USER="${_USER}_${_cycle}"
 	done
 
-#	# New snapshot ensures the most up-to-date version of the template jail
-#	zfs snapshot $EPHMSNAP
-#	# Trap destroy snapshot and anything else that might exist after qb-create
-#	trap 'destroy_ephemeral' INT TERM HUP QUIT EXIT
-echo TESTING: $EPHMJAIL	
+	get_msg2 -m _m4    # Inform user that it will take a moment to create/start the ephmjail
+
 	# Create dispjail and disable the no_destroy protection
-	if /usr/local/bin/qb-create -y -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false \
-			-p AUTOSNAP=false -c dispjail -t $_JAIL $EPHMJAIL > /dev/null 2>&1 ; then
-		_JAIL="$EPHMJAIL"
-	else
+	if ! /usr/local/bin/qb-create -y -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false \
+			-p AUTOSNAP=false -c dispjail -t $_TEMPL_JAIL $_JAIL > /dev/null 2>&1 ; then
 		get_msg2 -Em _e11
 	fi
-	
+
 	# Monitor for any EPHM ps TT that are open, with detached script. Will destroy EPHM after.
-	export EPHMJAIL
-	daemon -t "Ephemeral: $EPHMJAIL" -o /dev/null -- /bin/sh << 'EOF'
+	export _JAIL
+	daemon -t "Ephemeral: $_JAIL " -o /dev/null -- /bin/sh << 'EOF'
 		. /usr/local/lib/quBSD/quBSD.sh
-		monitor_ephm_windows
+		get_global_variables
+		monitor_ephmjail
 EOF
 }
 
@@ -144,9 +146,6 @@ run_jail_command() {
 	[ ! "$_USER" = "root" ] && [ ! -d "${M_QROOT}/${_JAIL}/home/${_USER}" ] \
 		&& get_msg2 -Epm _e7
 
-	# If [-p] popup was passed, create the popup and get the _CMD to be run
-	[ "$_POPUP" ] \
-		&& _CMD=$(create_popup -im "Enter command for $_JAIL\\\n${_USER}@${_JAIL}: # ")
 	# Prefer Xephyr, but ensure that: it's possible, and it wasnt rejected by user-options
 	if [ "$XORG_AVAIL" = "true" ] && [ -z "$_NOX11" ] && [ -z "$_HOSTX11" ] ; then
 		if mount | grep $_JAIL | grep -Eqs "/qubsd/${_JAIL}/tmp/\.X11-unix" ; then
@@ -156,7 +155,8 @@ run_jail_command() {
 				_X11="true"
 			fi
 		fi
-	# Dangerous option. User needs to explicitly flag for running on host Xorg socket  
+
+	# Host .X11-unix Xorg socket (X0). User must explicitly flag dangerous option
 	elif [ "$XORG_AVAIL" ] && [ -z "$_NOX11" ] && [ -n "$_HOSTX11" ] ; then
 		# Make sure there's a nullfs mount to leverage
 		grep -Ev "^[[:blank:]]*#" ${JCONF}/${_JAIL} | grep -qs "host_x11.conf" || get_msg2 -Em _e12
@@ -237,7 +237,7 @@ main() {
 		exit 0
 	fi
 
-	# Ephemeral jails live for a short timeframe, then die when stopped or left
+	# Ephemeral jails live for a short timeframe, then die when stopped or window is closed
 	[ -n "$_EPHM" ] && create_ephmjail
 
 	# Make sure the jail is running
