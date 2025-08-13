@@ -1,0 +1,3 @@
+# DNS-over-HTTPS on net-firewall prevents ISP/public-wifi DNS interception / RRSIG stripping.
+# Disable ONLY if you trust your router DNS (you shouldnt); or jails downstream of net-firewall.
+dnscrypt_proxy_enable="YES"

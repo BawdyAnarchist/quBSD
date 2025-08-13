@@ -1,0 +1,3 @@
+# Turn on for wireguard gateways
+wireguard_enable="YES"
+wireguard_interfaces="wg0"

@@ -1,0 +1,3 @@
+tor_enable="YES"
+tor_pf_perms_enable="YES"  # Weird permissions issue has to be resovled for tor to start
+local_unbound_enable="NO"  # 0net default is yes, but Tor handles DNS for us
