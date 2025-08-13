@@ -1,0 +1,30 @@
+#!/bin/sh
+
+. /usr/local/lib/quBSD/quBSD.sh
+
+main() {
+	JAIL="$1"
+
+	# If exec script fails and jail start aborts, make sure to clean up the mounts
+	trap '/usr/local/etc/qubsd/exec.release $JAIL'
+
+	# /rw/ nullfs mounts are best symlinked from within the cloned appjail's root
+	# Make sure flags are down for directory and file, then symlink to /rw
+	chroot ${M_QROOT}/${JAIL} /bin/sh <<"EOT"
+		for _file in $(find "/rw" -type f | sed "s:/rw::") ; do
+			if	[ -d "$(dirname $_file)" ] ; then
+				chflags noschg "$(dirname $_file)"
+				[ -e "$_file" ] && chflags noschg $_file
+			else
+				mkdir -p $(dirname $_file)
+			fi
+			ln -sf /rw${_file} $_file
+		done
+EOT
+}
+
+get_global_variables
+
+main "$@"
+
+exit 0   # Script exits success, to not abort jail startup

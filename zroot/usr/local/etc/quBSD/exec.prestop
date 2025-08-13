@@ -1,0 +1,22 @@
+#!/bin/sh
+
+. /usr/local/lib/quBSD/quBSD.sh
+
+JAIL="$1"
+get_global_variables
+
+# Record stop attempt to log file
+echo "$(date "+%Y-%m-%d_%H:%M") exec.prestop: STOPPING: $JAIL" >> ${QBLOG} ${QBLOG}_$JAIL
+
+# Remove interfaces and handle files modification for those interfaces 
+INTFS=$(jexec -l -U root $JAIL ifconfig -g tap ; jexec -l -U root $JAIL ifconfig -g epair)
+for _intf in $INTFS; do
+	# If interface is an epair, pass [-d] destroy
+	[ -z "${_intf##epair*}" ] && _d='-d' || unset _d 
+	remove_interface $_d "$_intf" "$JAIL"	
+done
+
+# /rw system files might be schg, but needed by rc.shutdown.
+chflags -fR noschg ${M_ZUSR}/${JAIL}/rw
+
+exit 0   # Script exits success, to not abort jail shutdown.

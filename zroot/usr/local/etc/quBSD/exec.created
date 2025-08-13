@@ -1,0 +1,48 @@
+#!/bin/sh
+
+. /usr/local/lib/quBSD/quBSD.sh
+
+get_options() {
+	JAIL="$1"
+	get_jail_parameter -dqs CLASS   "$JAIL" || get_msg2 -m _e
+	get_jail_parameter -d   CONTROL "$JAIL" || get_msg2 -Em _e
+	get_jail_parameter -d   GATEWAY "$JAIL" || get_msg2 -Em _e
+}
+
+main() {
+	# If exec script fails and jail start aborts, make sure to clean up the mounts
+	trap '/usr/local/etc/qubsd/exec.release $JAIL'
+
+	# Establish connections to the jail's upstream gateway and control jail
+	connect_client_to_gateway -t SSH "$JAIL" "$CONTROL"
+	connect_client_to_gateway "$JAIL" "$GATEWAY"
+
+	# If this jail is also a gateway, connect it to downstream clients.
+	clients=$(get_info -e _CLIENTS "$JAIL" | tr '\n\t' ' ')
+	last_client=$(echo "$clients" | awk '{print $NF}')
+	for _CLI in $clients ; do
+		[ "$_CLI" = "$last_client" ] && _s="-s"  # -s currently unused, keeping for now until starts are fixed
+		chk_isrunning "$_CLI" && connect_client_to_gateway $_s "$_CLI" "$JAIL"
+	done
+
+	# If this is a cjail, check all the onjails to see if this is their control jail. 
+	if [ "$CLASS" = "cjail" ] ; then 
+		for _onj in $(get_info -e _ONJAILS | grep -v $JAIL) ; do
+			# Does _onj have an explicit cjail in QCONF? If not, is $JAIL the QCONF #default? 
+			! grep -Eqs "^${_onj}[[:blank:]]+CONTROL[[:blank:]]+${JAIL}" $QCONF \
+				&& ! grep -Eqs "^${_onj}[[:blank:]]+CONTROL[[:blank:]]+"  $QCONF \
+				&& ! grep -Eqs "^#default[[:blank:]]+CONTROL[[:blank:]]+${JAIL}" $QCONF \
+				&& continue			
+			connect_client_to_gateway -t SSH "$_onj" "$JAIL"
+		done
+	fi
+}
+
+
+get_global_variables
+
+get_options "$@"
+
+main
+
+exit 0   # Script exits success, to not abort jail startup

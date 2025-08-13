@@ -1,0 +1,68 @@
+#!/bin/sh
+
+. /usr/local/lib/quBSD/quBSD.sh
+
+get_parameters() {
+	# Define script variables
+	JAIL="$1"
+	echo "$(date "+%Y-%m-%d_%H:%M") exec.prepare: STARTING: $JAIL" >> $QBLOG ${QBLOG}_$JAIL
+
+	# Parameters and checks
+	get_jail_parameter CLASS   "$JAIL"    || get_msg2 -Em _e
+	get_jail_parameter ROOTENV "$JAIL"    || get_msg2 -Em _e
+	get_jail_parameter -d GATEWAY "$JAIL" || get_msg2 -Em _e
+	get_jail_parameter -d CONTROL "$JAIL" || get_msg2 -Em _e
+}
+
+preparation_actions() {
+	# The control jail should always be on. The function will return immediately if already on
+#	[ ! "$CLASS" = "cjail" ] && start_jail "$CONTROL"
+
+	# MUST redirect to null, otherwise VM here will hang the script .. coz .. file descriptors?
+	start_jail "$GATEWAY" > /dev/null 2>&1
+
+	# Double check to unmount any parts of <jail> before destroy/recreating the dataset
+	JMOUNT=$(mount | grep -Eo "${M_QROOT}/${JAIL}/[^[:blank:]]+")
+	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
+
+	# Make sure the zusr dataset is mounted. [-l load-key] for encrypted datasets
+	if [ ! "$(zfs list -Ho mounted ${U_ZFS}/${JAIL})" = "yes" ] ; then
+		if [ "$(get_info -e _NEEDPOP)" = "true" ] ; then
+			create_popup -c "zfs mount -l ${U_ZFS}/${JAIL}"
+		else
+			zfs mount -l ${U_ZFS}/${JAIL}
+		fi
+	fi
+}
+
+main() {
+  # If exec script fails and jail start aborts, make sure to clean up the mounts
+  trap '/usr/local/etc/qubsd/exec.release $JAIL'
+
+	# Misc things to do/check before recloning the datasets
+	preparation_actions
+
+	case $CLASS in
+		appjail|cjail)
+			# Reclone the root filesystem for JAIL
+			reclone_zroot "$JAIL" "$ROOTENV" || get_msg2 -Em _e2 "$JAIL" "$ROOTENV"
+		;;
+		dispjail)
+			# Reclone the root filesystem for JAIL
+			reclone_zroot "$JAIL" "$ROOTENV" || get_msg2 -Em _e2 "$JAIL" "$ROOTENV"
+
+			# Dispjails also reclone the zusr portion from template (if it exists)
+			get_jail_parameter -d TEMPLATE "$JAIL" || get_msg2 -Em _e
+			reclone_zusr "$JAIL" "$TEMPLATE" || get_msg2 -Em _e1_4 "$JAIL" "$TEMPLATE"
+		;;
+	esac
+	return 0
+}
+
+get_global_variables
+
+get_parameters "$@"
+
+main
+
+exit 0   # Script exits success, to not abort jail startup

@@ -1,0 +1,62 @@
+#!/bin/sh
+
+. /usr/local/lib/quBSD/quBSD.sh
+
+get_options() {
+	JAIL="$1"
+	get_jail_parameter -dqs CLASS   "$JAIL" || get_msg2 -m _e
+	get_jail_parameter -d   SCHG    "$JAIL" || get_msg2 -m _e
+	get_jail_parameter -d   SECLVL  "$JAIL" || get_msg2 -m _e
+	get_jail_parameter -d   MAXMEM  "$JAIL" || get_msg2 -Em _e
+	get_jail_parameter -d   CPUSET  "$JAIL" || get_msg2 -Em _e
+}
+
+resource_control() {
+	# Remove any existing rules for the jail
+	rctl -r jail:${JAIL}:: > /dev/null 2>&1
+
+	# Establish max memory allocation and jail CPUs
+	[ "$MAXMEM" = "none" ] || rctl -a jail:${JAIL}:memoryuse:deny=${MAXMEM}
+	[ "$CPUSET" = "none" ] || cpuset -j $JAIL -cl $CPUSET
+}
+
+security_flags() {
+	# Rootjail file protections can prevent updates, installs, disrupt start ops for
+	# dependent appjails. No dangerous work should be happening in rootjails anyways.
+	[ "$CLASS" = "rootjail" ] && return 0
+
+	# Different directories are schg flagged depending on user settings
+	case $SCHG in
+		all)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw /usr" ;;
+		sys)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw/etc /rw/root \
+						/usr/bin /usr/lib /usr/lib32 /usr/libdata /usr/libexec /usr/sbin \
+						/usr/local/bin /usr/local/lib /usr/local/lib32 /usr/local/libdata \
+						/usr/local/libexec /usr/local/sbin" ;;
+	esac
+
+	for _d in $_jdir; do
+		[ -e "${M_QROOT}/${JAIL}${_d}" ] && chflags -fR schg "${M_QROOT}/${JAIL}${_d}"
+	done
+
+	# Slightly hacky but resolv is an exception to schg. Services need to modify this.
+	[ -f "${M_QROOT}/${JAIL}/etc/resolv.conf" ] && chflags noschg ${M_QROOT}/${JAIL}/etc/resolv.conf
+	[ -f "${M_QROOT}/${JAIL}/etc/resolvconf.conf" ] && chflags noschg ${M_QROOT}/${JAIL}/etc/resolvconf.conf
+
+	# exec.poststart is always sent to background. Don't report seclvl change
+	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL" > /dev/null 2>&1
+}
+
+main() {
+	resource_control
+
+	security_flags
+}
+
+
+get_global_variables
+
+get_options "$@"
+
+main
+
+exit 0

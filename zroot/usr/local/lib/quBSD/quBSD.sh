@@ -172,9 +172,9 @@ get_msg2() {
 		V) local _V="true" ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-	# Using the caller script to generalize message calls. Switch between exec- and qb- scripts.
+	# Using the caller script to generalize message calls. Switch between exec and qb- scripts.
 	local _call="${0##*/}"
-	[ -z "${_call##exec-*}" ] && local _msg="msg_exec" || _msg="msg_${0##*-}"
+	[ -z "${_call##exec.*}" ] && local _msg="msg_exec" || _msg="msg_${0##*-}"
 
 	# Determine if popup should be used or not
 	get_info _NEEDPOP
@@ -633,10 +633,10 @@ stop_jail() {
 		# Attempt normal removal [-r]. If failure, then remove forcibly [-R].
 		elif ! jail -vr "$_jail"  >> ${QBLOG}_${_jail} 2>&1 ; then
 			if chk_isrunning "$_jail" ; then
-				# Manually run exec-prestop, then forcibly remove jail, and run exec-release
-				/bin/sh ${QBDIR}/exec-prestop "$_jail" > /dev/null 2>&1
+				# Manually run exec.prestop, then forcibly remove jail, and run exec.release
+				/bin/sh ${QBDIR}/exec.prestop "$_jail" > /dev/null 2>&1
 				jail -vR "$_jail"  >> ${QBLOG}_${_jail} 2>&1
-				/bin/sh ${QBDIR}/exec-release "$_jail" > /dev/null 2>&1
+				/bin/sh ${QBDIR}/exec.release "$_jail" > /dev/null 2>&1
 
 				if chk_isrunning "$_jail" ; then
 					# Warning about failure to forcibly remove jail
@@ -814,7 +814,7 @@ select_snapshot() {
 		[ -z "$_rootsnap" ] && get_msg $_qz -m _e32_1 -- "$_jail" "$_rootenv" && eval $_R1
 
 	# Latest ROOTENV snapshot unimportant for stops, and prefer not to clutter ROOTENV snaps.
-	elif [ -z "${0##*exec-release}" ] || [ -z "${0##*qb-stop}" ] ; then
+	elif [ -z "${0##*exec.release}" ] || [ -z "${0##*qb-stop}" ] ; then
 		# The jail is running, meaning there's a ROOTENV snapshot available (no error/chks needed)
 		local _rootsnap=$(zfs list -t snapshot -Ho name $_rootzfs | tail -1)
 
@@ -1940,9 +1940,8 @@ configure_client_network() {
 
 	# Interface assignments
 	if [ "$ipv4" = "DHCP" ] ; then
-		# qubsd_dhcp daemon runs internally to each jail monitoring for new dhcp interfaces
-		mkdir -p ${_cl_root}/tmp > /dev/null 2>&1
-		echo "$_vif_cl" >> ${_cl_root}/tmp/qubsd_dhcp.interfaces
+		# qubsd_dhcp daemon runs in jails monitoring for new dhcp interfaces
+		eval $_jexec ifconfig $_vif_cl group DHCP
 		[ "$_client" = "host" ] && dhclient $_vif_cl
 	else
 		# No _gw_ip implies ipv4 is the statically assigned IP in QCONF. Otherwise, rely on _gw_ip
@@ -1958,12 +1957,13 @@ configure_client_network() {
 	# DNS and pf management
 	if sysrc -nqj $_client dnscrypt_proxy_enable 2>/dev/null | grep -q "YES" ; then
 		# Using DoH, presumably for external-router connected (net-firewall) gateway
+		rm "${_cl_root}/var/unbound/forward.conf" 2>/dev/null 
 		chroot ${_cl_root} /bin/sh -c 'ln -s /var/unbound/forward-doh.conf /var/unbound/forward.conf'
 
 	elif sysrc -nqj $_client wireguard_enable 2>/dev/null | grep -q "YES" ; then
 		# Wireguard itself will update resolvconf, and thus, unbound
-		[ ! -L "${_cl_root}/var/unbound/forward.conf" ] && chroot \
-				${_cl_root} /bin/sh -c 'ln -s /var/unbound/forward-resolv.conf /var/unbound/forward.conf'
+		rm "${_cl_root}/var/unbound/forward.conf" 2>/dev/null 
+		chroot ${_cl_root} /bin/sh -c 'ln -s /var/unbound/forward-resolv.conf /var/unbound/forward.conf'
 
 		# Endpoint IP
 		local _ep=$(sed -nE "s/[ \t]*Endpoint[ \t]*=[ \t]*([^[ \t]+):.*/\1/p" \
@@ -1977,14 +1977,21 @@ configure_client_network() {
 	else
 		# All other gateways use normal resolvconf mechanism
 		if sysrc -nqj $_client local_unbound_enable 2>/dev/null | grep -qs "YES" ; then
-			[ ! -L "${_cl_root}/var/unbound/forward.conf" ] && chroot ${_cl_root} /bin/sh -c \
-					'ln -s /var/unbound/forward-resolv.conf /var/unbound/forward.conf'
+			rm "${_cl_root}/var/unbound/forward.conf" 2>/dev/null 
+			chroot ${_cl_root} /bin/sh -c 'ln -s /var/unbound/forward-resolv.conf /var/unbound/forward.conf'
 		fi
 		if [ ! "$ipv4" = "DHCP" ] ; then      # Without DHCP, resolvconf doesnt know the assigned IP
-			_gw_name_server="name_servers_append=${_cl_ip%.*/*}.1"
-			sed -i '' -E "/name_servers_append/d" ${_cl_root}/etc/resolvconf.conf 2>/dev/null
-			echo "$_gw_name_server" >> ${_cl_root}/etc/resolvconf.conf
-			eval $_jexec resolvconf -u
+			if [ "$_client" = "host" ] ; then
+				echo "nameserver ${_cl_ip%.*/*}.1" | resolvconf -a tmpdns0 -m 0 > /dev/null 2>&1
+			else
+				chroot ${_cl_root} /bin/sh -c \
+					"echo \"nameserver ${_cl_ip%.*/*}.1\" | resolvconf -a tmpdns0 -m 0 > /dev/null 2>&1"
+			fi
+# Leave for now Aug12, in case something isnt right later. Added above line to not taint rootjails filesystem
+#			_gw_name_server="name_servers_append=${_cl_ip%.*/*}.1"
+#			sed -i '' -E "/name_servers_append/d" ${_cl_root}/etc/resolvconf.conf 2>/dev/null
+#			echo "$_gw_name_server" >> ${_cl_root}/etc/resolvconf.conf
+#			eval $_jexec resolvconf -u > /dev/null 2>&1
 		fi
 	fi
 	eval $_R0
