@@ -1,6 +1,8 @@
 
 It sounds like I still need magic cookies because some jails will still have opt to be on nullfs on host x11-unix
 
+review qubsd_dhcpd
+
 0control review and ... overhaul?
    remember that you turned it off in exec.created
    local-unbound vs named. Maybe I dont need named?
