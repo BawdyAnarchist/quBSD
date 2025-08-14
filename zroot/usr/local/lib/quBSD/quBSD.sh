@@ -1883,12 +1883,10 @@ connect_client_to_gateway() {
 	fi
 
 	# Transport the interfaces if they belong in a jail
-	[ -n "$_vif_gw" ] && [ -n "$_gw_mod" ] \
-		&& ifconfig $_vif_gw vnet $_gateway \
-		&& ifconfig $_gw_mod $_vif_gw group ${_client}_ group CLIENTS
-	[ -n "$_vif_cl" ] && [ -n "$_cl_mod" ] \
-		&& ifconfig $_vif_cl vnet $_client  \
-		&& ifconfig $_cl_mod $_vif_cl group $_type $_groupmod
+	[ -n "$_vif_gw" ] && [ -n "$_gw_mod" ] && ifconfig $_vif_gw vnet $_gateway
+	[ -n "$_vif_gw" ] && ifconfig $_gw_mod $_vif_gw group ${_client}_ group CLIENTS
+	[ -n "$_vif_cl" ] && [ -n "$_cl_mod" ] && ifconfig $_vif_cl vnet $_client
+	[ -n "$_vif_cl" ] && ifconfig $_cl_mod $_vif_cl group $_type $_groupmod
 
 	# Configure the interfaces
 	[ ! "$ipv4" = "dhcp" ] && [ -n "$_vif_gw" ] && ifconfig $_gw_mod $_vif_gw inet $_gw_ip mtu $_mtu up

@@ -65,8 +65,8 @@ climb_hierarchy() {
 
 	# Disposition JAIL based on _gateway, and also identify its control jail for ordered start
 	local _gateway=$(get_jail_parameter -deqsz GATEWAY "$_JAIL")
-	local _control=$(get_jail_parameter -deqsz CONTROL $_JAIL)
-	_CJAILS="$(printf "%b" "${_control}\n${_CJAILS}")"
+#	local _control=$(get_jail_parameter -deqsz CONTROL $_JAIL)
+#	_CJAILS="$(printf "%b" "${_control}\n${_CJAILS}")"
 
 	if [ "$_gateway" = "none" ] || [ -z "$_gateway" ] ; then
 		# JAIL is an endpoint. Either has no network, or is top of hierarchy.
@@ -90,11 +90,11 @@ ips_and_xpra() {
 	# Only get IP addrs and Xpra sockets for off jails
 	if ! chk_isrunning "$_jail" ; then
 		# IP calculations for 0control SSH connections
-		printf "%b" "$_jail SSH $(discover_open_ipv4 -t SSH $_jail)\n" >> $_TMP_IP
+		printf "%b" "$_jail CJ_SSH $(discover_open_ipv4 -t CJ_SSH $_jail)\n" >> $_TMP_IP
 
 		# For networking, skip hierarchy tops.
 		! echo_grep "$_HIERTOP" "$_jail" \
-			&& printf "%b" "$_jail NET $(discover_open_ipv4 -t NET $_jail)\n" >> $_TMP_IP
+			&& printf "%b" "$_jail NET $(discover_open_ipv4 -t EXT_IF $_jail)\n" >> $_TMP_IP
 
 		# Check if operating on jail, and check if it has xpra installed 
 		! chk_isvm "$_jail" && [ -e "${M_QROOT}/${_rootenv}/usr/local/bin/xpra" ] \
@@ -192,7 +192,7 @@ main() {
 
 	# Control jails must be started first
 	for _cjail in $(echo "$_CJAILS" | sort | uniq) ; do
-		start_jail $_cjail
+#		start_jail $_cjail
 	done
 
 	# Start the hierarchy tops, then their clients, until all of FULLIST is started
@@ -217,8 +217,6 @@ main() {
 }
 
 get_global_variables
-
-get_networking_variables
 
 get_options "$@"
 
