@@ -1,12 +1,17 @@
 
 It sounds like I still need magic cookies because some jails will still have opt to be on nullfs on host x11-unix
 
+eliminate all files and directories that reference quBSD ... It should just be qubsd
+
+remove all of the local var=asdf ; local var2=lkj ... you can just say local ONCE
+
 0control review and ... overhaul?
    remember that you turned it off in exec.created
    local-unbound vs named. Maybe I dont need named?
    0control doesnt need a special mount for IP addresses. Just print them directly to the jail's /tmp
    control_netmap is borked and constantly double lists
 	**update nicvm**
+	CHANGES: qb-hostnet, exec.created, quBSD.sh, qb-connect, msg-qubsd.sh
 
 qb-start
 	- Needs updated with new networking functions in mind
