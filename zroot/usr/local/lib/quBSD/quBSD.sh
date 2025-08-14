@@ -173,8 +173,8 @@ get_msg2() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Using the caller script to generalize message calls. Switch between exec and qb- scripts.
-	local _call="${0##*/}"
-	[ -z "${_call##exec.*}" ] && local _msg="msg_exec" || _msg="msg_${0##*-}"
+	local _call="${0##*/}"  _msg  _NEEDPOP
+	[ -z "${_call##exec.*}" ] && _msg="msg_exec" || _msg="msg_${0##*-}"
 
 	# Determine if popup should be used or not
 	get_info _NEEDPOP
@@ -203,6 +203,7 @@ get_msg2() {
 	# Evaluate usage if present
 	[ -z "$_q" ] && [ $_usage ] && _message="usage" && eval "$_msg"
 
+	[ -n "$_exit" ] && rm_errfiles  # Had problems with lingering $ERR in QRUN. Make it unequivocal
 	eval $_exit :
 	return 0
 }
@@ -243,7 +244,7 @@ get_parameter_lists() {
 
 exists_then_copy() {
 	# Checks if the file exists, then copies it
-	local _file="$1" ; local _dest="$2"
+	local _file="$1"  _dest="$2"
 	{ [ -z "$_file" ] || [ -z "$_dest" ] ;} && return 1
 	[ -e "$_file" ] && cp "$_file" "$_dest" && return 0
 }
@@ -283,7 +284,7 @@ get_jail_parameter() {
 	local _fn="get_jail_parameter" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
 	# Ensure all options variables are reset
-	local _dp= ; local _ep= ; local _qp= ; local _rp= ; local _sp= ;local _xp= ;local _zp= ;local _V=
+	local _dp=  _ep=  _qp=  _rp=  _sp=  _xp=  _zp=  _V=
 	while getopts deqrsVxz opts ; do case $opts in
 			d) _dp="-d" ;;
 			e) _ep="-e" ;;
@@ -297,8 +298,8 @@ get_jail_parameter() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Positional and function variables
-	local _param="$1"  ; local _low_param=$(echo "$_param" | tr '[:upper:]' '[:lower:]')
-	local _jail="$2"   ; local _value=''
+	local _param="$1"  local _jail="$2"   _value=''
+	local _low_param=$(echo "$_param" | tr '[:upper:]' '[:lower:]')
 
 	# Either jail or param weren't provided
 	[ -z "$_param" ] && get_msg $_qp $_V -m _e0 -- "PARAMETER and jail" && eval "$_sp $_R1"
@@ -344,7 +345,8 @@ get_info() {
 		V) local _V="-V" ;;
 	esac ; done ; shift $(( OPTIND - 1))
 
-	local _info="$1"  ;  local _jail="$2"  ;  local _value=''
+	local _info="$1"  _jail="$2"  _value=''
+
 	# Either jail or param weren't provided
 	[ -z "$_info" ] && get_msg $_qp -m _e0 -- "INFO PARAMETER" && eval "$_sp $_R1"
 
@@ -477,10 +479,10 @@ create_popup() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Discern if it's i3, and modify with center/floating options
-	ps c | grep -qs 'i3' && _i3mod="i3-msg -q floating enable, move position center"
+	ps c | grep -qs 'i3' && local _i3mod="i3-msg -q floating enable, move position center"
 
 	# If a file was passed, set the msg equal to the contents of the file
-	[ "$_popfile" ] && _popmsg=$(cat $_popfile)
+	[ "$_popfile" ] && local _popmsg=$(cat $_popfile)
 
 	# Might've been launched from quick-key or without an environment. Get the host DISPLAY
 	[ -z "$DISPLAY" ] && export DISPLAY=$(pgrep -fl Xorg | grep -Eo ":[0-9]+")
@@ -783,9 +785,8 @@ select_snapshot() {
 	# Generalized function to be shared across qb-start/stop, and reclone_zfs's
 	# Returns the best/latest snapshot for a given ROOTENV
 	local _fn="select_snapshot" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-	local _jlsdate ; local _rootsnaps ; local _snapdate ; local _newsnap
-	local _tmpsnaps="${QRUN}/.tmpsnaps"
-	local _rootzfs="${R_ZFS}/${_rootenv}"
+	local _jlsdate  _rootsnaps  _snapdate  _newsnap
+	local _tmpsnaps="${QRUN}/.tmpsnaps"  _rootzfs="${R_ZFS}/${_rootenv}"
 
 	# For safety, running ROOTENV snapshot should be taken from before it was started
 	if chk_isrunning ${_rootenv} ; then
@@ -1841,7 +1842,7 @@ connect_client_to_gateway() {
 	: "${_gateway:=$(get_jail_parameter -de GATEWAY $_client)}"
 	[ "$_gateway" = "none" ] && eval $_R0
 	! chk_isrunning "$_gateway" && get_msg $_q $_V -m _e28 && eval $_R1
-[ "$_gateway" = "nicvm" ] && setlog1
+
 	# Reduce verbosity/switches by setting some mods for later commands
 	[ "$_gateway" = "host" ] && unset _gw_mod || _gw_mod="-j $_gateway"
 	[ "$_client"  = "host" ] && unset _cl_mod _cl_root \
@@ -1880,9 +1881,6 @@ connect_client_to_gateway() {
 		_vif_gw=$(ifconfig epair create)
 		_vif_cl="${_vif_gw%?}b"
 	fi
-
-#echo ipv4: $ipv4 ; echo _gw_ip: $_gw_ip ; echo _route: "${_gw_ip%/*}" ; echo _cl_ip: $_cl_ip ; echo _mtu: $_mtu
-#echo client: $_client   gateway: $_gateway echo cl_vif: $_vif_cl   gw_vif: $_vif_gw echo _groupmod: $_groupmod
 
 	# Transport the interfaces if they belong in a jail
 	[ -n "$_vif_gw" ] && [ -n "$_gw_mod" ] \
@@ -1956,8 +1954,8 @@ configure_ssh_control() {
 	# In the case of a restart of the control jail, use [-f] to make sure flags are restored
 
 	getopts f _opts && local _flags="true" && shift
-	local _client="$1" ; local _control="$2"
-	local _chome="${M_QROOT}/${_client}/home/${_client}" ; local _croot="${M_QROOT}/${_client}/root"
+	local _client="$1"  _control="$2"
+	local _chome="${M_QROOT}/${_client}/home/${_client}"  _croot="${M_QROOT}/${_client}/root"
 
 	# Lift flags for edits, create the .ssh directory if not there, and copy the files
 	chflags -R noschg ${_croot}
@@ -2007,7 +2005,7 @@ discover_open_ipv4() {
 			*) get_msg -m _e9 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
-	local _client="$1" ; local _ip0=10 ; local _ip2=1 ; local _ip3=${_ip3:=2} ; local _subnet=30
+	local _client="$1"  _ip0=10  _ip2=1  _ip3=${_ip3:=2}  _subnet=30
 
 	# The quBSD IP conventions for various use cases.
 	case "$_type" in
@@ -2048,7 +2046,7 @@ remove_interface() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Pos params and _action. taps stay on host but epairs get destroyed
-	local _intf="$1"  ;  local _jail="$2" ; local _action="${_action:=down}"
+	local _intf="$1"  _jail="$2"  _action="${_action:=down}"
 
 	# First check if it's already on host
 	if ifconfig "$_intf" > /dev/null 2>&1 ; then
@@ -2062,7 +2060,7 @@ remove_interface() {
 	# If the above fails, then check all jails
 	else
 		for _j in $(get_info -e _ONJAILS) ; do
-			if ifconfig -j $_j -l 2>/dev/null | grep -Eqs "^${_intf}: " ; then
+			if ifconfig -j $_j -l 2>/dev/null | grep -Eqs "${_intf}" ; then
 				ifconfig $_intf -vnet $_j
 				ifconfig $_intf $_action
 			fi
@@ -2090,14 +2088,16 @@ cleanup_vm() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))  ;  [ "$1" = "--" ] && shift
 
 	# Positional variables
-	local _VM="$1"  ;  local _rootenv="$2"
+	local _VM="$1"  _rootenv="$2"   _ct  _gw  _jail
 	[ -z "$_VM" ] && get_msg $_qcv -m _e0 && eval $_R1
 
 	# Bring all recorded taps back to host, and destroy. Skip checks for speed (non-essential)
-	local _ct=$(get_jail_parameter -des CONTROL $_VM)
-	local _gw=$(get_jail_parameter -des GATEWAY $_VM)
+	_ct=$(get_jail_parameter -des CONTROL $_VM)
+	_gw=$(get_jail_parameter -des GATEWAY $_VM)
 	for _tap in $(sed -E "s/^$_VM [^[:blank:]]+ ([^[:blank:]]+)/\1/" $VMTAPS 2> /dev/null) ; do
-		remove_interface -d "$_tap" "$_gw"
+		grep -Eqs "CJ_SSH $_tap" $VMTAPS && _jail="$_ct"
+		grep -Eqs "EXT_IF $_tap" $VMTAPS && _jail="$_gw"
+		remove_interface -d "$_tap" "$_jail"
 	done
 	sed -i '' -E "/^$_VM /d" $VMTAPS   # Remove any lines in VMTAPS associated to the VM
 
@@ -2332,7 +2332,7 @@ EOF
 
 		# Create tap, make sure it's down, increment slot
 		_tap=$(ifconfig tap create)
-		sed -i '' -E "/$_tap[ \t]*/d" $VMTAPS # Delete any stray lingering taps in the VMTAPS tracker
+		sed -i '' -E "/${_tap}[ \t]*/d" $VMTAPS # Delete any stray lingering taps in the VMTAPS tracker
 		ifconfig $_tap group "${_VM}_" down   # Use ifconfig groups to track which VM this tap belongs to
 		_VTNET=$(printf "%b" "${_VTNET} -s ${_slot},virtio-net,${_tap}")
 		_slot=$(( _slot + 1 )) ; [ "$_slot" -eq 29 ] && _slot=32
@@ -2374,7 +2374,7 @@ launch_bhyve_vm() {
 
 	# Launch the VM to background
 	eval $_BHYVE_CMD
-	sleep 3
+	sleep 5   # Allow plent of time for launch. Sometimes weirdness can delay pgrep appearance
 
 	# Monitor the VM, perform cleanup after done
 	while pgrep -xfq "bhyve: $_VM" ; do sleep 1 ; done
@@ -2447,14 +2447,13 @@ exec_vm_coordinator() {
 		launch_bhyve_vm
 EOF
 
-
 	# Monitor to make sure that the bhyve command started running, then return 0
 	local _count=0 ; sleep .5
 
 	while ! { pgrep -xfq "bhyve: $_VM" \
 				|| pgrep -fl "bhyve" | grep -Eqs "^[[:digit:]]+ .* ${_VM}[ \t]*\$" ;} ; do
 	sleep .5 ; _count=$(( _count + 1 ))
-	[ "$_count" -ge 6 ] && get_msg -m _e4_1 -- "$_VM" && eval $_R1
+	[ "$_count" -ge 10 ] && get_msg -m _e4_1 -- "$_VM" && eval $_R1
 	done
 
 	finish_vm_connections &
