@@ -155,7 +155,7 @@ main() {
 				chk_isrunning "$GATEWAY" || start_jail "$GATEWAY" || exit 1
 
 				# Make the connection beteween jails
-				connect_client_to_gateway "$JAIL" "$GATEWAY" "$IPV4"
+				connect_client_to_gateway -t NET "$JAIL" "$GATEWAY" "$IPV4"
 		;;
 		destroy)
 				assemble_interface_list

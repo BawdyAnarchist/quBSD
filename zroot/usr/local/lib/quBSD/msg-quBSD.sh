@@ -90,7 +90,7 @@ ENDOFMSG
 ENDOFMSG
 	;;
 	_e7) cat << ENDOFMSG
-   < $1 > is missing from $JCONF_D 
+   < $1 > is missing from $JCONF
 ENDOFMSG
 	;;
 	_e8) cat << ENDOFMSG
@@ -125,7 +125,7 @@ ENDOFMSG
 	;;
 	_e13_2) cat << ENDOFMSG
    JAILNAME < $1 > has an entry in at least one of the following:
-   $JCONF_D, $QCONF , $U_ZFS, or $R_ZFS
+   $JCONF, $QCONF , $U_ZFS, or $R_ZFS
    Destroy/remove all occurrences with:  qb-destroy $1
 ENDOFMSG
 	;;
@@ -266,6 +266,10 @@ ENDOFMSG
 	_e33) cat << ENDOFMSG
    ${2##*bin/} failed to ${2##*qb-} all jails/VMs
    within the allotted timeout of < $2 secs >.
+ENDOFMSG
+	;;
+	_e34) cat << ENDOFMSG
+   Control jail < $_gateway > should only ever have IPV4 < auto > or < dhcp >
 ENDOFMSG
 	;;
 	_w1) cat << ENDOFMSG

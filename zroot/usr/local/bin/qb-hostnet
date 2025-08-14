@@ -59,7 +59,7 @@ check_and_manage_connection() {
 	connection_down
 
 	# Bring connection up
-	connect_client_to_gateway "host" "$GATEWAY"
+	connect_client_to_gateway -t NET "host" "$GATEWAY"
 }
 
 revert_connection() {
