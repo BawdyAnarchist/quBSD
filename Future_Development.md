@@ -1,17 +1,10 @@
 
-It sounds like I still need magic cookies because some jails will still have opt to be on nullfs on host x11-unix
 
-eliminate all files and directories that reference quBSD ... It should just be qubsd
-
-remove all of the local var=asdf ; local var2=lkj ... you can just say local ONCE
-
-0control review and ... overhaul?
-   remember that you turned it off in exec.created
+0control review and overhaul 
+   remember that you turned it off in exec.created, quBSD.sh (VMs), qb-start, qb-cmd, start_jail
    local-unbound vs named. Maybe I dont need named?
-   0control doesnt need a special mount for IP addresses. Just print them directly to the jail's /tmp
-   control_netmap is borked and constantly double lists
 	**update nicvm**
-	CHANGES: qb-hostnet, exec.created, quBSD.sh, qb-connect, msg-qubsd.sh
+	CHANGES:
 
 qb-start
 	- Needs updated with new networking functions in mind
@@ -42,10 +35,9 @@ Host as Unprivileged user
 	- Unprivileged user on host will pass jails SSH commands via Control Jail     
 	- Control jail pf will block all, except port 22 between host and jails     
 
-pwd
-	- I think the right way to do this, is export any existing pwd db in /rw, and import it into the created jail (or maybe vice versa) 
-	- Right now I'm not so confident on how that's working
-	- To get around the pw -V problem, you could put /usr/local/bin/pw wrapper
+pwd: Overaul plan two parts:
+   - rootjail contains a default qubsd_pw.conf - Just a 1-liner manifest for basic user creation 
+   - /rw/etc/ (or /rw/usr/local/etc/) qubsd.conf.local - Users can add new groups/users. Created at jail start
 
 dispVM
 	- vm-rc.local should use its IP address to get it's hostname from 0control ftp server
@@ -79,6 +71,9 @@ qb-connect
 
 qb-i3-launch - overhauled now that I'm using Xephyr
 
+qb-cmd -e [ephm]
+   - Ideally you would also clone the zroot from whatever jail you're ephm'ing. 
+
 qb-create
 	- [-z dupl] still needs to create and copy the fstab of the template jail, and maybe the rc.conf too. 
 	- It needs further and more extensive testing 
@@ -87,15 +82,10 @@ qb-create
 	- There needs to be a template for parameters, and a template for zusr
 	- You can in install a brand new rootjail via tar base.txz, and this should be an opt coz of the little qubSD required adjustments 
 
-qb_ssh [[actually it's likely I dont need this now that I'm gonna go to fat32 zfs volumes for new VMs)
-	- Probably can remove the FreeBSD parts of it. Maybe the Net/Open ones as well 
-
 qb-pci
 	- summary of PCI devices relevant to user
 	- USB, NIC, maybe others
 	- Show what was is currently passthrough'd
-
-qb-ephm - Clone from zroot too. Tricky, because of "reclone_zroot" operation in exec.prepare 
 
 qb-update - Update rootjails, create snapshots
 
@@ -113,6 +103,11 @@ consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-i
 
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP
 
+It sounds like I still need magic cookies because some jails will still have opt to be on nullfs on host x11-unix
+
+eliminate all files and directories that reference quBSD ... It should just be qubsd
+remove all of the local var=asdf ; local var2=lkj ... you can just say local ONCE
+
 TIMEOUT overhaul - timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
 
 rc.conf -nmdm cuse , I dont know if I need them or what for
@@ -121,13 +116,7 @@ When you restore, the datasets dont inherit their qubsd:autosnap properties
 
 Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
 
-There's a timing problem in qb-cmd regarding a VM, when i installed 0bsdvm
-
-There is some question now as to the dispjails and their templates, and the devfs in jail.conf. 
-
-ALL file names should ALWAYS be variables defined in get_global_variables
-
-0control qb-copy is SLOW af alot of times
+ALL file names should ALWAYS be variables defined in get_global_variables ?
 
 Take another hack at the recording device problems
 
