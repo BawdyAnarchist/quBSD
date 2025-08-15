@@ -298,12 +298,12 @@ get_jail_parameter() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Positional and function variables
-	local _param="$1"  local _jail="$2"   _value=''
+	local _param="$1"  _jail="$2"  _value=''
 	local _low_param=$(echo "$_param" | tr '[:upper:]' '[:lower:]')
 
 	# Either jail or param weren't provided
 	[ -z "$_param" ] && get_msg $_qp $_V -m _e0 -- "PARAMETER and jail" && eval "$_sp $_R1"
-	[ -z "$_jail" ] && get_msg $_qp $_V -m _e0 -- "jail" && eval "$_sp $_R1"
+	[ -z "$_jail" ]  && get_msg $_qp $_V -m _e0 -- "jail" && eval "$_sp $_R1"
 
 	# Get the <_value> from QCONF.
 	_value=$(sed -nE "s/^${_jail}[ \t]+${_param}[ \t]+//p" $QCONF)
@@ -353,9 +353,6 @@ get_info() {
 	case $_info in
 		_CLIENTS)  # All _clients listed in QCONF, which depend on _jail as a gateway
 			_value=$(sed -nE "s/[ \t]+GATEWAY[ \t]+${_jail}//p" $QCONF)
-			;;
-		_CONTROLD)  # All _clients listed in QCONF, which depend on _jail as a gateway
-			_value=$(sed -nE "s/[ \t]+CONTROL[ \t]+${_jail}//p" $QCONF)
 			;;
 		_ONJAILS)  # All jails/VMs that are currently running
 			_value=$(jls | sed "1 d" | awk '{print $2}' ; \
@@ -740,7 +737,7 @@ reclone_zusr() {
 
 	[ -z "$_jail" ] && get_msg $_qr -m _e0 -- "jail" && eval $_R1
 	[ -z "$_template" ] && get_msg $_qr -m _e0 -- "template" && eval $_R1
-  ! chk_valid_zfs "$templzfs" && get_msg $_qr -m _e0 -- "template" && eval $_R1
+  ! chk_valid_zfs "$_templzfs" && get_msg $_qr -m _e0 -- "template" && eval $_R1
 
 	# `zfs-diff` from other jails causes a momentary snapshot which the reclone operation
 	if chk_valid_zfs "$_presnap" ; then
@@ -1844,18 +1841,17 @@ connect_client_to_gateway() {
 	! chk_isrunning "$_gateway" && get_msg $_q $_V -m _e28 && eval $_R1
 
 	# Reduce verbosity/switches by setting some mods for later commands
-	[ "$_gateway" = "host" ] && unset _gw_mod || _gw_mod="-j $_gateway"
-	[ "$_client"  = "host" ] && unset _cl_mod _cl_root \
-		|| { _cl_mod="-j $_client" ; _cl_root="${M_QROOT}/${_client}" ;}
+	[ "$_gateway" = "host" ] ||   _gw_mod="-j $_gateway"
+	[ "$_client"  = "host" ] || { _cl_mod="-j $_client" ; _cl_root="${M_QROOT}/${_client}" ;}
 
 	# Resolve IP addr. Respect [-i] first, otherwise assign based on _type.
 	case $_type in
+		CJ_SSH) : "${ipv4:=$(get_jail_parameter -de IPV4 $_gateway)}" ;;  # Should only be DHCP or auto
 		EXT_IF) : "${ipv4:=$(get_jail_parameter -de IPV4 $_client)}"  ;;
-		CJ_SSH) : "${ipv4:=$(get_jail_parameter -de IPV4 $_gateway)}" ;;
 	esac
 	case $ipv4 in
 		DHCP)
-			_groupmod="group DHCP"
+			_groupmod="group DHCP"   # Later for ifconfig interface groups
 			chk_isvm $_gateway || _gw_ip=$(discover_open_ipv4 -g -t "$_type" -- "$_client" "$_gateway")
 			;;
 		auto)
@@ -1863,13 +1859,13 @@ connect_client_to_gateway() {
 			_cl_ip="${_gw_ip%.*/*}.2/30"
 			;;
 		*)
-			get_msg $_q $_V -m _e2 -- "$_gateway" && eval $_R1  # cjail IP should not be hand jammed
+			get_msg $_q $_V -m _e2 -- "$_gateway" && eval $_R1      # cjail IP should not be hand jammed
 			_gw_ip="${ipv4%.*/*}.1/${ipv4#*/}"
 			_cl_ip="$ipv4"
 			;;
 	esac
 
-	# Respect explicit QCONF setting. If no QCONF, limit to the gw ETX_IF mtu size. Fallback to #default
+	# Respect jail's QCONF. If no jail-specific MTU, limit to the gw ETX_IF mtu size. Fallback to #default
 	_mtu="$(get_jail_parameter -ez MTU $_client)"
 	: "${_mtu:=$(ifconfig $_gw_mod -ag EXT_IF 2>/dev/null | sed -En "s/.*mtu ([^ \t]+)/\1/p")}"
 	: "${_mtu:=$(get_jail_parameter -de MTU $_client)}"
@@ -1884,14 +1880,15 @@ connect_client_to_gateway() {
 
 	# Transport the interfaces if they belong in a jail
 	[ -n "$_vif_gw" ] && [ -n "$_gw_mod" ] && ifconfig $_vif_gw vnet $_gateway
-	[ -n "$_vif_gw" ] && ifconfig $_gw_mod $_vif_gw group ${_client}_ group CLIENTS
 	[ -n "$_vif_cl" ] && [ -n "$_cl_mod" ] && ifconfig $_vif_cl vnet $_client
+
+	# Assign group tags to the interfaces
+	[ -n "$_vif_gw" ] && ifconfig $_gw_mod $_vif_gw group ${_client}_ group CLIENTS
 	[ -n "$_vif_cl" ] && ifconfig $_cl_mod $_vif_cl group $_type $_groupmod
 
-	# Configure the interfaces
+	# Configure the interfaces with IP addr and route, if not DHCP
 	[ ! "$ipv4" = "dhcp" ] && [ -n "$_vif_gw" ] && ifconfig $_gw_mod $_vif_gw inet $_gw_ip mtu $_mtu up
-	[ ! "$ipv4" = "dhcp" ] && [ -n "$_vif_cl" ] \
-		&& ifconfig $_cl_mod $_vif_cl inet $_cl_ip mtu $_mtu up \
+	[ ! "$ipv4" = "dhcp" ] && [ -n "$_vif_cl" ] && ifconfig $_cl_mod $_vif_cl inet $_cl_ip mtu $_mtu up \
 		&& route $_cl_mod add default "${_gw_ip%/*}" > /dev/null 2>&1
 
 	# Final configuration for each client depending on type of connection being made
@@ -1927,7 +1924,7 @@ configure_client_network() {
 		echo "$_ep" > ${_cl_root}/etc/pf-wg_ep.table
 
 		# Wireguard restart is required if its upstream gateway restarts. $_CLI comes from exec.created
-		[ "$_CLI" = "$_client" ] && service $_cl_md wireguard restart
+		[ "$_CLI" = "$_client" ] && service $_cl_mod wireguard restart
 
 	else
 		# All other gateways use normal resolvconf mechanism
@@ -1948,37 +1945,29 @@ configure_client_network() {
 }
 
 configure_ssh_control() {
-	# Ensures that the latest ssh pubkey for the control jail is copied to client jail
-	# In the case of a restart of the control jail, use [-f] to make sure flags are restored
+	# Ensures that the latest pubkey for the cjail SSH is copied to the controlled jail
 
-	getopts f _opts && local _flags="true" && shift
-	local _client="$1"  _control="$2"
-	local _chome="${M_QROOT}/${_client}/home/${_client}"  _croot="${M_QROOT}/${_client}/root"
+	for _dir in $(ls -1 ${_cl_root}/home/) ; do
+		_homes="${_cl_root}/home/${_dir}  ${_homes}"   # Mechanism to get root ssh and all the users' ssh
+	done
 
-	# Lift flags for edits, create the .ssh directory if not there, and copy the files
-	chflags -R noschg ${_croot}
-	[ ! -d "${_croot}/.ssh" ] && mkdir ${_croot}/.ssh
-	cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub ${_croot}/.ssh/authorized_keys
+	for _parent in ${_cl_root}/root ${_homes} ; do
+		ls -alo $_parent | awk '{print $5}' | grep -qs schg && _schg_H='true'     # Record for later reset
+		ls -alo $_parent/.ssh 2>/dev/null | awk '{print $5}' | grep -qs schg && _schg_S='true'
+		chflags -R noschg ${_parent} ${_parent}/.ssh 2>/dev/null                  # Lift flags for edits
 
-	# Change ownership and permissions of all files, then bring up flags
-	chmod 700 ${_croot}/.ssh
-	chmod 600 ${_croot}/.ssh/authorized_keys
-	chflags -R schg ${_croot}/.ssh
+		[ ! -d "${_parent}/.ssh" ] && mkdir ${_parent}/.ssh \
+			&& _owner=$(ls -lnd $_parent | awk '{print $3":"$4}')      # We need the owner:group of parent
 
-	# Repeat all the same steps if there is an unprivileged user
-	if [ -d "${_chome}" ] ; then
-		chflags -R noschg ${_chome}
-		[ ! -d "${_chome}/.ssh" ] && mkdir ${_chome}/.ssh
-		chflags -R noschg ${_chome}/.ssh
-		cp ${M_ZUSR}/${_control}/rw/root/.ssh/id_rsa.pub ${_chome}/.ssh/authorized_keys
+		cp ${M_ZUSR}/${_gateway}/rw/root/.ssh/id_rsa.pub ${_parent}/.ssh/cjail_authorized_keys 2>/dev/null
+		chmod 700 ${_parent}/.ssh
+		chmod 600 ${_parent}/.ssh/cjail_authorized_keys
 
-		chmod 700 ${_chome}/.ssh
-		chmod 600 ${_chome}/.ssh/authorized_keys
-		chown -R 1001:1001 ${_chome}/.ssh
-		chflags -R schg ${_chome}/.ssh
-	fi
-
-	[ "$_flags" ] && /usr/local/bin/qb-flags -r $_client &
+       # Reset flags if necessary, and chown if we created the directory
+		[ -n "$_schg_H" ] && chflags schg ${_parent}
+		[ -n "$_schg_S" ] && chflags -R schg ${_parent}/.ssh
+		[ -n "$_owner" ] && chown -R $_owner ${_parent}/.ssh
+	done
 	eval $_R0
 }
 
@@ -2140,7 +2129,7 @@ return_ppt() {
 	while : ; do
 		_newppt=$(echo "$_bhyvecmd" | sed -En "s@.*passthru,([0-9/]+[0-9/]+[0-9/]+ ).*@\1@p")
 		[ -z "$_newppt" ] && break
-		_ppt=$(echo "$_ppt $_newppt")
+		_ppt="$_ppt $_newppt"
 		_bhyvecmd=$(echo "$_bhyvecmd" | sed -E "s@$_newppt@@")
 	done
 
