@@ -89,7 +89,7 @@ Notes: Not designed for network backups. quBSD's qb-autosnap
 
    A nice feature of qb-backup, you can do a recursive [-r]
    backup, but without implying [-R]. Thus you can send all
-   real descendant datasets without sending every incremental
+   real decendent datasets without sending every incremental
    snapshot. But you can still use [-R] if desired.
 
 Usage: qb-backup [-n][-F][-r][-R] [-z <destiation_dataset>]
