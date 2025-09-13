@@ -342,8 +342,14 @@ install_appjails() {
 
 	# 0control needs some key management
 	ssh-keygen -qt rsa -b 4096 -N "" -f ${zusr_mount}/0control/rw/root/.ssh/id_rsa
-	cp -a /zusr/0control/rw/root/.ssh/id_rsa.pub ${zusr_mount}/0control/home/ftp
+	chmod 700 ${zusr_mount}/0control/rw/root/.ssh
+	chmod 600 ${zusr_mount}/0control/rw/root/.ssh/*
 	rm ${zusr_mount}/0control/rw/root/.ssh/.gitkeep
+	ssh-keygen -qt rsa -b 4096 -N "" -f ${zusr_mount}/0control/home/0control/.ssh/id_rsa
+	chown -R 1001:1001 ${zusr_mount}/0control/home/0control/.ssh/id_rsa
+	chmod 700 ${zusr_mount}/0control/home/0control/.ssh
+	chmod 600 ${zusr_mount}/0control/home/0control/.ssh/*
+	rm ${zusr_mount}/0control/home/0control/.ssh/.gitkeep
 }
 
 modify_fstab() {

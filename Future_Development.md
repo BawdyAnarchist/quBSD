@@ -2,7 +2,7 @@
 
 0control review and overhaul 
    remember that you turned it off in exec.created, quBSD.sh (VMs), qb-start, qb-cmd, start_jail
-   local-unbound vs named. Maybe I dont need named?
+  	remove all the extra services like named, ftp, others? Only need DHCP now 
 	**update nicvm**
 	CHANGES:
 
@@ -127,6 +127,9 @@ Crons - No crons running. Probably something long term security that should be i
 
 
 ### INSTALLER SCRIPT CHANGES ###
+cjails ssh
+	- Generate separate ssh key for root vs 0control user
+
 local unbound
   chroot 0net && service local_unbound setup
     - MODIFY THE chroot line to:  `chroot: ""`

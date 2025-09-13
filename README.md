@@ -35,4 +35,4 @@ i3wm integration (still usable with other window managers)
 Control jail is used with ssh for file transfers between VMs.
 
 ### Install to host
-NOTE: NOT READY YET, NOT ADDED TO PORTS `pkg install qubsd`
+NOTE: NOT READY YET, NOT ADDED TO PORTS

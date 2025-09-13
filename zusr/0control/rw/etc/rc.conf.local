@@ -1,6 +1,8 @@
 # quBSD. 0control serves DHCP to jails for IP to initiate SSH connections 
+sshd_enable="NO"          # sshd unnecessary. cjail makes outbound, not inbound connections
 qubsd_dhcp_enable="NO"
 dhcpd_conf="/usr/local/etc/dhcpd.0control.conf"
-ftpd_enable="YES"    # Control jail also runs ftp and named for VMs access. This might be going away tho.
-named_enable="YES"
+#ftpd_enable="YES"        # Control jail also runs ftp and named for VMs access. This might be going away tho.
+#named_enable="YES"
+#local_unbound_enable="NO"  # Control doesnt serve DNS 
 #hostname="0control.qubsd.local"
