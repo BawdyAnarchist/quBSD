@@ -64,8 +64,8 @@ get_jails_loop() {
 			ram=$(ps -p $jid -o %mem | awk '{sum+=$1;} END {print sum;}')
 		else
 			jid=$(jls -j $_jail -n jid | sed "s/jid=//")
-			cpu=$(ps axJ $_jail -o %cpu | awk '{sum+=$1;} END {print sum;}')
-			ram=$(ps axJ $_jail -o %mem | awk '{sum+=$1;} END {print sum;}')
+			cpu=$(jexec $_jail ps ax -o %cpu= | awk '{sum+=$1;} END {print sum;}')
+			ram=$(jexec $_jail ps ax -o %mem= | awk '{sum+=$1;} END {print sum;}')
 		fi
 	elif [ "$class" = "host" ] ; then
 		jid='-'
