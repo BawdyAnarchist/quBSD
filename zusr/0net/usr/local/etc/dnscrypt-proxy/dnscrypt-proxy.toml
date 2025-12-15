@@ -888,6 +888,7 @@ skip_incompatible = false
 
 ## Optional, local, static list of additional servers
 ## Mostly useful for testing your own servers.
+## Find alternative server/stamps at:  https://dnscrypt.info/public-servers/
 
 [static]
 
