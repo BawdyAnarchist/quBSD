@@ -1947,6 +1947,7 @@ configure_client_network() {
 configure_ssh_control() {
 	# Ensures that the latest pubkey for the cjail SSH is copied to the controlled jail
 
+	_pubkey=".ssh/cjail_authorized_keys"
 	for _dir in $(ls -1 ${_cl_root}/home/) ; do
 		_homes="${_cl_root}/home/${_dir}  ${_homes}"   # Mechanism to get root ssh and all the users' ssh
 	done
@@ -1959,7 +1960,11 @@ configure_ssh_control() {
 		[ ! -d "${_parent}/.ssh" ] && mkdir ${_parent}/.ssh \
 			&& _owner=$(ls -lnd $_parent | awk '{print $3":"$4}')      # We need the owner:group of parent
 
-		cp ${M_ZUSR}/${_gateway}/rw/root/.ssh/id_rsa.pub ${_parent}/.ssh/cjail_authorized_keys 2>/dev/null
+		# For root ops in a container, use cjail root ssh. For normal ops, use cjail user 
+		[ -z "${_parent##*/root}" ] \
+			&& cp ${M_ZUSR}/${_gateway}/rw/root/.ssh/id_rsa.pub ${_parent}/${_pubkey} \
+			|| cp ${M_ZUSR}/${_gateway}/home/${_gateway}/.ssh/id_rsa.pub ${_parent}/${_pubkey}
+
 		chmod 700 ${_parent}/.ssh
 		chmod 600 ${_parent}/.ssh/cjail_authorized_keys
 
@@ -2081,7 +2086,7 @@ cleanup_vm() {
 	# Bring all recorded taps back to host, and destroy. Skip checks for speed (non-essential)
 	_ct=$(get_jail_parameter -des CONTROL $_VM)
 	_gw=$(get_jail_parameter -des GATEWAY $_VM)
-	for _tap in $(sed -E "s/^$_VM [^[:blank:]]+ ([^[:blank:]]+)/\1/" $VMTAPS 2> /dev/null) ; do
+	for _tap in $(sed -En "s/^$_VM [^[:blank:]]+ ([^[:blank:]]+)/\1/p" $VMTAPS 2> /dev/null) ; do
 		grep -Eqs "CJ_SSH $_tap" $VMTAPS && _jail="$_ct"
 		grep -Eqs "EXT_IF $_tap" $VMTAPS && _jail="$_gw"
 		remove_interface -d "$_tap" "$_jail"
@@ -2384,7 +2389,7 @@ finish_vm_connections() {
 
 	# Connect to control jail and gateway
 	connect_client_to_gateway -dt EXT_IF -- "$_VM" "$_gateway" > /dev/null
-#	connect_client_to_gateway -dt CJ_SSH -- "$_VM" "$_control" > /dev/null
+	connect_client_to_gateway -dt CJ_SSH -- "$_VM" "$_control" > /dev/null
 
 	# Connect VM to all of it's clients (if there are any)
 	for _cli in $(get_info -e _CLIENTS "$_VM") ; do
