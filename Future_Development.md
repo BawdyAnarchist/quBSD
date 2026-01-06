@@ -1,10 +1,15 @@
 
 
+VM CHANGES:
+  qb_vmboot -> qb-vmboot
+  vm-rc.local -> rc.local rc.local_example
+  /vmusr -> /rw
+
 0control review and overhaul 
-   remember that you turned it off in exec.created, quBSD.sh (VMs), qb-start, qb-cmd, start_jail
   	remove all the extra services like named, ftp, others? Only need DHCP now 
 	**update nicvm**
-	CHANGES:
+
+Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
 
 qb-start
 	- Needs updated with new networking functions in mind
@@ -14,10 +19,9 @@ There are still demons in the xephyr-xclip daemon
    - Pretty sure they're all related to the closing of windows. It gets corrupted or something when I close windows. probably I'm not sufficiently detecting all possible events -- Like, maybe the disappearance of a socket is still problematic or something?
    - You need to kill the clipboard ownership inside the source as well after releasing. Otherwise you get inconsistent waffling on lease expiry, where what FEELS like stale clipboard then can still paste if you're inside the same socket for a window. Causes problems
 
-Why does Telegram freeze so much?
+
 
 Sound in Linuxulator?
-
 
 
 ### UPGRADES
@@ -114,7 +118,6 @@ rc.conf -nmdm cuse , I dont know if I need them or what for
 
 When you restore, the datasets dont inherit their qubsd:autosnap properties
 
-Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
 
 ALL file names should ALWAYS be variables defined in get_global_variables ?
 
