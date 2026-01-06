@@ -51,7 +51,7 @@ configure_network() {
 
   # INTIF first, so that default route goes there
   $(ifconfig $_GWIF > /dev/null 2>&1) && dhclient $_GWIF
-  dhclient $_CONTROLIF
+  dhclient $_CONTROLIF &
 }
 
 start_services() {
@@ -61,7 +61,9 @@ start_services() {
 
 apply_hardening() {
   # Highest level hardening measures. Set these appropriately for your usecase
-  chflags -R schg /bin /sbin /boot /etc /lib /libexec /usr/bin /home /usr/lib /usr/lib32 /usr/libdata /usr/libexec /usr/ports /usr/sbin /usr/src /usr/local/bin /usr/local/lib /usr/local/lib32 /usr/local/libdata /usr/local/libexec /usr/local/man /usr/local/sbin > /dev/null 2>&1
+  chflags -R schg /bin /sbin /boot /etc /lib /libexec /usr/bin /home /usr/lib /usr/lib32 /usr/libdata \
+    /usr/libexec /usr/ports /usr/sbin /usr/src /usr/local/bin /usr/local/lib /usr/local/lib32 \
+    /usr/local/libdata /usr/local/libexec /usr/local/man /usr/local/sbin > /dev/null 2>&1
 
   sysctl kern.securelevel 3
 }
@@ -85,9 +87,17 @@ main() {
   #start_services 
 
   # Hardening options. Turned off by default, but recommend setting at an appropriate level
-  #apply_hardening &
+  #apply_hardening
 }
 
 main
+#!/bin/sh
 
+# Executed by rc.d. Provides a unique config in addition to the underlying rootVM. 
 
+define_variables() {
+  # Add a unique hostname
+  _HOSTNAME="0bsdvm"
+  # vtnet0 is always allocated to the control jail 
+  _CONTROLIF="vtnet0"
+  # If the VM has a gateway, then vtnet1 will DHCP to that gateway

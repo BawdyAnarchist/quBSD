@@ -1,12 +1,14 @@
 #!/bin/sh
 
+# Configuration script for a new FreeBSD rootVM. Run this on first launch of the VM.
+
 modify_rc() {
   # Edit rc.conf
-  { echo ; echo '# quBSD - generic boot script' ; echo 'qb_vmboot_enable="YES"' ;} >> /etc/rc.conf
+  { echo ; echo '# quBSD - generic boot script' ; echo 'qb-vmboot_enable="YES"' ;} >> /etc/rc.conf
 
   # Copy the rc.d script
   [ -d "/usr/local/etc/rc.d" ] || mkdir -p /usr/local/etc/rc.d
-  cp /vmusr/.quBSD/qb_vmboot /usr/local/etc/rc.d
+  cp /vmusr/.quBSD/qb-vmboot /usr/local/etc/rc.d
 }
 
 modify_dhclient() {
@@ -16,19 +18,20 @@ modify_dhclient() {
 
 	# quBSD dhclient.conf for VMs
 
-	# DHCPREQUEST and retry every 30 seconds
-	timeout 30;
-	retry 30;
-	initial-interval 30;
+	# DHCPREQUEST and retry every 5 seconds (aggressive because it's all on same host)
+	timeout 5;
+	retry 5;
+	initial-interval 5;
 	# Select the most recently offered lease 
 	select-timeout 1;
 ENDOFCONF
 
-  # Start the client
+  # Bring up connection to the control jail
   dhclient vtnet0
 }
 
 handle_users() {
+  # Create a user
   pw useradd -n user -md /home/user -s /bin/csh
 }
 
@@ -36,12 +39,17 @@ manage_ssh() {
   # Copy ssh pubkeys from the control jail and set permissions
   [ -d "/root/.ssh/" ] || mkdir -p /root/.ssh
   chmod 700 /root/.ssh
-  fetch -o /root/.ssh/authorized_keys ftp://0control.qubsd.local/id_rsa.pub
+
+  # OLD COMMAND: fetch -o /root/.ssh/authorized_keys ftp://0control.qubsd.local/id_rsa.pub
+  # SHOULD BE PUSHING THE KEY THROUGH THE FAT32 CONFIG ZVOL 
+  # NEW COMMAND (incomplete): cp -a /dev/location/authorized_keys /root/.ssh/authorized_keys
+
   chmod 600 /root/.ssh/authorized_keys
   cp -a /root/.ssh /home/user/
 
   # Modify sshd, enable, and restart sshd
   sed -i '' -E 's/^#(PermitRootLogin).*/\1 yes/' /etc/ssh/sshd_config
+
   sed -i '' -E 's/^(PermitRootLogin).*/\1 yes/' /etc/ssh/sshd_config
   sed -i '' -E 's/^#(PasswordAuthentication).*/\1 no/' /etc/ssh/sshd_config
   sed -i '' -E 's/^(PasswordAuthentication).*/\1 no/' /etc/ssh/sshd_config
@@ -57,3 +65,5 @@ main() {
 }
 
 main
+
+
