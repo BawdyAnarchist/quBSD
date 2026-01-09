@@ -1,0 +1,54 @@
+### PREAMBLE ###
+
+echo "Beginning VM installation."
+
+# Env variables
+export DISTRIBUTIONS="kernel.txz base.txz"
+export ZFSBOOT_POOL_NAME="zroot"
+export ZFSBOOT_VDEV_TYPE="stripe"
+export ZFSBOOT_DISKS="vtbd0" 
+export ZFSBOOT_CONFIRM_LAYOUT=0
+export nonInteractive="YES"
+
+# Install to a ZFS root
+bsdinstall zfsboot
+bsdinstall mount
+bsdinstall distextract
+
+# Copy the setup files to a location accessible after bsdinstall chroot
+mkdir -p /mnt/tmp/qubsd-dist
+cp -R /qubsd-dist/* /mnt/tmp/qubsd-dist/
+
+
+### SETUP SCRIPT ###
+#!/bin/sh
+
+DIST="/mnt/tmp/qubsd-dist"
+
+# Prepare directories and files
+mkdir -p /usr/local/etc/rc.d
+mkdir -p /share && chmod -R 777 /share
+cp $DIST/loader.conf  /boot/loader.conf
+cp $DIST/fstab        /etc/fstab
+cp $DIST/rc.conf      /etc/rc.conf
+cp $DIST/sysctl.conf  /etc/sysctl.conf
+cp $DIST/localtime    /etc/localtime
+cp $DIST/qubsd-init   /usr/local/etc/rc.d
+chmod +x /usr/local/etc/rc.d/qubsd-init
+
+# Add a common user 'user'
+pw useradd -n user -d /home/user -s /bin/csh -m
+
+# Network connection with timeout (update and pkg installs) 
+dhclient vtnet0
+echo "Acquiring DHCP lease for VM pkg install. Timeout in 10 sec."
+if ping -Qot 10 freebsd.org > /dev/null 2>&1 ; then
+   echo "Lease acquired, bootstrapping pkg and installing packages."
+   env ASSUME_ALWAYS_YES=yes pkg bootstrap -y
+   pkg install -y vim tmux automount fusefs-exfat fusefs-ext2 fusefs-ifuse fusefs-jmtpfs
+fi
+
+# Cleanup and Shutdown
+echo "VM setup complete. Shutting down -> *Will automatically restart and apply updates*"
+rm -rf $DIST
+shutdown -p now
