@@ -1,15 +1,32 @@
 
 
 VM CHANGES:
-  qb_vmboot -> qb-vmboot
+  qb_vmboot -> qubsd-init 
   vm-rc.local -> rc.local rc.local_example
-  /vmusr -> /rw
+  /vmusr -> /overlay
 
-0control review and overhaul 
-  	remove all the extra services like named, ftp, others? Only need DHCP now 
-	**update nicvm**
+PLAN
+  - any rootVM start will assemble rootstrap drive on the fly via tmp
+    -- cleanup VM should remove this file
+  - Install a new 15.0 FreeBSD rootVM
+    -- Write a little local script to take the snapshot of the system state (for rollback for testing)
+    -- Note the /dev that it appears as, make a note of it somewhere (for qubsd manpages)
+    -- Figure out the 9p filesystem
+    -- Figure out solution for SSH command push (might still keep the control interface for now, dunno yet)
+    -- Make a thorough test of the rootstrap script until perfect. Save to /qubsd/zroot/usr/local/share
+       -- Remember you have software to install, required for usbvm
+ - nicvm
+    -- test inside to get rc.conf.local perfect for the bridged/promisc setup
+    -- After that, should be simple as using scp to push a correct rc.conf.local to /overlay. Then restart.
+ - usbvm
+    -- Test your usbvm custom script as well and save it
+    -- Make sure you have the automount and udev or whatever other shit necessary SAVED before destroying usbvm
+    -- Add those things to the repo
+ - installer will rely on 0bsdvm correctly setup, then can just SSH the config to nicvm/usbvm and restart them
+ - Linux/ubuntu
+    -- they actually have an overlayfs where you just add directories and it auto-tracks changes
+    -- This can be used for internal /etc, and for persisting /home inside of Linux, without distro-level faggotry
 
-Instead of all the named and ftp nonsense in 0control, just use a fat32 formatted zvol on the creation of a new VM
 
 qb-start
 	- Needs updated with new networking functions in mind
