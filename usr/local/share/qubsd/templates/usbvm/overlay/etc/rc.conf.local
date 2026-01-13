@@ -1,0 +1,2 @@
+hostname="usbvm"
+autofs_enable="YES"

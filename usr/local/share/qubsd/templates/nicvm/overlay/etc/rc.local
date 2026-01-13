@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# nicvm, once configured, should almost never need to change. Harden the system.
+
+directories="/bin /boot /entropy /etc /lib /libexec /media /mnt /net /proc /root /rescue /sbin /sys /tmp /usr /zroot /zusr"
+
+for _dir in $directories ; do
+	[ -d "$_dir" ] && chflags -fR schg $_dir/
+done

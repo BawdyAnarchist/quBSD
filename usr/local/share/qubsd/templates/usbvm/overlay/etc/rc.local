@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# kld_load is very early in rcorder, even before zfs. Have to manually load it here.
+kldload fusefs
+
+# Add user to operators so shutdown can be run from the user account
+pw groupmod operator -m usbvm
+
+# Shouldnt be a need to touch the filesystem. Harden it.
+directories="/bin /boot /entropy /etc /lib /libexec /net /proc /rescue /sbin /sys /tmp /usr /zroot"
+
+for _dir in $directories ; do
+	[ -d "$_dir" ] && chflags -fR schg $_dir/
+done

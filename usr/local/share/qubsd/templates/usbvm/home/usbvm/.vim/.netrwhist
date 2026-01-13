@@ -1,0 +1,12 @@
+let g:netrw_dirhistmax  =10
+let g:netrw_dirhistcnt =8
+let g:netrw_dirhist_8='/zusr/backup/quBSD/zusr/net-firewall'
+let g:netrw_dirhist_7='/zusr/backup/quBSD/zusr/0base'
+let g:netrw_dirhist_6='/zusr/net-tor/rw/etc'
+let g:netrw_dirhist_5='/usr/local/lib/quBSD'
+let g:netrw_dirhist_4='/var/run/resolvconf'
+let g:netrw_dirhist_3='/zusr/net-ivpn-dal/rw/etc'
+let g:netrw_dirhist_2='/zusr/backup/notes'
+let g:netrw_dirhist_1='/root/xephyr_NOPRIMARY'
+let g:netrw_dirhist_0='/root/.config'
+let g:netrw_dirhist_9='/zusr/disp1/home/disp1/.config/i3'

@@ -12,8 +12,12 @@ rcvar="${name}_enable"
 start_cmd="${name}_start"
 
 qubsd_init_start() {
-  zpool list zusr > /dev/null 2>&1 || zpool import -f zusr
+  # Make sure the zpool is mounted. If there is none, then dont run overlay or users
+  if ! zpool list zusr > /dev/null 2>&1 ; then 
+    zpool import -f zusr || return 0
+  fi
 
+  # Grab all overlay files and linke them to their corresponding locations
   for _file in $(find "/overlay" -type f | sed "s:/overlay::") ; do
 
     if [ -d "$(dirname $_file)" ] ; then
@@ -27,6 +31,10 @@ qubsd_init_start() {
     ln -sf /overlay${_file} $_file
   done
 
+  # Create the users listed in the zusr /home
+  for _dir in $(find "/home" -type d | sed "s:/home::") ; do
+    pw useradd -n $_dir -d /home/$_dir -s /bin/csh -m
+  done
 }
 
 load_rc_config $name

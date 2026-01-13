@@ -128,6 +128,7 @@ get_global_variables() {
 	QCONF="${QBDIR}/qubsd.conf"
 	QBLOG="/var/log/quBSD/quBSD.log"
 	QRUN="/var/run/qubsd"
+	QSHARE="/usr/local/share/qubsd"
 	VMTAPS="${QRUN}/vm_taps"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
@@ -1860,6 +1861,7 @@ connect_client_to_gateway() {
 			;;
 		*)
 			get_msg $_q $_V -m _e2 -- "$_gateway" && eval $_R1      # cjail IP should not be hand jammed
+### SELF NOTE: ISNT THIS AN UNREACHABLE COMMAND?? WHAT WAS I DOING HERE?
 			_gw_ip="${ipv4%.*/*}.1/${ipv4#*/}"
 			_cl_ip="$ipv4"
 			;;
@@ -1960,7 +1962,7 @@ configure_ssh_control() {
 		[ ! -d "${_parent}/.ssh" ] && mkdir ${_parent}/.ssh \
 			&& _owner=$(ls -lnd $_parent | awk '{print $3":"$4}')      # We need the owner:group of parent
 
-		# For root ops in a container, use cjail root ssh. For normal ops, use cjail user 
+		# For root ops in a container, use cjail root ssh. For normal ops, use cjail user
 		[ -z "${_parent##*/root}" ] \
 			&& cp ${M_ZUSR}/${_gateway}/rw/root/.ssh/id_rsa.pub ${_parent}/${_pubkey} \
 			|| cp ${M_ZUSR}/${_gateway}/home/${_gateway}/.ssh/id_rsa.pub ${_parent}/${_pubkey}
@@ -2256,6 +2258,13 @@ prep_bhyve_options() {
 		&& _BLK_ZUSR="-s ${_slot},virtio-blk,/dev/zvol/${U_ZFS}/${_VM}" \
 		&& _slot=$(( _slot + 1 )) || _BLK_ZUSR=''
 
+	# 9p creates a shared directory for file transfer. Directory must exist or bhyve will fail
+	[ ! "$_control" = "none" ] && mkdir -p "$M_ZUSR/$_control/home/$_control/xfer/$_VM" 2>/dev/null
+   if [ -d "$M_ZUSR/$_control/home/$_control/xfer/$_VM" ] ; then
+		_BLK_9P="-s ${_slot},virtio-9p,xfer=$M_ZUSR/$_control/home/$_control/xfer/$_VM"
+		_slot=$(( _slot + 1 ))
+	fi
+
 	# Handling BHYVE_CUST options
 	[ "$_bhyve_custm" ] && while IFS= read -r _line ; do
 
@@ -2310,8 +2319,9 @@ EOF
 	# Invoke the trap function for VM cleanup, in case of any errors after modifying host/trackers
 	trap "cleanup_vm -n $_VM ; exit 0" INT TERM HUP QUIT
 
-	# Default number of taps is 0. Add 1 for the control jail SSH connection
-	_taps=$(( _taps + 1 ))
+# Default number of taps is 0. Add 1 for the control jail SSH connection
+# NEW NOTE: THIS IS GOING AWAY. NO CJ
+#_taps=$(( _taps + 1 ))
 	# Also, for every gateway or client the VM touches, it needs another tap
 	[ -n "$_gateway" ] && [ ! "$_gateway" = "none" ] && _taps=$(( _taps + 1 ))
 	[ -n "$_clients" ] && [ ! "$_clients" = "none" ] \
@@ -2332,22 +2342,177 @@ EOF
 
 		# Tracker file for which taps are related to which VM, and for which purpose (_vif tags)
 		case "$_cycle" in
-			0) ifconfig $_tap group "CJ_SSH" ; echo "$_VM CJ_SSH $_tap" >> $VMTAPS ;;
-			1) ifconfig $_tap group "EXT_IF" ; echo "$_VM EXT_IF $_tap" >> $VMTAPS ;;
-			2) ifconfig $_tap group "X11"    ; echo "$_VM X11 $_tap"    >> $VMTAPS ;;
-			3) ifconfig $_tap group "EXTRA_${_cycle}_" ; echo "$_VM EXTRA_${_cycle}_ $_tap" >> $VMTAPS ;;
+#			0) 
+#THIS IS LIKELY GOING AWAY. SSH interfaces have proven slightly brittle, and p9fs can handle file xfer
+				#ifconfig $_tap group "CJ_SSH" ; echo "$_VM CJ_SSH $_tap" >> $VMTAPS
+#				;;
+			0) ifconfig $_tap group "EXT_IF" ; echo "$_VM EXT_IF $_tap" >> $VMTAPS ;;
+			1) ifconfig $_tap group "X11"    ; echo "$_VM X11 $_tap"    >> $VMTAPS ;;
+			2) ifconfig $_tap group "EXTRA_${_cycle}_" ; echo "$_VM EXTRA_${_cycle}_ $_tap" >> $VMTAPS ;;
 		esac
 		_cycle=$(( _cycle + 1 ))
 	done
 
 	# Define the full bhyve command
-	_BHYVE_CMD="$_TMUX1 bhyve $_CPU $_CPUPIN $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT \
-			$_BLK_ZUSR $_BHYVE_CUSTM $_PPT $_VTNET $_FBUF $_TAB $_LPC $_BOOT $_STDIO $_VM $_TMUX2"
+	_BHYVE_CMD="$_TMUX1 bhyve $_CPU $_CPUPIN $_RAM $_BHOPTS $_WIRE $_HOSTBRG $_BLK_ROOT $_BLK_ZUSR \
+		$_BLK_9P $_BHYVE_CUSTM $_PPT $_VTNET $_FBUF $_TAB $_LPC $_BOOT $_STDIO $_VM $_TMUX2"
 
 	# unset the trap
 	trap - INT TERM HUP QUIT EXIT
 
 	eval $_R0
+}
+
+rootstrap_bsdvm() {
+	# Prepares a new rootVM with qubsd specific files and init
+	local _fn="rootstrap_bsdvm" _fn_orig="$_FN" _FN="$_FN -> $_fn"
+	while getopts qV _opts ; do case $_opts in
+		q) local _q='-q' ;;
+		V) local _V="-V" ;;
+	esac ; done ; shift $(( OPTIND - 1))
+
+	# Positional and local variables and checks
+	local _VM="$1" volsize="$2" vm_zroot zvol distdir bsdvm tmp_zpool alt_mnt
+	[ -z "$_VM" ] && get_msg $_q -m _e0 "VM name" && eval $_R1
+	! chk_avail_jailname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
+
+	[ -z "$volsize" ] && get_msg $_q -m _e0 "zvol volume size" && eval $_R1
+   ! echo "$volsize" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" \
+			&& get_msg $_q -m _e1 -- "$volsize" "zvol size" && eval $_R1
+
+	# Interim variables
+	vm_zroot="zroot/qubsd/$_VM"
+	zvol="/dev/zvol/zroot/qubsd/$_VM"
+	distdir="$QSHARE/freebsd-dist"
+	release=$(freebsd-version -u | cut -d- -f1)
+	arch=$(uname -m)
+	bsdvm="$QSHARE/templates/0bsdvm/rootstrap"
+	tmp_zpool="zrootvm"
+	alt_mnt="/mnt/$tmp_zpool"
+	timeout=5
+
+	# Check network connection, inform if missing, give option to procede or exit
+	if ping -ot $timeout freebsd.org > /dev/null 2>&1 ; then
+		network=true
+	else
+		get_msg -Vm _w6 && ! get_user_response && get_msg2 -E
+	fi
+
+	# Download the dist files if necessary.
+	mkdir -p $distdir
+	export DISTRIBUTIONS="GITBRANCH base.txz kernel.txz"
+	export BSDINSTALL_DISTSITE="https://download.freebsd.org/ftp/releases/$arch/${release}-RELEASE/"
+	export BSDINSTALL_DISTDIR=$distdir
+	export BSDINSTALL_CHROOT=$alt_mnt
+	[ "$(grep -o "[[:digit:]].*" $distdir/GITBRANCH)" = "$release" ] || bsdinstall distfetch
+
+	# Create the zvol and partitions
+	zfs create -V $volsize -o volmode=geom -o qubsd:autosnap=true $vm_zroot
+	gpart create -s gpt "$zvol"
+	gpart add -t efi -s 200M -l efiboot "$zvol"
+	gpart add -t freebsd-zfs -l rootfs "$zvol"
+	newfs_msdos -L EFIBOOT "${zvol}p1"
+
+	# zpool -t deconflicts host zroot with the vm's 'zroot'. No cachefile created (not really necessary for VM)
+	sysctl vfs.zfs.vol.recursive=1    # zpool create WILL NOT WORK without this
+	zpool create -f -o altroot="$alt_mnt" -O mountpoint=/zroot -O atime=off -t ${tmp_zpool} zroot ${zvol}p2
+	zfs create -o mountpoint=none ${tmp_zpool}/ROOT
+	zfs create -o mountpoint=/ ${tmp_zpool}/ROOT/default
+	zpool set bootfs=$tmp_zpool/ROOT/default $tmp_zpool
+
+	# Extract the distribution to the VM root
+	export DISTRIBUTIONS="base.txz kernel.txz"   # Have to remove GITBRANCH or the extraction will fail
+	bsdinstall distextract
+
+	# Create the boot files
+	mkdir -p $alt_mnt/boot/efi
+	mount -t msdosfs ${zvol}p1 $alt_mnt/boot/efi
+	mkdir -p $alt_mnt/boot/efi/EFI/BOOT
+	cp $alt_mnt/boot/loader.efi $alt_mnt/boot/efi/EFI/BOOT/BOOTX64.EFI
+	umount "$alt_mnt/boot/efi"
+
+	# Files and directories to prepare for a running system
+	mkdir -p $alt_mnt/home
+	mkdir -p $alt_mnt/usr/local/etc/rc.d
+	mkdir -p $alt_mnt/xfer && chmod -R 777 $alt_mnt/xfer    # For virtio-9p file sharing between host/VM
+	cp -a $bsdvm/loader.conf $alt_mnt/boot/loader.conf
+	cp -a $bsdvm/fstab       $alt_mnt/etc/fstab
+	cp -a $bsdvm/rc.conf     $alt_mnt/etc/rc.conf
+	cp -a $bsdvm/sysctl.conf $alt_mnt/etc/sysctl.conf
+	cp -a /etc/localtime     $alt_mnt/etc/localtime
+	cp -a $bsdvm/qubsd-init  $alt_mnt/usr/local/etc/rc.d
+	sysrc -f $bsdvm/rc.conf hostname="$_VM"
+	
+	if [ "$network" ] ; then
+		# Update the container
+		freebsd-update --not-running-from-cron -b $alt_mnt/ -d /var/db/freebsd-update fetch install
+
+		# pkg and installs are more complete/correct with chroot, but requires devfs, resolv, and ldconfig
+		mount -t devfs devfs $alt_mnt/dev
+		cp /etc/resolv.conf $alt_mnt/etc
+		chroot $alt_mnt /etc/rc.d/ldconfig forcerestart
+		pkg -c $alt_mnt bootstrap -yf
+		pkg -c $alt_mnt install -y vim tmux automount fusefs-exfat fusefs-ext2 fusefs-ifuse fusefs-jmtpfs
+		umount $alt_mnt/dev
+	fi
+
+	# Unmount, export, and set the volmode correctly
+	umount $alt_mnt/zroot
+	umount $alt_mnt
+	rm -r $alt_mnt
+	zpool export $tmp_zpool
+	zfs set volmode=dev $vm_zroot
+
+	[ "$network" ] && get_msg -m _m11 "$_VM" || get_msg -m _m12 "$_VM"
+}
+
+configure_bsdvm_zusr() {
+	# Rough function for VM reconfiguration. Will eventually be made more robust for installer and qb-create 
+	# Creates the zusr zvol, and configures it
+	local _fn="configure_vm_zusr" _fn_orig="$_FN" _FN="$_FN -> $_fn"
+	while getopts d:qV _opts ; do case $_opts in
+		d) local _dircopy="$OPTARG" ;;
+		q) local _q='-q' ;;
+		V) local _V="-V" ;;
+	esac ; done ; shift $(( OPTIND - 1))
+
+	# Positional and local variables and checks
+	local _VM="$1" volsize="$2" vm_zusr zvol tmp_zpool alt_mnt
+	[ -z "$_VM" ] && get_msg $_q -m _e0 "VM name" && eval $_R1
+	! chk_avail_jailname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
+
+	[ -z "$volsize" ] && get_msg $_q -m _e0 "zvol volume size" && eval $_R1
+   ! echo "$volsize" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" \
+			&& get_msg $_q -m _e1 -- "$volsize" "zvol size" && eval $_R1
+
+	# Interim variables
+	vm_zusr="zusr/$_VM"
+	zvol="/dev/zvol/zusr/$_VM"
+	tmp_zpool="zusrvm"
+	alt_mnt="/mnt/$tmp_zpool"
+
+	zfs create -V $volsize -o volmode=geom -o qubsd:autosnap=true $vm_zusr
+	gpart create -s gpt "$zvol"
+	gpart add -t freebsd-zfs "$zvol"
+	
+	# zpool -t deconflicts host zroot with the vm's 'zusr'. No cachefile created (not really necessary for VM)
+	sysctl vfs.zfs.vol.recursive=1    # zpool create WILL NOT WORK without this
+	zpool create -f -o altroot="$alt_mnt" -O mountpoint=/zusr -O atime=off -t ${tmp_zpool} zusr ${zvol}p1
+
+	# Files and directories to prepare for a running system
+	mkdir -p $alt_mnt/zusr/overlay       # All zusr should come with an overlay directory, even if empty
+	if [ "$_dircopy" ] ; then            # Preference user specified directory
+		cp -a $_dircopy/ $alt_mnt/zusr/
+	elif [ -e "$QSHARE/templates/$_VM" ] ; then   # Fallback - If VM name matches a template, use it
+		cp -a $QSHARE/templates/$_VM $alt_mnt/zusr/
+	else
+		mkdir -p $alt_mnt/zusr/home/$_VM  # Otherwise assume the user just wants an empty but available VM user
+	fi
+
+	umount $alt_mnt/zusr
+	rm -r $alt_mnt
+	zpool export $tmp_zpool
+	zfs set volmode=dev $vm_zusr
 }
 
 launch_bhyve_vm() {
@@ -2366,6 +2531,7 @@ launch_bhyve_vm() {
 
 	# Launch the VM to background
 	eval $_BHYVE_CMD
+
 	sleep 5   # Allow plent of time for launch. Sometimes weirdness can delay pgrep appearance
 
 	# Monitor the VM, perform cleanup after done
@@ -2389,7 +2555,7 @@ finish_vm_connections() {
 
 	# Connect to control jail and gateway
 	connect_client_to_gateway -dt EXT_IF -- "$_VM" "$_gateway" > /dev/null
-	connect_client_to_gateway -dt CJ_SSH -- "$_VM" "$_control" > /dev/null
+#	connect_client_to_gateway -dt CJ_SSH -- "$_VM" "$_control" > /dev/null
 
 	# Connect VM to all of it's clients (if there are any)
 	for _cli in $(get_info -e _CLIENTS "$_VM") ; do

@@ -1,0 +1,7 @@
+hostname="nicvm"
+cloned_interfaces="bridge0"
+ifconfig_vtnet0="promisc up"
+ifconfig_nic="promisc up"
+ifconfig_bridge0="addm nic addm vtnet0 promisc up"
+kern_securelevel_enable="YES"
+kern_securelevel="3"

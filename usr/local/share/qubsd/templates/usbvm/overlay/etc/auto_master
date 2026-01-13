@@ -1,0 +1,6 @@
+#
+# Automounter master map, see auto_master(5) for details.
+#
+/net    -hosts   -nobrowse,nosuid,intr
+/media  -media   -nosuid,noatime,-g=1001,-m=770
+#/-     -noauto
