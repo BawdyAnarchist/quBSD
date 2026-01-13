@@ -1,31 +1,10 @@
 
-
-VM CHANGES:
-  qb_vmboot -> qubsd-init 
-  vm-rc.local -> rc.local rc.local_example
-  /vmusr -> /overlay
-
-PLAN
-  - any rootVM start will assemble rootstrap drive on the fly via tmp
-    -- cleanup VM should remove this file
-  - Install a new 15.0 FreeBSD rootVM
-    -- Write a little local script to take the snapshot of the system state (for rollback for testing)
-    -- Note the /dev that it appears as, make a note of it somewhere (for qubsd manpages)
-    -- Figure out the 9p filesystem
-    -- Figure out solution for SSH command push (might still keep the control interface for now, dunno yet)
-    -- Make a thorough test of the rootstrap script until perfect. Save to /qubsd/zroot/usr/local/share
-       -- Remember you have software to install, required for usbvm
- - nicvm
-    -- test inside to get rc.conf.local perfect for the bridged/promisc setup
-    -- After that, should be simple as using scp to push a correct rc.conf.local to /overlay. Then restart.
- - usbvm
-    -- Test your usbvm custom script as well and save it
-    -- Make sure you have the automount and udev or whatever other shit necessary SAVED before destroying usbvm
-    -- Add those things to the repo
- - installer will rely on 0bsdvm correctly setup, then can just SSH the config to nicvm/usbvm and restart them
+VM PLAN: only remaining aspect is Linux and qb-create
  - Linux/ubuntu
     -- they actually have an overlayfs where you just add directories and it auto-tracks changes
     -- This can be used for internal /etc, and for persisting /home inside of Linux, without distro-level faggotry
+ - Incorporate new VM / installer model to the installer script.
+ - Incorporate new VM model to qb-create. Script needs reviewed and with better integration
 
 
 qb-start
@@ -35,8 +14,6 @@ qb-start
 There are still demons in the xephyr-xclip daemon
    - Pretty sure they're all related to the closing of windows. It gets corrupted or something when I close windows. probably I'm not sufficiently detecting all possible events -- Like, maybe the disappearance of a socket is still problematic or something?
    - You need to kill the clipboard ownership inside the source as well after releasing. Otherwise you get inconsistent waffling on lease expiry, where what FEELS like stale clipboard then can still paste if you're inside the same socket for a window. Causes problems
-
-
 
 Sound in Linuxulator?
 
