@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/quBSD.sh
-. /usr/local/lib/quBSD/msg-i3-launch.sh
+. $QLIB/msg-i3-launch.sh
 
 get_options() {
 	while getopts f:Fht: opts ; do case $opts in
@@ -36,21 +35,21 @@ parse_config() {
 	sed -i '' -e "/^$/ d ; /^[[:blank:]]*#.*/ d" $CONF
 
 	# Get all running windows. Adds "WORKSPACE" at bottom, to simplify sed command later on).
-	WINDS=$(/usr/local/bin/qb-i3-windows| sed "s/Jail://g" | sed "$ a\\
+	WINDS=$($QLEXEC/qb-i3-windows| sed "s/Jail://g" | sed "$ a\\
 WORKSPACE")
 }
 
 qb_start_jails() {
 
 	# Create a popup so user can monitor jail starts, then remove it later
-	create_popup -h .9 -w .8 -c "/usr/local/bin/qb-stat" &
+	create_popup -h .9 -w .8 -c "$QLEXEC/qb-stat" &
 	_pid_stat="$!"
 
 	# Remove host and NO_WINDOW lines, and save to tmp file
 	grep -vE '(host|NO_WINDOW)' $CONF | awk '{print $2}' | uniq > $JAILS
 
 	# Turn on any jails not started
-	/usr/local/bin/qb-start -f $JAILS $_TIMEOUT > /dev/null 2>&1 || get_msg2 -Em _e3
+	#$QLEXEC/qb-start -f $JAILS $_TIMEOUT > /dev/null 2>&1 || get_msg2 -Em _e3
 
 	# Remove the temporary monitoring popup
 	kill -15 $_pid_stat
@@ -113,7 +112,7 @@ execute_commands() {
 		;;
 		*)
 			# Execute the command provided
-			eval "/usr/local/bin/qb-cmd $_LOC $_CMD"
+			eval "$QLEXEC/qb-cmd $_LOC $_CMD"
 
 			# A bit dirty, but it eliminates interference with the eval above
 			[ "$?" = "0" ] && wait_for_window

@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/quBSD.sh
-. /usr/local/lib/quBSD/msg-hostnet.sh
+. $QLIB/msg-hostnet.sh
 
 get_options() {
 	while getopts cdhkt:u opts ; do case $opts in
@@ -81,7 +80,7 @@ revert_connection() {
 
 main() {
 	# Terminate any other instances of qb-hostnet that might be running (waiting for TIMEOUT)
-	pkill -f '/bin/sh /usr/local/bin/qb-hostnet'
+	pkill -f '/bin/sh $QLEXEC/qb-hostnet'
 
 	if [ "$_CMD" = "up" ] ; then
 		# Start gateway, modify pf 

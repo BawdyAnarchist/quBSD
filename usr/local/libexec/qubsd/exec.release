@@ -1,6 +1,5 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/quBSD.sh
 
 get_parameters() {
 	JAIL="$1"

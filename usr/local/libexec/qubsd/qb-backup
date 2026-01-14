@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/quBSD.sh
-. /usr/local/lib/quBSD/msg-backup.sh
+. $QLIB/msg-backup.sh
 
 get_options() {
 	while getopts aAhf:FnrRz: _opts ; do case $_opts in
@@ -37,12 +36,12 @@ check_zbackup() {
 determine_datasets() {
 	case $MODE in
 		auto) # Backup datasets selected as "auto" in QCONF
-			_JAILS=$(/usr/local/bin/qb-list -Hp BACKUP | grep -Ev "^#" | awk '/.*true$/{print $1}')
+			_JAILS=$($QLEXEC/qb-list -Hp BACKUP | grep -Ev "^#" | awk '/.*true$/{print $1}')
 			for _jail in $_JAILS ; do
 				[ -z "$DATASETS" ] \
-					&& DATASETS=$(/usr/local/bin/qb-list -HZ $_jail | awk '{print $1}') \
+					&& DATASETS=$($QLEXEC/qb-list -HZ $_jail | awk '{print $1}') \
 					|| DATASETS=$(echo "$DATASETS" \
-						; /usr/local/bin/qb-list -HZ $_jail | awk '{print $1}')
+						; $QLEXEC/qb-list -HZ $_jail | awk '{print $1}')
 			done
 			;;
 		all)  # Backup all zroot/qubsd and zusr datasets. Default is [-r] (recurse not Replicate)

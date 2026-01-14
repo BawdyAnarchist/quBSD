@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/quBSD.sh
-. /usr/local/lib/quBSD/msg-stop.sh
+. $QLIB/msg-stop.sh
 
 get_options() {
 	while getopts aAeE:hf:Frt: opts ; do case $opts in
@@ -22,10 +21,10 @@ get_options() {
 
 	# Trap function important for keeping the lock, timeout, and coordination files clean
 	trap "cleanup_trapped" INT TERM HUP QUIT EXIT
-
-	_TMP_LOCK="${QRUN}/.qb-startstop_lock"
-	_TMP_TIME="${QRUN}/.qb-startstop_timeout"
-	_TMP_SNAPS="${QRUN}/.tmpsnaps"
+## accidental runs of qb-stop is screwing up some stuff. Disable this. Should NOT use qb-stop anymore for now
+#	_TMP_LOCK="${QRUN}/.qb-startstop_lock"
+#	_TMP_TIME="${QRUN}/.qb-startstop_timeout"
+#	_TMP_SNAPS="${QRUN}/.tmpsnaps"
 
 	# _STOPS is used for calculating the TIMEOUT later on. Initialize to zero
 	_STOPS=0
@@ -221,7 +220,7 @@ main() {
 
 	# If restart, clean up the tracker files, then fork to qb-start
 	if [ "$_RESTART" ] ; then
-		exec /usr/local/bin/qb-start "$_JLIST"
+		exec $QLEXEC/qb-start "$_JLIST"
 	fi
 }
 

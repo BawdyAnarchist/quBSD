@@ -145,7 +145,6 @@ define_variables() {
 
 	if [ "$INJAIL" = "false" ] ; then
 		# Source quBSD library, and get variables (only available for host)
-		. /usr/local/lib/quBSD/quBSD.sh
 		get_global_variables
 
 		# These variables reduce the need for if/then branches. Can combine commands.
@@ -173,8 +172,8 @@ handle_if_off() {
 	# Modify seclvl to -1. Trap and restore original if exit before finish
 	# If we're only turning on the jail to LIST its connection, don't mod seclvl
 	if [ "$SEC_orig" -ge 0 ] && [ -z "$LIST" ] ; then
-		trap '/usr/local/bin/qb-edit -qf $JAIL SECLVL $SEC_orig ; exit 0' INT TERM HUP QUIT EXIT
-		/usr/local/bin/qb-edit -fq $JAIL SECLVL -1
+		trap '$QLEXEC/qb-edit -qf $JAIL SECLVL $SEC_orig ; exit 0' INT TERM HUP QUIT EXIT
+		$QLEXEC/qb-edit -fq $JAIL SECLVL -1
 	fi
 
 	start_jail "$JAIL" || msg_ivpn -Em _1
@@ -223,7 +222,7 @@ flags_down() {
 	chflags -RL noschg ${PATHMOD}/${PFCONF}
 
 	# Make sure that qb-ivpn can be copied to the jail
-	chflags -R noschg "${M_QROOT}/${JAIL}/usr/local/bin"
+	chflags -R noschg "${M_QROOT}/${JAIL}$QLEXEC"
 }
 
 update_api() {
@@ -354,11 +353,11 @@ main() {
 
 	else
 		# Use ls to check for file, coz [ -e <file> ] fails for linked files 
-		ls "${M_QROOT}/${JAIL}/usr/local/bin/qb-ivpn" > /dev/null 2>&1 \
-			|| cp /usr/local/bin/qb-ivpn "${M_QROOT}/${JAIL}/usr/local/bin/qb-ivpn"
+		ls "${M_QROOT}/${JAIL}$QLEXEC/qb-ivpn" > /dev/null 2>&1 \
+			|| cp $QLEXEC/qb-ivpn "${M_QROOT}/${JAIL}$QLEXEC/qb-ivpn"
 
 		# Re-run script in jail to modify ivpn
-		jexec -l -U root $JAIL /usr/local/bin/qb-ivpn -x -p $PORT
+		jexec -l -U root $JAIL $QLEXEC/qb-ivpn -x -p $PORT
 
 		# The flags applied somehow still prevent moving until jail is stopped.
 		stop_jail "$JAIL"

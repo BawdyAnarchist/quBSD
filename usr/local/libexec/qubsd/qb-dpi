@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/quBSD.sh
-. /usr/local/lib/quBSD/msg-dpi.sh
+. $QLIB/msg-dpi.sh
 
 get_options() {
 	while getopts hrt: opts ; do case $opts in

@@ -124,6 +124,7 @@ get_global_variables() {
 
 	# Define variables for files
 	QETC="/usr/local/etc/qubsd"
+	QLIB="/usr/local/lib/qubsd"
 	QRUN="/var/run/qubsd"
 	QSHARE="/usr/local/share/qubsd"
 	QLEXEC="/usr/local/libexec/qubsd"
@@ -176,7 +177,7 @@ get_msg2() {
 
 	# Using the caller script to generalize message calls. Switch between exec and qb- scripts.
 	local _call="${0##*/}"  _msg  _NEEDPOP
-	[ -z "${_call##exec.*}" ] && _msg="msg_exec" || _msg="msg_${0##*-}"
+	[ -z "${_call##exec.*}" ] && _msg="msg_exec" || { _msg="msg_${0##*/}" ; _msg="${_msg##*-}" ;}
 
 	# Determine if popup should be used or not
 	get_info _NEEDPOP

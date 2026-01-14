@@ -1,8 +1,7 @@
 #!/bin/sh
 # Remember to finalize [ ! _param = BHYVE_CUSTM ]
 
-. /usr/local/lib/quBSD/quBSD.sh
-. /usr/local/lib/quBSD/msg-create.sh
+. $QLIB/msg-create.sh
 
 get_options() {
 
@@ -131,7 +130,7 @@ checks_jailVM_congruency() {
 	if [ ! "$TEMPLATE" = "none" ] ; then
 		_PARAMS="$_PARAMS TEMPLATE"
 		temp_cl=$(sed -nE "s/^${TEMPLATE}[[:blank:]]+CLASS[[:blank:]]+//p" $QCONF)
-		temp_params=$(/usr/local/bin/qb-list -j $TEMPLATE | grep -E "^$TEMPLATE " | awk '{print $2}')
+		temp_params=$($QLEXEC/qb-list -j $TEMPLATE | grep -E "^$TEMPLATE " | awk '{print $2}')
 
 		# Add template params unique from #default, to the PARAM list (unless already specified).
 		for t_par in $temp_params ; do
@@ -617,7 +616,7 @@ guided_mode() {
 
 launch_install() {
 	# Launch the vm to a detached process
-	exec /usr/local/bin/qb-cmd $NEWJAIL
+	exec $QLEXEC/qb-cmd $NEWJAIL
 }
 
 cleanup_finished() {

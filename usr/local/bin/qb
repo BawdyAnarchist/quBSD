@@ -1,0 +1,23 @@
+#!/bin/sh
+
+# Dispatcher script for calling sub-commands
+
+# Basically all subcommands need to source the library and global variables
+. /usr/local/lib/qubsd/quBSD.sh
+. /usr/local/lib/qubsd/msg-qb.sh
+get_global_variables
+
+SUBCMD="$1"
+
+if [ -z "$SUBCMD" ] ; then
+	get_msg2 -Eum _e1        # No command provided
+elif echo "$SUBCMD" | grep -Eqi -- 'help|-h|-help|--h|--help' ; then
+	get_msg2 -eu             # Help requested
+fi
+
+if [ -x "$QLEXEC/qb-$SUBCMD" ] ; then
+	shift
+	exec "$QLEXEC/qb-$SUBCMD" "$@"
+else
+	get_msg2 -Eum _e2
+fi

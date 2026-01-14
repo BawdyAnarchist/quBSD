@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/quBSD.sh
-. /usr/local/lib/quBSD/msg-stat.sh
+. $QLIB/msg-stat.sh
 
 get_options() {
 	while getopts c:h opts ; do case $opts in

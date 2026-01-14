@@ -1,6 +1,5 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/quBSD.sh
 
 JAIL="$1"
 get_global_variables

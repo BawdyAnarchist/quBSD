@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/msg-i3-genconf.sh
-. /usr/local/lib/quBSD/quBSD.sh
+. $QLIB/msg-i3-genconf.sh
 
 get_options() {
    while getopts c:f:h opts ; do case $opts in

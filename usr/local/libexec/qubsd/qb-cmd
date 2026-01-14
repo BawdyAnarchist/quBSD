@@ -2,8 +2,7 @@
 
 # Options and X11 window determine variables; incorporated by a single `eval` at the end
 
-. /usr/local/lib/quBSD/quBSD.sh
-. /usr/local/lib/quBSD/msg-cmd.sh
+. $QLIB/msg-cmd.sh
 
 get_options() {
 	while getopts d:ehHlL:Npqrs:tu:yxX opts ; do case $opts in
@@ -83,7 +82,7 @@ create_ephmjail() {
 	get_msg2 -m _m4    # Inform user that it will take a moment to create/start the ephmjail
 
 	# Create dispjail and disable the no_destroy protection
-	if ! /usr/local/bin/qb-create -y -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false \
+	if ! $QLEXEC/qb-create -y -p GATEWAY=none -p IPV4=none -p NO_DESTROY=false \
 			-p AUTOSNAP=false -c dispjail -t $_TEMPL_JAIL $_JAIL > /dev/null 2>&1 ; then
 		get_msg2 -Em _e11
 	fi
@@ -91,7 +90,6 @@ create_ephmjail() {
 	# Monitor for any EPHM ps TT that are open, with detached script. Will destroy EPHM after.
 	export _JAIL
 	daemon -t "Ephemeral: $_JAIL " -o /dev/null -- /bin/sh << 'EOF'
-		. /usr/local/lib/quBSD/quBSD.sh
 		get_global_variables
 		monitor_ephmjail
 EOF
@@ -134,7 +132,6 @@ prepare_and_launch_xephyr() {
 
 	export QRUN _JAIL _USER _DPI display _xresources
 	daemon -t "Xephyr: $display, Jail: $_JAIL, Command: $_CMD, " -o /dev/null -- /bin/sh << 'EOF'
-		. /usr/local/lib/quBSD/quBSD.sh
 		launch_xephyr
 EOF
 	sleep .2   # Give another moment for the env to load in Xephyr

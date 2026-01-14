@@ -1,6 +1,5 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/quBSD.sh
 
 get_options() {
 	JAIL="$1"
@@ -30,7 +29,7 @@ security_flags() {
 		all)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw /usr" ;;
 		sys)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw/etc /rw/root \
 						/usr/bin /usr/lib /usr/lib32 /usr/libdata /usr/libexec /usr/sbin \
-						/usr/local/bin /usr/local/lib /usr/local/lib32 /usr/local/libdata \
+						$QLEXEC /usr/local/lib /usr/local/lib32 /usr/local/libdata \
 						/usr/local/libexec /usr/local/sbin" ;;
 	esac
 

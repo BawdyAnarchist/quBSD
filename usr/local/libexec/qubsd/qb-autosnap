@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. /usr/local/lib/quBSD/quBSD.sh
-. /usr/local/lib/quBSD/msg-autosnap.sh
+. $QLIB/msg-autosnap.sh
 
 get_options() {
 	while getopts ':dhl:st:' opts ; do case $opts in
@@ -69,7 +68,7 @@ calculate_variables() {
 sync_from_qconf() {
 
 	# Get list of all jails with an AUTOSNAP setting in QCONF
-	_jlist=$(/usr/local/bin/qb-list -Hp AUTOSNAP | awk '/.*true$/{print $1}')
+	_jlist=$($QLEXEC/qb-list -Hp AUTOSNAP | awk '/.*true$/{print $1}')
 	for _jail in $_jlist ; do
 
 		# Pull the value of the AUTOSNAP, and conform datasets to QCONF
