@@ -124,9 +124,9 @@ get_global_variables() {
 
 	# Define variables for files
 	JCONF="/usr/local/etc/quBSD/jail.conf.d/jails"
-	QBDIR="/usr/local/etc/quBSD"
-	QCONF="${QBDIR}/qubsd.conf"
-	QBLOG="/var/log/quBSD/quBSD.log"
+	QETC="/usr/local/etc/quBSD"
+	QCONF="${QETC}/qubsd.conf"
+	QLOG="/var/log/quBSD/quBSD.log"
 	QRUN="/var/run/qubsd"
 	QSHARE="/usr/local/share/qubsd"
 	VMTAPS="${QRUN}/vm_taps"
@@ -189,7 +189,7 @@ get_msg2() {
 				echo -e "$_ERROR\n" > $ERR2
 
 				# If exiting due to error, log the date and error message to the log file
-				[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QBLOG
+				[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QLOG
 
 				# Send the error message
 				if [ -z "$_q" ] && [ "$_ERROR" ] ; then
@@ -580,15 +580,15 @@ start_jail() {
 				[ "$_norun" ] && return 0
 
 				# Have to use tmpfile to grab the error message while still allowing for user zfs -l
-				get_msg -m _m1 -- "$_jail" | tee -a $QBLOG ${QBLOG}_${_jail}
+				get_msg -m _m1 -- "$_jail" | tee -a $QLOG ${QLOG}_${_jail}
 				_jailout=$(mktemp ${QRUN}/start_jail${0##*/}.XXXX)
 
 				if jail -vc "$_jail" | tee -a $_jailout ; then
-					cat $_jailout >> ${QBLOG}_${_jail}
+					cat $_jailout >> ${QLOG}_${_jail}
 					rm $_jailout 2>/dev/null
 				else
 					cat $_jailout > $ERR1
-					cat $_jailout > ${QBLOG}_${_jail}
+					cat $_jailout > ${QLOG}_${_jail}
 					rm $_jailout 2>/dev/null
 					get_msg $_qs -m _e4 -- "$_jail" && eval $_R1
 				fi
@@ -619,7 +619,7 @@ stop_jail() {
 	# Check that the jail is on
 	if chk_isrunning "$_jail" ; then
 		# Log stop attempt, then switch by VM or jail
-		get_msg -m _m2 -- "$_jail" | tee -a $QBLOG ${QBLOG}_${_jail}
+		get_msg -m _m2 -- "$_jail" | tee -a $QLOG ${QLOG}_${_jail}
 
 		if chk_isvm "$_jail" ; then
 			if [ -z "$_force" ] ; then
@@ -631,12 +631,12 @@ stop_jail() {
 			[ "$_wait" ] && ! monitor_vm_stop $_qj $_timeout "$_jail" && eval $_R1
 
 		# Attempt normal removal [-r]. If failure, then remove forcibly [-R].
-		elif ! jail -vr "$_jail"  >> ${QBLOG}_${_jail} 2>&1 ; then
+		elif ! jail -vr "$_jail"  >> ${QLOG}_${_jail} 2>&1 ; then
 			if chk_isrunning "$_jail" ; then
 				# Manually run exec.prestop, then forcibly remove jail, and run exec.release
-				/bin/sh ${QBDIR}/exec.prestop "$_jail" > /dev/null 2>&1
-				jail -vR "$_jail"  >> ${QBLOG}_${_jail} 2>&1
-				/bin/sh ${QBDIR}/exec.release "$_jail" > /dev/null 2>&1
+				/bin/sh ${QETC}/exec.prestop "$_jail" > /dev/null 2>&1
+				jail -vR "$_jail"  >> ${QLOG}_${_jail} 2>&1
+				/bin/sh ${QETC}/exec.release "$_jail" > /dev/null 2>&1
 
 				if chk_isrunning "$_jail" ; then
 					# Warning about failure to forcibly remove jail
@@ -943,44 +943,44 @@ monitor_vm_stop() {
 }
 
 launch_xephyr() {
-  # sysvshm cannot share Xephyr here. Some apps will fail if we dont disable it. XVideo prevents non-existent
-  # GPU overlay. We MUST stop GLX entirely (even iglx), as A) Xephyr implementation sucks (<1.4), and B) even
-  # if it didnt, Xephyr is launched from *host*, and the jail only sees an X socket, not the Xephyr process.
-  Xephyr -extension MIT-SHM -extension XVideo -extension XVideo-MotionCompensation -extension GLX \
-      -resizeable -terminate -no-host-grab :$display > /dev/null 2>&1 &
+	# sysvshm cannot share Xephyr here. Some apps will fail if we dont disable it. XVideo prevents non-existent
+	# GPU overlay. We MUST stop GLX entirely (even iglx), as A) Xephyr implementation sucks (<1.4), and B) even
+	# if it didnt, Xephyr is launched from *host*, and the jail only sees an X socket, not the Xephyr process.
+	Xephyr -extension MIT-SHM -extension XVideo -extension XVideo-MotionCompensation -extension GLX \
+		-resizeable -terminate -no-host-grab :$display > /dev/null 2>&1 &
 
-  xephyr_pid=$!  &&  sleep 0.1       # Give a moment for Xephyr session to launch, trap it
+	xephyr_pid=$!  &&  sleep 0.1       # Give a moment for Xephyr session to launch, trap it
 	trap "kill -15 $xephyr_pid" INT TERM HUP QUIT EXIT
-  ! ps -p "$xephyr_pid" > /dev/null 2>&1 && get_msg2 -Em _e8
+	! ps -p "$xephyr_pid" > /dev/null 2>&1 && get_msg2 -Em _e8
 
-  # The Xephyr window_id is needed for monitoring/cleanup
-  winlist=$(xprop -root _NET_CLIENT_LIST | sed 's/.*# //' | tr ',' '\n' | tail -r)
-  for wid in $winlist; do
-    xprop -id "$wid" | grep -Eqs "WM_NAME.*Xephyr.*:$display" \
-      && window_id="$wid" && break
-  done
+	# The Xephyr window_id is needed for monitoring/cleanup
+	winlist=$(xprop -root _NET_CLIENT_LIST | sed 's/.*# //' | tr ',' '\n' | tail -r)
+	for wid in $winlist; do
+		xprop -id "$wid" | grep -Eqs "WM_NAME.*Xephyr.*:$display" \
+		&& window_id="$wid" && break
+	done
 
 	# Launch a simple window manager for scaling/resizing to the full Xephyr size
-  jexec -l -U $_USER $_JAIL env DISPLAY=:$display bspwm -c /usr/local/etc/X11/bspwmrc &
-  bspwm_pid="$!"
+	jexec -l -U $_USER $_JAIL env DISPLAY=:$display bspwm -c /usr/local/etc/X11/bspwmrc &
+	bspwm_pid="$!"
 
 	# Link the sockets together
-  socat \
-    UNIX-LISTEN:${QRUN}/X11/${_JAIL}/.X11-unix/X${display},fork,unlink-close,mode=0666 \
-    UNIX-CONNECT:/tmp/.X11-unix/X${display} &
-  socat_pid="$!"
+	socat \
+		UNIX-LISTEN:${QRUN}/X11/${_JAIL}/.X11-unix/X${display},fork,unlink-close,mode=0666 \
+		UNIX-CONNECT:/tmp/.X11-unix/X${display} &
+	socat_pid="$!"
 	trap "kill -15 $bspwm_pid $socat_pid $xephyr_pid" INT TERM HUP QUIT EXIT
 
 	# Push the Xresources and DPI to the Xephyr instance
-  [ -n "$_xresources" ] && env DISPLAY=:$display xrdb -merge $_xresources
-  [ -n "$_DPI" ] && echo "Xft.dpi: $_DPI" | env DISPLAY=:$display xrdb -merge
+	[ -n "$_xresources" ] && env DISPLAY=:$display xrdb -merge $_xresources
+	[ -n "$_DPI" ] && echo "Xft.dpi: $_DPI" | env DISPLAY=:$display xrdb -merge
 
 	# Monitor both the window, and the existence of the jail,
-  while sleep 1 ; do
-    xprop -id "$window_id" | grep -Eqs ".*Xephyr.*:$display" || exit 0
-    jls | grep -Eqs "[ \t]${_JAIL}[ \t]" || exit 0
-  done
-  exit 0
+	while sleep 1 ; do
+		xprop -id "$window_id" | grep -Eqs ".*Xephyr.*:$display" || exit 0
+		jls | grep -Eqs "[ \t]${_JAIL}[ \t]" || exit 0
+	done
+	exit 0
 }
 
 monitor_ephmjail() {
@@ -2132,7 +2132,7 @@ return_ppt() {
 	[ -z "$_VM" ] && get_msg $_q -m _e0 -- "VM name" && eval $_R1
 
 	# Get PPT devices from the actual bhyve command that was launched for the VM
-	_bhyvecmd=$(tail -1 "${QBLOG}_${_VM}" 2>&1)
+	_bhyvecmd=$(tail -1 "${QLOG}_${_VM}" 2>&1)
 	while : ; do
 		_newppt=$(echo "$_bhyvecmd" | sed -En "s@.*passthru,([0-9/]+[0-9/]+[0-9/]+ ).*@\1@p")
 		[ -z "$_newppt" ] && break
@@ -2526,8 +2526,8 @@ launch_bhyve_vm() {
 	trap "cleanup_vm $_VM $_rootenv ; exit 0" INT TERM HUP QUIT EXIT
 
 	# Log the exact bhyve command being run
-	echo "\$(date "+%Y-%m-%d_%H:%M") Starting VM: $_VM" | tee -a $QBLOG ${QBLOG}_${_VM}
-	echo $_BHYVE_CMD >> ${QBLOG}_${_VM}
+	echo "\$(date "+%Y-%m-%d_%H:%M") Starting VM: $_VM" | tee -a $QLOG ${QLOG}_${_VM}
+	echo $_BHYVE_CMD >> ${QLOG}_${_VM}
 
 	# Launch the VM to background
 	eval $_BHYVE_CMD
@@ -2536,7 +2536,7 @@ launch_bhyve_vm() {
 
 	# Monitor the VM, perform cleanup after done
 	while pgrep -xfq "bhyve: $_VM" ; do sleep 1 ; done
-	echo "\$(date "+%Y-%m-%d_%H:%M") VM: $_VM HAS ENDED." | tee -a $QBLOG ${QBLOG}_${_VM}
+	echo "\$(date "+%Y-%m-%d_%H:%M") VM: $_VM HAS ENDED." | tee -a $QLOG ${QLOG}_${_VM}
 	exit 0
 }
 
@@ -2597,8 +2597,8 @@ exec_vm_coordinator() {
 	! start_jail $_gateway && eval $_R1
 
 	# Launch VM sent to background, so connections can be made (network, vnc, tmux)
-	get_msg -m _m1 -- "$_jail" | tee -a $QBLOG ${QBLOG}_${_VM}
-	export _BHYVE_CMD _VM _rootenv QBLOG
+	get_msg -m _m1 -- "$_jail" | tee -a $QLOG ${QLOG}_${_VM}
+	export _BHYVE_CMD _VM _rootenv QLOG
 	daemon -t "bhyve: $_jail" -o /dev/null -- /bin/sh << 'EOF'
 		. /usr/local/lib/quBSD/quBSD.sh
 		. /usr/local/lib/quBSD/msg-quBSD.sh
