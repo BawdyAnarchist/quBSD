@@ -125,6 +125,7 @@ get_global_variables() {
 	# Define variables for files
 	JCONF="/usr/local/etc/quBSD/jail.conf.d/jails"
 	QETC="/usr/local/etc/quBSD"
+	QLEXEC="/usr/local/libexec/qubsd"
 	QCONF="${QETC}/qubsd.conf"
 	QLOG="/var/log/quBSD/quBSD.log"
 	QRUN="/var/run/qubsd"
@@ -634,9 +635,9 @@ stop_jail() {
 		elif ! jail -vr "$_jail"  >> ${QLOG}_${_jail} 2>&1 ; then
 			if chk_isrunning "$_jail" ; then
 				# Manually run exec.prestop, then forcibly remove jail, and run exec.release
-				/bin/sh ${QETC}/exec.prestop "$_jail" > /dev/null 2>&1
+				/bin/sh ${QLEXEC}/exec.prestop "$_jail" > /dev/null 2>&1
 				jail -vR "$_jail"  >> ${QLOG}_${_jail} 2>&1
-				/bin/sh ${QETC}/exec.release "$_jail" > /dev/null 2>&1
+				/bin/sh ${QLEXEC}/exec.release "$_jail" > /dev/null 2>&1
 
 				if chk_isrunning "$_jail" ; then
 					# Warning about failure to forcibly remove jail

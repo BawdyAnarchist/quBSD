@@ -6,7 +6,7 @@ main() {
 	JAIL="$1"
 
 	# If exec script fails and jail start aborts, make sure to clean up the mounts
-	trap '/usr/local/etc/qubsd/exec.release $JAIL'
+	trap "$QLEXEC/exec.release $JAIL"
 
 	# /rw/ nullfs mounts are best symlinked from within the cloned appjail's root
 	# Make sure flags are down for directory and file, then symlink to /rw

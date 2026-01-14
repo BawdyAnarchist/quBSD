@@ -11,7 +11,7 @@ get_options() {
 
 main() {
 	# If exec script fails and jail start aborts, make sure to clean up the mounts
-	trap '/usr/local/etc/qubsd/exec.release $JAIL'
+	trap "$QLEXEC/exec.release $JAIL"
 
 	# Establish connections to the jail's upstream gateway and control jail
 	connect_client_to_gateway -t CJ_SSH "$JAIL" "$CONTROL"
