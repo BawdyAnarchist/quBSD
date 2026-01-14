@@ -5,7 +5,7 @@
 get_parameters() {
 	# Define script variables
 	JAIL="$1"
-	echo "$(date "+%Y-%m-%d_%H:%M") exec.prepare: STARTING: $JAIL" >> $QBLOG ${QBLOG}_$JAIL
+	echo "$(date "+%Y-%m-%d_%H:%M") exec.prepare: STARTING: $JAIL" >> $QLOG ${QLOG}_$JAIL
 
 	# Parameters and checks
 	get_jail_parameter CLASS   "$JAIL"    || get_msg2 -Em _e
@@ -16,7 +16,7 @@ get_parameters() {
 
 preparation_actions() {
 	# The control jail should always be on. The function will return immediately if already on
-#	[ ! "$CLASS" = "cjail" ] && start_jail "$CONTROL"
+	[ ! "$CLASS" = "cjail" ] && start_jail "$CONTROL"
 
 	# MUST redirect to null, otherwise VM here will hang the script .. coz .. file descriptors?
 	start_jail "$GATEWAY" > /dev/null 2>&1

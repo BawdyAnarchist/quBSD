@@ -13,7 +13,7 @@ get_msg() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
 
 	# DEBUG helps to see what the chain of functions was for an error.
-	[ "$DEBUG" = "1" ] && echo "$(date "+%Y-%m-%d_%H:%M")  $0  ${_FN}" >> $QBLOG
+	[ "$DEBUG" = "1" ] && echo "$(date "+%Y-%m-%d_%H:%M")  $0  ${_FN}" >> $QLOG
 
 	case $_msg1 in
 		_m*) [ -z "$_q" ] && msg_qubsd "$@" ;;
@@ -275,7 +275,7 @@ ENDOFMSG
 	_w1) cat << ENDOFMSG
 WARNING: < $1 > had to be forcibly stopped. Recommend double
    checking mounts with: mount | grep $1
-   For details see log at: $QBLOG
+   For details see log at: $QLOG
 ENDOFMSG
 	;;
 	_w2) cat << ENDOFMSG
@@ -283,7 +283,7 @@ WARNING: < $1 > could not be stopped. Forcible stop failed.
 Recommend running the following commands:
    jail -R $1
    mount | grep $1
-   For details see log at: $QBLOG
+   For details see log at: $QLOG
 ENDOFMSG
 	;;
 	_w3) cat << ENDOFMSG
@@ -299,6 +299,12 @@ ENDOFMSG
 	_w5) cat << ENDOFMSG
 WARNING: Was unable to revert PPT: < $1 > to host after VM stop.
 ENDOFMSG
+	;;
+	_w6) cat << ENDOFMSG
+WARNING: Unable to ping freebsd.org. Automated rootVM installation
+   requires network for update and pkg installation. 
+ENDOFMSG
+echo -e "Continue anyways (you must manually install updates/pkgs afterwards) (Y/n): \c"
 	;;
 	_m1) cat << ENDOFMSG
 ${0##*/} is starting < $1 >
@@ -342,6 +348,23 @@ serv-jails        net-firewall   10.128.x.2/30
 appjails          net-<gateway>  10.1.x.2/30
 cjails            none           10.99.x.2/30
 < adhoc created by qb-connect >  10.88.x.2/30
+ENDOFMSG
+	;;
+	_m10) cat << ENDOFMSG
+ALERT: Checking for network connection, ping timeout in $1 sec 
+ENDOFMSG
+	;;
+	_m11) cat << ENDOFMSG
+
+< $1 > was successfully created, and can be used as a rootVM for other appVMs.
+
+ENDOFMSG
+	;;
+	_m12) cat << ENDOFMSG
+
+< $1 > was successfully created, but there was no network connectivity.
+   Therefore the user must update and install packages in the VM, manually.
+
 ENDOFMSG
 	;;
 	esac

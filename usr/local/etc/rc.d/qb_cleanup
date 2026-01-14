@@ -31,10 +31,10 @@ cleanup_files() {
 	mkdir $QRUN > /dev/null 2>&1
 
 	# Empty the contents of the quBSD log directory
-	rm -r $(dirname $QBLOG) > /dev/null 2>&1
+	rm -r $(dirname $QLOG) > /dev/null 2>&1
 
 	# Make sure the directory exists
-	mkdir -p $(dirname $QBLOG) > /dev/null 2>&1
+	mkdir -p $(dirname $QLOG) > /dev/null 2>&1
 }
 
 cleanup_disps() {

@@ -11,7 +11,7 @@ Must specify an action [-d|-u]
 ENDOFMSG
 	;;
 	_e3) cat << ENDOFMSG
-Gateway: < $JAIL > failed to start. See: $QBLOG
+Gateway: < $JAIL > failed to start. See: $QLOG
 ENDOFMSG
 	;;
 	_w1) cat << ENDOFMSG

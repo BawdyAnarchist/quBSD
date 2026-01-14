@@ -20,7 +20,7 @@ get_options() {
 	DATE=$(date +%b%d)
 	POS_SETS="$@"
 	SNAPNAME='@qbBAK'
-	BAK_LOG="$(dirname $QBLOG)/qb-backup.log"
+	BAK_LOG="$(dirname $QLOG)/qb-backup.log"
 }
 
 check_zbackup() {

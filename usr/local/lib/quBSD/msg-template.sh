@@ -15,7 +15,7 @@ msg_() {
 		; retreive_msg "$@" ; [ "$GET_MSG" ] && echo "$GET_MSG")
 
 	# If exiting with error, send it to the log
-	[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")  $0\n$_MESSAGE" >> $QBLOG
+	[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")  $0\n$_MESSAGE" >> $QLOG
 
 	# If -q wasnt specified, print message to the terminal
 	[ -z "$_q" ] && echo "$_MESSAGE"

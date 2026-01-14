@@ -53,8 +53,8 @@ main() {
 	elif [ "$RESTORE" ] ; then
 		# Jails might have different chflag settings if started or stopped
 		chk_isrunning "$JAIL" \
-									&& ${QBDIR}/exec.poststart $JAIL \
-																|| ${QBDIR}/exec.release $JAIL
+									&& ${QETC}/exec.poststart $JAIL \
+																|| ${QETC}/exec.release $JAIL
 	fi
 }
 
