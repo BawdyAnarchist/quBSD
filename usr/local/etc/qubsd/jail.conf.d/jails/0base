@@ -1,0 +1,4 @@
+0base {
+	.include "/usr/local/etc/qubsd/jail.conf.d/base.conf";
+	devfs_ruleset="4";
+}

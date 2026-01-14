@@ -4,7 +4,7 @@ define_vars() {
 	REPO="/usr/local/share/quBSD"
 	XINIT="/usr/local/etc/X11/xinit/xinitrc"
 	QLOAD="/boot/loader.conf.d/qubsd_loader.conf"
-	Q_CONF="/usr/local/etc/quBSD/qubsd.conf"
+	Q_CONF="/usr/local/etc/qubsd/qubsd.conf"
 	JCONF_D="/etc/jail.conf.d"
 	QRC_CONF="${REPO}/zroot/etc/rc.conf"
 	QLOG="/var/log/quBSD/install.log"

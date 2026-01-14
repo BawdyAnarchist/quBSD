@@ -26,15 +26,15 @@ fetch_repo() {
 
 copy_repo() {
 	# Make sure the required directories exist
-	[ -e /usr/local/etc/quBSD ] || mkdir -p /usr/local/etc/quBSD
-	[ -e /usr/local/lib/quBSD ] || mkdir -p /usr/local/lib/quBSD
+	[ -e /usr/local/etc/qubsd ] || mkdir -p /usr/local/etc/qubsd
+	[ -e /usr/local/lib/qubsd ] || mkdir -p /usr/local/lib/quBSD
 	[ -e /usr/local/etc/rc.d ]  || mkdir -p /usr/local/etc/rc.d   
 	[ -e /boot/loader.conf.d ]  || mkdir -p /boot/loader.conf.d
 	[ -e /etc/cron.d ]          || mkdir -p /etc/cron.d
 	[ -e /etc/jail.conf.d ]     || mkdir -p /etc/jail.conf.d
 
 	# Copy files to their directories 
-	cp -a ${REPO}/zroot/usr/local/etc/quBSD/ /usr/local/etc/quBSD/
+	cp -a ${REPO}/zroot/usr/local/etc/qubsd/ /usr/local/etc/qubsd/
 	cp -a ${REPO}/zroot/usr/local/bin/       /usr/local/bin/
 	cp -a ${REPO}/zroot/usr/local/lib/quBSD/ /usr/local/lib/quBSD/
 	cp -a ${REPO}/zroot/usr/local/etc/rc.d/  /usr/local/etc/rc.d/

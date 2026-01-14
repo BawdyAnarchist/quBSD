@@ -1,5 +1,5 @@
 net-tor {
-	.include "/usr/local/etc/quBSD/jail.conf.d/base.conf";
+	.include "/usr/local/etc/qubsd/jail.conf.d/base.conf";
 	devfs_ruleset="6";
 
 	# TOR - Persistent data required for the gateway

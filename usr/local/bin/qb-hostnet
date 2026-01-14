@@ -15,8 +15,8 @@ get_options() {
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	TIMEOUT="${TIMEOUT:=300}"
-	PF_PASS="/usr/local/etc/quBSD/pf_pass.conf"
-	PF_BLOCK="/usr/local/etc/quBSD/pf.conf"
+	PF_PASS="$QETC/pf_pass.conf"
+	PF_BLOCK="$QETC/pf.conf"
 }
 
 get_parameters() {

@@ -123,14 +123,14 @@ get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
 
 	# Define variables for files
-	JCONF="/usr/local/etc/quBSD/jail.conf.d/jails"
-	QETC="/usr/local/etc/quBSD"
-	QLEXEC="/usr/local/libexec/qubsd"
-	QCONF="${QETC}/qubsd.conf"
-	QLOG="/var/log/quBSD/quBSD.log"
+	QETC="/usr/local/etc/qubsd"
 	QRUN="/var/run/qubsd"
 	QSHARE="/usr/local/share/qubsd"
-	VMTAPS="${QRUN}/vm_taps"
+	QLEXEC="/usr/local/libexec/qubsd"
+	JCONF="$QETC/jail.conf.d/jails"
+	QCONF="$QETC/qubsd.conf"
+	QLOG="/var/log/quBSD/quBSD.log"
+	VMTAPS="$QRUN/vm_taps"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
 	sed -i '' -E 's/[ \t]*$//' $QCONF

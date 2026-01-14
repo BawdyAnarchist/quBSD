@@ -1,4 +1,0 @@
-net-firewall {
-	.include "/usr/local/etc/quBSD/jail.conf.d/base.conf";
-	devfs_ruleset="6";
-}

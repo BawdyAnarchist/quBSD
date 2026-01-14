@@ -1,5 +1,5 @@
 0control {
-	.include "/usr/local/etc/quBSD/jail.conf.d/base.conf";
+	.include "/usr/local/etc/qubsd/jail.conf.d/base.conf";
 	devfs_ruleset="6";
 
 	# 0control functionality to be revisisted later. For now leave as-is 

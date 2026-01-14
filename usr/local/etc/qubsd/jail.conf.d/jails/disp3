@@ -1,0 +1,6 @@
+disp3 {
+	.include "/usr/local/etc/qubsd/jail.conf.d/base.conf";
+	.include "/usr/local/etc/qubsd/jail.conf.d/xephyr.conf";
+	.include "/usr/local/etc/qubsd/jail.conf.d/ubuntu.conf";
+	devfs_ruleset="7";
+}

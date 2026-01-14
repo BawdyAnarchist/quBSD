@@ -39,7 +39,7 @@ ENDOFMSG
 	;;
 	_params) cat << ENDOFMSG
 
-PARAMETERS SAVED AT /usr/local/etc/quBSD/qubsd.conf
+PARAMETERS SAVED AT /usr/local/etc/qubsd/qubsd.conf
 To see default values, run:  qb-list #default
 To see detailed description of each PARAMETER, run: qb-help <PARAMETER>
 
