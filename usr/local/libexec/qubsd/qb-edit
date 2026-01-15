@@ -1,5 +1,6 @@
 #!/bin/sh
 
+. $QLIB/quBSD.sh
 . $QLIB/msg-edit.sh
 
 get_options() {

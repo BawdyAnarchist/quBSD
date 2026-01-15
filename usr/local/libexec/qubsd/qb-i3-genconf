@@ -1,5 +1,6 @@
 #!/bin/sh
 
+. $QLIB/quBSD.sh
 . $QLIB/msg-i3-genconf.sh
 
 get_options() {

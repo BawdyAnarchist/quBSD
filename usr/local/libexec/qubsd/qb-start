@@ -6,6 +6,7 @@
 	# Epair race conditions and mishandling between gateway/client
 # This script deconflicts these, starting jails in serial when necessary, parallel if possible
 
+. $QLIB/quBSD.sh
 . $QLIB/msg-start.sh
 
 get_options() {

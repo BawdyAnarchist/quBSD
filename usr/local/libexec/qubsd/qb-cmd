@@ -2,6 +2,7 @@
 
 # Options and X11 window determine variables; incorporated by a single `eval` at the end
 
+. $QLIB/quBSD.sh
 . $QLIB/msg-cmd.sh
 
 get_options() {
@@ -90,6 +91,7 @@ create_ephmjail() {
 	# Monitor for any EPHM ps TT that are open, with detached script. Will destroy EPHM after.
 	export _JAIL
 	daemon -t "Ephemeral: $_JAIL " -o /dev/null -- /bin/sh << 'EOF'
+		. $QLIB/quBSD.sh
 		get_global_variables
 		monitor_ephmjail
 EOF
@@ -130,8 +132,9 @@ prepare_and_launch_xephyr() {
 	[ -f "$_xresources" ] || _xresources="${HOME}/.Xresources"
 	[ -f "$_xresources" ] || unset _xresources
 
-	export QRUN _JAIL _USER _DPI display _xresources
+	export QLIB QRUN _JAIL _USER _DPI display _xresources
 	daemon -t "Xephyr: $display, Jail: $_JAIL, Command: $_CMD, " -o /dev/null -- /bin/sh << 'EOF'
+		. $QLIB/quBSD.sh
 		launch_xephyr
 EOF
 	sleep .2   # Give another moment for the env to load in Xephyr

@@ -113,7 +113,7 @@
 ########################################################################################
 
 # Source error messages for library functions
-. /usr/local/lib/quBSD/msg-quBSD.sh
+. /usr/local/lib/qubsd/msg-quBSD.sh
 
 # Internal flow variables to handle returns, while reseting _fn and _FN variables with logging
 _R0='_FN="$_fn_orig" ; return 0'
@@ -123,34 +123,34 @@ get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
 
 	# Define variables for files
-	QETC="/usr/local/etc/qubsd"
-	QLIB="/usr/local/lib/qubsd"
-	QRUN="/var/run/qubsd"
-	QSHARE="/usr/local/share/qubsd"
-	QLEXEC="/usr/local/libexec/qubsd"
-	JCONF="$QETC/jail.conf.d/jails"
-	QCONF="$QETC/qubsd.conf"
-	QLOG="/var/log/quBSD/quBSD.log"
-	VMTAPS="$QRUN/vm_taps"
+	export QETC="/usr/local/etc/qubsd"
+	export QLIB="/usr/local/lib/qubsd"
+	export QRUN="/var/run/qubsd"
+	export QSHARE="/usr/local/share/qubsd"
+	export QLEXEC="/usr/local/libexec/qubsd"
+	export JCONF="$QETC/jail.conf.d/jails"
+	export QCONF="$QETC/qubsd.conf"
+	export QLOG="/var/log/quBSD/quBSD.log"
+	export VMTAPS="$QRUN/vm_taps"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
 	sed -i '' -E 's/[ \t]*$//' $QCONF
 	# Get datasets, mountpoints; and define files.
-   R_ZFS=$(sed -nE "s:#NONE[ \t]+jails_zfs[ \t]+::p" $QCONF)
-   U_ZFS=$(sed -nE "s:#NONE[ \t]+zusr_zfs[ \t]+::p" $QCONF)
+   export R_ZFS=$(sed -nE "s:#NONE[ \t]+jails_zfs[ \t]+::p" $QCONF)
+   export U_ZFS=$(sed -nE "s:#NONE[ \t]+zusr_zfs[ \t]+::p" $QCONF)
 	[ -z "$R_ZFS" ] && get_msg -V -m "_e0_1" "jails_zfs" && exit 1
 	[ -z "$U_ZFS" ] && get_msg -V -m "_e0_1" "zusr_zfs" && exit 1
 	! chk_valid_zfs "$R_ZFS" && get_msg -V -m _e0_2 -- "jails_zfs" "$R_ZFS" && exit 1
 	! chk_valid_zfs "$U_ZFS" && get_msg -V -m _e0_2 -- "zusr_zfs" "$U_ZFS" && exit 1
-	M_QROOT=$(zfs get -H mountpoint $R_ZFS | awk '{print $3}')
-	M_ZUSR=$(zfs get -H mountpoint $U_ZFS | awk '{print $3}')
+	export M_QROOT=$(zfs get -H mountpoint $R_ZFS | awk '{print $3}')
+	export M_ZUSR=$(zfs get -H mountpoint $U_ZFS | awk '{print $3}')
 	[ "$M_QROOT" = "-" ] && get_msg -V -m _e0_3 "$R_ZFS" && exit 1
 	[ "$M_ZUSR" = "-" ]  && get_msg -V -m _e0_3 "$U_ZFS" && exit 1
 
 	# Set the files for error recording, and trap them
 	[ -d "$QRUN" ] || mkdir $QRUN
-	ERR1=$(mktemp ${QRUN}/err1_${0##*/}.XXXX)
-	ERR2=$(mktemp ${QRUN}/err2_${0##*/}.XXXX)
+	export ERR1=$(mktemp ${QRUN}/err1_${0##*/}.XXXX)
+	export ERR2=$(mktemp ${QRUN}/err2_${0##*/}.XXXX)
 	trap "rm_errfiles" HUP INT TERM QUIT EXIT
 
 	return 0
@@ -177,7 +177,7 @@ get_msg2() {
 
 	# Using the caller script to generalize message calls. Switch between exec and qb- scripts.
 	local _call="${0##*/}"  _msg  _NEEDPOP
-	[ -z "${_call##exec.*}" ] && _msg="msg_exec" || { _msg="msg_${0##*/}" ; _msg="${_msg##*-}" ;}
+	[ -z "${_call##exec.*}" ] && _msg="msg_exec" || { _msg="msg_${0##*/}" ; _msg="msg_${_msg##*-}" ;}
 
 	# Determine if popup should be used or not
 	get_info _NEEDPOP

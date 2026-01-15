@@ -1,5 +1,6 @@
 #!/bin/sh
 
+. $2    # Source the libary. $2 is passed by /usr/local/etc/qubsd/jail.conf.d/base.conf
 
 JAIL="$1"
 get_global_variables
