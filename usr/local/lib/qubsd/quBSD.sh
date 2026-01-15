@@ -177,7 +177,7 @@ get_msg2() {
 
 	# Using the caller script to generalize message calls. Switch between exec and qb- scripts.
 	local _call="${0##*/}"  _msg  _NEEDPOP
-	[ -z "${_call##exec.*}" ] && _msg="msg_exec" || { _msg="msg_${0##*/}" ; _msg="msg_${_msg##*-}" ;}
+	[ -z "${_call##exec.*}" ] && _msg="msg_exec" || _msg="msg_${_call##*-}"
 
 	# Determine if popup should be used or not
 	get_info _NEEDPOP
