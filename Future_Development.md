@@ -1,13 +1,10 @@
 
-remove all of the local var=asdf ; local var2=lkj ... you can just say local ONCE
-
 VM PLAN: only remaining aspect is Linux and qb-create
  - Linux/ubuntu
     -- they actually have an overlayfs where you just add directories and it auto-tracks changes
     -- This can be used for internal /etc, and for persisting /home inside of Linux, without distro-level faggotry
  - Incorporate new VM / installer model to the installer script.
  - Incorporate new VM model to qb-create. Script needs reviewed and with better integration
-
 
 qb-start
 	- Needs updated with new networking functions in mind

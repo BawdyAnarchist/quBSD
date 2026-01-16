@@ -2,7 +2,7 @@
 
 ### Summary of Default Features: 
 
-X11 GUI Jails, with X11-Xephyr compartmentalization!
+X11 GUI Jails, with X11-Xephyr compartmentalization.
 Network gateway jails/VMs for NIC, firewall, VPNs, and Tor.
 Disposable/ephemeral jails/VMs. 
 Automatic rolling zfs snapshots, with thinning.
@@ -17,7 +17,7 @@ Streamlined configuration/editing:
 ***Rootjails*** maintain a pristine root environment for launching appjails.   
 ***Appjails*** clone a designated rootjail at every start, destroyed at shutdown.   
 &nbsp;&nbsp;- Persistent /home directory lives in a separate zfs dataset   
-&nbsp;&nbsp;- Can specify persistent system files like rc.conf, pwd.db, pf.conf, etc ...   
+&nbsp;&nbsp;- Jail specific persistent system files (rc.conf, pwd.db, pf.conf, etc)
 ***Dispjails*** have no persistent data. Completely destroyed at jail shutdown.   
 ***Ephemeral*** jails clone the exact state of a running jail.   
 &nbsp;&nbsp;- Open untrusted files/attachments    
