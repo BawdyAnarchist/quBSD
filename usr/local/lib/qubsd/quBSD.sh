@@ -122,6 +122,9 @@ _R1='_FN="$_fn_orig" ; return 1'
 get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
 
+	# Remove any old ERR files (for exec commands)
+	[ "$ERR1" ] && [ "$ERR2" ] && rm_errfiles
+
 	# Define variables for files
 	export QETC="/usr/local/etc/qubsd"
 	export QLIB="/usr/local/lib/qubsd"
@@ -2600,10 +2603,10 @@ exec_vm_coordinator() {
 
 	# Launch VM sent to background, so connections can be made (network, vnc, tmux)
 	get_msg -m _m1 -- "$_jail" | tee -a $QLOG ${QLOG}_${_VM}
-	export _BHYVE_CMD _VM _rootenv QLOG
+	export QLIB _BHYVE_CMD _VM _rootenv QLOG
 	daemon -t "bhyve: $_jail" -o /dev/null -- /bin/sh << 'EOF'
-		. /usr/local/lib/quBSD/quBSD.sh
-		. /usr/local/lib/quBSD/msg-quBSD.sh
+		. $QLIB/quBSD.sh
+		. $QLIB/msg-quBSD.sh
 		launch_bhyve_vm
 EOF
 
