@@ -6,7 +6,7 @@ msg_stop() {
 Two instances of qb-stop or qb-start are already running.
 Cannot queue another instance until one of these finishes.
 
-$(pgrep -fl '/bin/sh /usr/local/bin/qb-st(art|op)')
+$(pgrep -fl '/bin/sh /usr/local/libexec/qubsd/qb-st(art|op)')
 ENDOFMSG
 	;;
 	_e1) cat << ENDOFMSG
@@ -29,7 +29,7 @@ ENDOFMSG
 	;;
 	_e4) cat << ENDOFMSG
 Failed to stop all jails/VMs within timeout of < $_TIMEOUT secs >
-Check /var/log/quBSD, and/or forcibly stop with: qb-stop -F
+Check /var/log/qubsd, and/or forcibly stop with: qb-stop -F
 ENDOFMSG
 	;;
 	_e5) cat << ENDOFMSG

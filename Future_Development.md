@@ -1,4 +1,6 @@
 
+remove all of the local var=asdf ; local var2=lkj ... you can just say local ONCE
+
 VM PLAN: only remaining aspect is Linux and qb-create
  - Linux/ubuntu
     -- they actually have an overlayfs where you just add directories and it auto-tracks changes
@@ -37,12 +39,7 @@ pwd: Overaul plan two parts:
    - rootjail contains a default qubsd_pw.conf - Just a 1-liner manifest for basic user creation 
    - /rw/etc/ (or /rw/usr/local/etc/) qubsd.conf.local - Users can add new groups/users. Created at jail start
 
-dispVM
-	- vm-rc.local should use its IP address to get it's hostname from 0control ftp server
-		- This will require creating a new file in /home/ftp/<IPaddr> on 0control
-
 NICVM - Linux VM (probably alpine) so that it can use all the wireless cards. 
-     - Someone made a post about this in FreeBSD
 
 I2P Gateway
 
@@ -102,9 +99,6 @@ consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-i
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP
 
 It sounds like I still need magic cookies because some jails will still have opt to be on nullfs on host x11-unix
-
-eliminate all files and directories that reference quBSD ... It should just be qubsd
-remove all of the local var=asdf ; local var2=lkj ... you can just say local ONCE
 
 TIMEOUT overhaul - timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
 

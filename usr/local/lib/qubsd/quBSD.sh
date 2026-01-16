@@ -133,7 +133,7 @@ get_global_variables() {
 	export QLEXEC="/usr/local/libexec/qubsd"
 	export JCONF="$QETC/jail.conf.d/jails"
 	export QCONF="$QETC/qubsd.conf"
-	export QLOG="/var/log/quBSD/quBSD.log"
+	export QLOG="/var/log/qubsd/quBSD.log"
 	export VMTAPS="$QRUN/vm_taps"
 
 	# Remove blanks at end of line, to prevent bad variable assignments.
