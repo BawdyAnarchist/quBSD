@@ -1,26 +1,78 @@
 #!/bin/sh
 
+perform_overlay() {
+	# Get all the files in the overlay directory
+	for _file in $(find "/rw" -type f | sed "s:^/rw::") ; do
+
+		# Flags down for jail init (flags will be reapplied after jail boot)
+		if	[ -d "$(dirname $_file)" ] ; then
+			chflags noschg "$(dirname $_file)"
+			[ -e "$_file" ] && chflags noschg $_file
+		else
+			mkdir -p $(dirname $_file)  # Ensure directory exists on the root filesystem
+		fi
+		ln -sf "/rw/${_file}" "${_file}"
+	done
+}
+
+merge_passwd() {
+	# Perform upsert for the overlay master.passwd.local and group.local
+
+	local pwd_sys="/etc/master.passwd"
+	local grp_sys="/etc/group"
+	local pwd_local="/etc/master.passwd.local"
+	local grp_local="/etc/group.local"
+
+	# Loop over each user in the .local file, and perform upsert
+	[ -e "$pwd_local" ] && while IFS=':' read -r _line ; do
+		case "$_line" in ""|'#'*) continue ;; esac   # Skip empty lines/comments
+		local user="${_line%%:*}"
+
+		# Upsert logic for the user
+		if grep -Eqs "^${user}:" "$pwd_sys"; then
+		   sed -i '' -E "s|^${user}:.*|${_line}|" "$pwd_sys"
+		else
+		   echo "$_line" >> "$pwd_sys"
+		fi
+	done < $pwd_local
+
+	# Loop over each group in the .local file, and perform upsert
+	[ -e "$grp_local" ] && while IFS=':' read -r _line ; do
+		case "$_line" in ""|'#'*) continue ;; esac   # Skip empty lines/comments
+		local group="${_line%%:*}"
+
+		# Upsert logic for the group
+		if grep -Eqs "^${group}:" "$grp_sys"; then
+		   sed -i '' -E "s|^${group}:.*|${_line}|" "$grp_sys"
+		else
+		   echo "$_line" >> "$grp_sys"
+		fi
+	done < $grp_local
+
+	pwd_mkdb -p $pwd_sys   # Reconstruct the database after changes
+}
+# Trap door for chroot execution while maintaining unique functions and syntax highlighting
+if [ "$1" = "--internal" ]; then
+    perform_overlay
+    merge_passwd
+    exit 0
+fi
+
 . $2    # Source the libary. $2 is passed by /usr/local/etc/qubsd/jail.conf.d/base.conf
 
 main() {
 	JAIL="$1"
 
 	# If exec script fails and jail start aborts, make sure to clean up the mounts
-	trap "$QLEXEC/exec.release $JAIL"
+	trap "$QLEXEC/exec.release $JAIL" EXIT
 
-	# /rw/ nullfs mounts are best symlinked from within the cloned appjail's root
-	# Make sure flags are down for directory and file, then symlink to /rw
-	chroot ${M_QROOT}/${JAIL} /bin/sh <<"EOT"
-		for _file in $(find "/rw" -type f | sed "s:/rw::") ; do
-			if	[ -d "$(dirname $_file)" ] ; then
-				chflags noschg "$(dirname $_file)"
-				[ -e "$_file" ] && chflags noschg $_file
-			else
-				mkdir -p $(dirname $_file)
-			fi
-			ln -sf /rw${_file} $_file
-		done
-EOT
+	# Overlay must be symlinked with reference to the jail's root, not host (chroot).
+	cp "$0" ${M_QROOT}/${JAIL}/tmp/qb_prestart.sh && chmod +x ${M_QROOT}/${JAIL}/tmp/qb_prestart.sh
+	chroot "${M_QROOT}/${JAIL}" /bin/sh /tmp/qb_prestart.sh --internal
+
+	# Cleanup the tmp file and trap
+	rm "${M_QROOT}/${JAIL}/tmp/qb_prestart.sh"
+	trap - EXIT
 }
 
 get_global_variables
