@@ -23,6 +23,9 @@ merge_passwd() {
 	local pwd_local="/etc/master.passwd.local"
 	local grp_local="/etc/group.local"
 
+	# If there's a user for the rootjail at 1001, remove it.
+	pw userdel -u 1001 2>/dev/null
+
 	# Loop over each user in the .local file, and perform upsert
 	[ -e "$pwd_local" ] && while IFS=':' read -r _line ; do
 		case "$_line" in ""|'#'*) continue ;; esac   # Skip empty lines/comments
