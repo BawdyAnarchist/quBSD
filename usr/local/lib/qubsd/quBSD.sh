@@ -2257,8 +2257,8 @@ prep_bhyve_options() {
 		&& _slot=$(( _slot + 1 )) || _BLK_ZUSR=''
 
 	# 9p creates a shared directory for file transfer. Directory must exist or bhyve will fail
-	[ ! "$_control" = "none" ] && mkdir -p "$M_ZUSR/$_control/home/$_control/xfer/$_VM" 2>/dev/null
-   if [ -d "$M_ZUSR/$_control/home/$_control/xfer/$_VM" ] ; then
+   if [ ! "$_control" = "none" ] ; then
+		mkdir -p "$M_ZUSR/$_control/home/$_control/xfer/$_VM" 2>/dev/null
 		_BLK_9P="-s ${_slot},virtio-9p,xfer=$M_ZUSR/$_control/home/$_control/xfer/$_VM"
 		_slot=$(( _slot + 1 ))
 	fi
