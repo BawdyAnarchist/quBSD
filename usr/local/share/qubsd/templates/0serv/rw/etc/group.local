@@ -1,0 +1,2 @@
+# Groups to upsert into /etc/group at jail creation. (Similar function as rc.conf.local)
+0serv:*:1001:

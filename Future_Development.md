@@ -1,4 +1,10 @@
 
+Finish pwd changes
+  - quBSD.sh and any other scripts that create a user, should be modified. No more pw user creation. It's all config files now
+  - Make a commensurate VM implementation too
+
+Change /rw to /overlay. Get rid of the qubesisms. Not just do be different, but coz they genuinely didnt use the most ideal terminology
+
 VM PLAN: only remaining aspect is Linux and qb-create
  - Linux/ubuntu
     -- they actually have an overlayfs where you just add directories and it auto-tracks changes
@@ -31,10 +37,6 @@ Host as Unprivileged user
 	- doas commands allowed by unprivileged user
 	- Unprivileged user on host will pass jails SSH commands via Control Jail     
 	- Control jail pf will block all, except port 22 between host and jails     
-
-pwd: Overaul plan two parts:
-   - rootjail contains a default qubsd_pw.conf - Just a 1-liner manifest for basic user creation 
-   - /rw/etc/ (or /rw/usr/local/etc/) qubsd.conf.local - Users can add new groups/users. Created at jail start
 
 NICVM - Linux VM (probably alpine) so that it can use all the wireless cards. 
 
