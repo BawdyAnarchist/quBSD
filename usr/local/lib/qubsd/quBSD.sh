@@ -711,17 +711,6 @@ reclone_zroot() {
 	zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1
 	zfs clone -o qubsd:autosnap='false' "${_rootsnap}" ${_jailzfs}
 
-	# Jails need to usermod for unique user.
-	if ! chk_isvm "$_jail" ; then
-		get_jail_shell "$_jail"
-		# Drop the flags for etc directory and add the user for the jailname
-		chflags -R noschg ${M_QROOT}/${_jail}/etc/
-		pw -V ${M_QROOT}/${_jail}/etc/ useradd -n $_jail -u 1001 -d /home/${_jail} -s /bin/csh 2>&1
-		[ -d "${M_QROOT}/${_jail}/compat/ubuntu" ] \
-			&& chroot ${M_QROOT}/${_jail}/compat/ubuntu /bin/bash -c "
-					/usr/sbin/useradd -m -u 1001 -d /home/${_jail} -s /bin/bash ${_jail}
-			"
-	fi
 	eval $_R0
 }
 
@@ -770,15 +759,19 @@ reclone_zusr() {
 		; zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs} ;}
 
 	if ! chk_isvm ${_jail} ; then
-		# Drop the flags for etc directory and add the user for the jailname
-		[ -e "${M_ZUSR}/${_jail}/rw" ] && chflags -R noschg ${M_ZUSR}/${_jail}/rw
-		[ -e "${M_ZUSR}/${_jail}/home/${_template}" ] \
-				&& chflags noschg ${M_ZUSR}/${_jail}/home/${_template}
-		# Replace the <template> jailname in fstab with the new <jail>
-		sed -i '' -e "s/${_template}/${_jail}/g" ${M_ZUSR}/${_jail}/rw/etc/fstab > /dev/null 2>&1
+		local jailhome="${M_ZUSR}/${_jail}/home"
+		local pwd_local="${M_ZUSR}/${_jail}/rw/etc/master.passwd.local"
+		local grp_local="${M_ZUSR}/${_jail}/rw/etc/group.local"
 
-		# Rename directories and mounts with dispjail name
-		mv ${M_ZUSR}/${_jail}/home/${_template} ${M_ZUSR}/${_jail}/home/${_jail} > /dev/null 2>&1
+		# Drop the flags for the home directory and rename it from template to dispjail name
+		[ -e "$jailhome/$_template" ] \
+			&& chflags noschg $jailhome/$_template \
+			&& mv $jailhome/$_template $jailhome/$_jail > /dev/null 2>&1
+
+		# Change the local pwd from template name to dispjail name
+		[ -e "${M_ZUSR}/${_jail}/rw/etc" ] && chflags -R noschg ${M_ZUSR}/${_jail}/rw/etc
+		[ -e "$pwd_local" ] && sed -i '' -E "s|$_template:|$_jail:|g" $pwd_local
+		[ -e "$grp_local" ] && sed -i '' -E "s|$_template:|$_jail:|g" $grp_local
 	fi
 
 	eval $_R0
