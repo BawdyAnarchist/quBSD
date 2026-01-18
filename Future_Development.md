@@ -1,7 +1,7 @@
 
 Finish pwd changes
-  - quBSD.sh and any other scripts that create a user, should be modified. No more pw user creation. It's all config files now
   - Make a commensurate VM implementation too
+    -- DispVMs: Pretty sure to do this I need to do the zvol mounting thing and edit those files
 
 Change /rw to /overlay. Get rid of the qubesisms. Not just do be different, but coz they genuinely didnt use the most ideal terminology
 
