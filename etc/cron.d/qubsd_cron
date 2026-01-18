@@ -4,9 +4,9 @@ SHELL=/bin/sh
 PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 #
 #minute  hour  mday  month  wday  who   command
-30       *     *     *      *     root  qb-hostnet -c
-20,40    *     *     *      *     root  qb-autosnap -dst 60m
-0        *     *     *      *     root  qb-autosnap -dst 11H 
-2        4     *     *      *     root  qb-autosnap -dst 7D 
-2        16    *     *      *     root  qb-autosnap -dst 2D 
-5        4     *     *      1     root  qb-autosnap -st 6W 
+30       *     *     *      *     root  qb hostnet -c
+20,40    *     *     *      *     root  qb autosnap -dst 60m
+0        *     *     *      *     root  qb autosnap -dst 11H
+2        4     *     *      *     root  qb autosnap -dst 7D
+2        16    *     *      *     root  qb autosnap -dst 2D
+5        4     *     *      1     root  qb autosnap -st 6W
