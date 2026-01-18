@@ -52,13 +52,19 @@ merge_passwd() {
 		fi
 	done < $grp_local
 
-	pwd_mkdb -p $pwd_sys   # Reconstruct the database after changes
+	# Reconstruct the database after changes
+	pwd_mkdb -p $pwd_sys
+
+	# Check for compat, and apply the user there as well
+	[ -d "/compat/ubuntu" ] && export user && chroot /compat/ubuntu /bin/bash -c \
+		"/usr/sbin/useradd -m -u 1001 -d /home/${user} -s /bin/bash ${user} > /dev/null 2>&1"
 }
+
 # Trap door for chroot execution while maintaining unique functions and syntax highlighting
 if [ "$1" = "--internal" ]; then
-    perform_overlay
-    merge_passwd
-    exit 0
+	perform_overlay
+	merge_passwd
+	exit 0
 fi
 
 . $2    # Source the libary. $2 is passed by /usr/local/etc/qubsd/jail.conf.d/base.conf
