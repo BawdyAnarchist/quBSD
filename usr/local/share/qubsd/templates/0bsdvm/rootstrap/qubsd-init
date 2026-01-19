@@ -11,37 +11,78 @@ desc="Ensures /zusr datasets are imported/mounted, and /overlay files symlinked"
 rcvar="${name}_enable"
 start_cmd="${name}_start"
 
-qubsd_init_start() {
-
+mount_filesystems() {
 	# Make sure that the pool is imported
-	if ! zpool list zusr > /dev/null 2>&1 ; then 
+	if ! zpool list zusr > /dev/null 2>&1 ; then
 		zpool import -f zusr || return 0
 	fi
 
+	# Mount /zusr/home
+	[ -d "/zusr/home" ] && mount_nullfs /zusr/home /home
+
 	# Better to check-then-load than risk boot failure with a failed fstab entry
 	sysctl dev.virtio_p9fs | grep -Eqs "xfer" && mount -t p9fs xfer /xfer
-	
+}
+
+perform_overlay() {
 	# Link all the files in overlay to their respective host locations
 	for _file in $(find "/zusr/overlay" -type f | sed "s:/zusr/overlay::") ; do
 		[ -d "$(dirname $_file)" ] || mkdir -p $(dirname $_file)
 		ln -sf /zusr/overlay${_file} $_file
 	done
-	
-	# Mount /zusr/home. If no passwd file, assume all directories are pw users
-	if [ -d "/zusr/home" ] ; then
-		mount_nullfs /zusr/home /home
+}
 
-		# Only create the users if there isnt a dedicated pw file
-		if [ ! -e "/zusr/overlay/etc/master.passwd" ] ; then
-			for _user in $(find "/home" -type d | sed "s:/home/::") ; do
-				pw useradd -n $_user -d /home/$_user -s /bin/csh -m
-			done
+merge_passwd() {
+	# Perform upsert for the overlay master.passwd.local and group.local
+
+	local pwd_sys="/etc/master.passwd"
+	local grp_sys="/etc/group"
+	local pwd_local="/etc/master.passwd.local"
+	local grp_local="/etc/group.local"
+
+	# If there's a user for the rootjail at 1001, remove it.
+	pw userdel -u 1001 2>/dev/null
+
+	# Loop over each user in the .local file, and perform upsert
+	[ -e "$pwd_local" ] && while IFS=':' read -r _line ; do
+		case "$_line" in ""|'#'*) continue ;; esac   # Skip empty lines/comments
+		local user="${_line%%:*}"
+
+		# Upsert logic for the user
+		if grep -Eqs "^${user}:" "$pwd_sys"; then
+		   sed -i '' -E "s|^${user}:.*|${_line}|" "$pwd_sys"
+		else
+		   echo "$_line" >> "$pwd_sys"
 		fi
-	fi
+	done < $pwd_local
+
+	# Loop over each group in the .local file, and perform upsert
+	[ -e "$grp_local" ] && while IFS=':' read -r _line ; do
+		case "$_line" in ""|'#'*) continue ;; esac   # Skip empty lines/comments
+		local group="${_line%%:*}"
+
+		# Upsert logic for the group
+		if grep -Eqs "^${group}:" "$grp_sys"; then
+		   sed -i '' -E "s|^${group}:.*|${_line}|" "$grp_sys"
+		else
+		   echo "$_line" >> "$grp_sys"
+		fi
+	done < $grp_local
+
+	# Reconstruct the database after changes
+	pwd_mkdb -p $pwd_sys
+}
+
+qubsd_init_start() {
+	mount_filesystems
+	perform_overlay
+	merge_passwd
 
 	# SIGALRM forces an rc config reload, which now has the symlinked rc.conf.local
 	kill -ALRM $RC_PID
 }
-
+	
 load_rc_config $name
 run_rc_command "$1"
+
+

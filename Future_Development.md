@@ -1,4 +1,6 @@
 
+add a /root/.cshrc to the rootenvs
+
 Finish pwd changes
   - Make a commensurate VM implementation too
     -- DispVMs: Pretty sure to do this I need to do the zvol mounting thing and edit those files

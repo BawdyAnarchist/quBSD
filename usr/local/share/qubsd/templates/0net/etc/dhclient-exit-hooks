@@ -1,18 +1,18 @@
 #!/bin/sh
 
-# quBSD: This script does nothing, because pf is now robust to interface
-#        changes and doesnt rely on IP addresses for the external interface.
+# quBSD: This script does nothing, because ifconfig GROUPS made pf robust to
+#        interface changes (doesnt rely on IP addr for the external interface).
 #        Keeping as a placeholder in case future gateway usecases call for it.
 
 no_run() {
-	# Exit if not a reason we care about, or if the IP didnt change 
-	echo "$reason" | grep -Eqs "BOUND|RENEW|REBIND|REBOOT" || exit 0 
+# Exit if not a reason we care about, or if the IP didnt change 
+echo "$reason" | grep -Eqs "BOUND|RENEW|REBIND|REBOOT" || exit 0 
 
-	# Only restart pf if the new addr is different from the old
-	if [ ! "$old_ip_address" = "$new_ip_address" ] ; then 
-		echo "$new_ip_address" > /etc/pf_EXT_IF.table
-		service pf restart
-	fi
+# Only restart pf if the new addr is different from the old
+if [ ! "$old_ip_address" = "$new_ip_address" ] ; then 
+	echo "$new_ip_address" > /etc/pf_EXT_IF.table
+	service pf restart
+fi
 }
 
 exit 0
