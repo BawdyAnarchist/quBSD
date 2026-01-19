@@ -8,14 +8,9 @@
 
 alias h     history 25
 alias j     jobs -l
-alias ls	   ls -1IG
-alias lsc	ls -CIG
-alias lsa   ls -1AGI 
-alias lsac  ls -CAGI 
-alias lsr   ls -CGIR
+alias ls    ls -1IG
 alias lsar  ls -CAGIR
 alias vi    vim
-alias sha   sha256sum
 
 # A righteous umask
 umask 22
