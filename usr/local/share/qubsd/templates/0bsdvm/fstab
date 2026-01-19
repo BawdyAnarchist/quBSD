@@ -1,3 +1,0 @@
-# Device           Mountpoint   FStype     Options  Dump  Pass#
-/dev/gpt/efiboot   /boot/efi    msdosfs    rw       2     2
-share              /share       p9fs       rw       0     0

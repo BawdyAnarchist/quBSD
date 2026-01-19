@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# Weird permissions issue has to be resovled for tor to start
+chgrp _tor /dev/pf
+chmod g+rw /dev/pf	
