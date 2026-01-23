@@ -1,0 +1,29 @@
+#!/bin/sh
+# /usr/local/etc/rc.d/qubsd-dhcpd
+
+# PROVIDE: qubsd_dhcpd
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="qubsd_dhcpd"
+desc="Monitors, starts, or restarts dhclient for interfaces with GROUP: DHCP"
+rcvar="${name}_enable"
+command="/usr/local/bin/qubsd-dhcp"
+pidfile="/var/run/qubsd-dhcpd.pid"
+procname="/bin/sh"
+
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+
+qubsd_dhcpd_stop() {
+	rm $pidfile	
+}
+
+qubsd_dhcpd_start() {
+	/usr/sbin/daemon -p ${pidfile} ${command} ${pidfile}
+}
+
+load_rc_config $name
+run_rc_command "$1"

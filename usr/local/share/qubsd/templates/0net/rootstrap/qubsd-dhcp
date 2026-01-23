@@ -1,0 +1,55 @@
+#!/bin/sh
+# /usr/local/bin/qubsd-dhcp
+
+# Unifed script for jails and FreeBSD VMs. Monitors for new interfaces or zombie connections,
+# and uses a fail-fast recover-fast mechanism if the gateway disconnects/restarts.
+
+write_dhclient_conf() {
+# There is little reason to renegotiate frequently, so timeout is set high.
+# Little/no backoff. Keep trying, so gateway restarts dont see long waits for connection return.
+cat << EOF
+timeout 600;
+retry 1;
+initial-interval 1;
+backoff-cutoff 1;
+EOF
+}
+
+monitor_connection() {
+	# Check for a dhclient process for the interface. Verify connection, or bring up a new one.
+	local addr
+	if pgrep -qfl "dhclient.*$_intf" ; then
+
+		# Verify the connection is still live; or reset dhcp immediately (fail fast, recover fast)
+		addr=$(ifconfig $_intf | sed -En "s/[[:blank:]]*inet ([^[:blank:]]+) .*/\1/p")
+		if [ "$addr" ] ; then 
+			! ping -qot 5 ${addr%?}1 > /dev/null 2>&1 \
+				&& pkill -15 -f "dhclient.*$_intf" \
+				&& ifconfig $_intf -alias
+		fi
+
+	else
+		# No dhclient process. Start one
+		dhclient -bc /tmp/qubsd_dhclient.conf $_intf
+		sleep 1    # Sleep prevents multiple intfs from locking up resolv.conf by dhclient
+	fi
+}
+
+main() {
+	# Write aggressive dhclient settings since these are virtual intfs in jails on host 
+	write_dhclient_conf > /tmp/qubsd_dhclient.conf
+
+	# Monitor for new interfaces that appear as ifconfig group DHCPD
+	while [ -f "$pidfile" ] ; do
+		for _intf in $(ifconfig -g DHCPD) ; do
+			monitor_connection
+		done
+		sleep 2
+	done
+}
+
+pidfile="$1"
+
+main
+
+exit 0

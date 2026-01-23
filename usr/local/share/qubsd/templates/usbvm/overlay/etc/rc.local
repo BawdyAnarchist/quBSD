@@ -7,5 +7,5 @@ kldload fusefs
 directories="/bin /boot /entropy /etc /lib /libexec /net /proc /rescue /sbin /sys /tmp /usr /zroot"
 
 for _dir in $directories ; do
-	[ -d "$_dir" ] && chflags -fR schg $_dir/
+#	[ -d "$_dir" ] && chflags -fR schg $_dir/
 done

@@ -1,4 +1,5 @@
 #!/bin/sh
+# /usr/local/etc/rc.d/qubsd-init
 
 # PROVIDE: qubsd-init
 # BEFORE: FILESYSTEMS

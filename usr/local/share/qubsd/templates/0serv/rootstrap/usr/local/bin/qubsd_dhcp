@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# Monitors for new interfaces with the ifconfig group 'DHCP', and starts dhclient for them 
+# No need to teardown dhclient later, as dhclient exits on its own when intf disappears
+
+write_dhclient_conf() {
+cat << EOF
+timeout 60;
+retry 1;
+initial-interval 1;
+backoff-cutoff 5;
+EOF
+}
+
+main() {
+	# Write aggressive dhclient settings since these are virtual intfs in jails on host 
+	write_dhclient_conf > /tmp/qubsd_dhclient.conf
+
+	# Monitor for new interfaces that appear as ifconfig group DHCP
+	while [ -f "$pidfile" ] ; do
+		for _intf in $(ifconfig -g DHCP) ; do
+		
+			# Check that the interface has a dhclient process running, or start one
+			! pgrep -qfl "dhclient.*$_intf" && dhclient -bc /tmp/qubsd_dhclient.conf $_intf
+			sleep 1    # Sleep prevents multiple intfs from locking up resolv.conf by dhclient
+
+		done
+		sleep 1
+	done
+}
+
+pidfile="$1"
+
+main
+
+exit 0

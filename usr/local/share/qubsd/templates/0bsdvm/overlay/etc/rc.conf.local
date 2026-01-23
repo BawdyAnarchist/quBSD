@@ -1,1 +1,1 @@
-ifconfig_vtnet0="DHCP"
+ifconfig_vtnet0="group DHCPD"

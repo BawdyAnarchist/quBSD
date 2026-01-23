@@ -1,0 +1,2 @@
+# Users to upsert into master.passwd at jail creation. (Similar function as rc.conf.local)
+0zusr:*:1001:1001::0:0:User &:/home/0zusr:/bin/csh
