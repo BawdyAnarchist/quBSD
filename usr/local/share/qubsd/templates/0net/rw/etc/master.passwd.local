@@ -1,1 +1,0 @@
-# Users to upsert into master.passwd at jail creation. (Similar function as rc.conf.local)

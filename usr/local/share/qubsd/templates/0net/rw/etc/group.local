@@ -1,1 +1,0 @@
-# Groups to upsert into /etc/group at jail creation. (Similar function as rc.conf.local)
