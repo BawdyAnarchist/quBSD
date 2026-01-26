@@ -86,7 +86,7 @@ main() {
 	download_base &
 	
 	# Install dependencies - possibly also xpra, xephyr, and doas in later revisions
-	pkg install -y bhyve-firmware tmux
+	pkg install -y bhyve-firmware tmux e2fsprogs-core
 
 	fetch_repo
 	copy_repo	
