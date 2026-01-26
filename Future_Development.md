@@ -1,4 +1,8 @@
 
+Jail starts are delayed for some reason. Need to see why.
+
+Probably need to add an fstab.local, just for generalization purposes if th
+
 Fix isc-dhcpd. It has to be restarted every time to force it to "see" a new request. I think maybe that has to be part of the connection procedure, and right now, it's not.
 
 Change /rw to /overlay. Get rid of the qubesisms. Not just do be different, but coz they genuinely didnt use the most ideal terminology
