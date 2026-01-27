@@ -402,7 +402,7 @@ change_datasets() {
 	# ZROOT changes: Only a new ROOTENV is duplicated. Everything else is cloned.
 	if [ -z "${CLASS##rootVM}" ] ; then
 		# Create the empty dataset
-		zfs create -V ${VOLSIZE} -o volmode=dev $_ASNAP ${R_ZPARENT} && return 0
+		zfs create -o atime=off -V ${VOLSIZE} -o volmode=dev $_ASNAP ${R_ZPARENT} && return 0
 	elif [ -z "${CLASS##rootjail}" ] ; then
 		echo ''
 		zfs send -vP "$R_SNAP" | zfs recv -v $_ASNAP ${R_ZFS}/${NEWJAIL}
@@ -445,11 +445,11 @@ change_datasets() {
 		dirs)
 			if [ "$_ZCRYPT1" ] ; then
 				# Create the new encrypted dataset, and mount it
-				zfs create $_ASNAP $_ZCRYPT1 ${U_ZFS}/${NEWJAIL}
+				zfs create -o atime=off $_ASNAP $_ZCRYPT1 ${U_ZFS}/${NEWJAIL}
 				zfs mount -l "${U_ZFS}/${NEWJAIL}"
 			else
 				# Create the empty dataset
-				zfs create $_ASNAP ${U_ZFS}/${NEWJAIL}
+				zfs create -o atime=off $_ASNAP ${U_ZFS}/${NEWJAIL}
 			fi
 
 			# Create the directory mapping of the template
@@ -471,7 +471,7 @@ change_datasets() {
 		empty) # Create the empty dataset/volume
 			# If VM, create a volume instead
 			chk_isvm -c "$CLASS" && _VOLmod="-V ${VOLSIZE} -o volmode=dev"
-			zfs create $_ASNAP $_VOLmod $_ZCRYPT1 ${U_ZFS}/${NEWJAIL}
+			zfs create -o atime=off $_ASNAP $_VOLmod $_ZCRYPT1 ${U_ZFS}/${NEWJAIL}
 
 			# VMs with zfs volumes dont get any file-level modifications later in this function
 			[ "$_VOLmod" ] && return 0
