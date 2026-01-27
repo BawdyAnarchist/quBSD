@@ -29,14 +29,14 @@ get_datasets() {
 	# Loop until valid dataset is entered (either already exists, or could be created)
 	while : ; do
 		zfs list "$jails_zfs" > /dev/null 2>&1 && break
-		zfs create -n "$jails_zfs" > /dev/null 2>&1 && break
+		zfs create -o atime=off -n "$jails_zfs" > /dev/null 2>&1 && break
 
 		msg_installer "_m1"
 		read jails_zfs
 	done
 	while : ; do
 		zfs list "$zusr_zfs" > /dev/null 2>&1 && break
-		zfs create -n "$zusr_zfs" > /dev/null 2>&1 && break
+		zfs create -o atime=off -n "$zusr_zfs" > /dev/null 2>&1 && break
 
 		msg_installer "_m2"
 		read zusr_zfs
@@ -165,10 +165,10 @@ final_confirmation() {
 
 create_datasets() {
 	# Create datasets and modify custom props appropriately
-	zfs list $jails_zfs > /dev/null 2>&1 || zfs create $jails_zfs
+	zfs list $jails_zfs > /dev/null 2>&1 || zfs create -o atime=off $jails_zfs
 	zfs set mountpoint="$jails_mount" qubsd:autosnap=true $jails_zfs
 
-	zfs list $zusr_zfs > /dev/null 2>&1	|| zfs create $zusr_zfs
+	zfs list $zusr_zfs > /dev/null 2>&1	|| zfs create -o atime=off $zusr_zfs
 	zfs set mountpoint="$zusr_mount"  qubsd:autosnap=true $zusr_zfs
 }
 
@@ -286,7 +286,7 @@ add_gui_pkgs() {
 
 install_rootjails() {
 	# Create 0base and extract new jail
-	zfs create -o mountpoint="${jails_mount}/0base" -o qubsd:autosnap="true" ${jails_zfs}/0base
+	zfs create -o atime=off -o mountpoint="${jails_mount}/0base" -o qubsd:autosnap="true" ${jails_zfs}/0base
 	tar -C ${jails_mount}/0base -xf /usr/local/freebsd-dist/base.txz
 
 	# Copy and modify files (copy all 0base user rc and conf files to root for convenience)
@@ -334,7 +334,7 @@ install_appjails() {
 	appjails="0base 0net 0control net-firewall net-vpn net-tor $appjails"
 
 	for _jail in $appjails ; do
-		zfs create -o mountpoint="${zusr_mount}/${_jail}" -o qubsd:autosnap="true" ${zusr_zfs}/${_jail}
+		zfs create -o atime=off -o mountpoint="${zusr_mount}/${_jail}" -o qubsd:autosnap="true" ${zusr_zfs}/${_jail}
 		cp -a ${REPO}/zusr/${_jail}/ ${zusr_mount}/${_jail}
 		modify_fstab "$_jail"
 		zfs snapshot ${zusr_zfs}/${_jail}@INSTALL
