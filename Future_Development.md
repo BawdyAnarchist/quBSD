@@ -1,17 +1,11 @@
-
+remember to atime=off all your datasets now
 Jail starts are delayed for some reason. Need to see why.
-
-Probably need to add an fstab.local, just for generalization purposes if th
 
 Fix isc-dhcpd. It has to be restarted every time to force it to "see" a new request. I think maybe that has to be part of the connection procedure, and right now, it's not.
 
 Change /rw to /overlay. Get rid of the qubesisms. Not just do be different, but coz they genuinely didnt use the most ideal terminology
 
 Review 0control SSH connections and comment them out. Keep them in the code just in case, but they should be disabled. The only real need was VM file /xfer, and that's now p9fs. Probably doas is the right vector here from a normal non-root user on host.
-
-VM pw implementation matches jails
-   -- DispVMs: Pretty sure to do this I need to do the zvol mounting thing and edit those files
-
 
 VM PLAN: only remaining aspect is Linux and qb-create
  - Linux/ubuntu
@@ -20,6 +14,7 @@ VM PLAN: only remaining aspect is Linux and qb-create
  - Incorporate new VM / installer model to the installer script.
  - Incorporate new VM model to qb-create. Script needs reviewed and with better integration
  - qubsd-dhcpd or something equivalent in settings? 
+ - dispVMs for Linux mount the ext4 and edit the pw
 
 qb-start
 	- Needs updated with new networking functions in mind
