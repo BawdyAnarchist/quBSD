@@ -272,6 +272,10 @@ ENDOFMSG
    Control jail < $_gateway > should only ever have IPV4 < auto > or < dhcp >
 ENDOFMSG
 	;;
+	_e35) cat << ENDOFMSG
+   Cannot reclone zusr, because < $1 > is currently running.
+ENDOFMSG
+	;;
 	_w1) cat << ENDOFMSG
 WARNING: < $1 > had to be forcibly stopped. Recommend double
    checking mounts with: mount | grep $1

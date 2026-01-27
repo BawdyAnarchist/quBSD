@@ -722,59 +722,100 @@ reclone_zusr() {
 
 	# Variables definitions
 	local _jail="$1"
-	local _jailzfs="${U_ZFS}/${_jail}"
+	local _jailzfs="$U_ZFS/$_jail"
 	local _template="$2"
-	local _templzfs="${U_ZFS}/${_template}"
 	local _date=$(date +%s)
 	local _ttl=$(( _date + 30 ))
-	local _newsnap="${_templzfs}@${_date}"
-	local _presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
 
+	# Basic checks, and do not attempt this on a running container
 	[ -z "$_jail" ] && get_msg $_qr -m _e0 -- "jail" && eval $_R1
 	[ -z "$_template" ] && get_msg $_qr -m _e0 -- "template" && eval $_R1
-  ! chk_valid_zfs "$_templzfs" && get_msg $_qr -m _e0 -- "template" && eval $_R1
+	! chk_valid_zfs "$U_ZFS/$_template" && get_msg $_qr -m _e0 -- "template" && eval $_R1
+	chk_isrunning "$_jail" && get_msg $_qr -m _e35 && -- "$_jail" eval $_R1
 
-	# `zfs-diff` from other jails causes a momentary snapshot which the reclone operation
-	if chk_valid_zfs "$_presnap" ; then
-		while [ -z "${_presnap##*@zfs-diff*}" ] ; do
-			# Loop until a proper snapshot is found
-			sleep .1
-			_presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)
-		done
-	fi
+	# Destroy the existing zusr dataset. Suppress error in case the dataset doesnt exist
+	zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1
 
-	# If there's a presnap, and no changes since then, use it for the snapshot.
-	[ "$_presnap" ] && ! [ "$(zfs diff "$_presnap" "$_templzfs")" ] && _newsnap="$_presnap"
+	# There is no `clone recursive`. Must find all the children and clone them one by one
+	local _datasets=$(zfs list -Hro name "$U_ZFS/$_template")
+	for _templzfs in $_datasets ; do
+		_newsnap="${_templzfs}@${_date}"                                  # Potential temporary snapshot
+		_presnap=$(zfs list -t snapshot -Ho name ${_templzfs} | tail -1)  # Latest snapshot
 
-	# If they're equal, then the valid/current snapshot already exists. Otherwise, make one.
-	if ! [ "$_newsnap" = "$_presnap" ] ; then
-		# Clone and set zfs params so snapshot will get auto deleted later.
-		zfs snapshot -o qubsd:destroy-date="$_ttl" \
-		 				 -o qubsd:autosnap='-' \
-						 -o qubsd:autocreated="yes" "$_newsnap"
-	fi
+		# Use "written" to detect any changes to the dataset since last snapshot
+		if [ $(zfs list -Ho written "$_templzfs") -eq 0 ] ; then
+			_source_snap="$_presnap"          # No changes, use the old snapshot
+		else
+			# Changes detected, create a new, short-lived snapshot
+			_source_snap="$_newsnap"
+			zfs snapshot -o qubsd:destroy-date="$_ttl"
+				-o qubsd:autosnap='-' -o qubsd:autocreated="yes" "$_newsnap"
+		fi
 
-   # Destroy the dataset and reclone it (only if jail is off).
-	! chk_isrunning "$_jail" && { zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1 \
-		; zfs clone -o qubsd:autosnap='false' "${_newsnap}" ${_jailzfs} ;}
+		# Substitute the jail/vm name for the template name
+		_newclone=$(echo $_templzfs | sed -E "s|/${_template}|/${_jail}|")
+		zfs clone -o qubsd:autosnap="false" $_source_snap $_newclone
+	done
 
-	if ! chk_isvm ${_jail} ; then
-		local jailhome="${M_ZUSR}/${_jail}/home"
-		local pwd_local="${M_ZUSR}/${_jail}/rw/etc/master.passwd.local"
-		local grp_local="${M_ZUSR}/${_jail}/rw/etc/group.local"
-
-		# Drop the flags for the home directory and rename it from template to dispjail name
-		[ -e "$jailhome/$_template" ] \
-			&& chflags noschg $jailhome/$_template \
-			&& mv $jailhome/$_template $jailhome/$_jail > /dev/null 2>&1
-
-		# Change the local pwd from template name to dispjail name
-		[ -e "${M_ZUSR}/${_jail}/rw/etc" ] && chflags -R noschg ${M_ZUSR}/${_jail}/rw/etc
-		[ -e "$pwd_local" ] && sed -i '' -E "s|$_template:|$_jail:|g" $pwd_local
-		[ -e "$grp_local" ] && sed -i '' -E "s|$_template:|$_jail:|g" $grp_local
+	# Dispjails need to adjust pw after cloning the template
+	if chk_isvm ${_jail} ; then
+		set_dispvm_pw
+	else
+		local prefix="${M_ZUSR}/${_jail}/rw"
+		set_freebsd_pw
 	fi
 
 	eval $_R0
+}
+
+set_dispvm_pw() {
+	local persist="$_jailzfs/persist"
+	local zvol="/dev/zvol/$persist"
+	local volmnt="/mnt/$persist"
+
+	zfs set volmode=geom $persist
+	fs_type=$(fstyp $zvol)
+	case "$fs_type" in
+		ufs)
+			mkdir -p $volmnt
+			mount -o rw $zvol $volmnt
+			local prefix="$volmnt/overlay"
+			set_freebsd_pw
+			;;
+		ext*)
+			kldstat -qn ext2fs || kldload -n ext2fs
+			mount -t ext2fs -o rw $zvol $volmnt
+			set_linux_pw
+			;;
+		*) # INSERT ERROR MESSAGE SYSTEM HERE
+			;;
+	esac
+
+	umount $volmnt
+	rm -r /mnt/$U_ZFS
+	zfs set volmode=dev $zvol
+}
+
+set_freebsd_pw() {
+	local jailhome="${prefix%/*}/home"   # Must remove /rw or /overlay to access /home
+	local etc_local="$prefix/etc"
+	local pwd_local="$prefix/etc/master.passwd.local"
+	local grp_local="$prefix/etc/group.local"
+
+	# Drop the flags for the home directory and rename it from template to dispjail name
+	[ -e "$jailhome/$_template" ] \
+		&& chflags noschg $jailhome/$_template \
+		&& mv $jailhome/$_template $jailhome/$_jail > /dev/null 2>&1
+
+	# Change the local pwd from template name to dispjail name
+	[ -e "$etc_local" ] && chflags -R noschg $etc_local
+	[ -e "$pwd_local" ] && sed -i '' -E "s|^$_template:|$_jail:|g" $pwd_local
+	[ -e "$grp_local" ] && sed -i '' -E "s/(:|,)$_template(,|[[:blank:]]|\$)/\1$_jail\2/g" $grp_local
+}
+
+set_linux_pw() {
+	# EMPTY FOR NOW. WILL FILL LATER WHEN THE LINUS OVERLAYFS IS A KNOWN ENTITY
+	return 0
 }
 
 select_snapshot() {
@@ -1850,7 +1891,7 @@ connect_client_to_gateway() {
 	esac
 	case $ipv4 in
 		DHCP)
-			_groupmod="group DHCP"   # Later for ifconfig interface groups
+			_groupmod="group DHCPD"  # Later for ifconfig interface groups
 			chk_isvm $_gateway || _gw_ip=$(discover_open_ipv4 -g -t "$_type" -- "$_client" "$_gateway")
 			;;
 		auto)
@@ -2106,10 +2147,11 @@ cleanup_vm() {
 	[ -z "$_rootenv" ] && ! _rootenv=$(get_jail_parameter -e ROOTENV $_VM) && eval $_R1
 	reclone_zroot -q "$_VM" "$_rootenv"
 
-	# If it's a dispVM then get the template, and reclone it
-	[ "$(get_jail_parameter -es CLASS $_VM)" = "dispVM" ] && [ -z "$_template" ] \
-		&& ! _template=$(get_jail_parameter -e TEMPLATE $_VM) && eval $_R1
-	[ -n "$_template" ] && reclone_zusr "$_VM" "$_template"
+	# If it's a dispVM with a template, then make a fresh clone of the template zusr (all children)
+	local _template=$(get_jail_parameter -e TEMPLATE $_VM)
+	if [ "$_template" ] && [ "$(get_jail_parameter -es CLASS $_VM)" = "dispVM" ] ; then
+		reclone_zusr "$_VM" "$_template" || eval $_R1
+	fi
 
 	# Remove the /tmp files
 	rm "${QRUN}/qb-bhyve_${_VM}" 2> /dev/null
@@ -2238,6 +2280,7 @@ prep_bhyve_options() {
 			;;
 		esac
 	done
+
 	# Output the final _cpupin string
 	[ -z "$_CPU" ] && _CPU="-c $_vcpu_count"
 	unset IFS
@@ -2251,10 +2294,12 @@ prep_bhyve_options() {
 	_slot=$(( _slot + 1 ))
 
 	# Assign zusr blk device. Must be a volume; or should be blank
-	chk_valid_zfs "${U_ZFS}/${_VM}" \
-		&& zfs list -Ho type "${U_ZFS}/${_VM}" | grep -qs "volume" \
-		&& _BLK_ZUSR="-s ${_slot},virtio-blk,/dev/zvol/${U_ZFS}/${_VM}" \
-		&& _slot=$(( _slot + 1 )) || _BLK_ZUSR=''
+	_zvols=$(zfs list -Hro name -t volume $U_ZFS/$_VM)
+	[ -z "$_zvols" ] && _BLK_ZUSR=''    # Set the variable to empty if no volumes are present
+	for _vol in $_zvols ; do
+		_BLK_ZUSR="-s ${_slot},virtio-blk,/dev/zvol/$_vol"
+		_slot=$(( _slot + 1 ))
+	done
 
 	# 9p creates a shared directory for file transfer. Directory must exist or bhyve will fail
    if [ ! "$_control" = "none" ] ; then
@@ -2379,15 +2424,15 @@ rootstrap_bsdvm() {
 			&& get_msg $_q -m _e1 -- "$volsize" "zvol size" && eval $_R1
 
 	# Interim variables
-	vm_zroot="zroot/qubsd/$_VM"
-	zvol="/dev/zvol/zroot/qubsd/$_VM"
-	distdir="$QSHARE/freebsd-dist"
-	release=$(freebsd-version -u | cut -d- -f1)
-	arch=$(uname -m)
-	bsdvm="$QSHARE/templates/0bsdvm/rootstrap"
-	tmp_zpool="zrootvm"
-	alt_mnt="/mnt/$tmp_zpool"
-	timeout=5
+	local vm_zroot="zroot/qubsd/$_VM"
+	local zvol="/dev/zvol/zroot/qubsd/$_VM"
+	local distdir="$QSHARE/freebsd-dist"
+	local release=$(freebsd-version -u | cut -d- -f1)
+	local arch=$(uname -m)
+	local bsdvm="$QSHARE/templates/0bsdvm/rootstrap"
+	local tmp_zpool="zrootvm"
+	local alt_mnt="/mnt/$tmp_zpool"
+	local timeout=5
 
 	# Check network connection, inform if missing, give option to procede or exit
 	if ping -ot $timeout freebsd.org > /dev/null 2>&1 ; then
@@ -2405,7 +2450,7 @@ rootstrap_bsdvm() {
 	[ "$(grep -o "[[:digit:]].*" $distdir/GITBRANCH)" = "$release" ] || bsdinstall distfetch
 
 	# Create the zvol and partitions
-	zfs create -V $volsize -o volmode=geom -o qubsd:autosnap=true $vm_zroot
+	zfs create -o atime=off -V $volsize -o volmode=geom -o qubsd:autosnap=true $vm_zroot
 	gpart create -s gpt "$zvol"
 	gpart add -t efi -s 200M -l efiboot "$zvol"
 	gpart add -t freebsd-zfs -l rootfs "$zvol"
@@ -2414,8 +2459,9 @@ rootstrap_bsdvm() {
 	# zpool -t deconflicts host zroot with the vm's 'zroot'. No cachefile created (not really necessary for VM)
 	sysctl vfs.zfs.vol.recursive=1    # zpool create WILL NOT WORK without this
 	zpool create -f -o altroot="$alt_mnt" -O mountpoint=/zroot -O atime=off -t ${tmp_zpool} zroot ${zvol}p2
-	zfs create -o mountpoint=none ${tmp_zpool}/ROOT
-	zfs create -o mountpoint=/ ${tmp_zpool}/ROOT/default
+	sysctl vfs.zfs.vol.recursive=0    # recursive is deadlock prone. Set it back to default
+	zfs create -o atime=off -o mountpoint=none ${tmp_zpool}/ROOT
+	zfs create -o atime=off -o mountpoint=/ ${tmp_zpool}/ROOT/default
 	zpool set bootfs=$tmp_zpool/ROOT/default $tmp_zpool
 
 	# Extract the distribution to the VM root
@@ -2439,6 +2485,8 @@ rootstrap_bsdvm() {
 	cp -a $bsdvm/sysctl.conf $alt_mnt/etc/sysctl.conf
 	cp -a /etc/localtime     $alt_mnt/etc/localtime
 	cp -a $bsdvm/qubsd-init  $alt_mnt/usr/local/etc/rc.d
+	cp -a $bsdvm/qubsd-dhcp  $alt_mnt/usr/local/bin/qubsd-dhcp
+	cp -a $bsdvm/qubsd-dhcpd $alt_mnt/usr/local/etc/rc.d/qubsd-dhcpd
 	sysrc -f $bsdvm/rc.conf hostname="$_VM"
 	
 	if [ "$network" ] ; then
@@ -2484,32 +2532,26 @@ configure_bsdvm_zusr() {
 			&& get_msg $_q -m _e1 -- "$volsize" "zvol size" && eval $_R1
 
 	# Interim variables
-	vm_zusr="zusr/$_VM"
-	zvol="/dev/zvol/zusr/$_VM"
-	tmp_zpool="zusrvm"
-	alt_mnt="/mnt/$tmp_zpool"
+	local vm_zusr="zusr/$_VM/persist"
+	local zvol="/dev/zvol/$vm_zusr"
+	local mnt="/mnt/$_VM"
 
-	zfs create -V $volsize -o volmode=geom -o qubsd:autosnap=true $vm_zusr
-	gpart create -s gpt "$zvol"
-	gpart add -t freebsd-zfs "$zvol"
+	# Create the zvol, filesystem, and mount it
+	zfs create -o atime=off -o qubsd:autosnap=true $U_ZFS/$_VM
+	zfs create -o atime=off -V $volsize -o volmode=geom -o qubsd:autosnap=true $vm_zusr
+	newfs -L zusr $zvol	  # Creates a label used in qubsd-init to identify the primary persistence drive
+	mkdir -p $mnt
+	mount $zvol $mnt
 	
-	# zpool -t deconflicts host zroot with the vm's 'zusr'. No cachefile created (not really necessary for VM)
-	sysctl vfs.zfs.vol.recursive=1    # zpool create WILL NOT WORK without this
-	zpool create -f -o altroot="$alt_mnt" -O mountpoint=/zusr -O atime=off -t ${tmp_zpool} zusr ${zvol}p1
-
 	# Files and directories to prepare for a running system
-	mkdir -p $alt_mnt/zusr/overlay       # All zusr should come with an overlay directory, even if empty
 	if [ "$_dircopy" ] ; then            # Preference user specified directory
-		cp -a $_dircopy/ $alt_mnt/zusr/
+		cp -a $_dircopy/ $mnt
 	elif [ -e "$QSHARE/templates/$_VM" ] ; then   # Fallback - If VM name matches a template, use it
-		cp -a $QSHARE/templates/$_VM $alt_mnt/zusr/
-	else
-		mkdir -p $alt_mnt/zusr/home/$_VM  # Otherwise assume the user just wants an empty but available VM user
+		cp -a $QSHARE/templates/$_VM $mnt
 	fi
 
-	umount $alt_mnt/zusr
-	rm -r $alt_mnt
-	zpool export $tmp_zpool
+	umount $mnt
+	rm -r $mnt
 	zfs set volmode=dev $vm_zusr
 }
 
