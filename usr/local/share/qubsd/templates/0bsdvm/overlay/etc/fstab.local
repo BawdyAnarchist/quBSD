@@ -1,0 +1,4 @@
+# These devices will be mounted by qubsd-init
+# Device    Mountpoint  FStype   Options  Dump  Pass#
+xfer        /xfer       p9fs     rw       0     0
+#/zusr/home  /home       nullfs   rw       0     0
