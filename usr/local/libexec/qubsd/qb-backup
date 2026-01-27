@@ -149,7 +149,8 @@ final_confirmation() {
 create_dataset_path() {
 	_PART="$ZBAK"
 	for _part in $(echo ${_dataset%/*} | sed 's#/# #g') ; do
-		! chk_valid_zfs "${_PART}/${_part}" && echo zfs create "${_PART}/${_part}"  && zfs create "${_PART}/${_part}"
+		! chk_valid_zfs "${_PART}/${_part}" && echo zfs create -o atime=off "${_PART}/${_part}" \
+			&& zfs create -o atime=off "${_PART}/${_part}"
 		_PART="${_PART}/${_part}"
 	done
 }
@@ -159,7 +160,7 @@ execute_backup() {
 	[ -e "$BAK_LOG" ] && rm $BAK_LOG
 
 	# Create the parent dataset if it doesnt already exist, and not doing a dry run
-	[ -z "$NORUN" ] && ! chk_valid_zfs "$ZBAK" && zfs create "${ZBAK}"
+	[ -z "$NORUN" ] && ! chk_valid_zfs "$ZBAK" && zfs create -o atime=off "${ZBAK}"
 
 	# Perform the backup
 	for _dataset in $DATASETS ; do
@@ -176,7 +177,7 @@ execute_backup() {
 			zfs send -nvw $REPL $_snap | tee -a $BAK_LOG
 		else
 			zfs send -wv $REPL ${_snap} \
-				| zfs recv $FORCE -vuo qubsd:autosnap=- $MOUNT ${ZBAK}/${_dataset} >> $BAK_LOG
+				| zfs recv $FORCE -vo qubsd:autosnap=- $MOUNT ${ZBAK}/${_dataset} >> $BAK_LOG
 		fi
 	done
 }
