@@ -13,16 +13,14 @@ rcvar="${name}_enable"
 start_cmd="${name}_start"
 
 mount_filesystems() {
-	# Make sure that the pool is imported
-	if ! zpool list zusr > /dev/null 2>&1 ; then
-		zpool import -f zusr || return 0
+	# zusr is identified by its UFS filesystem label
+	if [ -c "/dev/ufs/zusr" ] ; then
+		mkdir -p /zusr
+		mount -o noatime /dev/ufs/zusr /zusr
 	fi
 
-	# Mount /zusr/home
-	[ -d "/zusr/home" ] && mount_nullfs /zusr/home /home
-
-	# Better to check-then-load than risk boot failure with a failed fstab entry
-	sysctl dev.virtio_p9fs | grep -Eqs "xfer" && mount -t p9fs xfer /xfer
+	# Mount fstab.local
+	[ -f "/zusr/overlay/etc/fstab.local" ] && mount -aF /zusr/overlay/etc/fstab.local
 }
 
 perform_overlay() {
