@@ -1,11 +1,15 @@
-remember to atime=off all your datasets now
+
 Jail starts are delayed for some reason. Need to see why.
 
-Fix isc-dhcpd. It has to be restarted every time to force it to "see" a new request. I think maybe that has to be part of the connection procedure, and right now, it's not.
 
 Change /rw to /overlay. Get rid of the qubesisms. Not just do be different, but coz they genuinely didnt use the most ideal terminology
 
+
 Review 0control SSH connections and comment them out. Keep them in the code just in case, but they should be disabled. The only real need was VM file /xfer, and that's now p9fs. Probably doas is the right vector here from a normal non-root user on host.
+
+
+Split quBSD.sh into multiple parts. Is getting too long
+
 
 VM PLAN: only remaining aspect is Linux and qb-create
  - Linux/ubuntu
@@ -16,15 +20,10 @@ VM PLAN: only remaining aspect is Linux and qb-create
  - qubsd-dhcpd or something equivalent in settings? 
  - dispVMs for Linux mount the ext4 and edit the pw
 
-qb-start
-	- Needs updated with new networking functions in mind
-	- Simultaneous starts of clients could mess up wireguard restarting
 
-There are still demons in the xephyr-xclip daemon
+xephyr-xclip daemon still has demons
    - Pretty sure they're all related to the closing of windows. It gets corrupted or something when I close windows. probably I'm not sufficiently detecting all possible events -- Like, maybe the disappearance of a socket is still problematic or something?
    - You need to kill the clipboard ownership inside the source as well after releasing. Otherwise you get inconsistent waffling on lease expiry, where what FEELS like stale clipboard then can still paste if you're inside the same socket for a window. Causes problems
-
-Sound in Linuxulator?
 
 
 ### UPGRADES
@@ -72,6 +71,10 @@ qb-i3-launch - overhauled now that I'm using Xephyr
 qb-cmd -e [ephm]
    - Ideally you would also clone the zroot from whatever jail you're ephm'ing. 
 
+qb-start
+	- Needs updated with new networking functions in mind
+	- Simultaneous starts of clients could mess up wireguard restarting
+
 qb-create
 	- [-z dupl] still needs to create and copy the fstab of the template jail, and maybe the rc.conf too. 
 	- It needs further and more extensive testing 
@@ -109,15 +112,14 @@ rc.conf -nmdm cuse , I dont know if I need them or what for
 
 When you restore, the datasets dont inherit their qubsd:autosnap properties
 
-
-ALL file names should ALWAYS be variables defined in get_global_variables ?
-
 Take another hack at the recording device problems
 
 Hardened FreeBSD. Implements alot of HardenedBSD stuff with a simple .ini file and code.
 https://www.reddit.com/r/freebsd/comments/15nlrp6/hardened_freebsd_30_released/
 
 Crons - No crons running. Probably something long term security that should be integrated and automated.
+
+Sound in Linuxulator?
 
 
 ### INSTALLER SCRIPT CHANGES ###

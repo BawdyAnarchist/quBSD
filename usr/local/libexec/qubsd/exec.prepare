@@ -15,8 +15,9 @@ get_parameters() {
 }
 
 preparation_actions() {
-	# The control jail should always be on. The function will return immediately if already on
-	[ ! "$CLASS" = "cjail" ] && start_jail "$CONTROL"
+# CJAIL BEING DEPRECATED
+# The control jail should always be on. The function will return immediately if already on
+#	[ ! "$CLASS" = "cjail" ] && start_jail "$CONTROL"
 
 	# MUST redirect to null, otherwise VM here will hang the script .. coz .. file descriptors?
 	start_jail "$GATEWAY" > /dev/null 2>&1
@@ -33,6 +34,10 @@ preparation_actions() {
 			zfs mount -l ${U_ZFS}/${JAIL}
 		fi
 	fi
+
+	# Make sure the /rw and /home directories exist for the jail (required by base.conf)
+	[ -d "$M_ZUSR/$JAIL/home" ] || mkdir -p "$M_ZUSR/$JAIL/home"
+	[ -d "$M_ZUSR/$JAIL/rw" ] || mkdir -p "$M_ZUSR/$JAIL/rw"
 }
 
 main() {

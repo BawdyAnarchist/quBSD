@@ -1934,11 +1934,20 @@ connect_client_to_gateway() {
 
 	# Final configuration for each client depending on type of connection being made
 	case $_type in
-		EXT_IF) configure_client_network ;;
-		CJ_SSH) configure_ssh_control "$_client" "$_gateway" ;;
+		EXT_IF) configure_client_network ; reset_gateway_services ;;
+		CJ_SSH) 
+#CJAIL BEING DEPRECATED
+#configure_ssh_control "$_client" "$_gateway" ;;
 	esac
 
 	eval $_R0
+}
+
+reset_gateway_services() {
+	local _fn="configure_client_network" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+	if sysrc -nqj $_gateway dhcpd_enable 2>/dev/null | grep -q "YES" ; then
+		service -qj $_gateway isc-dhcpd restart 
+	fi
 }
 
 configure_client_network() {
@@ -1986,6 +1995,7 @@ configure_client_network() {
 }
 
 configure_ssh_control() {
+#CJAIL BEING DEPRECATED - whole function 
 	# Ensures that the latest pubkey for the cjail SSH is copied to the controlled jail
 
 	_pubkey=".ssh/cjail_authorized_keys"
@@ -2362,8 +2372,8 @@ EOF
 	# Invoke the trap function for VM cleanup, in case of any errors after modifying host/trackers
 	trap "cleanup_vm -n $_VM ; exit 0" INT TERM HUP QUIT
 
+#CJAIL BEING DEPRECATED
 # Default number of taps is 0. Add 1 for the control jail SSH connection
-# NEW NOTE: THIS IS GOING AWAY. NO CJ
 #_taps=$(( _taps + 1 ))
 	# Also, for every gateway or client the VM touches, it needs another tap
 	[ -n "$_gateway" ] && [ ! "$_gateway" = "none" ] && _taps=$(( _taps + 1 ))
@@ -2385,9 +2395,9 @@ EOF
 
 		# Tracker file for which taps are related to which VM, and for which purpose (_vif tags)
 		case "$_cycle" in
+#CJAIL BEING DEPRECATED
 #			0) 
-#THIS IS LIKELY GOING AWAY. SSH interfaces have proven slightly brittle, and p9fs can handle file xfer
-				#ifconfig $_tap group "CJ_SSH" ; echo "$_VM CJ_SSH $_tap" >> $VMTAPS
+#ifconfig $_tap group "CJ_SSH" ; echo "$_VM CJ_SSH $_tap" >> $VMTAPS
 #				;;
 			0) ifconfig $_tap group "EXT_IF" ; echo "$_VM EXT_IF $_tap" >> $VMTAPS ;;
 			1) ifconfig $_tap group "X11"    ; echo "$_VM X11 $_tap"    >> $VMTAPS ;;
@@ -2595,6 +2605,7 @@ finish_vm_connections() {
 
 	# Connect to control jail and gateway
 	connect_client_to_gateway -dt EXT_IF -- "$_VM" "$_gateway" > /dev/null
+#CJAIL BEING DEPRECATED
 #	connect_client_to_gateway -dt CJ_SSH -- "$_VM" "$_control" > /dev/null
 
 	# Connect VM to all of it's clients (if there are any)

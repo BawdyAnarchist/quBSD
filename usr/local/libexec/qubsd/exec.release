@@ -15,7 +15,9 @@ main() {
 	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
 
 	case $CLASS in
-		appjail|cjail)
+#CJAIL BEING DEPRECATED
+#appjail|cjail)
+		appjail)
          # Reclone the root filesystem for JAIL
 			reclone_zroot "$JAIL" "$ROOTENV" || get_msg2 -Em _e2 "$JAIL" "$ROOTENV"
 		;;
