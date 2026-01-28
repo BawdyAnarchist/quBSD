@@ -1,6 +1,9 @@
 
 Jail starts are delayed for some reason. Need to see why.
 
+Nuissance errors on gateway launch with VM connected. Likely due to DHCP auto and the path doesnt go to DHCP like it should
+
+usbvm still not automounting android
 
 Change /rw to /overlay. Get rid of the qubesisms. Not just do be different, but coz they genuinely didnt use the most ideal terminology
 
