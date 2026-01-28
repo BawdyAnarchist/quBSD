@@ -2598,7 +2598,7 @@ mount_persistent_zvol() {
 	_VM="$1"
 	local zvol_dev="/dev/zvol/$U_ZFS/$_VM/persist"
 
-	zfs set volmode=geom $U_ZFS/$_VM/persist
+	zfs set volmode=geom "$U_ZFS/$_VM/persist"
 	sleep .2        # Without this delay, fs_typ fails (presumably due to zfs delays in chaning the volmode)
 
 	fs_type=$(fstyp $zvol_dev)
