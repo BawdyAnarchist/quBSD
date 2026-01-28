@@ -57,7 +57,11 @@ get_jails_loop() {
 	rootenv=$(sed -En "s/^${_jail}[[:blank:]]+ROOTENV.*[[:blank:]]+//p" $QCONF)
 	rootenv="${rootenv:=-}"
 
-	if chk_isrunning "$_jail" ; then
+	if [ "$class" = "host" ] ; then
+		jid='-'
+		cpu=$(ps -axo %cpu -o comm | grep -v idle | awk '{sum+=$1;} END {print sum;}')
+		ram=$(ps -axo %mem -o comm | grep -v idle | awk '{sum+=$1;} END {print sum;}')
+	elif chk_isrunning "$_jail" ; then
 		if chk_isvm "$_jail" ; then
 			jid=$(pgrep -xf "bhyve: $_jail")
 			cpu=$(ps -p $jid -o %cpu | awk '{sum+=$1;} END {print sum;}')
@@ -67,10 +71,6 @@ get_jails_loop() {
 			cpu=$(jexec $_jail ps ax -o %cpu= | awk '{sum+=$1;} END {print sum;}')
 			ram=$(jexec $_jail ps ax -o %mem= | awk '{sum+=$1;} END {print sum;}')
 		fi
-	elif [ "$class" = "host" ] ; then
-		jid='-'
-		cpu=$(ps -axo %cpu -o comm | grep -v idle | awk '{sum+=$1;} END {print sum;}')
-		ram=$(ps -axo %mem -o comm | grep -v idle | awk '{sum+=$1;} END {print sum;}')
 	else
 		jid='-' ;  cpu='-' ;  ram='-'
 	fi
