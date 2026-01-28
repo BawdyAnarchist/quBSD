@@ -6,7 +6,7 @@ bindsym $mod+Mod1+c exec "/usr/local/bin/qubsd_xclip copy"
 bindsym $mod+Mod1+v exec "/usr/local/bin/qubsd_xclip paste"
 
 # quBSD: HIGHLY RECOMMEND. Opens xterm on host, or in jail, depending on active window
-bindsym $mod+Return exec qb-cmd -n 
+bindsym $mod+Return exec qb cmd -n 
 
 # quBSD: HIGHLY RECOMMEND. Like above, but if active window is a jail, open xterm on host
 bindsym $mod+Shift+Return exec xterm 
@@ -62,11 +62,11 @@ mode "quickselect1" {
 	bindsym grave mode "quickselect2"
 
 	# Some examples of bindsyms that you might want
-	bindsym c exec qb-cmd corporate firefox, mode "default"
-	bindsym d exec qb-cmd dispjail falkon , mode "default"
-	bindsym e exec qb-cmd email firefox, mode "default"
-	bindsym k exec qb-cmd vault keepassxc , mode "default"
-	bindsym r exec qb-cmd social falkon, mode "default"
+	bindsym c exec qb cmd corporate firefox, mode "default"
+	bindsym d exec qb cmd dispjail falkon , mode "default"
+	bindsym e exec qb cmd email firefox, mode "default"
+	bindsym k exec qb cmd vault keepassxc , mode "default"
+	bindsym r exec qb cmd social falkon, mode "default"
 
 	# Inside of quickselect, you only need to press the number key to switch workspace 
 	bindsym 1 workspace number $ws1, mode "default"
