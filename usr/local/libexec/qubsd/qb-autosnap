@@ -69,7 +69,7 @@ calculate_variables() {
 sync_from_qconf() {
 
 	# Get list of all jails with an AUTOSNAP setting in QCONF
-	_jlist=$($QLEXEC/qb-list -Hp AUTOSNAP | awk '/.*true$/{print $1}')
+	_jlist=$($QLEXEC/qb list -Hp AUTOSNAP | awk '/.*true$/{print $1}')
 	for _jail in $_jlist ; do
 
 		# Pull the value of the AUTOSNAP, and conform datasets to QCONF

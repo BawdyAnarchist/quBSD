@@ -69,7 +69,7 @@ ENDOFMSG
 		;;
 	_m3)
 			echo -e "Success \c"
-			qb-list -j $JAIL -p $PARAM
+			qb list -j $JAIL -p $PARAM
 		;;
 	_m4) cat << ENDOFMSG
 Deleted the following line(s):

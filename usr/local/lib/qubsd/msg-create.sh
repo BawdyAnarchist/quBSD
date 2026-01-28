@@ -282,7 +282,7 @@ we'll assume you want to use < $ROOTENV > as the template.
 
 Here are the qubsd.conf settings for:  $ROOTENV
 ENDOFMSG
-		qb-list -j $ROOTENV
+		qb list -j $ROOTENV
 
 cat << ENDOFMSG
 WOULD YOU LIKE TO:
@@ -313,7 +313,7 @@ or more CL params can be used in combination with the template.
 
 Use qb-edit to change #default. Current #default parameters:
 ENDOFMSG
-		qb-list -j '#default' | grep -Ev "[[:blank:]]+ROOTENV[[:blank:]]+" \
+		qb list -j '#default' | grep -Ev "[[:blank:]]+ROOTENV[[:blank:]]+" \
 								  	 | grep -Ev "[[:blank:]]+CLASS[[:blank:]]+" \
 								  	 | grep -Ev "[[:blank:]]+TEMPLATE[[:blank:]]+"
 cat << ENDOFMSG
@@ -348,7 +348,7 @@ ENDOFMSG
 
 Here's the settings from $TEMPLATE to be used for the new jail:
 ENDOFMSG
-		qb-list -j $TEMPLATE | grep -Ev "[[:blank:]]+ROOTENV[[:blank:]]+" \
+		qb list -j $TEMPLATE | grep -Ev "[[:blank:]]+ROOTENV[[:blank:]]+" \
 									| grep -Ev "[[:blank:]]+CLASS[[:blank:]]+"
 cat << ENDOFMSG
 WOULD YOU LIKE TO:
@@ -522,8 +522,8 @@ Duplicate ROOTENV:  qb-create -t <existing_rootenv> <newjail/VM>
 Install rootVM:     qb-create -i /usr/local/share/ISOs/<ISOfile> -v <size> <newVM>
 
 If no opts or <template> are specified, qubsd.conf \'#default' are used.
-  #default can be viewed with:   qb-list -j #default
-  #default can be changed with:  qb-edit #default <PARAM> <value>
+  #default can be viewed with:   qb list -j #default
+  #default can be changed with:  qb edit #default <PARAM> <value>
 
 ENDOFMSG
 	;;
