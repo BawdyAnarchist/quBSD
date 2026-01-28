@@ -1944,7 +1944,7 @@ connect_client_to_gateway() {
 }
 
 reset_gateway_services() {
-	local _fn="configure_client_network" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+	local _fn="reset_gateway_services" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 	if sysrc -nqj $_gateway dhcpd_enable 2>/dev/null | grep -q "YES" ; then
 		# Only attempt restart if it's already running
 		service -qj $_gateway isc-dhcpd status && service -qj $_gateway isc-dhcpd restart
@@ -2164,7 +2164,10 @@ cleanup_vm() {
 		reclone_zusr "$_VM" "$_template" || eval $_R1
 	fi
 
-	# Remove the /tmp files
+	# Make sure the persistent zusr zvol is unmounted and converted back to dev not geom
+	umount /dev/zvol/$U_ZFS/$_VM/persist
+	zfs set volmode=dev "$U_ZFS/$_VM/persist"
+
 	rm "${QRUN}/qb-bhyve_${_VM}" 2> /dev/null
 	rm_errfiles
 	eval $_R0
@@ -2565,31 +2568,6 @@ configure_bsdvm_zusr() {
 	zfs set volmode=dev $vm_zusr
 }
 
-launch_bhyve_vm() {
-	# Need to detach the launch an monitoring of VMs completely from qb-cmd and qb-start
-
-	# Get globals, although errfiles arent needed
-	get_global_variables
-	rm_errfiles
-
-	# Create trap for post VM exit
-	trap "cleanup_vm $_VM $_rootenv ; exit 0" INT TERM HUP QUIT EXIT
-
-	# Log the exact bhyve command being run
-	echo "\$(date "+%Y-%m-%d_%H:%M") Starting VM: $_VM" | tee -a $QLOG ${QLOG}_${_VM}
-	echo $_BHYVE_CMD >> ${QLOG}_${_VM}
-
-	# Launch the VM to background
-	eval $_BHYVE_CMD
-
-	sleep 5   # Allow plent of time for launch. Sometimes weirdness can delay pgrep appearance
-
-	# Monitor the VM, perform cleanup after done
-	while pgrep -xfq "bhyve: $_VM" ; do sleep 1 ; done
-	echo "\$(date "+%Y-%m-%d_%H:%M") VM: $_VM HAS ENDED." | tee -a $QLOG ${QLOG}_${_VM}
-	exit 0
-}
-
 finish_vm_connections() {
 	# While the _BHYVE_CMD appears in ps immediately, emulated devices are not yet attached, and
 	# would cause an error. Due to qb-start dynamics/timeouts, we dont want to wait. Instead,
@@ -2614,6 +2592,49 @@ finish_vm_connections() {
 	done
 
 	eval $_R0
+}
+
+mount_persistent_zvol() {
+	_VM="$1"
+	local zvol_dev="/dev/zvol/$U_ZFS/$_VM/persist"
+
+	zfs set volmode=geom $U_ZFS/$_VM/persist
+	sleep .2        # Without this delay, fs_typ fails (presumably due to zfs delays in chaning the volmode)
+
+	fs_type=$(fstyp $zvol_dev)
+	case "$fs_type" in
+		ufs) mount -o rw $zvol_dev $M_ZUSR/$_VM
+			;;
+		ext*) mount -t ext2fs -o rw $zvol_dev $M_ZUSR/$_VM
+			;;
+		*) # Other filetypes arent supported. INSERT msg here
+			;;
+	esac
+}
+
+launch_bhyve_vm() {
+	# Need to detach the launch an monitoring of VMs completely from qb-cmd and qb-start
+
+	# Get globals, although errfiles arent needed
+	get_global_variables
+	rm_errfiles
+
+	# Create trap for post VM exit
+	trap "cleanup_vm $_VM $_rootenv ; mount_persistent_zvol $_VM ; exit 0" INT TERM HUP QUIT EXIT
+
+	# Log the exact bhyve command being run
+	echo "\$(date "+%Y-%m-%d_%H:%M") Starting VM: $_VM" | tee -a $QLOG ${QLOG}_${_VM}
+	echo $_BHYVE_CMD >> ${QLOG}_${_VM}
+
+	# Launch the VM to background
+	eval $_BHYVE_CMD
+
+	sleep 5   # Allow plent of time for launch. Sometimes weirdness can delay pgrep appearance
+
+	# Monitor the VM, perform cleanup after done
+	while pgrep -xfq "bhyve: $_VM" ; do sleep 1 ; done
+	echo "\$(date "+%Y-%m-%d_%H:%M") VM: $_VM HAS ENDED." | tee -a $QLOG ${QLOG}_${_VM}
+	exit 0
 }
 
 exec_vm_coordinator() {
@@ -2650,11 +2671,8 @@ exec_vm_coordinator() {
 	# Launch VM sent to background, so connections can be made (network, vnc, tmux)
 	get_msg -m _m1 -- "$_jail" | tee -a $QLOG ${QLOG}_${_VM}
 	export QLIB _BHYVE_CMD _VM _rootenv QLOG
-	daemon -t "bhyve: $_jail" -o /dev/null -- /bin/sh << 'EOF'
-		. $QLIB/quBSD.sh
-		. $QLIB/msg-quBSD.sh
-		launch_bhyve_vm
-EOF
+	daemon -t "bhyve: $_jail" -o /dev/null -- /bin/sh -c \
+		'. $QLIB/quBSD.sh ; . $QLIB/msg-quBSD.sh ; launch_bhyve_vm'
 
 	# Monitor to make sure that the bhyve command started running, then return 0
 	local _count=0 ; sleep .5
