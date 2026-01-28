@@ -1,12 +1,12 @@
 
 Jail starts are delayed for some reason. Need to see why.
+  - seems only to be after reboot
 
 Nuissance errors on gateway launch with VM connected. Likely due to DHCP auto and the path doesnt go to DHCP like it should
 
-usbvm still not automounting android
-
 Change /rw to /overlay. Get rid of the qubesisms. Not just do be different, but coz they genuinely didnt use the most ideal terminology
 
+qubsd.conf -> this needs to look more like jail.conf.d/*, where each jail has its own config
 
 Split quBSD.sh into multiple parts. Is getting too long
 

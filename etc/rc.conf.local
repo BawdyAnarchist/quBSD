@@ -1,10 +1,9 @@
-
 ## quBSD MODIFICATIONS ##
 jail_enable="NO"
 pf_enable="YES"
 pf_rules="/usr/local/etc/qubsd/pf.conf"
 qb_cleanup_enable="YES"
-qb_autostart_enable="NO"
+qb_autostart_enable="YES"
 dbus_enable="YES"
 linux_enable="YES"
 #webcamd_0_flags="-d ugen2.3"
