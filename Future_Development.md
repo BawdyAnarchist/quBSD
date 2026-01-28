@@ -5,9 +5,6 @@ Jail starts are delayed for some reason. Need to see why.
 Change /rw to /overlay. Get rid of the qubesisms. Not just do be different, but coz they genuinely didnt use the most ideal terminology
 
 
-Review 0control SSH connections and comment them out. Keep them in the code just in case, but they should be disabled. The only real need was VM file /xfer, and that's now p9fs. Probably doas is the right vector here from a normal non-root user on host.
-
-
 Split quBSD.sh into multiple parts. Is getting too long
 
 
