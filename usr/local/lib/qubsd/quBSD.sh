@@ -1935,8 +1935,8 @@ connect_client_to_gateway() {
 	# Final configuration for each client depending on type of connection being made
 	case $_type in
 		EXT_IF) configure_client_network ; reset_gateway_services ;;
-		CJ_SSH) 
 #CJAIL BEING DEPRECATED
+#CJ_SSH)
 #configure_ssh_control "$_client" "$_gateway" ;;
 	esac
 
@@ -1946,7 +1946,8 @@ connect_client_to_gateway() {
 reset_gateway_services() {
 	local _fn="configure_client_network" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 	if sysrc -nqj $_gateway dhcpd_enable 2>/dev/null | grep -q "YES" ; then
-		service -qj $_gateway isc-dhcpd restart 
+		# Only attempt restart if it's already running
+		service -qj $_gateway isc-dhcpd status && service -qj $_gateway isc-dhcpd restart
 	fi
 }
 
@@ -2312,11 +2313,9 @@ prep_bhyve_options() {
 	done
 
 	# 9p creates a shared directory for file transfer. Directory must exist or bhyve will fail
-   if [ ! "$_control" = "none" ] ; then
-		mkdir -p "$M_ZUSR/$_control/home/$_control/xfer/$_VM" 2>/dev/null
-		_BLK_9P="-s ${_slot},virtio-9p,xfer=$M_ZUSR/$_control/home/$_control/xfer/$_VM"
-		_slot=$(( _slot + 1 ))
-	fi
+	mkdir -p "$QRUN/xfer/$_VM" 2>/dev/null
+	_BLK_9P="-s ${_slot},virtio-9p,xfer=$QRUN/xfer/$_VM"
+	_slot=$(( _slot + 1 ))
 
 	# Handling BHYVE_CUST options
 	[ "$_bhyve_custm" ] && while IFS= read -r _line ; do
@@ -2427,7 +2426,7 @@ rootstrap_bsdvm() {
 	# Positional and local variables and checks
 	local _VM="$1" volsize="$2" vm_zroot zvol distdir bsdvm tmp_zpool alt_mnt
 	[ -z "$_VM" ] && get_msg $_q -m _e0 "VM name" && eval $_R1
-	! chk_avail_jailname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
+	chk_avail_jailname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
 
 	[ -z "$volsize" ] && get_msg $_q -m _e0 "zvol volume size" && eval $_R1
    ! echo "$volsize" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" \
@@ -2460,7 +2459,7 @@ rootstrap_bsdvm() {
 	[ "$(grep -o "[[:digit:]].*" $distdir/GITBRANCH)" = "$release" ] || bsdinstall distfetch
 
 	# Create the zvol and partitions
-	zfs create -o atime=off -V $volsize -o volmode=geom -o qubsd:autosnap=true $vm_zroot
+	zfs create -V $volsize -o volmode=geom -o qubsd:autosnap=true $vm_zroot
 	gpart create -s gpt "$zvol"
 	gpart add -t efi -s 200M -l efiboot "$zvol"
 	gpart add -t freebsd-zfs -l rootfs "$zvol"
@@ -2487,16 +2486,17 @@ rootstrap_bsdvm() {
 
 	# Files and directories to prepare for a running system
 	mkdir -p $alt_mnt/home
+	mkdir -p $alt_mnt/usr/local/bin
 	mkdir -p $alt_mnt/usr/local/etc/rc.d
 	mkdir -p $alt_mnt/xfer && chmod -R 777 $alt_mnt/xfer    # For virtio-9p file sharing between host/VM
-	cp -a $bsdvm/loader.conf $alt_mnt/boot/loader.conf
 	cp -a $bsdvm/fstab       $alt_mnt/etc/fstab
+	cp -a $bsdvm/loader.conf $alt_mnt/boot/loader.conf
+	cp -a $bsdvm/qubsd-dhcp  $alt_mnt/usr/local/bin/qubsd-dhcp
+	cp -a $bsdvm/qubsd-dhcpd $alt_mnt/usr/local/etc/rc.d/qubsd-dhcpd
+	cp -a $bsdvm/qubsd-init  $alt_mnt/usr/local/etc/rc.d
 	cp -a $bsdvm/rc.conf     $alt_mnt/etc/rc.conf
 	cp -a $bsdvm/sysctl.conf $alt_mnt/etc/sysctl.conf
 	cp -a /etc/localtime     $alt_mnt/etc/localtime
-	cp -a $bsdvm/qubsd-init  $alt_mnt/usr/local/etc/rc.d
-	cp -a $bsdvm/qubsd-dhcp  $alt_mnt/usr/local/bin/qubsd-dhcp
-	cp -a $bsdvm/qubsd-dhcpd $alt_mnt/usr/local/etc/rc.d/qubsd-dhcpd
 	sysrc -f $bsdvm/rc.conf hostname="$_VM"
 	
 	if [ "$network" ] ; then
@@ -2535,7 +2535,7 @@ configure_bsdvm_zusr() {
 	# Positional and local variables and checks
 	local _VM="$1" volsize="$2" vm_zusr zvol tmp_zpool alt_mnt
 	[ -z "$_VM" ] && get_msg $_q -m _e0 "VM name" && eval $_R1
-	! chk_avail_jailname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
+	chk_avail_jailname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
 
 	[ -z "$volsize" ] && get_msg $_q -m _e0 "zvol volume size" && eval $_R1
    ! echo "$volsize" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" \
@@ -2548,7 +2548,7 @@ configure_bsdvm_zusr() {
 
 	# Create the zvol, filesystem, and mount it
 	zfs create -o atime=off -o qubsd:autosnap=true $U_ZFS/$_VM
-	zfs create -o atime=off -V $volsize -o volmode=geom -o qubsd:autosnap=true $vm_zusr
+	zfs create -V $volsize -o volmode=geom -o qubsd:autosnap=true $vm_zusr
 	newfs -L zusr $zvol	  # Creates a label used in qubsd-init to identify the primary persistence drive
 	mkdir -p $mnt
 	mount $zvol $mnt
@@ -2557,7 +2557,7 @@ configure_bsdvm_zusr() {
 	if [ "$_dircopy" ] ; then            # Preference user specified directory
 		cp -a $_dircopy/ $mnt
 	elif [ -e "$QSHARE/templates/$_VM" ] ; then   # Fallback - If VM name matches a template, use it
-		cp -a $QSHARE/templates/$_VM $mnt
+		cp -a $QSHARE/templates/$_VM/ $mnt
 	fi
 
 	umount $mnt
