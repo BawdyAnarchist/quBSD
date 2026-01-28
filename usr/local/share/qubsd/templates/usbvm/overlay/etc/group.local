@@ -1,2 +1,3 @@
 # Groups to upsert into /etc/group at jail creation. (Similar function as rc.conf.local)
 operator:*:5:root,usbvm
+usbvm:*:1001:
