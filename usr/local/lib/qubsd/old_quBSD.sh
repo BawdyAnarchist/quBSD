@@ -112,13 +112,6 @@
 ######################  VARIABLE ASSIGNMENTS and VALUE RETRIEVAL  ######################
 ########################################################################################
 
-# Source error messages for library functions
-. /usr/local/lib/qubsd/messages/old_quBSD.sh
-
-# Internal flow variables to handle returns, while reseting _fn and _FN variables with logging
-_R0='_FN="$_fn_orig" ; return 0'
-_R1='_FN="$_fn_orig" ; return 1'
-
 get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
 
@@ -145,64 +138,6 @@ get_global_variables() {
 	export ERR2=$(mktemp ${QRUN}/err2_${0##*/}.XXXX)
 	trap "rm_errfiles" HUP INT TERM QUIT EXIT
 
-	return 0
-}
-
-rm_errfiles() {
-	rm $ERR1 $ERR2 > /dev/null 2>&1
-}
-
-get_msg2() {
-	# Unified messaging function. Makes standard calls to individual script messages.
-	# NOTE: The reality is that the error message files could experience race conditions.
-
-	while getopts eEFm:pquV opts ; do case $opts in
-		e) local _exit="exit 0" ;;
-		E) local _exit="exit 1" ;;
-		F) local _force="true" ; unset _exit= ;;
-		m) local _message="$OPTARG" ;;
-		p) local _popup="true" ;;
-		q) local _q="true" ;;
-		u) local _usage="true" ;;
-		V) local _V="true" ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))
-
-	# Using the caller script to generalize message calls. Switch between exec and qb- scripts.
-	local _caller="${0##*/}"  _msg  _NEEDPOP
-	[ -z "${_caller##exec.*}" ] && _msg="msg_exec" || _msg="msg_${_caller##*-}"
-
-	# Source the correct message file
-	. "$QLIB/messages/${_msg#msg_}.sh"
-
-	# Determine if popup should be used or not
-	get_info _NEEDPOP
-
-	case $_message in
-		_m*|_w*) [ -z "$_q" ] && eval "$_msg" "$@" ;;
-		_e*)
-			if [ -z "$_force" ] ; then
-				# Place final ERROR message into a variable. $ERR1 (tmp) enables func tracing
-				_ERROR="$(echo "ERROR: $_caller" ; "$_msg" "$@" ; [ -s "$ERR1" ] && cat $ERR1)"
-				echo -e "$_ERROR\n" > $ERR2
-
-				# If exiting due to error, log the date and error message to the log file
-				[ "$_exit" = "exit 1" ] && echo -e "$(date "+%Y-%m-%d_%H:%M")\n$_ERROR" >> $QLOG
-
-				# Send the error message
-				if [ -z "$_q" ] && [ "$_ERROR" ] ; then
-					{ [ "$_popup" ] && [ "$_NEEDPOP" ] && create_popup -f "$ERR2" ;} || echo "$_ERROR"
-				fi
-			fi ;;
-	esac
-
-	# Now that it has been dispositioned, erase the message
-	truncate -s 0 $ERR1 ; unset _ERROR
-
-	# Evaluate usage if present
-	[ -z "$_q" ] && [ $_usage ] && _message="usage" && eval "$_msg"
-
-	[ -n "$_exit" ] && rm_errfiles  # Had problems with lingering $ERR in QRUN. Make it unequivocal
-	eval $_exit :
 	return 0
 }
 
@@ -2678,28 +2613,4 @@ exec_vm_coordinator() {
 	finish_vm_connections &
 	eval $_R0
 }
-
-
-
-########################################################################################
-###################################  DEBUG LOGGING  ####################################
-########################################################################################
-
-setlog1() {
-	set -x
-	rm /root/debug1 > /dev/null 2>&1
-	exec > /root/debug1 2>&1
-}
-
-setlog2() {
-	set -x
-	rm /root/debug2 > /dev/null 2>&1
-	exec > /root/debug2 2>&1
-}
-setlog3() {
-	set -x
-	rm /root/debug3 > /dev/null 2>&1
-	exec > /root/debug3 2>&1
-}
-
 

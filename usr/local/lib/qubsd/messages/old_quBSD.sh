@@ -1,35 +1,5 @@
 #!/bin/sh
 
-get_msg() {
-	local _msg1= ; local _msg2= ; local _error
-
-   # Quiet option finally resolves.
-	while getopts m:M:pqV opts ; do case $opts in
-		m) _msg1="$OPTARG" ;;
-		M) _msg2="$OPTARG" ;;
-		q) local _q="true" ;;
-		p) local _popup="true" ;;
-		V) local _V="true" ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
-
-	# DEBUG helps to see what the chain of functions was for an error.
-	[ "$DEBUG" = "1" ] && echo "$(date "+%Y-%m-%d_%H:%M")  $0  ${_FN}" >> $QLOG
-
-	case $_msg1 in
-		_m*) [ -z "$_q" ] && msg_qubsd "$@" ;;
-		_w*|_e*) # Append messages to top of $ERR1. Must end with `|| :;}` , for `&& cp -a` to work
-			[ -z "$_q" ] && { msg_qubsd "$@" ; [ "$_msg2" ] && _msg1="$_msg2" && msg_qubsd "$@" \
-				; [ -s "$ERR1" ] && cat $ERR1 || :;} > $ERR2 && cp -a $ERR2 $ERR1
-
-			# If -V was passed, then print the message immediately
-			[ "$_V" ] && msg_qubsd "$@"
-			;;
-	esac
-
-	unset _msg1 _msg2
-	return 0
-}
-
 msg_qubsd() {
 	case "$_msg1" in
 	_e0) cat << ENDOFMSG
@@ -373,21 +343,3 @@ ENDOFMSG
 	;;
 	esac
 }
-
-msg_exec() {
-	case "$_message" in
-	_e1) cat << ENDOFMSG
-   < $2 > has an invalid $1 in QCONF
-ENDOFMSG
-		;;
-	_e2) cat << ENDOFMSG
-   Was unable to clone ROOTENV: < $2 > for jail: < $1 >
-ENDOFMSG
-		;;
-	_e3) cat << ENDOFMSG
-   Was unable to clone the $U_ZFS TEMPLATE: < $2 > for jail: < $1 >
-ENDOFMSG
-		;;
-esac
-}
-

@@ -3,10 +3,12 @@
 # Source of source library for improved modularity
 
 . /usr/local/lib/qubsd/constants.sh
+. /$QLIB/exception.sh
 
 
 
 
 
 # TEMPORARY CATCHALL DURING MIGRATION
-. /usr/local/lib/qubsd/old_quBSD.sh
+. $QLIB/old_quBSD.sh
+. $QLIB/messages/old_quBSD.sh

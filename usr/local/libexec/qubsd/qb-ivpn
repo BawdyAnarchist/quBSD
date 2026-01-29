@@ -145,7 +145,7 @@ define_variables() {
 
 	if [ "$INJAIL" = "false" ] ; then
 		# Source quBSD library, and get variables (only available for host)
-		. /usr/local/lib/qubsd/quBSD.sh
+		. /usr/local/lib/qubsd/qubsd.sh
 		get_global_variables
 
 		# These variables reduce the need for if/then branches. Can combine commands.
