@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. $QLIB/quBSD.sh
-. $QLIB/msg-flags.sh
+. $QUBSD
 
 get_options() {
 	while getopts dhru opts ; do case $opts in

@@ -125,17 +125,6 @@ get_global_variables() {
 	# Remove any old ERR files (for exec commands)
 	[ "$ERR1" ] && [ "$ERR2" ] && rm_errfiles
 
-	# Define variables for files
-	export QETC="/usr/local/etc/qubsd"
-	export QLIB="/usr/local/lib/qubsd"
-	export QRUN="/var/run/qubsd"
-	export QSHARE="/usr/local/share/qubsd"
-	export QLEXEC="/usr/local/libexec/qubsd"
-	export JCONF="$QETC/jail.conf.d/jails"
-	export QCONF="$QETC/qubsd.conf"
-	export QLOG="/var/log/qubsd/quBSD.log"
-	export VMTAPS="$QRUN/vm_taps"
-
 	# Remove blanks at end of line, to prevent bad variable assignments.
 	sed -i '' -E 's/[ \t]*$//' $QCONF
 	# Get datasets, mountpoints; and define files.

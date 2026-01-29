@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. $QLIB/quBSD.sh
-. $QLIB/msg-hostnet.sh
+. $QUBSD
 
 get_options() {
 	while getopts cdhkt:u opts ; do case $opts in

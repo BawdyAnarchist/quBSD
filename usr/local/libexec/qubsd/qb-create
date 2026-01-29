@@ -1,8 +1,7 @@
 #!/bin/sh
 # Remember to finalize [ ! _param = BHYVE_CUSTM ]
 
-. $QLIB/quBSD.sh
-. $QLIB/msg-create.sh
+. $QUBSD
 
 get_options() {
 

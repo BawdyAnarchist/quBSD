@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. $QLIB/quBSD.sh
-. $QLIB/msg-rename.sh
+. $QUBSD
 
 get_options() {
 	while getopts fhn opts ; do case $opts in

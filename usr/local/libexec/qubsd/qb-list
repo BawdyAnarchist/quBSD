@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. $QLIB/quBSD.sh
-. $QLIB/msg-list.sh
+. $QUBSD
 
 get_options() {
 	while getopts ahHj:lp:szZ opts ; do

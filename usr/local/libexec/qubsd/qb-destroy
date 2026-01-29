@@ -1,7 +1,6 @@
 #!/bin/sh
 
-. $QLIB/quBSD.sh
-. $QLIB/msg-destroy.sh
+. $QUBSD
 
 get_options() {
 	while getopts h opts ; do

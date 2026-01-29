@@ -9,4 +9,4 @@
 
 
 # TEMPORARY CATCHALL DURING MIGRATION
-. /usr/local/lib/qubsd/quBSD.sh
+. /usr/local/lib/qubsd/old_quBSD.sh
