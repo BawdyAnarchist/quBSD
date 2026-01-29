@@ -1,5 +1,9 @@
 #!/bin/sh
 
+## EXCEPTION HANDLING SYSTEM ##
+
+## NOTE: Will later be modularized into separate messaging and exception libraries
+
 rm_errfiles() {
 # Catchall cleanup for the error storage mechanism
 	rm $ERR1 $ERR2 > /dev/null 2>&1
@@ -95,6 +99,57 @@ get_msg2() {
 	return 0
 }
 
+create_popup() {
+	# Handles popus to send messages, receive inputs, and pass commands
+	# _h should be as a percentage of the primary screen height (between 0 and 1)
+	# _w is a multiplication factor for _h
+	local _fn="create_popup" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	while getopts c:f:h:im:qVw: opts ; do case $opts in
+			c) local _cmd="$OPTARG" ;;
+			i) local _input="true" ;;
+			f) local _popfile="$OPTARG" ;;
+			h) local _h="$OPTARG" ;;
+			m) local _popmsg="$OPTARG" ;;
+			q) local _qs="-q" ; _quiet='> /dev/null 2>&1' ;;
+			V) local _V="-V" ;;
+			w) local _w="$OPTARG" ;;
+			*) get_msg -m _e9 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
+
+	# Discern if it's i3, and modify with center/floating options
+	ps c | grep -qs 'i3' && local _i3mod="i3-msg -q floating enable, move position center"
+
+	# If a file was passed, set the msg equal to the contents of the file
+	[ "$_popfile" ] && local _popmsg=$(cat $_popfile)
+
+	# Might've been launched from quick-key or without an environment. Get the host DISPLAY
+	[ -z "$DISPLAY" ] && export DISPLAY=$(pgrep -fl Xorg | grep -Eo ":[0-9]+")
+
+	# Equalizes popup size and fonts between systems of different resolution and DPI settings.
+	calculate_sizes
+
+	# Execute popup depending on if input is needed or not
+	if [ "$_cmd" ] ; then
+	echo $DISPLAY >> /root/temp
+		xterm -fa Monospace -fs $_fs -e /bin/sh -c "eval \"$_i3mod\" ; eval \"$_cmd\" ; "
+	elif [ -z "$_input" ] ; then
+		# Simply print a message, and return 0
+		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
+			"eval \"$_i3mod\" ; echo \"$_popmsg\" ; echo \"{Enter} to close\" ; read _INPUT ;"
+		eval $_R0
+	else
+		# Need to collect a variable, and use a tmp file to pull it from the subshell, to a variable.
+		local _poptmp=$(mktemp ${QRUN}/popup.XXXX)
+		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
+			"eval \"$_i3mod\"; printf \"%b\" \"$_popmsg\"; read _INPUT; echo \"\$_INPUT\" > $_poptmp"
+
+		# Retreive the user input, remove tmp, and echo the value back to the caller
+		_input=$(cat $_poptmp)
+		rm $_poptmp > /dev/null 2>&1
+		echo "$_input"
+	fi
+}
 
 # DEBUG FUNCTIONS FOR DEEPER ERROR PROBING
 
@@ -115,4 +170,3 @@ setlog3() {
 	rm /root/debug3 > /dev/null 2>&1
 	exec > /root/debug3 2>&1
 }
-

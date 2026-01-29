@@ -1,4 +1,6 @@
-# GLOBAL VARIABLES FOR LIBRARIES AND SCRIPTS
+#!/bin/sh
+
+## GLOBAL VARIABLES FOR LIBRARIES AND SCRIPTS ##
 
 # Primary directories
 export QETC="/usr/local/etc/qubsd"
