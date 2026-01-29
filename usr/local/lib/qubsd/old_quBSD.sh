@@ -113,7 +113,7 @@
 ########################################################################################
 
 # Source error messages for library functions
-. /usr/local/lib/qubsd/messages/quBSD.sh
+. /usr/local/lib/qubsd/messages/old_quBSD.sh
 
 # Internal flow variables to handle returns, while reseting _fn and _FN variables with logging
 _R0='_FN="$_fn_orig" ; return 0'
