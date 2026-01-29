@@ -10,7 +10,7 @@ export QSHARE="/usr/local/share/qubsd"
 export QRUN="/var/run/qubsd"
 
 # Supporting directories and files
-export QUBSD="$QLIB/qubsd.sh"
+export COMMON="$QLIB/common.sh"
 export B_DEF="$QETC/qubsd.conf.d/defaults.base.conf"
 export J_DEF="$QETC/qubsd.conf.d/defaults.jail.conf"
 export V_DEF="$QETC/qubsd.conf.d/defaults.vm.conf"

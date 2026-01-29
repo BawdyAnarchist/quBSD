@@ -642,4 +642,37 @@ chk_valid_x11() {
 	get_msg $_q -m _e1 -- "$1" "X11FWD" && eval $_R1
 }
 
+chk_avail_jailname() {
+	# Checks that the proposed new jailname does not have any entries or partial entries
+	# in JCONF, QCONF, and ZFS datasets
+	# Return 0 jailname available, return 1 for any failure
+	local _fn="chk_avail_jailname" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+	while getopts qV _opts ; do case $_opts in
+		q) local _qa='-q' ;;
+		V) local _V="-V" ;;
+	esac ; done ; shift $(( OPTIND - 1))
+
+	# Positional parmeters
+	local _jail="$1"
+	[ -z "$_jail" ] && get_msg $_qa -m _e0 -- "new jail name" && eval $_R1
+
+	# Checks that proposed jailname isn't 'none' or 'qubsd' or starts with '#'
+	echo "$_jail" | grep -Eqi "^(none|qubsd)\$" \
+			&& get_msg $_qa -m _e13 -- "$_jail" && eval $_R1
+
+	# Jail must start with :alnum: and afterwards, have only _ or - as special chars
+	! echo "$_jail" | grep -E -- '^[[:alnum:]]([-_[:alnum:]])*[[:alnum:]]$' \
+			| grep -Eqv '(--|-_|_-|__)' && get_msg $_qa -m _e13_1 -- "$_jail" && eval $_R1
+
+   # Checks that proposed jailname doesn't exist or partially exist
+	if chk_valid_zfs "${R_ZFS}/$_jail" || \
+		chk_valid_zfs "${U_ZFS}/$_jail"  || \
+		grep -Eq "^${_jail}[ \t]+" $QCONF || \
+		[ -e "${JCONF}/${_jail}" ] ; then
+		get_msg $_qa -m _e13_2 -- "$_jail" && eval $_R1
+	fi
+
+	eval $_R0
+}
 

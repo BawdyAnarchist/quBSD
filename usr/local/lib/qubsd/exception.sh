@@ -10,7 +10,7 @@ rm_errfiles() {
 }
 
 get_msg() {
-# qubsd.sh internal messaging system
+# qubsd common.sh internal messaging system
 # THIS WILL BE OVERHAULED INTO A UNIFIED SYSTEM WITH get_msg2()
 	local _msg1= ; local _msg2= ; local _error
 
@@ -27,13 +27,13 @@ get_msg() {
 	[ "$DEBUG" = "1" ] && echo "$(date "+%Y-%m-%d_%H:%M")  $0  ${_FN}" >> $QLOG
 
 	case $_msg1 in
-		_m*) [ -z "$_q" ] && msg_qubsd "$@" ;;
+		_m*) [ -z "$_q" ] && msg_lib_common "$@" ;;
 		_w*|_e*) # Append messages to top of $ERR1. Must end with `|| :;}` , for `&& cp -a` to work
-			[ -z "$_q" ] && { msg_qubsd "$@" ; [ "$_msg2" ] && _msg1="$_msg2" && msg_qubsd "$@" \
+			[ -z "$_q" ] && { msg_lib_common "$@" ; [ "$_msg2" ] && _msg1="$_msg2" && msg_lib_common "$@" \
 				; [ -s "$ERR1" ] && cat $ERR1 || :;} > $ERR2 && cp -a $ERR2 $ERR1
 
 			# If -V was passed, then print the message immediately
-			[ "$_V" ] && msg_qubsd "$@"
+			[ "$_V" ] && msg_lib_common "$@"
 			;;
 	esac
 

@@ -5,7 +5,7 @@
 # KEYWORD: shutdown
 
 . /etc/rc.subr
-. /usr/local/lib/qubsd/qubsd.sh
+. /usr/local/lib/qubsd/common.sh
 
 name="qb_cleanup"
 desc="Cleans up lingering pieces of quBSD at boot/poweroff"
