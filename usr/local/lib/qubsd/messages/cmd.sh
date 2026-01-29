@@ -80,10 +80,11 @@ qb-cmd: Runs command in a jail, or connects to VM.
         both tmux and VNC if no option specified.
 
 Usage: qb-cmd <jail/VM>
-       qb-cmd [-N][-d][-H|x][-p][-q][-r|-u <user>] <jail> <command>
+       qb-cmd [-N][-d][-e][-H|x][-p][-q][-r|-u <user>] <jail> <command>
        qb-cmd [-N] <VM>
 
    -d: (d)pi. Set DPI of the Xephyr window to be launched.
+   -e: (e)phm. Launch an ephemeral version of <jail>. 
    -h: (h)elp. Outputs this help message
    -l: (l)inux default: /compat/ubuntu
    -L: (L)inux user-specified: /compat/<your_linux_compat>

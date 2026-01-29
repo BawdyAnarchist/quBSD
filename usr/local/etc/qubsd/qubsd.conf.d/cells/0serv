@@ -1,0 +1,7 @@
+AUTOSNAP="true"
+CLASS="rootjail"
+GATEWAY="net-ivpn-dal"
+MAXMEM="6G"
+ROOTENV="0serv"
+SCHG="none"
+SECLVL="-1"

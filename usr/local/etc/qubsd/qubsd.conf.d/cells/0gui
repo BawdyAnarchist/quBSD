@@ -1,0 +1,6 @@
+AUTOSNAP="true"
+CLASS="rootjail"
+GATEWAY="net-ivpn-dal"
+ROOTENV="0gui"
+SCHG="none"
+SECLVL="-1"

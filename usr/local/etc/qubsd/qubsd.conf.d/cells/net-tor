@@ -1,0 +1,4 @@
+AUTOSNAP="true"
+CLASS="appjail"
+GATEWAY="net-firewall"
+ROOTENV="0net"

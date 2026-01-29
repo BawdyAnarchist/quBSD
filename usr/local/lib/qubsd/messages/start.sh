@@ -6,7 +6,7 @@ msg_start() {
 Two instances of qb-stop or qb-start are already running.
 Cannot queue another instance until one of these finishes.
 
-$(pgrep -fl '/bin/sh /usr/local/bin/qb-st(art|op)')
+$(pgrep -fl '/bin/sh /usr/local/libexec/qubsd/qb-st(art|op)')
 ENDOFMSG
 		;;
 	_e1) cat << ENDOFMSG

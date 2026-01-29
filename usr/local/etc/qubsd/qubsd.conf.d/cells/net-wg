@@ -1,0 +1,4 @@
+CLASS="appjail"
+GATEWAY="net-firewall"
+MAXMEM="1G"
+ROOTENV="0net"

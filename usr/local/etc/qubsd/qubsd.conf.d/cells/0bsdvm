@@ -1,0 +1,5 @@
+AUTOSNAP="true"
+CLASS="rootVM"
+GATEWAY="net-ivpn-dal"
+ROOTENV="0bsdvm"
+TMUX="true"

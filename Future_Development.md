@@ -1,3 +1,11 @@
+CHANGES:
+   /usr/local/etc/qubsd/qubsd.conf.d  ADDED
+
+Pivoting to "cells" now. Works on both jails and bhyve both generically (guests) and even semantically
+  - guests was rejected because it's a bit too generic for an opinionated container system like this
+  - This is a much larger change which generalizes the qubsd.conf to reflect jail.conf.d schema
+  - Ultimately this is the final correctness overhaul which segregates GET, CHECK/MODIFY, PROPOSAL, EXECUTE
+    -- This will take probably a few months of work. If I'm lucky, maybe just 1-2, then package time
 
 Jail starts are delayed for some reason. Need to see why.
   - seems only to be after reboot
@@ -50,8 +58,7 @@ I2P Gateway
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
 
-qubsd.conf
-   - generalize the schg to being able to list specific files, and not my preselected ones.
+/usr/local/bin/qb and /usr/local/bin/qubsd should both be there. qb symlinks to qubsd
 
 qb-edit
 	- chk_isqubsd_ipv4 - [-x] isnt used anywhere, but a check for quBSD IP convention would be a good addon 

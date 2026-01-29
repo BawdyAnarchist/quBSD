@@ -113,7 +113,7 @@
 ########################################################################################
 
 # Source error messages for library functions
-. /usr/local/lib/qubsd/msg-quBSD.sh
+. /usr/local/lib/qubsd/messages/quBSD.sh
 
 # Internal flow variables to handle returns, while reseting _fn and _FN variables with logging
 _R0='_FN="$_fn_orig" ; return 0'
@@ -179,8 +179,11 @@ get_msg2() {
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
 	# Using the caller script to generalize message calls. Switch between exec and qb- scripts.
-	local _call="${0##*/}"  _msg  _NEEDPOP
-	[ -z "${_call##exec.*}" ] && _msg="msg_exec" || _msg="msg_${_call##*-}"
+	local _caller="${0##*/}"  _msg  _NEEDPOP
+	[ -z "${_caller##exec.*}" ] && _msg="msg_exec" || _msg="msg_${_caller##*-}"
+
+	# Source the correct message file
+	. "$QLIB/messages/${_msg#msg_}.sh"
 
 	# Determine if popup should be used or not
 	get_info _NEEDPOP
@@ -190,7 +193,7 @@ get_msg2() {
 		_e*)
 			if [ -z "$_force" ] ; then
 				# Place final ERROR message into a variable. $ERR1 (tmp) enables func tracing
-				_ERROR="$(echo "ERROR: $_call" ; "$_msg" "$@" ; [ -s "$ERR1" ] && cat $ERR1)"
+				_ERROR="$(echo "ERROR: $_caller" ; "$_msg" "$@" ; [ -s "$ERR1" ] && cat $ERR1)"
 				echo -e "$_ERROR\n" > $ERR2
 
 				# If exiting due to error, log the date and error message to the log file

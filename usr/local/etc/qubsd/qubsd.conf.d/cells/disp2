@@ -1,0 +1,5 @@
+CLASS="dispjail"
+GATEWAY="net-ivpn-dal"
+MAXMEM="64G"
+ROOTENV="0gui"
+TEMPLATE="0gui"

@@ -1,0 +1,4 @@
+CLASS="dispjail"
+GATEWAY="net-firewall"
+ROOTENV="0gui"
+TEMPLATE="0gui"

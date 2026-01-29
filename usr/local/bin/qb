@@ -3,9 +3,7 @@
 # Dispatcher script for calling sub-commands
 
 # Basically all subcommands need to source the library and global variables
-. /usr/local/lib/qubsd/quBSD.sh
-. /usr/local/lib/qubsd/msg-qb.sh
-get_global_variables
+. /usr/local/lib/qubsd/qubsd.sh
 
 SUBCMD="$1"
 

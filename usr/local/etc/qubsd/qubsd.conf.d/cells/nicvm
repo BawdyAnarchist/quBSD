@@ -1,0 +1,6 @@
+AUTOSNAP="true"
+CLASS="appVM"
+MEMSIZE="800M"
+PPT="69/0/0"
+ROOTENV="0bsdvm"
+TMUX="true"
