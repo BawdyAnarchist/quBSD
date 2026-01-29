@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. $QUBSD
+. $COMMON
 
 get_options() {
 	while getopts aAhf:FnrRz: _opts ; do case $_opts in

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. $QUBSD
+. $COMMON
 
 get_options() {
 	while getopts cdhi:l opts ; do case $opts in

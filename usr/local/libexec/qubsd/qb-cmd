@@ -2,7 +2,7 @@
 
 # Options and X11 window determine variables; incorporated by a single `eval` at the end
 
-. $QUBSD
+. $COMMON
 
 get_options() {
 	while getopts d:ehHlL:Npqrs:tu:yxX opts ; do case $opts in
