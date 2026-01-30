@@ -256,6 +256,7 @@ set_freebsd_pw() {
 	# Change the local pwd from template name to dispjail name
 	[ -e "$etc_local" ] && chflags -R noschg $etc_local
 	[ -e "$pwd_local" ] && sed -i '' -E "s|^$_template:|$_jail:|g" $pwd_local
+	[ -e "$pwd_local" ] && sed -i '' -E "s|/home/$_template:|/home/$_jail:|g" $pwd_local
 	[ -e "$grp_local" ] && sed -i '' -E "s/(:|,)$_template(,|[[:blank:]]|\$)/\1$_jail\2/g" $grp_local
 }
 
