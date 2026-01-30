@@ -589,8 +589,8 @@ exec_vm_coordinator() {
 
 	# Launch VM sent to background, so connections can be made (network, vnc, tmux)
 	get_msg -m _m1 -- "$_jail" | tee -a $QLOG ${QLOG}_${_VM}
-	export QUBSD _BHYVE_CMD _VM _rootenv QLOG
-	daemon -t "bhyve: $_jail" -o /dev/null -- /bin/sh -c '. $QUBSD ; launch_bhyve_vm'
+	export COMMON _BHYVE_CMD _VM _rootenv QLOG
+	daemon -t "bhyve: $_jail" -o /dev/null -- /bin/sh -c '. $COMMON ; launch_bhyve_vm'
 
 	# Monitor to make sure that the bhyve command started running, then return 0
 	local _count=0 ; sleep .5

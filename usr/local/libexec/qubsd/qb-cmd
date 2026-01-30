@@ -88,9 +88,9 @@ create_ephmjail() {
 	fi
 
 	# Monitor for any EPHM ps TT that are open, with detached script. Will destroy EPHM after.
-	export _JAIL QUBSD
+	export _JAIL COMMON
 	daemon -t "Ephemeral: $_JAIL " -o /dev/null -- /bin/sh << 'EOF'
-		. $QUBSD
+		. $COMMON
 		get_global_variables
 		monitor_ephmjail
 EOF
@@ -131,9 +131,9 @@ prepare_and_launch_xephyr() {
 	[ -f "$_xresources" ] || _xresources="${HOME}/.Xresources"
 	[ -f "$_xresources" ] || unset _xresources
 
-	export QUBSD _JAIL _USER _DPI display _xresources
+	export COMMON _JAIL _USER _DPI display _xresources
 	daemon -t "Xephyr: $display, Jail: $_JAIL, Command: $_CMD, " -o /dev/null -- /bin/sh << 'EOF'
-		. $QUBSD
+		. $COMMON
 		launch_xephyr
 EOF
 	sleep .2   # Give another moment for the env to load in Xephyr
