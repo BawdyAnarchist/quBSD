@@ -16,6 +16,7 @@ export J_DEF="$QETC/qubsd.conf.d/defaults.jail.conf"
 export V_DEF="$QETC/qubsd.conf.d/defaults.vm.conf"
 export CELLS="$QETC/qubsd.conf.d/cells"
 export JCONF="$QETC/jail.conf.d/jails"
+export QCONF="$QETC/qubsd.conf"
 export QLOG="/var/log/qubsd/quBSD.log"
 export VMTAPS="$QRUN/vm_taps"
 
