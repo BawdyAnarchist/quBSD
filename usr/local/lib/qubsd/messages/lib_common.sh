@@ -1,6 +1,6 @@
 #!/bin/sh
 
-msg_lib_qubsd() {
+msg_lib_common() {
 	case "$_msg1" in
 	_e0) cat << ENDOFMSG
    func: $_fn() expected to be passed a $1, but was null
