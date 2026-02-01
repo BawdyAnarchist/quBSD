@@ -168,3 +168,9 @@ check_yesno
 get_user_response
 
 
+### TEMPORARY DUPLICATES AND SURGICAL SUPPORTS DURING THE OVERHAUL
+constants.sh -> _R0 and _RET0
+
+
+
+

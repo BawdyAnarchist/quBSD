@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. $COMMON
+. $QCOMMON
 
 get_options() {
 	while getopts aAeE:hf:Frt: opts ; do case $opts in
