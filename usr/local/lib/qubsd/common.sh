@@ -12,3 +12,8 @@
 . $QLIB/network.sh 
 . $QLIB/lifecycle.sh 
 . $QLIB/vm.sh 
+
+# Output Redirects
+quiet() { "$@" > /dev/null 2>&1 ; }     # Pure silence
+hush() { "$@" 2 > /dev/null ; }         # Hush errors
+verbose() { echo ">> $*" >&2; "$@" ; }  # Debug tool
