@@ -10,8 +10,6 @@ val_args_notnull() {
 
     for _arg in "$@" ; do
         [ -z "$_arg" ] && eval $(THROW _ev1)
-        [ -z "$_arg" ] && THROW _ev1 && return 1
-
         [ $_i -ge $_require ] && return 0 || _i=$(( _i + 1 ))
     done
 
