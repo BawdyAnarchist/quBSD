@@ -1,6 +1,28 @@
 #!/bin/sh
 
-## CONFIG, RUNTIME, AND CALCULATIONS SUPPORT 
+# GENERALIZED QUERY FUNCTION FOR READING A CELL'S VARIABLES
+query() {
+    # $1: Cell to read ; $2: Variable prefix for deconfliction (can be blank)
+    
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##################################################################################################
+####################################  OLD  FUNCTIONS  ############################################
+##################################################################################################
 
 get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts

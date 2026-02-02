@@ -1,6 +1,34 @@
 #!/bin/sh
 
-## SANITY CHECKS FOR CELL PARAMETERS ##
+val_args_notnull() {
+    local _fn="val_args_notnull" ; local _FN="$_FN::$_fn"
+    local _require="$1" ; shift
+    local _count="$#"
+    local _i=1
+
+    [ "$_count" -lt "$_require" ] && eval $(THROW _ev1)
+
+    for _arg in "$@" ; do
+        [ -z "$_arg" ] && eval $(THROW _ev1)
+        [ -z "$_arg" ] && THROW _ev1 && return 1
+
+        [ $_i -ge $_require ] && return 0 || _i=$(( _i + 1 ))
+    done
+
+    return 0
+}
+
+val_path_exists() {
+    local _fn="val_path_exists" ; local _FN="$_FN::$_fn"
+    [ $1 $2 ] && return 0 || eval $(THROW _ev2 $2)
+}
+
+
+
+
+##################################################################################################
+####################################  OLD  FUNCTIONS  ############################################
+##################################################################################################
 
 chk_valid_zfs() {
 	# Silently verifies existence of zfs dataset, because zfs has no quiet option

@@ -1,13 +1,52 @@
 #!/bin/sh
 
-## EXCEPTION HANDLING SYSTEM ##
+# OUTPUT REDIRECTS
+quiet() { "$@" > /dev/null 2>&1 ;}     # Pure silence
+hush() { "$@" 2>/dev/null ;}           # Hush errors
+verbose() { echo ">> $*" >&2; "$@" ;}  # Command-specific debug tool
 
-## NOTE: Will later be modularized into separate messaging and exception libraries
+# ERROR SYSTEM FOR CONSOLE OUTPUT [add a note for the explanation of magic]
+TRY() { "$@" || { rm -f $ERR ; return 1 ;};}
+THROW() {
+    [ "$TRACE" ] && echo "$_FN" >> $ERR
 
-rm_errfiles() {
-# Catchall cleanup for the error storage mechanism
-	rm $ERR1 $ERR2 > /dev/null 2>&1
+    # Search for message only if passed a message code
+    if [ "$1" ] ; then
+        awk -v code="$1" '
+            $1 == code { found=1; next }
+            found && /^\/END\// { exit }
+            found { print }
+        ' $D_QMSG/lib*.msg >> $ERR
+    fi
+
+    echo "return 1"
 }
+
+rm_errfile() { rm -f $ERR ;}    # Baseline trap
+
+# DEBUG FUNCTIONS FOR DEEPER ERROR PROBING
+setlog1() {
+	set -x
+	rm /root/debug1 > /dev/null 2>&1
+	exec > /root/debug1 2>&1
+}
+setlog2() {
+	set -x
+	rm /root/debug2 > /dev/null 2>&1
+	exec > /root/debug2 2>&1
+}
+
+
+
+
+
+
+########################################################################################
+########################################## OLD #########################################
+########################################################################################
+
+
+rm_errfiles() { rm -f $ERR ;}    # Baseline trap
 
 get_msg() {
 # qubsd common.sh internal messaging system
@@ -151,22 +190,3 @@ create_popup() {
 	fi
 }
 
-# DEBUG FUNCTIONS FOR DEEPER ERROR PROBING
-
-setlog1() {
-	set -x
-	rm /root/debug1 > /dev/null 2>&1
-	exec > /root/debug1 2>&1
-}
-
-setlog2() {
-	set -x
-	rm /root/debug2 > /dev/null 2>&1
-	exec > /root/debug2 2>&1
-}
-
-setlog3() {
-	set -x
-	rm /root/debug3 > /dev/null 2>&1
-	exec > /root/debug3 2>&1
-}

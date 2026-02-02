@@ -13,7 +13,9 @@
 . $QLIB/lifecycle.sh 
 . $QLIB/vm.sh 
 
-# Output Redirects
-quiet() { "$@" > /dev/null 2>&1 ; }     # Pure silence
-hush() { "$@" 2 > /dev/null ; }         # Hush errors
-verbose() { echo ">> $*" >&2; "$@" ; }  # Debug tool
+# Verify Environment
+[ -d "$D_CELLS" ] || mkdir -p $D_CELLS
+[ -d "$D_JAILS" ] || mkdir -p $D_JAILS
+[ -d "$D_QERR" ] || mkdir -p $D_QERR
+[ -d "$D_QX11" ] || mkdir -p $D_QX11
+[ -d "$D_XFER" ] || mkdir -p $D_XFER
