@@ -12,11 +12,11 @@ THROW() {
 
     # Search for message only if passed a message code
     if [ "$1" ] ; then
-        awk -v code="$1" '
+        local _msg=$(awk -v code="$1:" '
             $1 == code { found=1; next }
             found && /^\/END\// { exit }
-            found { print }
-        ' $D_QMSG/lib*.msg >> $ERR
+            found { print }' $D_QMSG/lib*.msg)
+        [ "$_msg" ] && shift && printf "$_msg\n" "$@" >> $ERR
     fi
 
     echo "return 1"
