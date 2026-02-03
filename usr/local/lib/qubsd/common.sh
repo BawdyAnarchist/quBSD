@@ -8,10 +8,11 @@
 # Library Components
 . $QLIB/exception.sh
 . $QLIB/query.sh
-. $QLIB/validate.sh 
+. $QLIB/check.sh 
+. $QLIB/compose.sh 
 . $QLIB/network.sh 
 . $QLIB/lifecycle.sh 
-. $QLIB/vm.sh 
+. $QLIB/bhyve.sh 
 
 # Verify Environment
 [ -d "$D_CELLS" ] || mkdir -p $D_CELLS

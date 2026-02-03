@@ -13,7 +13,7 @@ rootstrap_bsdvm() {
 	# Positional and local variables and checks
 	local _VM="$1" volsize="$2" vm_zroot zvol distdir bsdvm tmp_zpool alt_mnt
 	[ -z "$_VM" ] && get_msg $_q -m _e0 "VM name" && eval $_R1
-	chk_avail_jailname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
+	validate_cellname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
 
 	[ -z "$volsize" ] && get_msg $_q -m _e0 "zvol volume size" && eval $_R1
    ! echo "$volsize" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" \
@@ -122,7 +122,7 @@ configure_bsdvm_zusr() {
 	# Positional and local variables and checks
 	local _VM="$1" volsize="$2" vm_zusr zvol tmp_zpool alt_mnt
 	[ -z "$_VM" ] && get_msg $_q -m _e0 "VM name" && eval $_R1
-	chk_avail_jailname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
+	validate_cellname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
 
 	[ -z "$volsize" ] && get_msg $_q -m _e0 "zvol volume size" && eval $_R1
    ! echo "$volsize" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" \

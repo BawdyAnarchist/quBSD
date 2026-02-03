@@ -1,28 +1,37 @@
 #!/bin/sh
 
-# GENERALIZED QUERY FUNCTION FOR READING A CELL'S VARIABLES
-query() {
-    # $1: Cell to read ; $2: Variable prefix for deconfliction (can be blank)
-    
+is_path_exist() {
+    local _fn="val_path_exists"
+    chk_args_set 2 $1 $2 || eval $(THROW)
+    [ $1 $2 ] && return 0 || eval $(THROW _qry1 $2)
 }
 
+is_zfs_exist() {
+    local _fn="is_zfs_exist"
+    chk_args_set 1 $1 || eval $(THROW)
+    quiet zfs list -- $1 || eval $(THROW _qry2 $1) 
+}
 
+# READ A SINGLE PARAMETER 
+read_cell_param() {
+    local _fn="read_cell_param"
+    chk_args_set 2 $1 $2 || eval $(THROW)
+    sed -En "s/$2=\"(.*)\"/\1/p" $D_CELLS/$1 || eval $(THROW _qry3 $1 $2)
+}
 
+query_zfs_mountpoint() {
 
-
-
-
-
-
-
-
-
-
+}
 
 
 ##################################################################################################
 ####################################  OLD  FUNCTIONS  ############################################
 ##################################################################################################
+
+chk_valid_zfs() {
+   # Silently verifies existence of zfs dataset, because zfs has no quiet option
+   zfs list -- $1 >> /dev/null 2>&1  &&  return 0  ||  return 1
+}
 
 get_global_variables() {
 	# Global config files, mounts, and datasets needed by most scripts
@@ -356,8 +365,6 @@ calculate_sizes() {
 	fi
 }
 
-# HELPERS
-
 chk_isblank() {
 	# Seems there are only verbose POSIX ways to test a variable is either null contains spaces.
 	[ "$1" = "${1#*[![:space:]]}" ] && return 0  ||  return 1
@@ -373,59 +380,6 @@ chk_isrunning() {
 
 	# Neither jail nor bhyve were found. Return error
 	return 1
-}
-
-chk_truefalse() {
-	local _fn="chk_truefalse" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	while getopts qV _opts ; do case $_opts in
-		q) local _qf='-q' ;;
-		V) local _V="-V" ;;
-	esac ; done ; shift $(( OPTIND - 1))
-
-	local _value="$1"  ;  local _param="$2"
-	[ -z "$_value" ] && get_msg $_qf -m _e0 -- "$_param" && eval $_R1
-
-	# Must be either true or false.
-	[ ! "$_value" = "true" ] && [ ! "$_value" = "false" ] \
-			&& get_msg $_qf -m _e10 -- "$_param" && eval $_R1
-	eval $_R0
-}
-
-chk_integer() {
-	# Checks that _value is integer, and can checks boundaries. [-n] is a descriptive variable name
-	# from caller, for error message. Assumes that integers have been provided by the caller.
-	local _fn="chk_integer" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	while getopts g:G:l:L:qv:V opts ; do case $opts in
-			g) local _g="$OPTARG" ; local _c="greater-than or equal to"
-				! echo "${_g}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q -m _e11 -- "$_g" && eval $_R1;;
-			G) local _G="$OPTARG" ; local _c="greater-than"
-				! echo "${_G}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q -m _e11 -- "$_G" && eval $_R1;;
-			l) local _l="$OPTARG" ; local _c="less-than or equal to"
-				! echo "${_l}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q -m _e11 -- "$_l" && eval $_R1;;
-			L) local _L="$OPTARG" ; local _c="less-than"
-				! echo "${_L}" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q -m _e11 -- "$_L" && eval $_R1;;
-			v) local _p="$OPTARG" ;;
-			V) local _V="-V" ;;
-			q) local _q='-q' ;;
-			*) get_msg -m _e9 ; eval $_R1 ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))
-	_val="$1"
-
-	# Check that it's an integer
-	! echo "$_val" | grep -Eq -- '^-*[0-9]+$' && get_msg $_q -m _e11 -- "$_val" && eval $_R1
-
-	# Check each option one by one
-	[ "$_g" ] && [ ! "$_val" -ge "$_g" ] \
-		&& get_msg $_q -m _e12 -- "$_p" "$_val" "$_c" "$_g" && eval $_R1
-	[ "$_G" ] && [ ! "$_val" -gt "$_G" ] \
-		&& get_msg $_q -m _e12 -- "$_p" "$_val" "$_c" "$_G" && eval $_R1
-	[ "$_l" ] && [ ! "$_val" -le "$_l" ] \
-		&& get_msg $_q -m _e12 -- "$_p" "$_val" "$_c" "$_l" && eval $_R1
-	[ "$_L" ] && [ ! "$_val" -lt "$_L" ] \
-		&& get_msg $_q -m _e12 -- "$_p" "$_val" "$_c" "$_L" && eval $_R1
-	eval $_R0
 }
 
 chk_isvm() {

@@ -42,9 +42,16 @@ export QLOG="/var/log/qubsd/quBSD.log"
 export VMTAPS="$QRUN/vm_taps"
 
 # Function tracing begins with the main script
-export _FN="$0"
-export ERR="$D_QERR/$(basename $0).$$.err"
+export BASENAME=$(basename $0)
+export ERR="$D_QERR/$BASENAME.$$.err"
 export TRAP_SIGS="HUP INT TERM QUIT EXIT"
+
+# Runtime invariant lists
+export PARAMS_COMN="AUTOSTART AUTOSNAP BACKUP CLASS CONTROL ENVSYNC
+                    GATEWAY IPV4 MTU NO_DESTROY ROOTENV TEMPLATE R_ZFS U_ZFS"
+export PARAMS_JAIL="CPUSET MAXMEM SCHG SECLVL"
+export PARAMS_VM="BHYVEOPTS BHYVE_CUSTM MEMSIZE PPT TAPS TMUX VCPUS VNC WIREMEM X11"
+export CLASSES="rootjail appjail dispjail rootVM appVM dispVM"
 
 # Function tracing. Used with `eval` to track logic flow for exception messages 
 # TEMPORARY: will be removed after overhaul
