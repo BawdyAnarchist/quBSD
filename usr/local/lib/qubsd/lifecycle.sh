@@ -424,7 +424,7 @@ select_snapshot() {
 											| xargs -I@ date -j -f "%a %b %d %H:%M %Y" @ +"%s")
 
 		# Cycle from most-to-least recent until a snapshot older-than running ROOTENV pid, is found
-		while chk_integer -q -g $_jlsdate $(( _snapdate + 59 )) ; do
+		while chk_integer2 -q -g $_jlsdate $(( _snapdate + 59 )) ; do
 			_rootsnaps=$(echo "$_rootsnaps" | sed '$ d')
 			[ -n "$_rootsnaps" ] \
 				&& _snapdate=$(echo "$_rootsnaps" | tail -1 | xargs -I@ zfs list -Ho creation @ \

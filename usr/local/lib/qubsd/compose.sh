@@ -1,28 +1,10 @@
 #!/bin/sh
 
-# RETURN [JAIL|VM] BASED ON $1 CLASS. BOOTSTRAPS PARAMETER SOURCING
-resolve_cell_type() {
-    local _fn="read_cell_type" _cell _type
-
-    chk_args_set 1 $1 && _cell="$1" || eval $(THROW)
-    is_path_exist -f $D_CELLS/$_cell || eval $(THROW)
-
-    _type=$(read_cell_param $1 CLASS) || eval $(THROW)
-    case $_type in
-        *jail) echo "JAIL" ;;
-        *VM) echo "VM" ;;
-        *) eval $(THROW _cmp1 $_cell $_type) ;;
-    esac
-
-    return 0
-}
-
-# SOURCE THE CELL CONFIG ($1). OPTIONALLY - SET A UNIQUE VARIABLE PREFIX ($2)
 resolve_cell_parameters() {
-    local _fn="load_cell_config" _prefix="$2" _cell _type _params _val
+    local _fn="resolve_cell_config" _prefix="$2" _cell _type _params _val
 
     chk_args_set 1 $1 && _cell="$1" || eval $(THROW)  # Safety assurance
-    _type=$(resolve_cell_type $_cell) || eval $(THROW)  # JAIL vs VM
+    _type=$(query_cell_type $_cell) || eval $(THROW)  # JAIL vs VM
 
     # Get all PARAM variable names. If _prefix, protect globals from clobber with `local` 
     eval _params=\"\${PARAMS_COMN} \${PARAMS_${_type}}\"
@@ -36,17 +18,20 @@ resolve_cell_parameters() {
     # Assign the correct variable name based on _prefix, and render global: _PARAMS
     for _param in $_params ; do
         eval _val=\${$_param}
-        if [ "$_val" ] ; then
-            eval ${_prefix}${_param}='${_val}'
-            # SET GLOBAL $_PARAMS LIST.  UNSURE IF THIS IS NEEDED, BUT KEEP JUST IN CASE
-            #eval ${_prefix%_}_PARAMS=\"\${_PARAMS} \${_param}\"
-        fi
+        [ "$_val" ] && eval ${_prefix}${_param}='${_val}'
     done
+
+    # Complete the ZFS mountpoints, as they are structurally indispensible to resolution
+    R_MNT=$(hush zfs list -Ho mountpoint "$R_ZFS") 
+    U_MNT=$(hush zfs list -Ho mountpoint "$U_ZFS") 
 
     return 0
 }
 
+validate_cell_parameters() {
+   {}
 
+}
 
 
 ##################################################################################################

@@ -1,45 +1,131 @@
 #!/bin/sh
 
+################################  SECTION 1: GENERAL FORMAT CHECKS  ################################ 
+
 chk_args_set() {
-    local _fn="val_args_notnull"
+    local _fn="chk_args_set"
     local _require="$1" ; shift
     local _count="$#" _i=1 
 
-    [ "$_count" -lt "$_require" ] && eval $(THROW _chk1)
+    [ "$_count" -lt "$_require" ] && eval $(THROW $_fn)
 
     for _arg in "$@" ; do
-        [ "$_arg" = "${_arg#*[![:space:]]}" ] && eval $(THROW _chk1)
+        [ "$_arg" = "${_arg#*[![:space:]]}" ] && eval $(THROW $_fn)
         [ $_i -ge $_require ] && return 0 || _i=$(( _i + 1 ))
     done
 
     return 0
 }
 
-chk_bool_fmt() {
-    local _fn="chk_bool_fmt"
-    chk_args_set 1 $1 || eval $(THROW)
+chk_bool_tf() {
+    local _fn="chk_bool_tf"
+    echo $1 | tr '[:upper:]' '[:lower:]' | grep -Eqs "true|false" || eval $(THROW $_fn)
+}
 
-    case "$1" in
-        true|True|TRUE|false|False|FALSE) return 0 ;;
-        *) eval $(THROW _chk2) ;;
+chk_integer() {
+    local _fn="chk_integer"
+    echo "$1" | grep -Eqs -- '^-*[0-9]+$' || eval $(THROW $_fn $1)
+}
+
+normalize_integer() {
+    # Checks that _value is integer, and can checks boundaries. [-n] is a descriptive variable name
+    # from caller, for error message. Assumes that integers have been provided by the caller.
+    local _fn="normalize_integer" _val
+
+    while getopts :g:G:l:L: opts ; do case $opts in
+        g) local _g="$OPTARG" ;;
+        G) local _G="$OPTARG" ;;
+        l) local _l="$OPTARG" ;;
+        L) local _L="$OPTARG" ;;
+        *) eval $(THROW ${_fn}2 $_fn) ;;   # getopts warning suppressed because we handle it here
+    esac  ;  done  ;  shift $(( OPTIND - 1 ))
+    _val="$1"
+
+    # Check each option one by one
+    [ "$_g" ] && { [ "$_val" -ge "$_g" ] || eval $(THROW ${_fn} $_val '<'  $_g) ;}
+    [ "$_G" ] && { [ "$_val" -gt "$_G" ] || eval $(THROW ${_fn} $_val '<=' $_G) ;}
+    [ "$_l" ] && { [ "$_val" -le "$_l" ] || eval $(THROW ${_fn} $_val '>'  $_l) ;}
+    [ "$_L" ] && { [ "$_val" -lt "$_L" ] || eval $(THROW ${_fn} $_val '>=' $_L) ;} 
+
+    return 0
+}
+##################################  SECTION 2: COMMON PARAMETERS  ##################################
+
+chk_class() {
+    local _fn="chk_class"
+    echo "$CLASSES" | grep -Eqs -- "$1" || eval $(THROW _invalid CLASS $1)
+}
+
+chk_ipv4() {
+    local _fn="chk_ipv4" _val="$1" _b1 _b2 _b3
+
+    # Not as technically correct as a regex, but it's readable and functional
+    # IP represented by the form: a0.a1.a2.a3/a4 ; b-variables are local/ephemeral
+    _a0=${_val%%.*.*.*/*}
+    _a4=${_val##*.*.*.*/}
+        _b1=${_val#*.*}
+        _a1=${_b1%%.*.*/*}
+            _b2=${_val#*.*.*}
+            _a2=${_b2%%.*/*}
+                _b3=${_val%/*}
+                _a3=${_b3##*.*.*.}
+
+    # Ensures that each number is in the proper range
+    echo "$_val" | grep -Eqs "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+" \
+        || eval $(THROW _invalid2 IPV4 "$_val" "Use CIDR notation with subnet")
+
+    # Ensures that each digit is within the proper range
+    { [ "$_a0" -ge 0 ] && [ "$_a0" -le 255 ] && [ "$_a1" -ge 0 ] && [ "$_a1" -le 255 ] \
+        && [ "$_a2" -ge 0 ] && [ "$_a2" -le 255 ] && [ "$_a3" -ge 0 ] && [ "$_a3" -le 255 ] \
+        && [ "$_a4" -ge 0 ] && [ "$_a4" -le 32 ] ;} \
+        || eval $(THROW _invalid2 IPV4 "$_val" "Use CIDR notation with subnet")
+}
+
+chk_bytesize() {
+    local _fn="chk_bytesize"
+    echo "$1" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" || eval $(THROW _invalid bytesize $1)
+}
+
+normalize_bytesize() {
+    local _fn="normalize_bytesize" _val="$1" _raw
+    _raw=$(echo $_val | sed -nE "s/.\$//p")
+    case $_val in
+        *K|*k) echo $(( _raw * 1024 )) ;;
+        *M|*m) echo $(( _raw * 1024 * 1024 )) ;;
+        *G|*g) echo $(( _raw * 1024 * 1024 * 1024 )) ;;
+        *T|*t) echo $(( _raw * 1024 * 1024 * 1024 * 1024 )) ;;
     esac
 }
 
-chk_integer_fmt() {
-    local _fn="chk_int_fmt"
-    chk_args_set 1 $1 || eval $(THROW)
-    echo "$1" | grep -Eqs -- '^-*[0-9]+$' || eval $(THROW _chk3)
+
+###################################  SECTION 3: JAIL PARAMETERS  ################################### 
+
+
+####################################  SECTION 4: VM PARAMETERS  ####################################
+
+chk_bhyveopts() {
+    local _fn="chk_bhyveopts" _opt="$1"
+    _opt=$(echo "$_opt" | sed -E 's/^-//')   # Remove the leading dash
+
+    # Only includes bhyve opts with no argument
+    echo "$_opt" | grep -Eqs -- '^[AaCDeHhPSuWwxY]+$' || eval $(THROW ${_fn}1 BHYVEOPTS $_opt)
+ 
+    # No duplicate characters
+    [ "$(echo "$_opt" | fold -w1 | sort | uniq -d | wc -l)" -gt 0 ] \
+        && eval $(THROW ${_fn}2 BHYVEOPTS $_opt)
+
+    return 0
 }
+
+
+
+
 
 
 ##################################################################################################
 ####################################  OLD  FUNCTIONS  ############################################
 ##################################################################################################
 
-
-
-##########################################
-########## FULLY REPLACED WITH NEW #######
 
 chk_truefalse() {
    local _fn="chk_truefalse" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
@@ -60,15 +146,11 @@ chk_truefalse() {
 
 
 
-########## ^^ FULLY REPLACED WITH NEW ^^ ##########
-###################################################
-
-
-
-chk_integer() {
+################# OVERHAUL: come back and review this last
+chk_integer2() {
    # Checks that _value is integer, and can checks boundaries. [-n] is a descriptive variable name
    # from caller, for error message. Assumes that integers have been provided by the caller.
-   local _fn="chk_integer" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+   local _fn="chk_integer2" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
 
    while getopts g:G:l:L:qv:V opts ; do case $opts in
          g) local _g="$OPTARG" ; local _c="greater-than or equal to"
@@ -414,8 +496,8 @@ chk_valid_mtu() {
 	esac ; done ; shift $(( OPTIND - 1))
 	_value="$1"
 
-	! chk_integer -v "MTU" -- "$_value" && get_msg $_q -m _e1 -- "$_value" "MTU" && eval $_R1
-	chk_integer -g 1200 -l 1600 -v "MTU sanity check:" -- "$_value" && eval $_R0
+	! chk_integer2 -v "MTU" -- "$_value" && get_msg $_q -m _e1 -- "$_value" "MTU" && eval $_R1
+	chk_integer2 -g 1200 -l 1600 -v "MTU sanity check:" -- "$_value" && eval $_R0
 	get_msg $_q -m _e1 -- "$_value" "MTU" && eval $_R1
 }
 
@@ -541,7 +623,7 @@ chk_valid_taps() {
 
 	# Make sure that it's an integer
 	for _val in $_value ; do
-		! chk_integer -g 0 -v "Number of TAPS (in QCONF)," -- $_value \
+		! chk_integer2 -g 0 -v "Number of TAPS (in QCONF)," -- $_value \
 			 && get_msg $_q -m _e1 -- "$_value" "TAPS" && eval $_R1
 	done
 
@@ -604,7 +686,7 @@ chk_valid_vcpus() {
 	_syscpus=$(( _syscpus + 1 ))
 
 	# Ensure that the input is a number
-	! chk_integer -G 0 -v "Number of VCPUS" -- $_value \
+	! chk_integer2 -G 0 -v "Number of VCPUS" -- $_value \
 		&& get_msg $_q -m _e1 -- "$_value" "VCPUS" && eval $_R1
 
 	# Ensure that vpcus doesnt exceed the number of system cpus or bhyve limits
@@ -654,4 +736,3 @@ chk_valid_x11() {
 	chk_truefalse $_q -- "$1" "X11FWD" && eval $_R0
 	get_msg $_q -m _e1 -- "$1" "X11FWD" && eval $_R1
 }
-

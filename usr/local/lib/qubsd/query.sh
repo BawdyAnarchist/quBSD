@@ -1,27 +1,64 @@
 #!/bin/sh
 
+# BINARY RESPONSE QUERIES
 is_path_exist() {
     local _fn="val_path_exists"
     chk_args_set 2 $1 $2 || eval $(THROW)
-    [ $1 $2 ] && return 0 || eval $(THROW _qry1 $2)
+    [ $1 $2 ] && return 0 || eval $(THROW $_fn $2)
 }
 
 is_zfs_exist() {
     local _fn="is_zfs_exist"
     chk_args_set 1 $1 || eval $(THROW)
-    quiet zfs list -- $1 || eval $(THROW _qry2 $1) 
+    quiet zfs list -- $1 || eval $(THROW $_fn $1) 
+}
+
+is_cell_running() {
+    local _fn="is_zfs_exist" _cell="$1"
+    chk_args_set 1 $_cell || eval $(THROW)
+
+    [ "$_cell" = "host" ] && return 0
+    quiet jls -j "$_cell" && return 0
+    quiet pgrep -xqf "bhyve: $_jail" && return 0
+    eval $(THROW $_fn $_cell)
+}
+
+query_sysmem() {
+    local _fn="query_sysmem"
+    grep "avail memory" /var/run/dmesg.boot | sed "s/.* = //" | sed "s/ (.*//" | tail -1 \
+        || eval $(THROW $_fn)
 }
 
 # READ A SINGLE PARAMETER 
 read_cell_param() {
     local _fn="read_cell_param"
     chk_args_set 2 $1 $2 || eval $(THROW)
-    sed -En "s/$2=\"(.*)\"/\1/p" $D_CELLS/$1 || eval $(THROW _qry3 $1 $2)
+    sed -En "s/$2=\"(.*)\"/\1/p" $D_CELLS/$1 || eval $(THROW $_fn $1 $2)
 }
 
-query_zfs_mountpoint() {
+# RETURN [JAIL|VM] BASED ON $1 CLASS. BOOTSTRAPS PARAMETER SOURCING
+query_cell_type() {
+    local _fn="resolve_cell_type" _cell _type
 
+    chk_args_set 1 $1 && _cell="$1" || eval $(THROW)
+    is_path_exist -f $D_CELLS/$_cell || eval $(THROW)
+
+    _type=$(read_cell_param $1 CLASS) || eval $(THROW)
+    case $_type in
+        *jail) echo "JAIL" ;;
+        *VM) echo "VM" ;;
+        *) eval $(THROW $_fn $_cell $_type) ;;
+    esac
+
+    return 0
 }
+
+
+
+
+
+
+
 
 
 ##################################################################################################

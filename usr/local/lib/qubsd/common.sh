@@ -9,6 +9,7 @@
 . $QLIB/exception.sh
 . $QLIB/query.sh
 . $QLIB/check.sh 
+. $QLIB/validate.sh 
 . $QLIB/compose.sh 
 . $QLIB/network.sh 
 . $QLIB/lifecycle.sh 

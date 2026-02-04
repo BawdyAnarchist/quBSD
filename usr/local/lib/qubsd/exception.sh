@@ -8,15 +8,18 @@ verbose() { echo ">> $*" >&2; "$@" ;}  # Command-specific debug tool
 # ERROR SYSTEM FOR CONSOLE OUTPUT [add a note for the explanation of magic]
 TRY() { "$@" || { rm -f $ERR ; return 1 ;};}
 THROW() {
-    [ "$TRACE" ] && local _trace="[ $_fn ]"
+    local _code="$1" _trace _msg _args
+    [ "$TRACE" ] && _trace="[ $_fn ]"
 
     # Search for message only if passed a message code
-    if [ "$1" ] ; then
-        local _msg=$(awk -v code="$1:" '
+    if [ "$_code" ] ; then
+        _msg=$(awk -v code=":$_code:" '
             $1 == code { found=1; next }
             found && /^\/END\// { exit }
             found { print }' $D_QMSG/lib*.msg $D_QMSG/$BASENAME.msg)
         shift
+        # If _code is misformatted and _msg not found, will fault printf. Send warning 
+        [ "$_msg" ] || _msg="Help message not found. Check lib_*.msg formatting"
     fi
 
     if [ "$_trace" ] || [ "$_msg" ] ; then
