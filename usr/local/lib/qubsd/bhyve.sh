@@ -10,14 +10,8 @@ rootstrap_bsdvm() {
 		V) local _V="-V" ;;
 	esac ; done ; shift $(( OPTIND - 1))
 
-	# Positional and local variables and checks
+	# Positional and local variables
 	local _VM="$1" volsize="$2" vm_zroot zvol distdir bsdvm tmp_zpool alt_mnt
-	[ -z "$_VM" ] && get_msg $_q -m _e0 "VM name" && eval $_R1
-	validate_cellname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
-
-	[ -z "$volsize" ] && get_msg $_q -m _e0 "zvol volume size" && eval $_R1
-   ! echo "$volsize" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" \
-			&& get_msg $_q -m _e1 -- "$volsize" "zvol size" && eval $_R1
 
 	# Interim variables
 	local vm_zroot="zroot/qubsd/$_VM"
@@ -29,6 +23,13 @@ rootstrap_bsdvm() {
 	local tmp_zpool="zrootvm"
 	local alt_mnt="/mnt/$tmp_zpool"
 	local timeout=5
+
+   # Variables checks
+	[ -z "$_VM" ] && get_msg $_q -m _e0 "VM name" && eval $_R1
+
+	[ -z "$volsize" ] && get_msg $_q -m _e0 "zvol volume size" && eval $_R1
+   ! echo "$volsize" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" \
+			&& get_msg $_q -m _e1 -- "$volsize" "zvol size" && eval $_R1
 
 	# Check network connection, inform if missing, give option to procede or exit
 	if ping -ot $timeout freebsd.org > /dev/null 2>&1 ; then
@@ -122,7 +123,6 @@ configure_bsdvm_zusr() {
 	# Positional and local variables and checks
 	local _VM="$1" volsize="$2" vm_zusr zvol tmp_zpool alt_mnt
 	[ -z "$_VM" ] && get_msg $_q -m _e0 "VM name" && eval $_R1
-	validate_cellname "$_VM" && get_msg $_q -m _e1 "$_VM" "VM name" && eval $_R1
 
 	[ -z "$volsize" ] && get_msg $_q -m _e0 "zvol volume size" && eval $_R1
    ! echo "$volsize" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" \

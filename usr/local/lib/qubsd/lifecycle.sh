@@ -1,6 +1,6 @@
 #!/bin/sh
 
-## RUNTIME CHANGES FOR CELL LIFECYCLE MANAGEMENT ## 
+
 
 start_jail() {
 	# Starts jail. Performs sanity checks before starting. Logs results.
@@ -462,3 +462,54 @@ select_snapshot() {
 	echo "$_rootsnap" && eval $_R0
 }
 
+create_popup() {
+	# Handles popus to send messages, receive inputs, and pass commands
+	# _h should be as a percentage of the primary screen height (between 0 and 1)
+	# _w is a multiplication factor for _h
+	local _fn="create_popup" _cmd _hw _input _popfile _h _w _fs _popmsg _i3mod
+
+	while getopts c:f:h:im:qVw: opts ; do case $opts in
+			c) _cmd="$OPTARG" ;;
+			i) _input="true" ;;
+			f) _popfile="$OPTARG" ;;
+			h) _h="$OPTARG" ;;
+			m) _popmsg="$OPTARG" ;;
+			w) [ "$_h" ] && _hw="$_h $OPTARG" ;;
+			*) get_msg -m _e9 ;;
+	esac  ;  done  ;  shift $(( OPTIND - 1 ))
+
+	# Discern if it's i3, and modify with center/floating options
+	ps c | grep -qs 'i3' && local _i3mod="i3-msg -q floating enable, move position center,"
+
+	# If a file was passed, set the msg equal to the contents of the file
+	[ "$_popfile" ] && local _popmsg=$(cat $_popfile)
+
+	# Might've been launched from quick-key or without an environment. Get the host DISPLAY
+	[ -z "$DISPLAY" ] && export DISPLAY=$(pgrep -fl Xorg | grep -Eo ":[0-9]+")
+
+	# Equalizes popup size and fonts between systems of different resolution and DPI settings.
+	[ "$_hw" ] || _hw=$(_resolve_popup_dimensions)
+   _fs=$(_resolve_popup_fontsize)
+   _i3mod="$_i3mod, resize set $_hw"
+
+	# Execute popup depending on if input is needed or not
+	if [ "$_cmd" ] ; then
+	echo $DISPLAY >> /root/temp
+		xterm -fa Monospace -fs $_fs -e /bin/sh -c "eval \"$_i3mod\" ; eval \"$_cmd\" ; "
+	elif [ -z "$_input" ] ; then
+		# Simply print a message, and return 0
+		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
+			"eval \"$_i3mod\" ; echo \"$_popmsg\" ; echo \"{Enter} to close\" ; read _INPUT ;"
+		eval $_R0
+	else
+		# Need to collect a variable, and use a tmp file to pull it from the subshell, to a variable.
+		local _poptmp=$(mktemp ${QRUN}/popup.XXXX)
+		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
+			"eval \"$_i3mod\"; printf \"%b\" \"$_popmsg\"; read _INPUT; echo \"\$_INPUT\" > $_poptmp"
+
+		# Retreive the user input, remove tmp, and echo the value back to the caller
+		_input=$(cat $_poptmp)
+		rm $_poptmp > /dev/null 2>&1
+		echo "$_input"
+	fi
+}

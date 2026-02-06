@@ -1,14 +1,14 @@
 
+:chk_args_set:
+Argument missing or blank
+/END/
+
 :_invalid:
 Invalid %s < %s >
 /END/
 
 :_invalid2:
 Invalid %s < %s >. %s
-/END/
-
-:chk_args_set:
-Argument missing or blank
 /END/
 
 :chk_bool_tf:
@@ -29,15 +29,20 @@ Invalid input: < %s >. Integer required.
 
 :chk_ipv4:
 %s < %s > is not in CIDR 
-   Use CIDR notation for IPV4 addresses. Or <auto|none>.
+Use CIDR notation for IPV4 addresses. Or <auto|none>.
 /END/
 
-:normalize_integer:
+:compare_integer:
 %s %s %s
 /END/
 
-:normalize_integer2:
-Internal bug: Invalid option provided to function < %s >
+:internal:
+Internal bug: Invalid getopts option
+/END/
+
+:chk_cellname:
+Invalid cellname < %s >. Must start/end with alpha-numeric.
+May contain '-' or '_', but not consecutively.
 /END/
 
 

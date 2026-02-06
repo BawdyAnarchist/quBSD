@@ -1,24 +1,34 @@
 #!/bin/sh
 
+# Lazy loading is extremely fast/convenient. Use prefix ($2) to modify assigned PARAM names
 resolve_cell_parameters() {
-    local _fn="resolve_cell_config" _prefix="$2" _cell _type _params _val
+    local _fn="resolve_cell_parameters" _prefix="$2" _cell _PARAMS _val _def_type
+    chk_args_set 1 $1 && _cell="$1" || eval $(THROW 1)  # Safety assurance
+    is_path_exist -f $D_CELLS/$_cell   || eval $(THROW 1)
 
-    chk_args_set 1 $1 && _cell="$1" || eval $(THROW)  # Safety assurance
-    _type=$(query_cell_type $_cell) || eval $(THROW)  # JAIL vs VM
+    # Rare loading of new global in subshell. Derived from CLASS, important across boundaries
+    _TYPE=$(query_cell_type $_cell) || eval $(THROW 1)  # JAIL vs VM
 
-    # Get all PARAM variable names. If _prefix, protect globals from clobber with `local` 
-    eval _params=\"\${PARAMS_COMN} \${PARAMS_${_type}}\"
-    [ "$_prefix" ] && eval local $_params && eval unset $_params
+    # Assemble all PARAM names. $_PARAMS isnt global, but CAPS separates [:upper:] vs [:lower:]
+    eval _PARAMS=\"\${PARAMS_COMN} \${PARAMS_${_TYPE}}\"
+    if [ "$_prefix" ] ; then 
+        eval local $_PARAMS            # Protect globals against clobber
+        eval unset "$_prefix$_PARAMS"  # Protect against stale _prefix_params assignments 
+        eval $_prefix=$_cell           # Record the name of the cell associated to the prefix
+    else
+        eval unset "$_PARAMS"          # Protect against stale global PARAMS assignments
+    fi
 
     # Source defaults and _cell conf
+    eval _def_type=\${DEF_${_TYPE}}
     . $DEF_BASE
-    eval . \${DEF_${_type}}
+    . $_def_type 
     . $D_CELLS/$_cell
 
     # Assign the correct variable name based on _prefix, and render global: _PARAMS
-    for _param in $_params ; do
-        eval _val=\${$_param}
-        [ "$_val" ] && eval ${_prefix}${_param}='${_val}'
+    for _PARAM in $_PARAMS ; do
+        eval _val=\${$_PARAM}
+        [ "$_val" ] && eval ${_prefix}${_PARAM}='${_val}'
     done
 
     # Complete the ZFS mountpoints, as they are structurally indispensible to resolution
@@ -28,47 +38,35 @@ resolve_cell_parameters() {
     return 0
 }
 
+# Requires $1 (cellname). Optional prefix [-p] and PARAM_LIST [-P]; or defaults to global constants
 validate_cell_parameters() {
-   {}
+    local _fn="validate_cell_parameters" _cell _opts _prefix _cell _PARAMS _params _funct
+    chk_args_set 1 $1 || eval $(THROW 1)  # Safety assurance
+    
+    while getopts :p:P: _opts ; do case $_opts in
+        p) _prefix="$OPTARG" ; eval _cell=\${$_prefix} ;;
+        P) _PARAMS="$OPTARG" ;;
+        *) eval $(THROW 1 internal) ;;
+    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
+    # Check that the positional $1 cellname matches what's stored in the prefix designator
+    [ "$_cell" = "$1" ] || eval $(THROW 1 internal2 $_prefix $1 $_cell)
+
+    # Assemble all PARAM names. $_PARAMS isnt global, but CAPS separates [:upper:] vs [:lower:]
+    [ -z "$_PARAMS" ] && eval _PARAMS=\"\${PARAMS_COMN} \${PARAMS_${_TYPE}}\"
+
+    for _PARAM in $_PARAMS ; do
+        _param=$(echo "$_PARAM" | tr '[:upper:]' '[:lower:]')
+        _funct="validate_param_$_param"
+        quiet type $_funct || eval $(THROW 1 ${_fn} $_PARAM $_funct)  # Verify exist before call
+        eval $_funct \${${_prefix}${_PARAM}} $_cell || eval $(THROW 1)
+    done
 }
 
 
 ##################################################################################################
 ####################################  OLD  FUNCTIONS  ############################################
 ##################################################################################################
-
-validate_cellname() {
-    # Check for collisions in proposed cellname
-    local _fn="validate_cellname" ; local _FN="$_FN::$_fn"
- 
-    while getopts qV _opts ; do case $_opts in
-       q) local _qa='-q' ;;
-       V) local _V="-V" ;;
-    esac ; done ; shift $(( OPTIND - 1))
- 
-    # Positional parmeters
-    local _jail="$1"
-    [ -z "$_jail" ] && get_msg $_qa -m _e0 -- "new jail name" && eval $_R1
- 
-    # Checks that proposed jailname isn't 'none' or 'qubsd' or starts with '#'
-    echo "$_jail" | grep -Eqi "^(none|qubsd)\$" \
-          && get_msg $_qa -m _e13 -- "$_jail" && eval $_R1
- 
-    # Jail must start with :alnum: and afterwards, have only _ or - as special chars
-    ! echo "$_jail" | grep -E -- '^[[:alnum:]]([-_[:alnum:]])*[[:alnum:]]$' \
-          | grep -Eqv '(--|-_|_-|__)' && get_msg $_qa -m _e13_1 -- "$_jail" && eval $_R1
- 
-    # Checks that proposed jailname doesn't exist or partially exist
-    if chk_valid_zfs "${R_ZFS}/$_jail" || \
-       chk_valid_zfs "${U_ZFS}/$_jail"  || \
-       grep -Eq "^${_jail}[ \t]+" $QCONF || \
-       [ -e "${JCONF}/${_jail}" ] ; then
-       get_msg $_qa -m _e13_2 -- "$_jail" && eval $_R1
-    fi 
- 
-    eval $_R0
-}  
 
 
 chk_valid_jail() {

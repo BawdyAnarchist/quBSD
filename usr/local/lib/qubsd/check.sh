@@ -7,10 +7,10 @@ chk_args_set() {
     local _require="$1" ; shift
     local _count="$#" _i=1 
 
-    [ "$_count" -lt "$_require" ] && eval $(THROW $_fn)
+    [ "$_count" -lt "$_require" ] && eval $(THROW 1 $_fn)
 
     for _arg in "$@" ; do
-        [ "$_arg" = "${_arg#*[![:space:]]}" ] && eval $(THROW $_fn)
+        [ "$_arg" = "${_arg#*[![:space:]]}" ] && eval $(THROW 1 $_fn)
         [ $_i -ge $_require ] && return 0 || _i=$(( _i + 1 ))
     done
 
@@ -19,41 +19,55 @@ chk_args_set() {
 
 chk_bool_tf() {
     local _fn="chk_bool_tf"
-    echo $1 | tr '[:upper:]' '[:lower:]' | grep -Eqs "true|false" || eval $(THROW $_fn)
+    echo $1 | tr '[:upper:]' '[:lower:]' | grep -Eqs "true|false" || eval $(THROW 1 $_fn)
 }
 
 chk_integer() {
     local _fn="chk_integer"
-    echo "$1" | grep -Eqs -- '^-*[0-9]+$' || eval $(THROW $_fn $1)
+    echo "$1" | grep -Eqs -- '^-*[0-9]+$' || eval $(THROW 1 $_fn $1)
 }
 
-normalize_integer() {
+chk_cellname() {
+    local _fn="chk_cellname" _val="$1" 
+
+    # Trigger words to avoid, just in case.
+    case $_val in 
+        none|qubsd) eval $(THROW 1 _invalid2 cellname $_val "Cannot be 'none' or 'qubsd'") ;;
+    esac
+
+    # Jail must start with :alnum: and afterwards, have only _ or - as special chars
+    echo "$_val" | grep -E -- '^[[:alnum:]]([-_[:alnum:]])*[[:alnum:]]$' \
+        | grep -Eqv '(--|-_|_-|__)' || eval $(THROW 1 $_fn $_val)
+}
+
+compare_integer() {
     # Checks that _value is integer, and can checks boundaries. [-n] is a descriptive variable name
     # from caller, for error message. Assumes that integers have been provided by the caller.
-    local _fn="normalize_integer" _val
+    local _fn="compare_integer" _val
 
     while getopts :g:G:l:L: opts ; do case $opts in
         g) local _g="$OPTARG" ;;
         G) local _G="$OPTARG" ;;
         l) local _l="$OPTARG" ;;
         L) local _L="$OPTARG" ;;
-        *) eval $(THROW ${_fn}2 $_fn) ;;   # getopts warning suppressed because we handle it here
+        *) eval $(THROW 1 internal) ;;   # getopts warning suppressed because we handle it here
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
     _val="$1"
 
     # Check each option one by one
-    [ "$_g" ] && { [ "$_val" -ge "$_g" ] || eval $(THROW ${_fn} $_val '<'  $_g) ;}
-    [ "$_G" ] && { [ "$_val" -gt "$_G" ] || eval $(THROW ${_fn} $_val '<=' $_G) ;}
-    [ "$_l" ] && { [ "$_val" -le "$_l" ] || eval $(THROW ${_fn} $_val '>'  $_l) ;}
-    [ "$_L" ] && { [ "$_val" -lt "$_L" ] || eval $(THROW ${_fn} $_val '>=' $_L) ;} 
+    [ "$_g" ] && { [ "$_val" -ge "$_g" ] || eval $(THROW 1 ${_fn} $_val '<'  $_g) ;}
+    [ "$_G" ] && { [ "$_val" -gt "$_G" ] || eval $(THROW 1 ${_fn} $_val '<=' $_G) ;}
+    [ "$_l" ] && { [ "$_val" -le "$_l" ] || eval $(THROW 1 ${_fn} $_val '>'  $_l) ;}
+    [ "$_L" ] && { [ "$_val" -lt "$_L" ] || eval $(THROW 1 ${_fn} $_val '>=' $_L) ;} 
 
     return 0
 }
+
 ##################################  SECTION 2: COMMON PARAMETERS  ##################################
 
 chk_class() {
     local _fn="chk_class"
-    echo "$CLASSES" | grep -Eqs -- "$1" || eval $(THROW _invalid CLASS $1)
+    echo "$CLASSES" | grep -Eqs -- "$1" || eval $(THROW 1 _invalid CLASS $1)
 }
 
 chk_ipv4() {
@@ -72,18 +86,18 @@ chk_ipv4() {
 
     # Ensures that each number is in the proper range
     echo "$_val" | grep -Eqs "[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+" \
-        || eval $(THROW _invalid2 IPV4 "$_val" "Use CIDR notation with subnet")
+        || eval $(THROW 1 _invalid2 IPV4 "$_val" "Use CIDR notation with subnet")
 
     # Ensures that each digit is within the proper range
     { [ "$_a0" -ge 0 ] && [ "$_a0" -le 255 ] && [ "$_a1" -ge 0 ] && [ "$_a1" -le 255 ] \
         && [ "$_a2" -ge 0 ] && [ "$_a2" -le 255 ] && [ "$_a3" -ge 0 ] && [ "$_a3" -le 255 ] \
         && [ "$_a4" -ge 0 ] && [ "$_a4" -le 32 ] ;} \
-        || eval $(THROW _invalid2 IPV4 "$_val" "Use CIDR notation with subnet")
+        || eval $(THROW 1 _invalid2 IPV4 "$_val" "Use CIDR notation with subnet")
 }
 
 chk_bytesize() {
     local _fn="chk_bytesize"
-    echo "$1" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" || eval $(THROW _invalid bytesize $1)
+    echo "$1" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" || eval $(THROW 1 _invalid bytesize $1)
 }
 
 normalize_bytesize() {
@@ -108,11 +122,11 @@ chk_bhyveopts() {
     _opt=$(echo "$_opt" | sed -E 's/^-//')   # Remove the leading dash
 
     # Only includes bhyve opts with no argument
-    echo "$_opt" | grep -Eqs -- '^[AaCDeHhPSuWwxY]+$' || eval $(THROW ${_fn}1 BHYVEOPTS $_opt)
+    echo "$_opt" | grep -Eqs -- '^[AaCDeHhPSuWwxY]+$' || eval $(THROW 1 ${_fn}1 BHYVEOPTS $_opt)
  
     # No duplicate characters
     [ "$(echo "$_opt" | fold -w1 | sort | uniq -d | wc -l)" -gt 0 ] \
-        && eval $(THROW ${_fn}2 BHYVEOPTS $_opt)
+        && eval $(THROW 1 ${_fn}2 BHYVEOPTS $_opt)
 
     return 0
 }
@@ -144,9 +158,6 @@ chk_truefalse() {
    eval $_R0
 }
 
-
-
-################# OVERHAUL: come back and review this last
 chk_integer2() {
    # Checks that _value is integer, and can checks boundaries. [-n] is a descriptive variable name
    # from caller, for error message. Assumes that integers have been provided by the caller.
@@ -409,9 +420,6 @@ chk_isqubsd_ipv4() {
 
 	# $_a0 - $_a4 vars are needed later. Check that they're all here, or get them.
 	echo "${_a0}#${_a1}#${_a2}#${_a3}#${_a4}" | grep -q "##" && chk_valid_ipv4 -q -- "$_value"
-
-# Assigns global variables that will be used here for checks.
-#define_ipv4_convention "$_jail"
 
 	# Assigning an IP of 'none' to a jail with clients, should throw a warning.
 	[ "$_value" = "none" ] && [ -n "$(get_info -e CLIENTS $_jail)" ] \

@@ -1,35 +1,65 @@
 #!/bin/sh
 
-# OUTPUT REDIRECTS
+# OUTPUT REDIRECTS FOR INTERNAL LIBRARY USE
 quiet() { "$@" > /dev/null 2>&1 ;}     # Pure silence
 hush() { "$@" 2>/dev/null ;}           # Hush errors
 verbose() { echo ">> $*" >&2; "$@" ;}  # Command-specific debug tool
 
-# ERROR SYSTEM FOR CONSOLE OUTPUT [add a note for the explanation of magic]
-TRY() { "$@" || { rm -f $ERR ; return 1 ;};}
+# ERROR/TRACING SYSTEM
+rm_errfile() { rm -f $ERR ;}
+
+MUTE() { "$@" || { rm -f $ERR ; return 1 ;};}
+
+CLEAR() { WARN_CNT=0 ; rm -f $ERR ; return 0 ;}
+
 THROW() {
-    local _code="$1" _trace _msg _args
+    local _code="$1" _msg_code="$2" _trace _msg _args
+
+    # Return code must always have a non-zero integer value
+    echo $_code | grep -Eqs '[1-9]+' && shift \
+        || { echo "Internal error: THROW called without return code" && exit 0 ;}
+
+    # Activate stack trace
     [ "$TRACE" ] && _trace="[ $_fn ]"
 
-    # Search for message only if passed a message code
-    if [ "$_code" ] ; then
-        _msg=$(awk -v code=":$_code:" '
+    # Code in *.msg library must have the form:   :_msg_code: 
+    if [ "$_msg_code" ] ; then
+        _msg=$(awk -v code=":$_msg_code:" '
             $1 == code { found=1; next }
             found && /^\/END\// { exit }
             found { print }' $D_QMSG/lib*.msg $D_QMSG/$BASENAME.msg)
         shift
-        # If _code is misformatted and _msg not found, will fault printf. Send warning 
-        [ "$_msg" ] || _msg="Help message not found. Check lib_*.msg formatting"
+        # If _msg_code is misformatted and _msg not found, printf errors. Send warning.
+        [ "$_msg" ] || _msg="Error message not found. Check lib_*.msg formatting"
     fi
 
+    # Record the trace and/or error message to the global ERR file
     if [ "$_trace" ] || [ "$_msg" ] ; then
         printf "$_trace $_msg\n" "$@" >> $ERR
     fi
 
-    echo "return 1"
+    # This echo gets `eval` on return to caller. $_code was sanitized, so this is safe.
+    echo "return $_code"
 }
 
-rm_errfile() { rm -f $ERR ;}    # Baseline trap
+WARN() {
+    local _msg_code="$1" _msg
+    : $(( WARN_CNT += 1 ))   # Increment warn count
+
+    # Warning code in *.msg libs must have the form:  :w:_msg_code: 
+    if [ "$_msg_code" ] ; then
+        _msg=$(awk -v code=":w:$_msg_code:" '
+            $1 == code { found=1; next }
+            found && /^\/END\// { exit }
+            found { print }' $D_QMSG/lib*.msg $D_QMSG/$BASENAME.msg)
+        shift
+        # If _msg_code is misformatted and _msg not found, printf errors. Send warning.
+        [ "$_msg" ] || _msg="Warn message not found. Check lib_*.msg formatting"
+    fi
+
+    [ "$_msg" ] && printf "[ WARN ] $_msg\n" "$@" >> $ERR
+    return 0
+}
 
 # DEBUG FUNCTIONS FOR DEEPER ERROR PROBING
 setlog1() {
@@ -42,9 +72,6 @@ setlog2() {
 	rm /root/debug2 > /dev/null 2>&1
 	exec > /root/debug2 2>&1
 }
-
-
-
 
 
 
@@ -143,57 +170,5 @@ get_msg2() {
 	[ -n "$_exit" ] && rm_errfiles  # Had problems with lingering $ERR in QRUN. Make it unequivocal
 	eval $_exit :
 	return 0
-}
-
-create_popup() {
-	# Handles popus to send messages, receive inputs, and pass commands
-	# _h should be as a percentage of the primary screen height (between 0 and 1)
-	# _w is a multiplication factor for _h
-	local _fn="create_popup" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
-
-	while getopts c:f:h:im:qVw: opts ; do case $opts in
-			c) local _cmd="$OPTARG" ;;
-			i) local _input="true" ;;
-			f) local _popfile="$OPTARG" ;;
-			h) local _h="$OPTARG" ;;
-			m) local _popmsg="$OPTARG" ;;
-			q) local _qs="-q" ; _quiet='> /dev/null 2>&1' ;;
-			V) local _V="-V" ;;
-			w) local _w="$OPTARG" ;;
-			*) get_msg -m _e9 ;;
-	esac  ;  done  ;  shift $(( OPTIND - 1 ))
-
-	# Discern if it's i3, and modify with center/floating options
-	ps c | grep -qs 'i3' && local _i3mod="i3-msg -q floating enable, move position center"
-
-	# If a file was passed, set the msg equal to the contents of the file
-	[ "$_popfile" ] && local _popmsg=$(cat $_popfile)
-
-	# Might've been launched from quick-key or without an environment. Get the host DISPLAY
-	[ -z "$DISPLAY" ] && export DISPLAY=$(pgrep -fl Xorg | grep -Eo ":[0-9]+")
-
-	# Equalizes popup size and fonts between systems of different resolution and DPI settings.
-	calculate_sizes
-
-	# Execute popup depending on if input is needed or not
-	if [ "$_cmd" ] ; then
-	echo $DISPLAY >> /root/temp
-		xterm -fa Monospace -fs $_fs -e /bin/sh -c "eval \"$_i3mod\" ; eval \"$_cmd\" ; "
-	elif [ -z "$_input" ] ; then
-		# Simply print a message, and return 0
-		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
-			"eval \"$_i3mod\" ; echo \"$_popmsg\" ; echo \"{Enter} to close\" ; read _INPUT ;"
-		eval $_R0
-	else
-		# Need to collect a variable, and use a tmp file to pull it from the subshell, to a variable.
-		local _poptmp=$(mktemp ${QRUN}/popup.XXXX)
-		xterm -fa Monospace -fs $_fs -e /bin/sh -c \
-			"eval \"$_i3mod\"; printf \"%b\" \"$_popmsg\"; read _INPUT; echo \"\$_INPUT\" > $_poptmp"
-
-		# Retreive the user input, remove tmp, and echo the value back to the caller
-		_input=$(cat $_poptmp)
-		rm $_poptmp > /dev/null 2>&1
-		echo "$_input"
-	fi
 }
 

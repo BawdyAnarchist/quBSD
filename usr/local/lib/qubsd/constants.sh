@@ -29,6 +29,18 @@ export REL_LRCD="$REL_LETC/rc.d"
 export REL_LX11="$REL_LETC/X11"
 export REL_UNBOUND="/var/unbound"
 
+# Common overlay directories
+export OV="rw"
+export OVETC="$OV/etc"
+export OVULOC="$OV/usr/local"
+
+# Common overlay files
+export FSTAB_LOC="$OVETC/fstab.local"  
+export RC_CONF_LOC="$OVETC/rc.conf.local"
+export RC_LOC="$OVETC/rc.local"
+export PW_LOC="$OVETC/master.passwd.local"
+export GP_LOC="$OVETC/group.local"
+
 # Primary qubsd files
 export QCOMMON="$QLIB/common.sh"
 export DEF_BASE="$D_QCONF/defaults.base.conf"
@@ -45,10 +57,10 @@ export VMTAPS="$QRUN/vm_taps"
 export BASENAME=$(basename $0)
 export ERR="$D_QERR/$BASENAME.$$.err"
 export TRAP_SIGS="HUP INT TERM QUIT EXIT"
+export WARN_CNT=0
 
 # Runtime invariant lists
-export PARAMS_COMN="AUTOSTART AUTOSNAP BACKUP CLASS CONTROL ENVSYNC
-                    GATEWAY IPV4 MTU NO_DESTROY ROOTENV TEMPLATE R_ZFS U_ZFS"
+export PARAMS_COMN="AUTOSTART AUTOSNAP BACKUP CLASS CONTROL ENVSYNC GATEWAY IPV4 MTU NO_DESTROY ROOTENV TEMPLATE R_ZFS U_ZFS"
 export PARAMS_JAIL="CPUSET MAXMEM SCHG SECLVL"
 export PARAMS_VM="BHYVEOPTS BHYVE_CUSTM MEMSIZE PPT TAPS TMUX VCPUS VNC WIREMEM"
 export CLASSES="rootjail appjail dispjail rootVM appVM dispVM"
