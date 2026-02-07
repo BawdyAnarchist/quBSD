@@ -1,18 +1,15 @@
 
-Pivoting to "cells" now. Works on both jails and bhyve both generically (guests) and even semantically
-  - guests was rejected because it's a bit too generic for an opinionated container system like this
-  - This is a much larger change which generalizes the qubsd.conf to reflect jail.conf.d schema
-  - Ultimately this is the final correctness overhaul which segregates QUERY, VALIDATE, COMPOSE, EXECUTE
-    -- Modularize the exception and messaging systems
-    -- Implement the new qubsd.conf.d 
+OVERHAUL TODO
+   - validate_param_ppt
+   - Finish -s strict in validate_cell_parameters - and add the WARN_CNT checker
+   - Change /rw to /overlay.
+   - Give a good once over testing on all the new validations
 
-	
+
 Jail starts are delayed for some reason. Need to see why.
   - seems only to be after reboot
 
 Nuissance errors on gateway launch with VM connected. Likely due to DHCP auto and the path doesnt go to DHCP like it should
-
-Change /rw to /overlay.
 
 
 VM PLAN: only remaining aspect is Linux and qb-create

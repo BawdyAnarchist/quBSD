@@ -466,7 +466,7 @@ create_popup() {
 	# Handles popus to send messages, receive inputs, and pass commands
 	# _h should be as a percentage of the primary screen height (between 0 and 1)
 	# _w is a multiplication factor for _h
-	local _fn="create_popup" _cmd _hw _input _popfile _h _w _fs _popmsg _i3mod
+	local _fn="create_popup" _cmd _wh _input _popfile _h _w _fs _popmsg _i3mod
 
 	while getopts c:f:h:im:qVw: opts ; do case $opts in
 			c) _cmd="$OPTARG" ;;
@@ -474,7 +474,7 @@ create_popup() {
 			f) _popfile="$OPTARG" ;;
 			h) _h="$OPTARG" ;;
 			m) _popmsg="$OPTARG" ;;
-			w) [ "$_h" ] && _hw="$_h $OPTARG" ;;
+			w) [ "$_h" ] && _wh="$_h $OPTARG" ;;
 			*) get_msg -m _e9 ;;
 	esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
@@ -488,9 +488,9 @@ create_popup() {
 	[ -z "$DISPLAY" ] && export DISPLAY=$(pgrep -fl Xorg | grep -Eo ":[0-9]+")
 
 	# Equalizes popup size and fonts between systems of different resolution and DPI settings.
-	[ "$_hw" ] || _hw=$(_resolve_popup_dimensions)
+	[ "$_wh" ] || _wh=$(_resolve_popup_dimensions)
    _fs=$(_resolve_popup_fontsize)
-   _i3mod="$_i3mod, resize set $_hw"
+   _i3mod="$_i3mod, resize set $_wh"
 
 	# Execute popup depending on if input is needed or not
 	if [ "$_cmd" ] ; then

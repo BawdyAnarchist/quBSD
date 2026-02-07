@@ -93,6 +93,9 @@ chk_ipv4() {
         && [ "$_a2" -ge 0 ] && [ "$_a2" -le 255 ] && [ "$_a3" -ge 0 ] && [ "$_a3" -le 255 ] \
         && [ "$_a4" -ge 0 ] && [ "$_a4" -le 32 ] ;} \
         || eval $(THROW 1 _invalid2 IPV4 "$_val" "Use CIDR notation with subnet")
+
+    # Reserve a.b.c.1 (ending in .1) for the gateway
+    [ "$_a3" = "1" ] && eval $(THROW 1 ${_fn}2 $_val) || return 0
 }
 
 chk_bytesize() {
@@ -114,26 +117,107 @@ normalize_bytesize() {
 
 ###################################  SECTION 3: JAIL PARAMETERS  ################################### 
 
+chk_cpuset() {
+    local _fn="chk_cpuset"
+    # Test for negative numbers and dashes in the wrong place
+    echo "$1" | grep -Eq "(,,+|--+|,-|-,|,[ \t]*-|^[^[:digit:]])" && eval $(THROW 1 $_fn $1)
+    return 0
+}
+
+chk_schg() {
+    local _fn="chk_valid_schg"
+    case $1 in
+        none|sys|all) return 0 ;; 
+        *) eval $(THROW 1 _invalid2 $1 "Must be <none|sys|all>") ;;
+    esac
+}
+
+chk_valid_seclvl() {
+    local _fn="chk_valid_seclvl"
+    case $1 in
+        none|-1|-0|0|1|2|3) return 0 ;;   
+        *) eval $(THROW 1 _invalid2 $1 "Must be <none|-1|0|1|2|3>") ;; 
+    esac
+}
+
 
 ####################################  SECTION 4: VM PARAMETERS  ####################################
 
 chk_bhyveopts() {
-    local _fn="chk_bhyveopts" _opt="$1"
-    _opt=$(echo "$_opt" | sed -E 's/^-//')   # Remove the leading dash
+    local _fn="chk_bhyveopts" _val="$1"
+    _val=$(echo "$_val" | sed -E 's/^-//')   # Remove the leading dash
 
     # Only includes bhyve opts with no argument
-    echo "$_opt" | grep -Eqs -- '^[AaCDeHhPSuWwxY]+$' || eval $(THROW 1 ${_fn}1 BHYVEOPTS $_opt)
+    echo "$_val" | grep -Eqs -- '^[AaCDeHhPSuWwxY]+$' || eval $(THROW 1 ${_fn}1 BHYVEOPTS $_val)
  
     # No duplicate characters
-    [ "$(echo "$_opt" | fold -w1 | sort | uniq -d | wc -l)" -gt 0 ] \
-        && eval $(THROW 1 ${_fn}2 BHYVEOPTS $_opt)
+    [ "$(echo "$_val" | fold -w1 | sort | uniq -d | wc -l)" -gt 0 ] \
+        && eval $(THROW 1 ${_fn}2 BHYVEOPTS $_val)
 
     return 0
 }
 
+chk_taps() {
+    local _fn="chk_taps"
+    compare_integer -g 0 -- "$1" || eval $(THROW 1 _invalid2 TAPS $1 "Must be an integer >= 0")
+}
 
+chk_vcpus() {
+    local _fn="chk_vcpus"
+    compare_integer -G 0 -- "$1" || eval $(THROW 1 _invalid2 VCPUS $1 "Must be an integer > 0")
+}
 
+normalize_ppt() {
+    local _fn="normalize_ppt"
+    echo "$1" | sed "s#/#:#g"
+}
 
+chk_ppt() {
+    local _fn="chk_valid_ppt" _val
+    
+    [ "$_value" = "none" ] && eval $_R0
+
+    # Get list of pci devices on the machine
+    _pciconf=$(pciconf -l | awk '{print $1}')
+
+    # Check all listed PPT devices from QCONF
+    for _val in $_value ; do
+
+        # convert _val to native pciconf format with :colon: instead of /fwdslash/
+        _val2=$(echo "$_val" | sed "s#/#:#g")
+
+        # Search for the individual device and specific device for devctl functions later
+        _pciline=$(echo "$_pciconf" | grep -Eo ".*${_val2}")
+        _pcidev=$(echo "$_pciline" | grep -Eo "pci.*${_val2}")
+
+        # PCI device doesnt exist on the machine
+        [ -z "$_pciline" ] && get_msg $_q -m _e22_0 -- "$_val" "PPT" \
+            && get_msg $_q -m _e1 -- "$_val" "PPT" && eval $_R1
+    done
+}
+
+pci_extra() {
+	for _val in $_value ; do
+		# Extra set of checks for the PCI device, if it's about to be attached to a VM
+		if [ "$_xtra" ] ; then
+			# First detach the PCI device, and examine the error message
+			_dtchmsg=$(devctl detach "$_pcidev" 2>&1)
+			[ -n "${_dtchmsg##*not configured}" ] && get_msg $_q -m _e22_1 -- "$_pcidev" \
+					&& get_msg $_q -m _e22 -- "$_pcidev" "$_VM" && eval $_R1
+
+			# Switch based on status of the device after being detached
+			if pciconf -l $_pcidev | grep -Eqs "^none" ; then
+				# If the device is 'none' then set the driver to ppt (it attaches automatically).
+				! devctl set driver "$_pcidev" ppt && get_msg $_q -m _e22_2 -- "$_pcidev" \
+					&& get_msg $_q -m _e22 -- "$_pcidev" "$_VM" && eval $_R1
+			else
+				# Else the devie was already ppt. Attach it, or error if unable
+				! devctl attach "$_pcidev" && get_msg $_q -m _e22_3 -- "$_pcidev" \
+					&& get_msg $_q -m _e22 -- "$_pcidev" "$_VM" && eval $_R1
+			fi
+		fi
+	done
+}
 
 
 ##################################################################################################
@@ -744,3 +828,84 @@ chk_valid_x11() {
 	chk_truefalse $_q -- "$1" "X11FWD" && eval $_R0
 	get_msg $_q -m _e1 -- "$1" "X11FWD" && eval $_R1
 }
+
+chk_valid_jail() {
+   # Checks that jail has JCONF, QCONF, and corresponding ZFS dataset
+   # Return 0 for passed all checks, return 1 for any failure
+   local _fn="chk_valid_jail" ; local _fn_orig="$_FN" ; _FN="$_FN -> $_fn"
+
+   local _class= ; local _template= ; local _class_of_temp=
+   while getopts c:qV opts ; do case $opts in
+         c) _class="$OPTARG" ;;
+         q) local _qv='-q' ;;
+         V) local _V="-V" ;;
+         *) get_msg -m _e9 ;;
+   esac  ;  done  ;  shift $(( OPTIND - 1 )) ; [ "$1" = "--" ] && shift
+
+   # Positional parmeters and function specific variables.
+   local _value="$1"
+   [ -z "$_value" ] && get_msg $_qv -m _e0 -- "jail" && eval $_R1
+
+   # _class is a necessary element of all jails. Use it for pulling datasets
+   [ -z "$_class" ] && _class=$(get_jail_parameter -eqs CLASS $_value)
+
+   # Must have a ROOTENV in QCONF.
+   ! grep -Eqs "^${_value}[ \t]+ROOTENV[ \t]+[^ \t]+" $QCONF \
+      && get_msg $_qv $_V -m _e2 -- "$_value" "ROOTENV" \
+      && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
+
+   # Jails must have an entry in JCONF
+   ! chk_isvm -c $_class "$_value" && [ ! -e "${JCONF}/${_value}" ] \
+         && get_msg $_qv -m _e7 -- "$_value" && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
+    
+   case $_class in
+      "") # Empty, no class exists in QCONF
+         get_msg $_qv $_V -m _e2 -- "jail" "$_value" \  
+         get_msg $_qv $_V -m _e1 -- "$_value" "class" && eval $_R1
+         ;;
+      rootjail) # Rootjail's zroot dataset should have no origin (not a clone)
+         ! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' | grep -Eq '^-$' \
+             && get_msg $_qv -m _e5 -- "$_value" "$R_ZFS" \
+             && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
+         ;;
+      appjail|cjail) # Appjails require a dataset at quBSD/zusr
+         ! chk_valid_zfs ${U_ZFS}/${_value} \
+            && get_msg $_qv -m _e5 -- "${_value}" "${U_ZFS}" \
+            && get_msg $_qv -m _e1 -- "${U_ZFS}/${_value}" "ZFS dataset" && eval $_R1
+         ;;
+      dispjail) # Verify the dataset of the template for dispjail
+         # Template cant be blank
+         local _template=$(get_jail_parameter -deqs TEMPLATE $_value)
+         [ -z "$_template" ] && get_msg $_qv -m _e2 -- "$_value" "TEMPLATE" \
+            && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
+    
+         # Dispjails can't reference other dispjails
+         local _templ_class=$(sed -nE "s/^${_template}[ \t]+CLASS[ \t]+//p" $QCONF)
+         [ "$_templ_class" = "dispjail" ] \
+            && get_msg $_qv -m _e6_1 -- "$_value" "$_template" && eval $_R1
+
+         # Ensure that the template being referenced is valid
+         ! chk_valid_jail $_qv -c "$_templ_class" -- "$_template" \
+            && get_msg $_qv -m _e6_2 -- "$_value" "$_template" \
+            && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
+         ;;
+      rootVM) # VM zroot dataset should have no origin (not a clone)
+         ! zfs get -H origin ${R_ZFS}/${_value} 2> /dev/null | awk '{print $3}' \
+            | grep -Eq '^-$'  && get_msg $_qv -m _e5 -- "$_value" "$R_ZFS" && eval $_R1
+         ;;
+      *VM) :
+         ;;
+      *) # Any other class is invalid
+         get_msg $_qv -m _e1 -- "$_class" "CLASS" \
+         get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
+         ;;
+   esac
+
+   # One more case statement for VMs vs jails
+   case $_class in
+      *jail)
+   esac
+
+   eval $_R0
+}
+

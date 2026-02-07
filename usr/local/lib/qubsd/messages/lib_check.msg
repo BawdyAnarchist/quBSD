@@ -32,6 +32,10 @@ Invalid input: < %s >. Integer required.
 Use CIDR notation for IPV4 addresses. Or <auto|none>.
 /END/
 
+:chk_ipv42:
+IP addr < %s > ends with `.1`, which is reserved for the gateway.
+/END/
+
 :compare_integer:
 %s %s %s
 /END/
@@ -44,6 +48,17 @@ Internal bug: Invalid getopts option
 Invalid cellname < %s >. Must start/end with alpha-numeric.
 May contain '-' or '_', but not consecutively.
 /END/
+
+:chk_cpuset:
+Invalid cpuset format < %s >. Must be comma separated intergers, a range, or combination. See man 1 cpuset
+/END/
+
+:chk_schg:
+Invalid SCHG < %s > Must be: <none|sys|all>
+/END/
+
+
+
 
 
 
@@ -97,10 +112,6 @@ ERROR: ZFS dataset < $1 > does not have a valid mountpoint.
    JAILNAME < $1 > has an entry in at least one of the following:
    $JCONF, $QCONF , $U_ZFS, or $R_ZFS
    Destroy/remove all occurrences with:  qb-destroy $1
-	_e16) cat << ENDOFMSG
-   Only comma separated intergers, range, or combo of both. man 1 cpuset
-	_e16_1) cat << ENDOFMSG
-   < $1 > is not among the list of valid cores. Highest core is < $2 >
 	_e17) cat << ENDOFMSG
    Must have the form: <name>=<rulenum>, and be present in devfs.rules
 	_e19) cat << ENDOFMSG
@@ -124,11 +135,6 @@ ERROR: ZFS dataset < $1 > does not have a valid mountpoint.
    < $1 > is an invalid CLASS for a ROOTENV.
 	_e24) cat << ENDOFMSG
    < $1 > is an invalid SECLVL. Must be: <-1|0|1|2|3>
-	_e25) cat << ENDOFMSG
-   < $1 > is an invalid SCHG. Must be: <none|sys|all>
-	_e26) cat << ENDOFMSG
-   < $1 > must be less-than the number of CPUs cores on
-   the host ($2), and less than bhyve limit of 16.
 	_e27) cat << ENDOFMSG
    Invalid VNC. Must be: <true|false|640x480|800x600|1024x768|1920x1080>
    (A value of 'true' will default to a resolution of 1920x1080)

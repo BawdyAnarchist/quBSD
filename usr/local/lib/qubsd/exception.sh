@@ -17,7 +17,7 @@ THROW() {
 
     # Return code must always have a non-zero integer value
     echo $_code | grep -Eqs '[1-9]+' && shift \
-        || { echo "Internal error: THROW called without return code" && exit 0 ;}
+        || { echo "Internal error: THROW called without return code" && exit 99 ;}
 
     # Activate stack trace
     [ "$TRACE" ] && _trace="[ $_fn ]"
