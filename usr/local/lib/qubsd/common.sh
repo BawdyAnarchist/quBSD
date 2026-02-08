@@ -8,7 +8,7 @@
 # Library Components
 . $QLIB/exception.sh
 . $QLIB/query.sh
-. $QLIB/check.sh 
+. $QLIB/assert.sh 
 . $QLIB/validate.sh 
 . $QLIB/compose.sh 
 . $QLIB/network.sh 

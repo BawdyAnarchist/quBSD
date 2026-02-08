@@ -34,7 +34,7 @@ GATEWAY < %s > is a VM. Most VM-gateways serve DHCP to clients, not static IP
 /END/
 
 :validate_param_cpuset:
-Cell < %s >, invalid cpuset < %s >. Valid cores are < %s > 
+Cell < %s >, invalid cpuset < %s >. `cpuset -g` for list of available CPUs
 /END/
 
 :validate_param_vcpus:
@@ -42,8 +42,12 @@ Cell < %s >, invalid VCPUS < %s >
 Must be less than cores on the host < %s >, and less than bhyve limit of 16
 /END/
 
-:validate_cell_dependency:
-Cell < %s > has dependency on cell < %s >, but is missing config < %s >
+:validate_param_ppt:
+Cell < %s > has invalid PPT < %s >
+/END/
+
+:validate_param_template:
+Cell < %s > CLASS not found. Could not validate TEMPLATE < %s >
 /END/
 
 :missing_zfs:
@@ -51,6 +55,10 @@ Cell < %s > has dependency on cell < %s >, but missing dataset < %s >
 /END/
 
 :validate_cellname:
+:validate_cell_dependency:
+Cell < %s > has dependency on cell < %s >, but is missing config < %s >
+/END/
+
 Cellname < %s > collides with existing %s < %s >
 /END/
 

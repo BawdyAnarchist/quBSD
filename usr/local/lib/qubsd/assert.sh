@@ -2,8 +2,8 @@
 
 ################################  SECTION 1: GENERAL FORMAT CHECKS  ################################ 
 
-chk_args_set() {
-    local _fn="chk_args_set"
+assert_args_set() {
+    local _fn="assert_args_set"
     local _require="$1" ; shift
     local _count="$#" _i=1 
 
@@ -17,18 +17,13 @@ chk_args_set() {
     return 0
 }
 
-chk_bool_tf() {
-    local _fn="chk_bool_tf"
+assert_bool_tf() {
+    local _fn="assert_bool_tf"
     echo $1 | tr '[:upper:]' '[:lower:]' | grep -Eqs "true|false" || eval $(THROW 1 $_fn)
 }
 
-chk_integer() {
-    local _fn="chk_integer"
-    echo "$1" | grep -Eqs -- '^-*[0-9]+$' || eval $(THROW 1 $_fn $1)
-}
-
-chk_cellname() {
-    local _fn="chk_cellname" _val="$1" 
+assert_cellname() {
+    local _fn="assert_cellname" _val="$1" 
 
     # Trigger words to avoid, just in case.
     case $_val in 
@@ -40,38 +35,44 @@ chk_cellname() {
         | grep -Eqv '(--|-_|_-|__)' || eval $(THROW 1 $_fn $_val)
 }
 
-compare_integer() {
+assert_integer() {
+    local _fn="assert_integer"
+    echo "$1" | grep -Eqs -- '^-*[0-9]+$' || eval $(THROW 1 $_fn $1)
+}
+
+assert_int_comparison() {
     # Checks that _value is integer, and can checks boundaries. [-n] is a descriptive variable name
     # from caller, for error message. Assumes that integers have been provided by the caller.
-    local _fn="compare_integer" _val
+    local _fn="assert_int_comparison" _opts OPTARG OPTIND _val _g _G _l _L
 
     while getopts :g:G:l:L: opts ; do case $opts in
-        g) local _g="$OPTARG" ;;
-        G) local _G="$OPTARG" ;;
-        l) local _l="$OPTARG" ;;
-        L) local _L="$OPTARG" ;;
-        *) eval $(THROW 1 internal) ;;   # getopts warning suppressed because we handle it here
+        g) assert_integer "$OPTARG" && _g="$OPTARG" || eval $(THROW 1 _internal3 $OPTARG) ;;
+        G) assert_integer "$OPTARG" && _G="$OPTARG" || eval $(THROW 1 _internal3 $OPTARG) ;;
+        l) assert_integer "$OPTARG" && _l="$OPTARG" || eval $(THROW 1 _internal3 $OPTARG) ;;
+        L) assert_integer "$OPTARG" && _L="$OPTARG" || eval $(THROW 1 _internal3 $OPTARG) ;;
+        *) eval $(THROW 1 _internal) ;;   # getopts warning suppressed because we handle it here
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
-    _val="$1"
 
-    # Check each option one by one
-    [ "$_g" ] && { [ "$_val" -ge "$_g" ] || eval $(THROW 1 ${_fn} $_val '<'  $_g) ;}
-    [ "$_G" ] && { [ "$_val" -gt "$_G" ] || eval $(THROW 1 ${_fn} $_val '<=' $_G) ;}
-    [ "$_l" ] && { [ "$_val" -le "$_l" ] || eval $(THROW 1 ${_fn} $_val '>'  $_l) ;}
-    [ "$_L" ] && { [ "$_val" -lt "$_L" ] || eval $(THROW 1 ${_fn} $_val '>=' $_L) ;} 
+    assert_integer "$_val" && _val="$1" || eval $(THROW 1 _interal3 $_val) 
+
+    # Check each option one by one. Opts and _val already sanitized as integer format -> no quotes
+    [ "$_g" ] && { [ $_val -ge $_g ] || eval $(THROW 1 ${_fn} $_val '<'  $_g) ;}
+    [ "$_G" ] && { [ $_val -gt $_G ] || eval $(THROW 1 ${_fn} $_val '<=' $_G) ;}
+    [ "$_l" ] && { [ $_val -le $_l ] || eval $(THROW 1 ${_fn} $_val '>'  $_l) ;}
+    [ "$_L" ] && { [ $_val -lt $_L ] || eval $(THROW 1 ${_fn} $_val '>=' $_L) ;} 
 
     return 0
 }
 
 ##################################  SECTION 2: COMMON PARAMETERS  ##################################
 
-chk_class() {
-    local _fn="chk_class"
-    echo "$CLASSES" | grep -Eqs -- "$1" || eval $(THROW 1 _invalid CLASS $1)
+assert_class() {
+    local _fn="assert_class"
+    echo "$CLASSES" | grep -Eqs -- "(^| )$1( |\$)" || eval $(THROW 1 _invalid CLASS $1)
 }
 
-chk_ipv4() {
-    local _fn="chk_ipv4" _val="$1" _b1 _b2 _b3
+assert_ipv4() {
+    local _fn="assert_ipv4" _val="$1" _b1 _b2 _b3
 
     # Not as technically correct as a regex, but it's readable and functional
     # IP represented by the form: a0.a1.a2.a3/a4 ; b-variables are local/ephemeral
@@ -98,8 +99,8 @@ chk_ipv4() {
     [ "$_a3" = "1" ] && eval $(THROW 1 ${_fn}2 $_val) || return 0
 }
 
-chk_bytesize() {
-    local _fn="chk_bytesize"
+assert_bytesize() {
+    local _fn="assert_bytesize"
     echo "$1" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" || eval $(THROW 1 _invalid bytesize $1)
 }
 
@@ -117,23 +118,23 @@ normalize_bytesize() {
 
 ###################################  SECTION 3: JAIL PARAMETERS  ################################### 
 
-chk_cpuset() {
-    local _fn="chk_cpuset"
+assert_cpuset() {
+    local _fn="assert_cpuset"
     # Test for negative numbers and dashes in the wrong place
     echo "$1" | grep -Eq "(,,+|--+|,-|-,|,[ \t]*-|^[^[:digit:]])" && eval $(THROW 1 $_fn $1)
     return 0
 }
 
-chk_schg() {
-    local _fn="chk_valid_schg"
+assert_schg() {
+    local _fn="assert_schg"
     case $1 in
         none|sys|all) return 0 ;; 
         *) eval $(THROW 1 _invalid2 $1 "Must be <none|sys|all>") ;;
     esac
 }
 
-chk_valid_seclvl() {
-    local _fn="chk_valid_seclvl"
+assert_seclvl() {
+    local _fn="assert_seclvl"
     case $1 in
         none|-1|-0|0|1|2|3) return 0 ;;   
         *) eval $(THROW 1 _invalid2 $1 "Must be <none|-1|0|1|2|3>") ;; 
@@ -143,8 +144,8 @@ chk_valid_seclvl() {
 
 ####################################  SECTION 4: VM PARAMETERS  ####################################
 
-chk_bhyveopts() {
-    local _fn="chk_bhyveopts" _val="$1"
+assert_bhyveopts() {
+    local _fn="assert_bhyveopts" _val="$1"
     _val=$(echo "$_val" | sed -E 's/^-//')   # Remove the leading dash
 
     # Only includes bhyve opts with no argument
@@ -157,67 +158,16 @@ chk_bhyveopts() {
     return 0
 }
 
-chk_taps() {
-    local _fn="chk_taps"
-    compare_integer -g 0 -- "$1" || eval $(THROW 1 _invalid2 TAPS $1 "Must be an integer >= 0")
+assert_taps() {
+    local _fn="assert_taps"
+    assert_int_comparison -g 0 -- "$1" || eval $(THROW 1 _invalid2 TAPS $1 "Require: integer >= 0")
 }
 
-chk_vcpus() {
-    local _fn="chk_vcpus"
-    compare_integer -G 0 -- "$1" || eval $(THROW 1 _invalid2 VCPUS $1 "Must be an integer > 0")
+assert_vcpus() {
+    local _fn="assert_vcpus"
+    assert_int_comparison -G 0 -- "$1" || eval $(THROW 1 _invalid2 VCPUS $1 "Require: integer > 0")
 }
 
-normalize_ppt() {
-    local _fn="normalize_ppt"
-    echo "$1" | sed "s#/#:#g"
-}
-
-chk_ppt() {
-    local _fn="chk_valid_ppt" _val
-    
-    [ "$_value" = "none" ] && eval $_R0
-
-    # Get list of pci devices on the machine
-    _pciconf=$(pciconf -l | awk '{print $1}')
-
-    # Check all listed PPT devices from QCONF
-    for _val in $_value ; do
-
-        # convert _val to native pciconf format with :colon: instead of /fwdslash/
-        _val2=$(echo "$_val" | sed "s#/#:#g")
-
-        # Search for the individual device and specific device for devctl functions later
-        _pciline=$(echo "$_pciconf" | grep -Eo ".*${_val2}")
-        _pcidev=$(echo "$_pciline" | grep -Eo "pci.*${_val2}")
-
-        # PCI device doesnt exist on the machine
-        [ -z "$_pciline" ] && get_msg $_q -m _e22_0 -- "$_val" "PPT" \
-            && get_msg $_q -m _e1 -- "$_val" "PPT" && eval $_R1
-    done
-}
-
-pci_extra() {
-	for _val in $_value ; do
-		# Extra set of checks for the PCI device, if it's about to be attached to a VM
-		if [ "$_xtra" ] ; then
-			# First detach the PCI device, and examine the error message
-			_dtchmsg=$(devctl detach "$_pcidev" 2>&1)
-			[ -n "${_dtchmsg##*not configured}" ] && get_msg $_q -m _e22_1 -- "$_pcidev" \
-					&& get_msg $_q -m _e22 -- "$_pcidev" "$_VM" && eval $_R1
-
-			# Switch based on status of the device after being detached
-			if pciconf -l $_pcidev | grep -Eqs "^none" ; then
-				# If the device is 'none' then set the driver to ppt (it attaches automatically).
-				! devctl set driver "$_pcidev" ppt && get_msg $_q -m _e22_2 -- "$_pcidev" \
-					&& get_msg $_q -m _e22 -- "$_pcidev" "$_VM" && eval $_R1
-			else
-				# Else the devie was already ppt. Attach it, or error if unable
-				! devctl attach "$_pcidev" && get_msg $_q -m _e22_3 -- "$_pcidev" \
-					&& get_msg $_q -m _e22 -- "$_pcidev" "$_VM" && eval $_R1
-			fi
-		fi
-	done
-}
 
 
 ##################################################################################################

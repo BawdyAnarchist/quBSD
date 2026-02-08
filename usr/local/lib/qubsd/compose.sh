@@ -47,48 +47,58 @@ resolve_cell_parameters() {
 
 # Unset PARAMS based on optional prefix [-p] and PARAM_LIST [-P], or defaults to global constants
 unset_cell_parameters() {
-    local _fn="unset_cell_parameters" _prefix _PARAMS
+    local _fn="unset_cell_parameters" _opts OPTARG OPTIND _prefix _PARAMS
  
     while getopts :p:P: _opts ; do case $_opts in
         p) _prefix="$OPTARG" ;;
         P) _PARAMS="$OPTARG" ;;
-        *) eval $(THROW 1 internal) ;;
+        *) eval $(THROW 1 _internal) ;;
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
-    [ -z "$_PARAMS" ] && _PARAMS="$PARAMS_COMN $PARAMS_JAIL $_PARAMS_VM"
+    [ -z "$_PARAMS" ] && _PARAMS="$PARAMS_COMN $PARAMS_JAIL $PARAMS_VM"
     [ "$_prefix" ] && eval unset $_prefix
     unset $(echo "$_PARAMS" | sed "s/^/$_prefix/; s/ / $_prefix/g")
     return 0
 }
 
-# Requires $1 (cellname). Use [-p prefix] [-P PARAM_LIST] to avoid global consts. [-s] for policy.
+# Orchestrator to validate an arbitrary list of PARAMS. WARN behavior opts. Require $1 (cell)
 validate_cell_parameters() {
-    local _fn="validate_cell_parameters"
-    local _cell _type _opts _prefix _cell _PARAMS _params _funct _strict
-    chk_args_set 1 $1 || eval $(THROW 1)  # Safety assurance
+    local _fn="validate_cell_parameters" _opts OPTIND OPTARG
+    local _cell _type _prefix _PARAMS _params _funct _emit _ret _warn=0 _warn_start="$WARN_CNT"
     
-    while getopts :p:P: _opts ; do case $_opts in
-        p) _prefix="$OPTARG" ; eval _cell=\${$_prefix} ;; # Without [-p], will operate on global
-        P) _PARAMS="$OPTARG" ;;                           # Without [-P], all PARAMS_ are used
-        t) _strict=true ;;         # Determines when  
-        *) eval $(THROW 1 internal) ;;
+    while getopts :ep:P:w: _opts ; do case $_opts in
+        p)  _prefix="$OPTARG" ;        # Specify prefix, or use the raw PARAM name from constants.sh
+            eval _cell=\${$_prefix} ;; # Get the cellname stored in the prefix designator
+        P)  _PARAMS="$OPTARG" ;;       # Specify PARAM list, or use the list from constants.sh 
+        e)  _emit=true ;;              # If no THROW occurred, then print any warnings before return
+        w)  _warn="$OPTARG" ;          # On WARN: [0->return 0 (default)] [1->return 2] [2->THROW]
+            assert_int_comparison -g 0 -l 2 $_warn || eval $(THROW 1 _internal4) ;;
+        *)  eval $(THROW 1 _internal) ;;
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-    # Check that the positional $1 cellname matches what's stored in the prefix designator
-    [ "$_cell" = "$1" ] || eval $(THROW 1 internal2 $_prefix $1 $_cell)
+    # Handle $1 and _cell (post getopts). We also double check caller usage, for bug prevention
+    chk_args_set 1 $1 || eval $(THROW 1)
+    [ -z "$_prefix" ] && _cell="$1"                          # Use $1 if prefix wasnt specified 
+    [ "$_cell" = "$1" ] || eval $(THROW 1 _internal2 $_prefix $1 $_cell)
 
-    eval _type=${_prefix}${_TYPE}
+    eval _type=\${${_prefix}TYPE}
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
-    [ -z "$_PARAMS" ] && eval _PARAMS=\"\${PARAMS_COMN} \${PARAMS_${_prefix}${_TYPE}}\"
+    [ -z "$_PARAMS" ] && eval _PARAMS=\"\${PARAMS_COMN} \${PARAMS_${_type}}\"
 
     for _PARAM in $_PARAMS ; do
         _param=$(echo "$_PARAM" | tr '[:upper:]' '[:lower:]')
         _funct="validate_param_$_param"
-        quiet type $_funct || eval $(THROW 1 ${_fn} $_PARAM $_funct)  # Verify exist before call
-        eval $_funct \${${_prefix}${_PARAM}} $_cell || eval $(THROW 1)
+        quiet type $_funct || eval $(THROW 1 ${_fn} $_PARAM $_funct)     # Verify _funct exists
+
+        # Hard failures, throw fast
+        eval $_funct \"\${${_prefix}${_PARAM}}\" $_cell || eval $(THROW 1)
+        [ "$_warn" = "2" ] && [ "$WARN_CNT" -gt "$_warn_start" ] && eval $(THROW 2)
     done
-    return 0
+
+    # Print warnings and return based on warning policy
+    is_path_exist -s $ERR && cat $ERR && CLEAR
+    [ "$WARN_CNT" -gt "$_warn_start" ] && [ "$_warn" -gt 0 ] && return 2 || return 0
 }
 

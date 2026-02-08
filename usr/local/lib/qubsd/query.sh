@@ -164,8 +164,10 @@ query_cpuset() {
 }
 
 query_pci() {
-    local _fn="query_pci" _val
-    pciconf - 
+    local _fn="query_pci" _ppt="$1" _val
+    _ppt=$(echo "pci$_ppt" | sed "s#/#:#g")
+    _val=$(hush pciconf -l $_ppt) || return 1
+    [ "$_val" ] && echo "$_val" && return 0 || return 1
 }
 
 ##########################################  X11 QUERIES  ###########################################

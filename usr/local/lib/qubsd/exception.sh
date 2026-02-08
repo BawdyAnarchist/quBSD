@@ -15,8 +15,8 @@ CLEAR() { WARN_CNT=0 ; rm -f $ERR ; return 0 ;}
 THROW() {
     local _code="$1" _msg_code="$2" _trace _msg _args
 
-    # Return code must always have a non-zero integer value
-    echo $_code | grep -Eqs '[1-9]+' && shift \
+    # Return code must always have a positive integer value
+    echo $_code | grep -Eqs '^[ \t]*[1-9]+[ \t]*$' && shift \
         || { echo "Internal error: THROW called without return code" && exit 99 ;}
 
     # Activate stack trace

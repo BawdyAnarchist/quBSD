@@ -1,5 +1,5 @@
 
-:chk_args_set:
+:assert_args_set:
 Argument missing or blank
 /END/
 
@@ -11,49 +11,45 @@ Invalid %s < %s >
 Invalid %s < %s >. %s
 /END/
 
-:chk_bool_tf:
+:assert_bool_tf:
 Boolean string required: [true|false]
 /END/
 
-:chk_integer:
+:assert_integer:
 Invalid input: < %s >. Integer required.
 /END/
 
-:chk_bhyveopts1:
+:assert_bhyveopts1:
 %s < %s > contains an invalid option. Permissible: <AaCDeHhPSuWwxY>.
 /END/
 
-:chk_bhyveopts2:
+:assert_bhyveopts2:
 %s < %s > contains a duplicate character.
 /END/
 
-:chk_ipv4:
+:assert_ipv4:
 %s < %s > is not in CIDR 
 Use CIDR notation for IPV4 addresses. Or <auto|none>.
 /END/
 
-:chk_ipv42:
+:assert_ipv42:
 IP addr < %s > ends with `.1`, which is reserved for the gateway.
 /END/
 
-:compare_integer:
+:assert_int_comparison:
 %s %s %s
 /END/
 
-:internal:
-Internal bug: Invalid getopts option
-/END/
-
-:chk_cellname:
+:assert_cellname:
 Invalid cellname < %s >. Must start/end with alpha-numeric.
 May contain '-' or '_', but not consecutively.
 /END/
 
-:chk_cpuset:
+:assert_cpuset:
 Invalid cpuset format < %s >. Must be comma separated intergers, a range, or combination. See man 1 cpuset
 /END/
 
-:chk_schg:
+:assert_schg:
 Invalid SCHG < %s > Must be: <none|sys|all>
 /END/
 

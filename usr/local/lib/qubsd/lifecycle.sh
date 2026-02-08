@@ -513,3 +513,24 @@ create_popup() {
 		echo "$_input"
 	fi
 }
+
+probe_ppt() {
+    _fn="probe_ppt" _val="$1"
+    chk_args_set 1 $_val
+
+    # Check all listed PPT devices from QCONF
+    for _ppt in $_val ; do
+        # Detach device, examine the error message
+        _dtchmsg=$(devctl detach "$_pcidev" 2>&1)
+        [ -n "${_dtchmsg##*not configured}" ] && eval $(THROW 1 _e22_1 _e22) ##################################
+
+        # Switch based on status of the device after being detached
+        if pciconf -l $_pcidev | grep -Eqs "^none" ; then
+           # If the device is 'none' then set the driver to ppt (it attaches automatically).
+           devctl set driver "$_pcidev" ppt || $(THROW 1 _e22_2 _e22) ##################################
+        else
+           # Else the devie was already ppt. Attach it, or error if unable
+           devctl attach "$_pcidev" || eval $(THROW 1 _e22_3 _e22) ####################################
+        fi
+    done
+}

@@ -3,22 +3,22 @@
 
 validate_param_autostart() {
     local _fn="validate_param_autostart"
-    chk_bool_tf $1 || eval $(THROW 1)
+    assert_bool_tf $1 || eval $(THROW 1)
 }
 
 validate_param_autosnap() {
     local _fn="validate_param_autosnap"
-    chk_bool_tf $1 || eval $(THROW 1)
+    assert_bool_tf $1 || eval $(THROW 1)
 }
 
 validate_param_backup() {
     local _fn="validate_param_backup"
-    chk_bool_tf $1 || eval $(THROW 1)
+    assert_bool_tf $1 || eval $(THROW 1)
 }
 
 validate_param_class() {
     local _fn="validate_param_class"
-    chk_class $1 || eval $(THROW 1)
+    assert_class $1 || eval $(THROW 1)
 }
 
 validate_param_control() {
@@ -40,7 +40,7 @@ validate_param_ipv4() {
 
     case $_val in 
         none|auto|DHCP) return 0 ;;  # Control values must return early (cant offload to checks.sh)
-        *) chk_ipv4 $_val || eval $(THROW 1) ;;  # Purely checks for CIDR format
+        *) assert_ipv4 $_val || eval $(THROW 1) ;;  # Purely checks for CIDR format
     esac
 
     [ "$_type" ] || _type=$(query_cell_type $_cell)  # Validation differs by TYPE. Guarantee value
@@ -60,13 +60,13 @@ validate_param_ipv4() {
 
 validate_param_mtu() {
     local _fn="validate_param_mtu" _val="$1"
-    chk_integer "$_val" || eval $(THROW 1)
-    compare_integer -g 1200 -l 1600 -- "$_val" || eval $(THROW 1 $_fn $2 $_val 1200 1600)
+    assert_integer "$_val" || eval $(THROW 1)
+    assert_int_comparison -g 1200 -l 1600 -- "$_val" || eval $(THROW 1 $_fn $2 $_val 1200 1600)
 }
 
 validate_param_no_destroy() {
     local _fn="validate_param_no_destroy"
-    chk_bool_tf $1 || eval $(THROW 1)
+    assert_bool_tf $1 || eval $(THROW 1)
 }
 
 validate_param_rootenv() {
@@ -80,8 +80,20 @@ validate_param_r_zfs() {
 }
 
 validate_param_template() {
-    local _fn="validate_param_template"
-    validate_cell_dependency $1 $2 && return 0 || eval $(THROW 1)
+    local _fn="validate_param_template" _val="$1" _cell="$2" _class
+
+    # Pivot the check based on CLASS
+    eval _class=\${${_prefix}CLASS}
+    [ -z "$_class" ] && _class=$(query_cell_param $_cell CLASS)
+    [ -z "$_class" ] && eval $(THROW $_fn $_cell $_val)
+
+    case $_class in 
+        disp*)  validate_cell_dependency $_val $_cell && return 0 || eval $(THROW 1) ;; # Hard dep
+        *)  [ "$_class" = "none" ] && return 0
+            validate_cell_dependency $_val $_cell && return 0 || eval $(WARN)
+            ;;
+    esac
+    return 0
 }
 
 validate_param_u_zfs() {
@@ -92,25 +104,17 @@ validate_param_u_zfs() {
 ###################################  SECTION 2: JAIL PARAMETERS  ################################### 
 
 validate_param_cpuset() {
-    local _fn="validate_param_cpuset" _val="$1" _sys_cpus
-    
-    [ "$_val" = "none" ] && return 0   # Explicit none is allowed/preferrable
-    chk_cpuset $_val || eval $(THROW 1)
-
-    # Get cpus on the system, and normalize _val for the check 
-    _sys_cpus=$(cpuset -g | sed "s/pid -1 mask: //" | sed "s/pid -1 domain.*//")
-    _val=$(echo $_val | sed -E "s/(,|-)/ /g")     # Remove `-' and `,'
- 
-    for _cpu in $_sys_cpus ; do
-       # Every number is followed by a comma except the last one
-       echo $_sys_cpus | grep -Eq "${_cpu},|${_cpu}\$" || eval $(THROW 1 $_fn $2 $1 $_sys_cpus)
-    done
-    return 0
+    local _fn="validate_param_cpuset" _val="$1"
+    [ "$_val" = "none" ] && return 0
+    assert_cpuset "$_val" || eval $(THROW 1)
+    quiet cpuset -l "$_val" && return 0 || eval $(THROW 1 $_fn $2 $_val)
 }
 
 validate_param_maxmem() {
     local _fn="validate_param_maxmem" _val="$1" _sysmem
-    chk_bytesize $_val || eval $(THROW 1)
+    [ "$_val" = "none" ] && return 0
+
+    assert_bytesize $_val || eval $(THROW 1)
     _bytes=$(normalize_bytesize $_val) || { eval $(WARN memwarn $2) && return 0 ;}
     _sysmem=$(query_sysmem)            || { eval $(WARN memwarn $2) && return 0 ;}
     [ "$_bytes" -lt "$_sysmem" ] || { eval $(WARN $_fn $2 $_val $_bytes $_sysmem) && return 0 ;}
@@ -119,52 +123,55 @@ validate_param_maxmem() {
 
 validate_param_schg() {
     local _fn="validate_param_schg"
-    chk_schg $1 || eval $(THROW 1)
+    assert_schg $1 || eval $(THROW 1)
 }
 
 validate_param_seclvl() {
     local _fn="validate_param_seclvl"
-    chk_seclvl $1 || eval $(THROW 1)
+    assert_seclvl $1 || eval $(THROW 1)
 }
 
 ##################################  SECTION 3: BHYVE PARAMETERS  ################################### 
 
 validate_param_bhyveopts() {
     local _fn="validate_param_bhyveopts"
-    chk_bhyveopts $1
+    assert_bhyveopts $1
 }
 
 validate_param_bhyve_custm() {
     local _fn="validate_param_bhyve_custm"
-    return 0
+    return 0   # No validation. This is special, mostly for qb-create to launch a ISO installation
 }
 
 validate_param_memsize() {
     local _fn="validate_param_memsize" _val="$1" _bytes _sysmem
-    chk_bytesize $_val || eval $(THROW 1)
+    assert_bytesize $_val || eval $(THROW 1)
     _bytes=$(normalize_bytesize $_val) || { eval $(WARN $_fn) && return 0 ;}
     _sysmem=$(query_sysmem)            || { eval $(WARN $_fn) && return 0 ;}
     [ "$_bytes" -lt "$_sysmem" ] || eval $(THROW 1 $_fn $2 $_val $_bytes $_sysmem)
 }
 
 validate_param_ppt() { #######################################################################################################
-    local _fn="validate_param_ppt" _val
-    _val=$(normalize ppt $1)
+    local _fn="validate_param_ppt" _val="$1"
+    [ "$_val" = "none" ] && return 0 ;
+    for _ppt in $_val ; do
+        quiet query_pci $_ppt || eval $(THROW 1 $_fn $2 $_ppt) ;
+    done
 }
 
 validate_param_taps() {
     local _fn="validate_param_taps"
-    chk_taps $1 || eval $(THROW 1)
+    assert_taps $1 || eval $(THROW 1)
 }
 
 validate_param_tmux() {
     local _fn="validate_param_tmux"
-    chk_bool_tf $1 || eval $(THROW 1)
+    assert_bool_tf $1 || eval $(THROW 1)
 }
 
 validate_param_vcpus() {
     local _fn="validate_param_vcpus" _val="$1"
-    chk_taps $_val || eval $(THROW 1)
+    assert_vcpus $_val || eval $(THROW 1)
 
     # Ensure that vpcus doesnt exceed the number of system cpus or bhyve limits
     _syscpus=$(cpuset -g | head -1 | grep -oE "[^ \t]+\$")
@@ -175,12 +182,12 @@ validate_param_vcpus() {
 
 validate_param_vnc() {
     local _fn="validate_param_vnc"
-    chk_bool_tf $1 || eval $(THROW 1)
+    assert_bool_tf $1 || eval $(THROW 1)
 }
 
 validate_param_wiremem() {
     local _fn="validate_param_wiremem"
-    chk_bool_tf $1 || eval $(THROW 1)
+    assert_bool_tf $1 || eval $(THROW 1)
 }
 
 ##################################  SECTION 4: MISC VALIDATIONS  ################################### 
@@ -189,7 +196,7 @@ validate_param_wiremem() {
 validate_cellname() {
     local _fn="validate_cellname" _val="$1" _r_zfs="$2" _u_zfs="$3"
     local _cellpath=$D_CELLS/$1 _jailpath=$D_JAILS/$1
-    chk_cellname $_val || $(THROW 1)
+    assert_cellname $_val || $(THROW 1)
     
     # Check config file path and zfs dataset clobber. MUTE because failure of `is_`, is passing.
     is_path_exist -f $_cellpath && $(THROW 1 $_fn $_val path $_cellpath)

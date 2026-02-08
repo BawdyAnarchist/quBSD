@@ -1,9 +1,7 @@
 
 OVERHAUL TODO
-   - validate_param_ppt
-   - Finish -s strict in validate_cell_parameters - and add the WARN_CNT checker
+   - Give a good once over testing on all the new validations. Including checking that blank values throw
    - Change /rw to /overlay.
-   - Give a good once over testing on all the new validations
 
 
 Jail starts are delayed for some reason. Need to see why.
