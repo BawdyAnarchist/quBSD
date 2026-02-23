@@ -1,5 +1,4 @@
 
-
 VM PLAN: only remaining aspect is Linux and qb-create
  - Linux/ubuntu
     -- they actually have an overlayfs where you just add directories and it auto-tracks changes

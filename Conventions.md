@@ -45,7 +45,7 @@ $ERR is a constants.sh global for each script invocation, where both THROW and W
 
 CLEAR is occassionally needed when a WARN is discarded in favor of some alternative path, to not pollute the $ERR file
 
-MUTE is rarely used, if/when you know that some error is harmless and you want clean up the $ERR file regardless. This is there more for "completeness" than with the expectation of being used.
+MUTE is rarely used, if/when you know that some error is harmless and you want clean up the $ERR file regardless.
 
 ## Library Notes
 
