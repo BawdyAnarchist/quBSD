@@ -8,9 +8,9 @@ verbose() { echo ">> $*" >&2; "$@" ;}  # Command-specific debug tool
 # TRAP MANAGAMENT
 rm_err() { rm -f $ERR ;}
 rm_rt_ctx() { rm -f $RT_CTX ;}
-trap_init() { trap 'eval "$TRAP"' ;}
+trap_init() { trap 'eval "$TRAP"' $TRAP_SIGS ;}
 trap_push() { TRAP="$1 ; $TRAP" ;}
-trap_pop() { : ;}    #### STUB FOR NOW ####
+trap_pop()  { TRAP=${TRAP#*;} ;}   # WARNING: Do not use semicolons in trap_push args
 
 # ERROR/TRACING SYSTEM
 MUTE() { "$@" || { rm -f $ERR ; return 1 ;};}
@@ -27,7 +27,7 @@ THROW() {
     # Activate stack trace
     [ "$TRACE" ] && _trace="[ $_fn ]"
 
-    # Code in *.msg library must have the form:   :_msg_code: 
+    # Code in *.msg library must have the form:   :_msg_code:
     if [ "$_msg_code" ] ; then
         _msg=$(awk -v code=":$_msg_code:" '
             $1 == code { found=1; next }
@@ -53,7 +53,7 @@ WARN() {
     # Activate stack trace
     [ "$TRACE" ] && _trace="[ $_fn ]"
 
-    # Warning code in *.msg libs must have the form:  :w:_msg_code: 
+    # Warning code in *.msg libs must have the form:  :w:_msg_code:
     if [ "$_msg_code" ] ; then
         _msg=$(awk -v code=":w:$_msg_code:" '
             $1 == code { found=1; next }

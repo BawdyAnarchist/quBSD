@@ -1,18 +1,18 @@
 #!/bin/sh
 
-## SINGLE SOURCE FOR LIBRARY MODULARITY 
+## SINGLE SOURCE FOR LIBRARY MODULARITY
 . /usr/local/lib/qubsd/constants.sh  # Bootstrap global constants
 
 # Library Components
 . $QLIB/exception.sh
 . $QLIB/context.sh
 . $QLIB/query.sh
-. $QLIB/assert.sh 
-. $QLIB/validate.sh 
-. $QLIB/compose.sh 
-. $QLIB/network.sh 
-. $QLIB/lifecycle.sh 
-. $QLIB/bhyve.sh 
+. $QLIB/assert.sh
+. $QLIB/validate.sh
+. $QLIB/compose.sh
+. $QLIB/network.sh
+. $QLIB/lifecycle.sh
+. $QLIB/bhyve.sh
 
 # Verify Environment
 [ -d "$D_CELLS" ] || mkdir -p $D_CELLS

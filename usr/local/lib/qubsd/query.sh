@@ -45,7 +45,7 @@ is_needpop() {
     ! ps -p $$ -o state | grep -qs -- '+' && pgrep -fq Xorg && return 0 || return 1
 }
 
-# return 0 for "Y/y". Optional $1=`severe` for a hard-typed `yes` required from the user 
+# return 0 for "Y/y". Optional $1=`severe` for a hard-typed `yes` required from the user
 is_user_response() {
     local _fn="query_user_response" _response
 
@@ -137,42 +137,58 @@ query_cell_shell() {
 }
 
 #####################################  SYSTEM STATE QUERIES  #######################################
+# ZFS queries may be passed $1 optionally to toggle pulling ALL datasets or only some
 
 query_datasets() {
     local _fn="query_datasets"
-    [ -z "$DATASETS" ] && DATASETS=$(zfs list -rHo name,mountpoint,mounted,origin)
-    return 0
+    if [ "$DATASETS" ] ; then
+        DATASETS=$(echo "$DATASETS" | zfs list -rHo name,mountpoint,mounted,origin $1)
+    else
+        DATASETS=$(zfs list -rHo name,mountpoint,mounted,origin $1)
+    fi
+    return $?
 }
 
 query_rootsnaps() {
     local _fn="query_rootsnaps"
-    # If passed $1, search is narrowed. Otherwise it pulls ALL snapshots on the system
-    [ -z "$ROOTSNAPS" ] && ROOTSNAPS=$(zfs list -Hrt snapshot -o name,written,creation $1)
-    return 0
+    if [ "$ROOTSNAPS" ] ; then
+        ROOTSNAPS=$(echo "$ROOTSNAPS" | zfs list -Hrt snapshot -o name,written,creation $1)
+    else
+        ROOTSNAPS=$(zfs list -Hrt snapshot -o name,written,creation $1)
+    fi
+    return $?
 }
 
 query_prstsnaps() {
     local _fn="query_prstsnaps"
-    # If passed $1, search is narrowed. Otherwise it pulls ALL snapshots on the system
-    [ -z "$PRSTSNAPS" ] && PRSTSNAPS=$(zfs list -Hrt snapshot -o name,written,creation $1)
-    return 0
+    if [ "$PRSTSNAPS" ] ; then
+        PRSTSNAPS=$(echo "$PRSTSNAPS" | zfs list -Hrt snapshot -o name,written,creation $1)
+    else
+        PRSTSNAPS=$(zfs list -Hrt snapshot -o name,written,creation $1)
+    fi
+    return $?
 }
 
 query_zfs_mountpoint() {
     local _fn="query_zfs_mountpoint"
-    query_datasets
+    assert_args_set 1 "$1"
     echo_grep "$DATASETS" "$1" | awk '{print $2}' && return 0 || return 1
 }
 
 query_onjails() {
-    local _fn="query_onjails"
-    [ -z "$ONJAILS" ] && ONJAILS=$(jls | sed "1 d" | awk '{print $2}')
-    return 0
+    local _fn="query_onjails" _onjails
+    if [ "$ONJAILS" ] ; then
+        _onjails=$(jls | sed "1 d" | awk '{print $2}')
+        ONJAILS=$(echo "$ONJAILS" | echo "$_onjails")
+    else
+        ONJAILS=$(jls | sed "1 d" | awk '{print $2}')
+    fi
+    return $?
 }
 
 query_onvms() {
     local _fn="query_onvms"
-    [ -z "$ONVMS" ] && ONVMS=$(pgrep -fl "daemon: bhyve:" | sed "s/\[.*]\$//")
+    ONVMS=$(pgrep -fl "daemon: bhyve:" | sed "s/\[.*]\$//")
     return 0
 }
 
@@ -185,7 +201,7 @@ query_sysmem() {
 
 query_num_cpus() {
     local _fn="query_ncpu"
-    [ -z "$NCPU" ] && NCPU=$(sysctl -n hw.ncpu) 
+    [ -z "$NCPU" ] && NCPU=$(sysctl -n hw.ncpu)
 }
 
 # With $1 < cell>, all active IPaddr of a running jail. Without $1, active IPs of all running jails
@@ -196,8 +212,8 @@ query_running_ips() {
         _val=$(ifconfig -j $_cell -a inet | awk '/inet / {print $2}')
     else
         query_onjails
-        for _jail in $ONJAILS ; do 
-            _jail_ips=$(ifconfig -j $_jail -a inet | awk '/inet / {print $2}') 
+        for _jail in $ONJAILS ; do
+            _jail_ips=$(ifconfig -j $_jail -a inet | awk '/inet / {print $2}')
             _val=$(printf "%b" "$_val" "\n" "$_jail_ips")
         done
     fi
@@ -216,7 +232,7 @@ query_net_active_xid() {
 
 query_xwin_name() {
     local _fn="query_xwin_name" _xid _val
-    _xid=$(query_net_active_xid) || return 1 
+    _xid=$(query_net_active_xid) || return 1
     _val=$(xprop -id "$_xid" WM_NAME _NET_WM_NAME WM_CLASS) || return 1
     [ "$_val" ] && echo "$_val" && return 0 || return 1
 }

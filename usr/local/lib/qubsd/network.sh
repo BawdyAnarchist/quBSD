@@ -111,12 +111,12 @@ configure_client_network() {
 	# DNS and pf management
 	if sysrc -nqj $_client dnscrypt_proxy_enable 2>/dev/null | grep -q "YES" ; then
 		# Using DoH, presumably for external-router connected (net-firewall) gateway
-		rm "${_cl_root}/var/unbound/forward.conf" 2>/dev/null 
+		rm "${_cl_root}/var/unbound/forward.conf" 2>/dev/null
 		chroot ${_cl_root} /bin/sh -c 'ln -s /var/unbound/forward-doh.conf /var/unbound/forward.conf'
 
 	elif sysrc -nqj $_client wireguard_enable 2>/dev/null | grep -q "YES" ; then
 		# Wireguard itself will update resolvconf, and thus, unbound
-		rm "${_cl_root}/var/unbound/forward.conf" 2>/dev/null 
+		rm "${_cl_root}/var/unbound/forward.conf" 2>/dev/null
 		chroot ${_cl_root} /bin/sh -c 'ln -s /var/unbound/forward-resolv.conf /var/unbound/forward.conf'
 
 		# Endpoint IP
@@ -131,7 +131,7 @@ configure_client_network() {
 	else
 		# All other gateways use normal resolvconf mechanism
 		if sysrc -nqj $_client local_unbound_enable 2>/dev/null | grep -qs "YES" ; then
-			rm "${_cl_root}/var/unbound/forward.conf" 2>/dev/null 
+			rm "${_cl_root}/var/unbound/forward.conf" 2>/dev/null
 			chroot ${_cl_root} /bin/sh -c 'ln -s /var/unbound/forward-resolv.conf /var/unbound/forward.conf'
 		fi
 		if [ ! "$ipv4" = "DHCP" ] ; then      # Without DHCP, resolvconf doesnt know the assigned IP
@@ -147,7 +147,7 @@ configure_client_network() {
 }
 
 configure_ssh_control() {
-#CJAIL BEING DEPRECATED - whole function 
+#CJAIL BEING DEPRECATED - whole function
 	# Ensures that the latest pubkey for the cjail SSH is copied to the controlled jail
 
 	_pubkey=".ssh/cjail_authorized_keys"

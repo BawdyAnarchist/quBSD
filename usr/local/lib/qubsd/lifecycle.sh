@@ -286,17 +286,24 @@ set_freebsd_pw() {
 
 
 fix_freebsd_pw() {
-    local _fn="set_freebsd_pw" _cell="$1" _templ="$2" _etc_local="$3" _pwd_local="$4" _grp_local="$5"
+    local _fn="set_freebsd_pw" _cell _templ _p_mnt _etc_local _pwd_local _grp_local
+    assert_args_set 3 "$1" "$2" "$3" && _cell="$1" _templ="$2" _p_mnt="$3"
+
+    # Convenienc variables
+    _etc_local=$_p_mnt/$OVETC
+    _pwd_local=$_p_mnt/$OV_PW_L
+    _grp_local=$_p_mnt/$OV_GP_L
 
     # Drop the flags for the home directory and rename it from template to dispjail name
-    hush chflags -R noschg $_cell/home
-    hush mv $_cell/home/$_templ $_cell/home/$_cell
+    hush chflags -R noschg $_p_mnt/home
+    hush mv $_p_mnt/home/$_templ $_p_mnt/home/$_cell
 
     # Change the local pwd from template name to dispjail name
     hush chflags -R noschg $_etc_local
     hush sed -i '' -E "s|^$_templ:|$_cell:|g" $_pwd_local
     hush sed -i '' -E "s|/home/$_templ:|/home/$_cell:|g" $_pwd_local
-    hush sed -i '' -E "s/(:|,)$_templ(,|[[:blank:]]|\$)/\1$_cell\2/g" $_grp_local
+    hush sed -i '' -E "s/(^|:|,)$_templ(:|,|[[:blank:]]|\$)/\1$_cell\2/g" $_grp_local
+    return 0
 }
 
 set_linux_pw() {
@@ -312,7 +319,7 @@ set_xauthority() {
 	touch $_file && chown 1001:1001 $_file
 	eval "jexec -l -U $_jail $_jail /usr/local/bin/xauth add $_xauth"
 	chmod 400 $_file
-}  
+}
 
 launch_xephyr() {
 	# sysvshm cannot share Xephyr here. Some apps will fail if we dont disable it. XVideo prevents non-existent
@@ -358,12 +365,12 @@ launch_xephyr() {
 monitor_ephmjail() {
 	# X11 windows can take a moment launch. Ineligant solution, but wait 3 secs before check-loop
 	sleep 5
-	
+
 	# ps -o tt tty -> is associated with terminals/windows. Keepalive until all are gone
 	while sleep 1 ; do
 		ps -axJ ${_JAIL} -o tt -o command | tail -n +2 | grep -v 'dbus' | grep -qv ' -' || break
 	done
-	
+
 	# Destroy sequence
 	stop_jail "$_JAIL" > /dev/null 2>&1
 	zfs destroy -rRf ${R_ZFS}/$_JAIL > /dev/null 2>&1

@@ -5,7 +5,7 @@ compose_runtime_context() {
     local _fn="compose_runtime_context" _cell="$1" _pfx="$2"
     trap_push "rm_rt_ctx"
 
-    bootstrap_cell_ctx $_cell $_pfx  || eval $(THROW 1 _generic "Cell bootstrap failed")
+    ctx_bootstrap_cell $_cell $_pfx  || eval $(THROW 1 _generic "Cell bootstrap failed")
     ctx_validate_params $_cell $_pfx || eval $(THROW 1 _generic "Cell validation failed")
     ctx_runtime_init $_cell $_pfx    || eval $(THROW 1 _generic "Failed to write runtime context")
 }
@@ -68,6 +68,54 @@ resolve_persist_snapname() {
     echo "$_dset@$_now" && return 2   # '2' tells caller to perform a new snapshot
 }
 
-compose_snapshot_context() {
-    local _fn="compose_snapshot_context"
+# Caller should be careful if deconfliction via $1 (_pfx) is necessary
+compose_root_reclone_cmds() {
+    local _fn="compose_root_reclone_cmds" _pfx="$1" _rootenv _snap _die _r_mnt _r_dset _pfxloc="rrc_"
+
+    # Compose the local vars based on their prefixes
+    _rootenv=$(ctx_get ${_pfx}ROOTENV)
+    _r_mnt=$(ctx_get ${_pfx}R_MNT)
+    _r_dset=$(ctx_get ${_pfx}R_DSET)
+
+    # Need the root dataset of the rootenv, to choose the snapshot
+    ctx_bootstrap_cell $_rootenv $_pfxloc || eval $(THROW 1 _generic "< $_rootenv > bootstrap failed")
+
+    _snap=$(resolve_rootenv_snapname $(ctx_get ${_pfxloc}R_DSET))
+    case $? in
+        0)  : ;;
+        1)  eval $(THROW 1 _generic "failed to get root snapshot name") ;;
+        2)  _die=$(( $(date +%s) + 30 ))
+            _CMD_SNAPSHOT_ROOT="zfs snapshot -o qb:dest_date=$_die -o qb:autosnap=- -o qb:autocreated=yes $_snap"
+            ;;
+    esac
+
+    [ "$_r_mnt" ] && _CMD_DESTROY_ROOT="zfs destroy -rRf $_r_dset"
+    _CMD_CLONE_ROOT="zfs clone -o qb:autosnap=false $_snap $_r_dset"
 }
+
+# $1 required. Caller should be careful if deconfliction via $2 (_pfx) is necessary
+compose_persist_reclone_cmds() {
+    local _fn="compose_persist_reclone_cmds" _cell _pfx="$2" _snap _die _p_mnt _p_dset _pfxloc="prc_"
+    assert_args_set 1 "$1" && _cell="$1" || $(THROW 1)
+
+    # Compose the local vars based on their prefixes
+    _template=$(ctx_get ${_pfx}TEMPLATE)
+    _p_mnt=$(ctx_get ${_pfx}P_MNT)
+    _p_dset=$(ctx_get ${_pfx}P_DSET)
+
+    # Need the persist dataset of the template, to choose the snapshot
+    ctx_bootstrap_cell $_template $_pfxloc || eval $(THROW 1 _generic "< $_template > bootstrap failed")
+
+    _snap=$(resolve_persist_snapname $(ctx_get ${_pfxloc}P_DSET))
+    case $? in
+        1)  eval $(THROW 1 _generic "failed to get persistent snapshot name")  ;;
+        2)  _die=$(( $(date +%s) + 30 ))
+            _CMD_SNAPSHOT_PERSIST="zfs snapshot -o qb:dest_date=$_die -o qb:autosnap=- -o qb:autocreated=yes $_snap"
+            ;;
+    esac
+
+    [ "$_p_mnt" ] && _CMD_DESTROY_PERSIST="zfs destroy -rRf $_p_dset"
+    _CMD_CLONE_PERSIST="zfs clone -o qb:autosnap=false $_snap $_p_dset"
+    _CMD_FIX_PW="fix_freebsd_pw $_cell $(ctx_get $_pfxloc) $_p_mnt"
+}
+

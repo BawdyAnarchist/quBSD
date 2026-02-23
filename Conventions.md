@@ -6,7 +6,7 @@
 ## Variables
 
 CAPS: Critical globals from constants.sh or cell PARAMETERS expect to live through a script lifecycle 
-\_CAPS: The execution commands intended for system mutation at the end of a script lifecycle
+\_CAPS: The execution commands intended for system mutation at the end of a script lifecycle. These should always wrap if necessary, as otherwise `DRY_RUN` and `VERBOSE` console printing becomes cumbersome
 lower: Rarely used
 \_lower: Always local to a function
 

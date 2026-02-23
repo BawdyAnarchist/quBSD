@@ -86,7 +86,7 @@ rootstrap_bsdvm() {
 	cp -a $bsdvm/sysctl.conf $alt_mnt/etc/sysctl.conf
 	cp -a /etc/localtime     $alt_mnt/etc/localtime
 	sysrc -f $bsdvm/rc.conf hostname="$_VM"
-	
+
 	if [ "$network" ] ; then
 		# Update the container
 		freebsd-update --not-running-from-cron -b $alt_mnt/ -d /var/db/freebsd-update fetch install
@@ -111,7 +111,7 @@ rootstrap_bsdvm() {
 }
 
 configure_bsdvm_zusr() {
-	# Rough function for VM reconfiguration. Will eventually be made more robust for installer and qb-create 
+	# Rough function for VM reconfiguration. Will eventually be made more robust for installer and qb-create
 	# Creates the zusr zvol, and configures it
 	local _fn="configure_vm_zusr" _fn_orig="$_FN" _FN="$_FN -> $_fn"
 	while getopts d:qV _opts ; do case $_opts in
@@ -139,7 +139,7 @@ configure_bsdvm_zusr() {
 	newfs -L zusr $zvol	  # Creates a label used in qubsd-init to identify the primary persistence drive
 	mkdir -p $mnt
 	mount $zvol $mnt
-	
+
 	# Files and directories to prepare for a running system
 	if [ "$_dircopy" ] ; then            # Preference user specified directory
 		cp -a $_dircopy/ $mnt
@@ -430,7 +430,7 @@ EOF
 		# Tracker file for which taps are related to which VM, and for which purpose (_vif tags)
 		case "$_cycle" in
 #CJAIL BEING DEPRECATED
-#			0) 
+#			0)
 #ifconfig $_tap group "CJ_SSH" ; echo "$_VM CJ_SSH $_tap" >> $VMTAPS
 #				;;
 			0) ifconfig $_tap group "EXT_IF" ; echo "$_VM EXT_IF $_tap" >> $VMTAPS ;;

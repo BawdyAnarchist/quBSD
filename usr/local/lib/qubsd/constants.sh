@@ -15,7 +15,7 @@ export D_QCONF="$QETC/qubsd.conf.d"
 export D_CELLS="$D_QCONF/cells"
 export D_JCONF="$QETC/jail.conf.d"
 export D_JAILS="$D_JCONF/jails"
-export D_QRUN="$QRUN/cells"
+export D_RUNTM="$QRUN/runtime"
 export D_QERR="$QRUN/err"
 export D_QX11="$QRUN/X11"
 export D_XFER="$QRUN/xfer"
@@ -74,7 +74,7 @@ export SYS_QUERY="DATASETS MOUNTS NCPU ONJAILS ONVMS PCICONF ROOTSNAPS PRSTSNAPS
 
 #########################################   OLD  SYSTEM  CONSTANTS / OVERRIDES  ##########################################
 
-# Function tracing. Used with `eval` to track logic flow for exception messages 
+# Function tracing. Used with `eval` to track logic flow for exception messages
 # Temporary Overrides and error definitions for overhaul/migration. Will be deleted later
 
 export JCONF="$QETC/jail.conf.d/jails"

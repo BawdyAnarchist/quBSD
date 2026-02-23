@@ -1,5 +1,5 @@
 
-##################################  SECTION 1: COMMON PARAMETERS  ################################## 
+##################################  SECTION 1: COMMON PARAMETERS  ##################################
 
 validate_param_autostart() {
     local _fn="validate_param_autostart"
@@ -24,7 +24,7 @@ validate_param_class() {
 validate_param_control() {
     local _fn="validate_param_control"
     [ "$1" = "none" ] && return 0
-    bootstrap_cell_ctx $1 "VAL_" && return 0 || eval $(THROW 1 _cellref $2 CJAIL $1)
+    ctx_bootstrap_cell $1 "VAL_" && return 0 || eval $(THROW 1 _cellref $2 CJAIL $1)
 }
 
 validate_param_envsync() { ##########  STUB  FOR  NOW  ################################################################
@@ -34,13 +34,13 @@ validate_param_envsync() { ##########  STUB  FOR  NOW  #########################
 validate_param_gateway() {
     local _fn="validate_param_gateway"
     [ "$1" = "none" ] && return 0
-    bootstrap_cell_ctx $1 "VAL_" && return 0 || eval $(THROW 1 _cellref $2 GATEWAY $1)
+    ctx_bootstrap_cell $1 "VAL_" && return 0 || eval $(THROW 1 _cellref $2 GATEWAY $1)
 }
 
-validate_param_ipv4() { 
+validate_param_ipv4() {
     local _fn="validate_param_ipv4" _val="$1" _cell="$2" _type _gw _gw_type _cli_confs
 
-    case $_val in 
+    case $_val in
         none|auto|DHCP) return 0 ;;  # Control values must return early (cant offload to checks.sh)
         *) assert_ipv4 $_val || eval $(THROW 1) ;;  # Purely checks for CIDR format
     esac
@@ -84,7 +84,7 @@ validate_param_no_destroy() {
 
 validate_param_rootenv() {
     local _fn="validate_param_rootenv"
-    bootstrap_cell_ctx $1 "VAL_" && return 0 || eval $(THROW 1 _cellref $2 ROOTENV $1)
+    ctx_bootstrap_cell $1 "VAL_" && return 0 || eval $(THROW 1 _cellref $2 ROOTENV $1)
 }
 
 validate_param_r_zfs() {
@@ -101,11 +101,11 @@ validate_param_template() {
     [ -z "$_class" ] && _class=$(query_cell_param $_cell CLASS)
     [ -z "$_class" ] && eval $(THROW 1 $_fn $_cell $_val)
 
-    case $_class in 
-        disp*)  bootstrap_cell_ctx $_val "VAL_" \
+    case $_class in
+        disp*)  ctx_bootstrap_cell $_val "VAL_" \
                     && return 0 || eval $(THROW 1 _cellref $_cell TEMPLATE $_val)
             ;;
-        *)  bootstrap_cell_ctx $_val "VAL_" \
+        *)  ctx_bootstrap_cell $_val "VAL_" \
                 && return 0 || eval $(WARN _cellref $_cell TEMPLATE $_val)
             ;;
     esac
@@ -114,10 +114,10 @@ validate_param_template() {
 
 validate_param_p_zfs() {
     local _fn="validate_param_p_zfs"
-    is_zfs_exist "$1" || eval $(THROW 1 _missing_zfs $2 $1) 
+    is_zfs_exist "$1" || eval $(THROW 1 _missing_zfs $2 $1)
 }
 
-###################################  SECTION 2: JAIL PARAMETERS  ################################### 
+###################################  SECTION 2: JAIL PARAMETERS  ###################################
 
 validate_param_cpuset() {
     local _fn="validate_param_cpuset" _val="$1"
@@ -147,7 +147,7 @@ validate_param_seclvl() {
     assert_seclvl $1 || eval $(THROW 1)
 }
 
-##################################  SECTION 3: BHYVE PARAMETERS  ################################### 
+##################################  SECTION 3: BHYVE PARAMETERS  ###################################
 
 validate_param_bhyveopts() {
     local _fn="validate_param_bhyveopts"
@@ -207,19 +207,19 @@ validate_param_wiremem() {
     assert_bool_tf $1 || eval $(THROW 1)
 }
 
-##################################  SECTION 4: MISC VALIDATIONS  ################################### 
+##################################  SECTION 4: MISC VALIDATIONS  ###################################
 
 # Validates that proposed cellname does not collide with existing cells, files, or datasets
 validate_cellname() {
     local _fn="validate_cellname" _val="$1" _r_zfs="$2" _u_zfs="$3"
     local _cellpath=$D_CELLS/$1 _jailpath=$D_JAILS/$1
     assert_cellname $_val || eval $(THROW 1)
-    
+
     # Check config file path and zfs dataset clobber. MUTE because failure of `is_`, is passing.
     is_path_exist -f $_cellpath && eval $(THROW 1 $_fn $_val path $_cellpath)
     is_path_exist -f $_jailpath && eval $(THROW 1 $_fn $_val path $_jailpath)
     is_zfs_exist "$_r_zfs" && eval $(THROW 1 $_fn $_val dataset $_r_zfs)
     is_zfs_exist "$_u_zfs" && eval $(THROW 1 $_fn $_val dataset $_u_zfs)
     return 0      # No failures, cellname is available
-} 
+}
 

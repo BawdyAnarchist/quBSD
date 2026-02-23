@@ -177,7 +177,7 @@ get_info() {
 			_value=$(jls | sed "1 d" | awk '{print $2}' ; \
 						pgrep -fl 'bhyve: ' | sed -E "s/.*[ \t]([^ \t]+)\$/\1/")
 			;;
-		_NEEDPOP) # Determine if process is detached, but Xorg is running (needs a popup) 
+		_NEEDPOP) # Determine if process is detached, but Xorg is running (needs a popup)
 			! ps -p $$ -o state | grep -qs -- '+' && pgrep -fq Xorg && _value="true"
 			;;
 		_USED_IPS) # List of ifconfig inet addresses for all running jails/VMs
@@ -975,10 +975,10 @@ chk_valid_jail() {
    # Jails must have an entry in JCONF
    ! chk_isvm -c $_class "$_value" && [ ! -e "${JCONF}/${_value}" ] \
          && get_msg $_qv -m _e7 -- "$_value" && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
-    
+
    case $_class in
       "") # Empty, no class exists in QCONF
-         get_msg $_qv $_V -m _e2 -- "jail" "$_value" \  
+         get_msg $_qv $_V -m _e2 -- "jail" "$_value" \
          get_msg $_qv $_V -m _e1 -- "$_value" "class" && eval $_R1
          ;;
       rootjail) # Rootjail's zroot dataset should have no origin (not a clone)
@@ -996,7 +996,7 @@ chk_valid_jail() {
          local _template=$(get_jail_parameter -deqs TEMPLATE $_value)
          [ -z "$_template" ] && get_msg $_qv -m _e2 -- "$_value" "TEMPLATE" \
             && get_msg $_qv -m _e1 -- "$_value" "jail" && eval $_R1
-    
+
          # Dispjails can't reference other dispjails
          local _templ_class=$(sed -nE "s/^${_template}[ \t]+CLASS[ \t]+//p" $QCONF)
          [ "$_templ_class" = "dispjail" ] \
