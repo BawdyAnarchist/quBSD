@@ -126,6 +126,9 @@ ctx_add_zfs() {
     _pmnt=$(ctx_get ${_pfx}P_MNT)
     [ "$_rmnt" ] || eval $(THROW 1 $_fn $_cell $_r_dset)  # Even zvol has "-" for mountpoint
     [ "$_pmnt" ] || eval $(THROW 1 $_fn $_cell $_p_dset)
+## NOTE: We hard-define _ZFS and _DSET. Only [ "$_MNT" ] can unequivocally attest to dataset existence ##
+
+    return 0
 }
 
 # Orchestrator to validate an arbitrary list of PARAMS. WARN behavior opts. REQUIRE $1 (cell)
@@ -150,12 +153,12 @@ ctx_validate_params() {
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
     _type=$(ctx_get ${_pfx}TYPE)
     [ -z "$_PARAMS" ] && eval _PARAMS=\"\${PARAMS_COMN} \${PARAMS_${_type}}\"
-
+#echo $_cell   # Too useful for testing right now
     for _PARAM in $_PARAMS ; do
         _param=$(echo "$_PARAM" | tr '[:upper:]' '[:lower:]')
         _funct="validate_param_$_param"
         quiet type $_funct || eval $(THROW 1 ${_fn} $_PARAM $_funct)     # Verify _funct exists
-
+#echo $_funct  # Too useful for testing right now
         # Hard failures, throw fast
         eval $_funct \"\${${_pfx}${_PARAM}}\" "$_cell" "$_pfx" || eval $(THROW 1)
         [ "$_warn" = "2" ] && [ "$WARN_CNT" -gt "$_warn_start" ] && eval $(THROW 2)
@@ -167,7 +170,7 @@ ctx_validate_params() {
 }
 
 # Initializes a new cell runtime in /var/run. This will clobber any existing runtime file
-ctx_runtime_init() {
+ctx_write_runtime() {
     local _fn="ctx_write_runtime" _opts OPTIND OPTARG
     local _cell _type _pfx _PARAMS _val _line
 
@@ -199,11 +202,35 @@ ctx_runtime_init() {
     done
 }
 
-
-
 ctx_runtime_upsert() {
     local _fn="ctx_write_runtime"
 #### STUB FOR NOW ####
 }
+
+ctx_load_runtime() {
+    local _fn="load_runtime_context" _pfx="$1"
+    _rt_ctx=$(ctx_get ${_pfx}RT_CTX)
+    [ -f "$_rt_ctx" ] || eval $(THROW 1 _missing_context $_rt_ctx)
+    . $_rt_ctx   # source (load) the runtime
+    return 0
+}
+
+ctx_bootstrap_runtime() {
+    local _fn="ctx_bootstrap_runtime" _cell _pfx="$2"
+    assert_args_set 1 "$1" && _cell="$1" || eval $(THROW 1)
+
+    hush ctx_bootstrap_cell $_cell $_pfx  # hush because a zfs failure here might not be a problem
+    case $? in
+        0)  : ;;
+        3)  CLEAR ;;  # Clear ERR. '3' indicates no persistent dataset, which is not a requirement
+        *)  eval $(THROW 1 _generic "Cell < $_cell > bootstrap failed") ;;
+    esac
+
+    # Validation and CTX can tolerate the misisng datasets without throwing
+    ctx_validate_params $_cell  || eval $(THROW 1 _generic "Cell validation failed")
+    ctx_write_runtime $_cell    || eval $(THROW 1 _generic "Failed to write runtime context")
+    return 0
+}
+
 
 

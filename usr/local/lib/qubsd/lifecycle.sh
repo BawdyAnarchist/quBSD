@@ -1,15 +1,26 @@
 #!/bin/sh
 
+execute_commands() {
+    local _func="execute_commands" _commands _cmd
+    assert_args_set 1 "$1" && _commands="$1"
+
+    # Simple loop over all passed commands
+    for _command in $_commands ; do
+        _cmd=$(ctx_get $_command)
+        exec_cmd "$_cmd" || eval $(THROW 1 _generic "Failed Command: $_cmd")
+    done
+}
+
 # Keeps main script execution syntax clean while allowing for global debug tools
 exec_cmd() {
     local _fn="exec_cmd" _cmd="$1"
     [ -z "$_cmd" ] && return 0   # Empty command would cause an error with printf
 
     case $DRY_RUN:$VERBOSE in
-        true:*)
+        true:*|TRUE:*)
             printf " # %s\n" "$_cmd" >&2
             ;;
-        *:true)
+        *:true|*:TRUE)
             printf " # %s\n" "$_cmd" >&2
             eval "$_cmd" ; return $?
             ;;

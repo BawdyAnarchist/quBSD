@@ -17,7 +17,8 @@ is_path_exist() {
 is_zfs_exist() {
     local _fn="is_zfs_exist"
     assert_args_set 1 $1 || eval $(THROW 1)
-    query_datasets
+    quiet echo_grep "$DATASETS" "$1" && return 0  # First check DATASETS
+    query_datasets "$1"                           # Query if missing
     quiet echo_grep "$DATASETS" "$1" && return 0 || return 1
 }
 
@@ -140,19 +141,35 @@ query_cell_shell() {
 # ZFS queries may be passed $1 optionally to toggle pulling ALL datasets or only some
 
 query_datasets() {
-    local _fn="query_datasets"
+    local _fn="query_datasets" _dsets="$1" _pull
+
+    # For each dataset passed, see if it's present. Assemble list of non-present datasets
+    [ "$_dsets" ] && for _dset in $_dsets ; do
+        quiet echo_grep "$DATASETS" $_dset || _pull="$_pull $_dset"
+        [ -z "$_pull" ] && return 0   # All datasets already present (no duplicate pull)
+    done
+
+    # Either add to the existing, or generate new DATASETS
     if [ "$DATASETS" ] ; then
-        DATASETS=$(echo "$DATASETS" | zfs list -rHo name,mountpoint,mounted,origin $1)
+        DATASETS=$(echo "$DATASETS" ; zfs list -rHo name,mountpoint,mounted,origin,encryption $_pull)
     else
-        DATASETS=$(zfs list -rHo name,mountpoint,mounted,origin $1)
+        DATASETS=$(zfs list -rHo name,mountpoint,mounted,origin $_pull)
     fi
     return $?
 }
 
 query_rootsnaps() {
-    local _fn="query_rootsnaps"
+    local _fn="query_rootsnaps" _dsets="$1" _pull
+
+    # For each snapshot passed, see if it's present. Assemble list of non-present snapshot
+    [ "$_dsets" ] && for _dset in $_dsets ; do
+        quiet echo_grep "$DATASETS" $_dset || _pull="$_pull $_dset"
+        [ -z "$_pull" ] && return 0    # All snapshots already present (no duplicate pull)
+    done
+
+    # Either add to the existing, or generate new ROOTSNAPS
     if [ "$ROOTSNAPS" ] ; then
-        ROOTSNAPS=$(echo "$ROOTSNAPS" | zfs list -Hrt snapshot -o name,written,creation $1)
+        ROOTSNAPS=$(echo "$ROOTSNAPS" ; zfs list -Hrt snapshot -o name,written,creation $1)
     else
         ROOTSNAPS=$(zfs list -Hrt snapshot -o name,written,creation $1)
     fi
@@ -162,7 +179,7 @@ query_rootsnaps() {
 query_prstsnaps() {
     local _fn="query_prstsnaps"
     if [ "$PRSTSNAPS" ] ; then
-        PRSTSNAPS=$(echo "$PRSTSNAPS" | zfs list -Hrt snapshot -o name,written,creation $1)
+        PRSTSNAPS=$(echo "$PRSTSNAPS" ; zfs list -Hrt snapshot -o name,written,creation $1)
     else
         PRSTSNAPS=$(zfs list -Hrt snapshot -o name,written,creation $1)
     fi
@@ -179,7 +196,7 @@ query_onjails() {
     local _fn="query_onjails" _onjails
     if [ "$ONJAILS" ] ; then
         _onjails=$(jls | sed "1 d" | awk '{print $2}')
-        ONJAILS=$(echo "$ONJAILS" | echo "$_onjails")
+        ONJAILS=$(echo "$ONJAILS" ; echo "$_onjails")
     else
         ONJAILS=$(jls | sed "1 d" | awk '{print $2}')
     fi

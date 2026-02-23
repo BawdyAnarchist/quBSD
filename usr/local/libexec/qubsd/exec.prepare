@@ -1,73 +1,80 @@
 #!/bin/sh
 
-. $2    # Source the libary. $2 is passed by /usr/local/etc/qubsd/jail.conf.d/base.conf
+. $2  # Passed by base.conf
 
-get_parameters() {
-	# Define script variables
-	JAIL="$1"
-	echo "$(date "+%Y-%m-%d_%H:%M") exec.prepare: STARTING: $JAIL" >> $QLOG ${QLOG}_$JAIL
+CELL=$1
+RT_CTX=$D_RUNTM/$CELL/ctx.conf
+trap_init
+trap_push "rm -rf $D_RUNTM/$CELL"  # Trap here, because RT_CTX might already exist
 
-	# Parameters and checks
-	get_jail_parameter CLASS   "$JAIL"    || get_msg2 -Em _e
-	get_jail_parameter ROOTENV "$JAIL"    || get_msg2 -Em _e
-	get_jail_parameter -d GATEWAY "$JAIL" || get_msg2 -Em _e
-	get_jail_parameter -d CONTROL "$JAIL" || get_msg2 -Em _e
+compose_cleanup_cmds() {
+    local _fn="compose_cleanup_cmds" _mounts _mounted _rootsnap _die
+
+    # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
+    [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
+    [ "$_mounts" ] && _CMD_UNMOUNT="unmount -f $_mounts"
+
+    # Make sure the persist dataset is mounted. [-l load-key] for encrypted datasets
+    [ "$P_MNT" ] && _mounted=$(echo_grep "$DATASETS" "$P_ZFS" | awk '{print $3}')
+    if [ ! "$_mounted" = "yes" ] ; then
+        is_needpop \
+            && _CMD_ZFS_MOUNT="create_popup -c \"zfs mount -l $P_ZFS\"" \
+            || _CMD_ZFS_MOUNT="zfs mount -l $P_ZFS"
+    fi
+
+    # Guarantee basic persistence directories. mkdir is idempotent
+    [ "$P_MNT" ] && _CMD_MKDIRS="hush mkdir -p $P_MNT/$OV $P_MNT/home"
+    return 0
 }
 
-preparation_actions() {
-# CJAIL BEING DEPRECATED
-# The control jail should always be on. The function will return immediately if already on
-#	[ ! "$CLASS" = "cjail" ] && start_jail "$CONTROL"
+compose_commands() {
+    local _fn="compose_commands"
 
-	# MUST redirect to null, otherwise VM here will hang the script .. coz .. file descriptors?
-	start_jail "$GATEWAY" > /dev/null 2>&1
+    compose_cleanup_cmds  || eval $(THROW 1)
 
-	# Double check to unmount any parts of <jail> before destroy/recreating the dataset
-	JMOUNT=$(mount | grep -Eo "${M_QROOT}/${JAIL}/[^[:blank:]]+")
-	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
+    # Only clone/reclone for non-rootjails. Otherwise we'll destroy the rootjail
+    if [ ! "$CLASS" = "rootjail" ] ; then
+        compose_root_reclone_cmds  || eval $(THROW 1)
+    fi
 
-	# Make sure the zusr dataset is mounted. [-l load-key] for encrypted datasets
-	if [ ! "$(zfs list -Ho mounted ${U_ZFS}/${JAIL})" = "yes" ] ; then
-		if [ "$(get_info -e _NEEDPOP)" = "true" ] ; then
-			create_popup -c "zfs mount -l ${U_ZFS}/${JAIL}"
-		else
-			zfs mount -l ${U_ZFS}/${JAIL}
-		fi
-	fi
+    # Only clone/reclone for dispjails. Otherwise we'll destroy the appjail persistent data
+    if [ "$CLASS" = "dispjail" ] ; then
+        compose_persist_reclone_cmds $CELL || eval $(THROW 1)
+    fi
+}
 
-	# Make sure the /rw and /home directories exist for the jail (required by base.conf)
-	[ -d "$M_ZUSR/$JAIL/home" ] || mkdir -p "$M_ZUSR/$JAIL/home"
-	[ -d "$M_ZUSR/$JAIL/rw" ] || mkdir -p "$M_ZUSR/$JAIL/rw"
+resolve_runtime_context() {
+    local _fn="resolve_runtime_context"
+
+    # Load runtime context. 'exec' caller shouldn't exist, if it does, it's stale
+    MUTE ctx_load_runtime   # Dont care if it fails, and dont want an $ERR if it fails
+    [ "$CALLER" = "exec" ] && rm -f $RT_CTX
+
+    # If CALLER is empty, then qb isnt coordinating, and `jail` must initialize the runtime context
+    if [ -z "$CALLER" ] ; then
+        ctx_bootstrap_runtime $CELL || eval $(THROW 1)
+    fi
+    return 0
 }
 
 main() {
-  # If exec script fails and jail start aborts, make sure to clean up the mounts
-  trap '/usr/local/etc/qubsd/exec.release $JAIL'
+    local _fn="main"
 
-	# Misc things to do/check before recloning the datasets
-	preparation_actions
+    resolve_runtime_context || eval $(THROW 1)
 
-	case $CLASS in
-		appjail|cjail)
-			# Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTENV" || get_msg2 -Em _e2 "$JAIL" "$ROOTENV"
-		;;
-		dispjail)
-			# Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTENV" || get_msg2 -Em _e2 "$JAIL" "$ROOTENV"
+    compose_commands || eval $(THROW 1)
 
-			# Dispjails also reclone the zusr portion from template (if it exists)
-			get_jail_parameter -d TEMPLATE "$JAIL" || get_msg2 -Em _e
-			reclone_zusr "$JAIL" "$TEMPLATE" || get_msg2 -Em _e1_4 "$JAIL" "$TEMPLATE"
-		;;
-	esac
-	return 0
+    _COMMANDS="_CMD_UNMOUNT _CMD_ZFS_MOUNT _CMD_MKDIRS _CMD_DESTROY_ROOT _CMD_SNAPSHOT_ROOT
+               _CMD_CLONE_ROOT _CMD_SNAPSHOT_PERSIST _CMD_DESTROY_PERSIST _CMD_CLONE_PERSIST _CMD_FIX_PW"
+
+    execute_commands "$_COMMANDS" || eval $(THROW 1)
+
+    # Successful completion of all tasks. Keep RT_CTX by removing it from the trap stack
+    [ "$CALLER" = "exec" ] && [ -z "$DRY_RUN" ] && trap_pop
+
+    return 0
 }
 
-get_global_variables
+main || { cat $ERR ; exit 1 ;}
 
-get_parameters "$@"
-
-main
-
-exit 0   # Script exits success, to not abort jail startup
+exit 0   # Guarantee that `jail` does not abort startup

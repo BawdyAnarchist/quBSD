@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Prestart must perform chroot functions in the jail's environment. Which cant be done by host.
+# Nothing can be imported yet, as the jail env wont have the libs. Delayed until trap door.
+
 perform_overlay() {
 	# Get all the files in the overlay directory
 	for _file in $(find "/rw" -type f | sed "s:^/rw::") ; do
@@ -61,32 +64,41 @@ merge_passwd() {
 		; /usr/sbin/useradd -u 1001 -d /home/${user} -s /bin/bash ${user} > /dev/null 2>&1"
 }
 
-# Trap door for chroot execution while maintaining unique functions and syntax highlighting
-if [ "$1" = "--internal" ]; then
+main2() {
+   local _fn="main2"
 	perform_overlay
 	merge_passwd
 	exit 0
-fi
-
-. $2    # Source the libary. $2 is passed by /usr/local/etc/qubsd/jail.conf.d/base.conf
-
-main() {
-	JAIL="$1"
-
-	# If exec script fails and jail start aborts, make sure to clean up the mounts
-	trap "$QLEXEC/exec.release $JAIL" EXIT
-
-	# Overlay must be symlinked with reference to the jail's root, not host (chroot).
-	cp "$0" ${M_QROOT}/${JAIL}/tmp/qb_prestart.sh && chmod +x ${M_QROOT}/${JAIL}/tmp/qb_prestart.sh
-	chroot "${M_QROOT}/${JAIL}" /bin/sh /tmp/qb_prestart.sh --internal
-
-	# Cleanup the tmp file and trap
-	rm "${M_QROOT}/${JAIL}/tmp/qb_prestart.sh"
-	trap - EXIT
 }
 
-get_global_variables
+main1() {
+   local _fn="main1"
 
-main "$@"
+   ctx_load_runtime || eval $(THROW 1)
+
+	# Overlay must be symlinked with reference to the jail's root, not host (chroot).
+	cp "$0" $R_MNT/tmp/qb_prestart.sh && chmod +x $R_MNT/tmp/qb_prestart.sh
+	chroot $R_MNT /bin/sh /tmp/qb_prestart.sh --trapdoor
+
+	# Cleanup tmp file. Pop exec.release from the trap
+	rm -f "$R_MNT/tmp/qb_prestart.sh"
+	trap_pop
+}
+
+
+#### Using a trap door to perform chroot, preserves syntax highlighting ####
+[ "$1" = "--trapdoor" ] && main2
+
+
+#### Proceed with the normal, host side of the script ####
+
+. $2   # Source the libary
+
+CELL=$1
+RT_CTX=$D_RUNTM/$CELL/ctx.conf
+trap_init
+trap_push "$QLEXEC/exec.release $CELL"   # Cleanup mounts and runtime
+
+main1 || { cat $ERR ; exit 1 ;}
 
 exit 0   # Script exits success, to not abort jail startup

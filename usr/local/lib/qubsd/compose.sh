@@ -1,15 +1,5 @@
 #!/bin/sh
 
-# High level aggregator that bootstraps the cell, validates it, and writes the initial runtime
-compose_runtime_context() {
-    local _fn="compose_runtime_context" _cell="$1" _pfx="$2"
-    trap_push "rm_rt_ctx"
-
-    ctx_bootstrap_cell $_cell $_pfx  || eval $(THROW 1 _generic "Cell bootstrap failed")
-    ctx_validate_params $_cell $_pfx || eval $(THROW 1 _generic "Cell validation failed")
-    ctx_runtime_init $_cell $_pfx    || eval $(THROW 1 _generic "Failed to write runtime context")
-}
-
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
 resolve_rootenv_snapname() {
     local _fn="resolve_rootenv_snapname" _dset="$1"

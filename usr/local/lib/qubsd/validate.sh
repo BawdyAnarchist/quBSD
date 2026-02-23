@@ -24,7 +24,7 @@ validate_param_class() {
 validate_param_control() {
     local _fn="validate_param_control"
     [ "$1" = "none" ] && return 0
-    ctx_bootstrap_cell $1 "VAL_" && return 0 || eval $(THROW 1 _cellref $2 CJAIL $1)
+    ctx_bootstrap_cell $1 "val_" && return 0 || eval $(THROW 1 _cellref $2 CJAIL $1)
 }
 
 validate_param_envsync() { ##########  STUB  FOR  NOW  ################################################################
@@ -34,7 +34,7 @@ validate_param_envsync() { ##########  STUB  FOR  NOW  #########################
 validate_param_gateway() {
     local _fn="validate_param_gateway"
     [ "$1" = "none" ] && return 0
-    ctx_bootstrap_cell $1 "VAL_" && return 0 || eval $(THROW 1 _cellref $2 GATEWAY $1)
+    ctx_bootstrap_cell $1 "val_" && return 0 || eval $(THROW 1 _cellref $2 GATEWAY $1)
 }
 
 validate_param_ipv4() {
@@ -84,7 +84,7 @@ validate_param_no_destroy() {
 
 validate_param_rootenv() {
     local _fn="validate_param_rootenv"
-    ctx_bootstrap_cell $1 "VAL_" && return 0 || eval $(THROW 1 _cellref $2 ROOTENV $1)
+    ctx_bootstrap_cell $1 "val_" && return 0 || eval $(THROW 1 _cellref $2 ROOTENV $1)
 }
 
 validate_param_r_zfs() {
@@ -97,17 +97,15 @@ validate_param_template() {
     local _fn="validate_param_template" _val="$1" _cell="$2" _pfx="$3" _class
 
     # Pivot the check based on CLASS
-    [ "$_pfx" ] && _class=$(ctx_get ${_pfx}CLASS)
+    _class=$(ctx_get ${_pfx}CLASS)
     [ -z "$_class" ] && _class=$(query_cell_param $_cell CLASS)
     [ -z "$_class" ] && eval $(THROW 1 $_fn $_cell $_val)
 
     case $_class in
-        disp*)  ctx_bootstrap_cell $_val "VAL_" \
+        disp*)  ctx_bootstrap_cell $_val "val_" \
                     && return 0 || eval $(THROW 1 _cellref $_cell TEMPLATE $_val)
             ;;
-        *)  ctx_bootstrap_cell $_val "VAL_" \
-                && return 0 || eval $(WARN _cellref $_cell TEMPLATE $_val)
-            ;;
+        *)  : ;;  # Not a dispjail
     esac
     return 0
 }

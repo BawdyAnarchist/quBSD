@@ -1,60 +1,68 @@
 #!/bin/sh
 
-. $2    # Source the libary. $2 is passed by /usr/local/etc/qubsd/jail.conf.d/base.conf
+. $2  # Passed by base.conf
 
-get_parameters() {
-	JAIL="$1"
-	# Get jail parameters.
-	get_jail_parameter CLASS   "$JAIL" || get_msg2 -Em _e
-	get_jail_parameter ROOTENV "$JAIL" || get_msg2 -Em _e
+CELL=$1
+RT_CTX=$D_RUNTM/$CELL/ctx.conf
+trap_init
+trap_push "rm -rf $D_RUNTM/$CELL"
+
+# Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
+compose_cleanup_cmds() {
+    local _fn="compose_cleanup_cmds" _mounts _rootsnap _die _encrypt
+
+    # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
+    [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
+    [ "$_mounts" ] && _CMD_UNMOUNT="unmount -f $_mounts"
+    return 0
+
+    # Clean up the jail's /var/run directory
+    _CMD_CLEAN_VARRUN="hush rm -rf $RUNTM/$CELL"
+
+    # Determine the mount status of the persistence
+    [ "$P_ZFS" ] && _encrypt=$(echo_grep "$DATASETS" "$P_ZFS" | awk '{print $5}')
+    { [ "$_encrypt" ] && [ ! "$_encrypt" = "off" ] ;} && _CMD_DECRYPT="zfs umount -u $P_ZFS"
+
+    # Flags come down after stopping, but fork process and silence, to reduce user lag
+    [ -d "$P_MNT" ] && _CMD_CHFLAGS="exec chflags -fR noschg $P_MNT"
+
+    # If dhcp is never found for, exec.poststart runs forever, and stays even after jail -r
+    # Neither pkill -15; nor pkill -9; nor kill -15 work here. Only kill -9
+    _CMD_KILL_POSTSTART="kill -9 $(hush pgrep -f "exec.poststart $CELL")"
+
+}
+
+compose_commands() {
+    local _fn="compose_commands"
+
+    compose_cleanup_cmds  || eval $(THROW 1)
+
+    # Only clone/reclone for non-rootjails. Otherwise we'll destroy the rootjail
+    if [ ! "$CLASS" = "rootjail" ] ; then
+        compose_root_reclone_cmds  || eval $(THROW 1)
+    fi
+
+    # Only clone/reclone for dispjails. Otherwise we'll destroy the appjail persistent data
+    if [ "$CLASS" = "dispjail" ] ; then
+        compose_persist_reclone_cmds $CELL || eval $(THROW 1)
+    fi
 }
 
 main() {
-	# Search for any lingering mounts, and remove them
-	JMOUNT=$(mount | egrep -o "${M_QROOT}/${JAIL}/[^[:blank:]]+")
-	[ -n "$JMOUNT" ] && echo "$JMOUNT" | xargs umount -f
+    local _fn="main"
 
-	case $CLASS in
-#CJAIL BEING DEPRECATED
-#appjail|cjail)
-		appjail)
-         # Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTENV" || get_msg2 -Em _e2 "$JAIL" "$ROOTENV"
-		;;
-		dispjail)
-         # Reclone the root filesystem for JAIL
-			reclone_zroot "$JAIL" "$ROOTENV" || get_msg2 -Em _e2 "$JAIL" "$ROOTENV"
+    MUTE ctx_load_runtime || ctx_bootstrap_runtime $CELL || eval $(THROW 1)
 
-			# Dispjails also reclone the zusr portion from template (if it exists)
-			get_jail_parameter -d TEMPLATE "$JAIL" || get_msg2 -Em _e
-			reclone_zusr "$JAIL" "$TEMPLATE" || get_msg2 -Em _e3 "$JAIL" "$ROOTENV"
-		;;
-		rootjail)
-			# Rootenv flags stay down for convenience, but can be long op. fork and silence 
-			[ -e ${M_QROOT}/${JAIL} ] && (exec chflags -fR noschg ${M_QROOT}/${JAIL})
-	esac
+    compose_commands || eval $(THROW 1)
 
-	# Clean up the jail's /var/run directory
-	rm -r ${QRUN}/${JAIL} 2>/dev/null
+    _COMMANDS="_CMD_UNMOUNT _CMD_CLEAN_VARRUN _CMD_CHFLAGS _CMD_ENCRYPT _CMD_DESTROY_ROOT _CMD_SNAPSHOT_ROOT
+               _CMD_CLONE_ROOT _CMD_SNAPSHOT_PERSIST _CMD_DESTROY_PERSIST _CMD_CLONE_PERSIST _CMD_FIX_PW
+               _CMD_KILL_POSTSTART"
+    execute_commands "$_COMMANDS" || eval $(THROW 1)
 
-	# Flags come down after stopping, but fork process and silence, to reduce user lag
-	[ -e ${M_ZUSR}/${JAIL} ] && (exec chflags -fR noschg ${M_ZUSR}/${JAIL})
-
-	# Re-encrypt the dataset, if applicable
-	[ ! "$(zfs list -Ho encryption ${U_ZFS}/${JAIL})" = "off" ] \
-		&& zfs umount -u ${U_ZFS}/${JAIL}
-
-	# If dhcp is never found for, exec.poststart runs forever, and stays even after jail -r 
-	# Neither pkill -15; nor pkill -9; nor kill -15 work here. Only kill -9
-	kill -9 $(pgrep -f "exec.poststart $JAIL") > /dev/null 2>&1
-
-	return 0
+    return 0
 }
 
-get_global_variables
+main || { cat $ERR ; exit 1 ;}
 
-get_parameters "$@"
-
-main
-
-exit 0   # Script exits success, to not cause trouble elsewhere
+exit 0   # Guarantee that `jail` does not abort startup
