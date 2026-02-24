@@ -29,14 +29,18 @@ THROW() {
     local _code="$1" _msg_code="$2" _trace _msg _args
 
     # Return code must always have a positive integer value
-    echo $_code | grep -Eqs '^[ \t]*[1-9]+[ \t]*$' && shift \
-        || { echo "Internal error: THROW called without return code" && exit 99 ;}
+    if echo $_code | grep -Eqs '^[ \t]*[1-9]+[ \t]*$' ; then
+        shift
+    else
+        _msg="Internal error: THROW called without return code"
+        _code=99
+    fi
 
     # Activate stack trace
     [ "$TRACE" ] && _trace="[ $_fn ]"
 
     # Code in *.msg library must have the form:   :_msg_code:
-    if [ "$_msg_code" ] ; then
+    if [ "$_msg_code" ] && [ ! "$_code" = 99 ]; then
         _msg=$(awk -v code=":$_msg_code:" '
             $1 == code { found=1; next }
             found && /^\/END\// { exit }
