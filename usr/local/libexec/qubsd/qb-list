@@ -6,15 +6,14 @@ trap_init
 
 parse_args() {
     local _fn="parse_args" _opts _pos1 _pos2
-    while getopts c:hp:svz _opts ; do
+    while getopts :c:hp:sz _opts ; do
         case $_opts in
             c) CELL="$OPTARG" ;;
-            h) eval $(WARN list_usage) ; cat $ERR ; exit 0 ;;
+            h) eval $(WARN usage) ; cat $ERR ; exit 0 ;;
             p) PARAM="$OPTARG" ;;
             s) snaps="true" ;;
-            v) valid="true" ;;
             z) zfs="true" ;;
-            *) exit 1 ;;
+            *) eval $(THROW 1 _generic "Invalid option") ;;
         esac
     done ; shift $(( OPTIND - 1 ))
     _pos1="$1" ; _pos2="$2"
@@ -36,7 +35,7 @@ parse_args() {
     return 0
 }
 
-checks() {
+validate_args() {
     local _fn="checks" _all_params
 
     if [ "$snaps" ] || [ "$zfs" ] ; then
@@ -59,6 +58,7 @@ retrieve_data() {
     # Cell retrieval has less work than parameter
     if [ "$CELL" ] ; then
         hush ctx_bootstrap_cell $CELL
+        non_defaults=$(grep -Eo "^.*=" $D_CELLS/$CELL | tr -d '=')
         [ "$snaps" ] && query_rootsnaps $R_DSET && query_persistsnaps $P_DSET
         [ "$zfs" ] && query_datasets "$R_DSET $P_DSET"
         return 0
@@ -79,7 +79,7 @@ retrieve_data() {
 }
 
 write_results() {
-    local _fn="write_results" _param _val
+    local _fn="write_results" _param _val _results
 
     make_tmp RESULTS
 
@@ -92,45 +92,53 @@ write_results() {
 
     #### The existence of $CELL is assumed now ###
 
+    # For just a single param, there's room to print the snapshots too
     if [ "$PARAM" ] ; then
-        # For just a single param, there's room to print the snapshots too
         _param=$(ctx_get $PARAM)
         echo "$CELL $PARAM $_param"                                  >> $RESULTS
         [ "$zfs" ]   && echo "$DATASETS"                             >> $RESULTS
         [ "$snaps" ] && echo "$ROOTSNAPS"        | awk '{print $1}'  >> $RESULTS
         [ "$snaps" ] && echo "$PERSISTSNAPS"     | awk '{print $1}'  >> $RESULTS
-    else
-        # All PARAMS + SNAPS can be quite long. If [-s], prioritize only snaps.
-        if [ "$snaps" ] ; then
-            [ "$zfs" ]   && echo "$DATASETS"                         >> $RESULTS
-            [ "$snaps" ] && echo "$ROOTSNAPS"    | awk '{print $1}'  >> $RESULTS
-            [ "$snaps" ] && echo "$PERSISTSNAPS" | awk '{print $1}'  >> $RESULTS
-            return 0
-        fi
-
-        # Without PARAM specified and no snaps, assume user wants the full list
-        for _param in $PARAMS_TYPE ; do
-            _val=$(ctx_get $_param)
-            echo "$CELL $_param $_val"  >> $RESULTS
-        done
-        # There's room to print the zfs datasets too
-        [ "$zfs" ] && echo "$DATASETS"  >> $RESULTS
+        return 0
     fi
+
+    # All PARAMS + SNAPS can be quite long. If [-s], prioritize only snaps.
+    if [ "$snaps" ] ; then
+        [ "$zfs" ]   && echo "$DATASETS"                         >> $RESULTS
+        [ "$snaps" ] && echo "$ROOTSNAPS"    | awk '{print $1}'  >> $RESULTS
+        [ "$snaps" ] && echo "$PERSISTSNAPS" | awk '{print $1}'  >> $RESULTS
+        return 0
+    fi
+
+    # Without PARAM specified and no snaps, assume user wants the full list
+    for _param in $PARAMS_TYPE ; do
+        _val=$(ctx_get $_param)
+
+        # Make special notation of lines which source from the default, vs directly
+        if quiet echo_grep "$non_defaults" $_param ; then
+            echo "$CELL $_param $_val"  >> $RESULTS
+        else
+            echo "#default $_param $_val"  >> $RESULTS
+        fi
+        _results=$(cat "$RESULTS" | sort)
+        echo "$_results" > $RESULTS
+    done
+
+    # There's room to print the zfs datasets too
+    [ "$zfs" ] && echo "$DATASETS"  >> $RESULTS
+    return 0
 }
 
 main() {
     local _fn="main"
 
     parse_args "$@" || eval $(THROW 1)
-
-    checks || eval $(THROW 1)
-
+    validate_args   || eval $(THROW 1)
     retrieve_data
-
     write_results
 
     cat $RESULTS | column -t
 }
 
 main "$@" || { cat $ERR ; exit 1 ;}
-
+exit 0
