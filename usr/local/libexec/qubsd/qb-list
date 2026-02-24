@@ -43,9 +43,13 @@ checks() {
         [ -z "$CELL" ] && eval $(THROW 1 missing_cell)
     fi
 
+    if [ "$CELL" ] ; then
+        quiet echo_grep "$(ls -1 $D_CELLS)" "$CELL" || eval $(THROW 1 invalid_cell $CELL $D_CELLS)
+    fi
+
     if [ "$PARAM" ] ; then
         _all_params="$PARAMS_COMN $PARAMS_JAIL $PARAMS_VM"
-        quiet echo_grep "$_all_params" "$PARAM" || eval $(THROW bad_param $PARAM)
+        quiet echo_grep "$_all_params" "$PARAM" || eval $(THROW 1 bad_param $PARAM)
     fi
 }
 
