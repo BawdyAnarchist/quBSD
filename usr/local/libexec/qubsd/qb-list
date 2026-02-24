@@ -9,7 +9,7 @@ parse_args() {
     while getopts c:hp:svz _opts ; do
         case $_opts in
             c) CELL="$OPTARG" ;;
-            h) eval $(THROW 1 usage) ;;
+            h) eval $(WARN list_usage) ; cat $ERR ; exit 0 ;;
             p) PARAM="$OPTARG" ;;
             s) snaps="true" ;;
             v) valid="true" ;;
