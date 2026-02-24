@@ -66,7 +66,6 @@ main() {
 
     _COMMANDS="_CMD_UNMOUNT _CMD_ZFS_MOUNT _CMD_MKDIRS _CMD_DESTROY_ROOT _CMD_SNAPSHOT_ROOT
                _CMD_CLONE_ROOT _CMD_SNAPSHOT_PERSIST _CMD_DESTROY_PERSIST _CMD_CLONE_PERSIST _CMD_FIX_PW"
-
     execute_commands "$_COMMANDS" || eval $(THROW 1)
 
     # Successful completion of all tasks. Keep RT_CTX by removing it from the trap stack

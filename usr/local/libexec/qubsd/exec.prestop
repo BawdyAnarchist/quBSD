@@ -1,22 +1,40 @@
 #!/bin/sh
 
-. $2    # Source the libary. $2 is passed by /usr/local/etc/qubsd/jail.conf.d/base.conf
+. $2  # Passed by base.conf
 
-JAIL="$1"
-get_global_variables
+CELL=$1
+RT_CTX=$D_RUNTM/$CELL/ctx.conf
+trap_init
 
-# Record stop attempt to log file
-echo "$(date "+%Y-%m-%d_%H:%M") exec.prestop: STOPPING: $JAIL" >> ${QLOG} ${QLOG}_$JAIL
+compose_commands() {
+    local _fn="compose_commands" _intfs
 
-# Remove interfaces and handle files modification for those interfaces 
-INTFS=$(jexec -l -U root $JAIL ifconfig -g tap ; jexec -l -U root $JAIL ifconfig -g epair)
-for _intf in $INTFS; do
-	# If interface is an epair, pass [-d] destroy
-	[ -z "${_intf##epair*}" ] && _d='-d' || unset _d 
-	remove_interface $_d "$_intf" "$JAIL"	
-done
+    # Remove interfaces and handle files modification for those interfaces
+    _intfs=$(jexec -l -U root $CELL ifconfig -g tap ; jexec -l -U root $CELL ifconfig -g epair)
+    for _intf in $_intfs; do
+       # If interface is an epair, pass [-d] destroy
+       [ -z "${_intf##epair*}" ] && _d='-d' || unset _d
+       _CMD_RM_INTF="remove_interface $_d $_intf $CELL ; $_CMD_RM_INTF"
+    done
 
-# /rw system files might be schg, but needed by rc.shutdown.
-chflags -fR noschg ${M_ZUSR}/${JAIL}/rw
+    # /rw system files might be schg, but needed by rc.shutdown.
+    _CMD_CHFLAGS="chflags -fR noschg $P_MNT/rw"
+}
 
-exit 0   # Script exits success, to not abort jail shutdown.
+
+main() {
+    local _fn="main"
+
+    MUTE ctx_load_runtime  || ctx_bootstrap_runtime $CELL || eval $(THROW 1)
+
+    compose_commands  || eval $(THROW 1)
+
+    _COMMANDS="_CMD_RM_INTF _CMD_CHFLAGS"
+    execute_commands "$_COMMANDS" || eval $(THROW 1)
+
+    return 0
+}
+
+main || { cat $ERR ; exit 1 ;}
+
+exit 0   # Guarantee that `jail` does not abort startup

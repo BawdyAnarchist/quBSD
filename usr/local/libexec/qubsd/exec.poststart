@@ -1,62 +1,63 @@
 #!/bin/sh
 
-. $2    # Source the libary. $2 is passed by /usr/local/etc/qubsd/jail.conf.d/base.conf
+. $2  # Passed by base.conf
 
-get_options() {
-	JAIL="$1"
-	get_jail_parameter -dqs CLASS   "$JAIL" || get_msg2 -m _e
-	get_jail_parameter -d   SCHG    "$JAIL" || get_msg2 -m _e
-	get_jail_parameter -d   SECLVL  "$JAIL" || get_msg2 -m _e
-	get_jail_parameter -d   MAXMEM  "$JAIL" || get_msg2 -Em _e
-	get_jail_parameter -d   CPUSET  "$JAIL" || get_msg2 -Em _e
+CELL=$1
+RT_CTX=$D_RUNTM/$CELL/ctx.conf
+trap_init
+
+compose_rctl_commands() {
+    local _fn="compose_rctl_commands"
+
+    # Remove any existing rules for the jail
+    _CMD_RM_RCTL="quiet rctl -r jail:${CELL}::"
+
+    # Establish max memory allocation and jail CPUs
+    [ "$MAXMEM" = "none" ] || _CMD_MAXMEM="rctl -a jail:${CELL}:memoryuse:deny=${MAXMEM}"
+    [ "$CPUSET" = "none" ] || _CMD_CPUSET="cpuset -j $CELL -cl $CPUSET"
 }
 
-resource_control() {
-	# Remove any existing rules for the jail
-	rctl -r jail:${JAIL}:: > /dev/null 2>&1
+compose_flags_commands() {
+    local _fn="compose_flags_commands" _dirs _resolvs
 
-	# Establish max memory allocation and jail CPUs
-	[ "$MAXMEM" = "none" ] || rctl -a jail:${JAIL}:memoryuse:deny=${MAXMEM}
-	[ "$CPUSET" = "none" ] || cpuset -j $JAIL -cl $CPUSET
-}
+    # Rootjail file protections can prevent updates, installs, and disrupt appjail starts
+    [ "$CLASS" = "rootjail" ] && return 0
 
-security_flags() {
-	# Rootjail file protections can prevent updates, installs, disrupt start ops for
-	# dependent appjails. No dangerous work should be happening in rootjails anyways.
-	[ "$CLASS" = "rootjail" ] && return 0
+    # Different directories are schg flagged depending on user settings
+    case $SCHG in
+        all) _dirs="/bin /sbin /boot /etc /lib /libexec /root /rw /usr" ;;
+        sys) _dirs="/bin /sbin /boot /etc /lib /libexec /root /rw/etc /rw /usr/bin /usr/lib \
+                    /usr/lib32 /usr/libdata /usr/libexec /usr/sbin /usr/local/lib /usr/local/lib32 \
+                    /usr/local/libdata /usr/local/libexec /usr/local/sbin"
+            ;;
+    esac
+    for _d in $_jdir ; do
+        [ -e "$R_MNT/$_d" ] && _CMD_CHFLAGS="chflags -fR schg $_d ; $_CMD_CHFLAGS"
+    done
 
-	# Different directories are schg flagged depending on user settings
-	case $SCHG in
-		all)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw /usr" ;;
-		sys)  _jdir="/bin /sbin /boot /etc /lib /libexec /root /rw/etc /rw/root \
-						/usr/bin /usr/lib /usr/lib32 /usr/libdata /usr/libexec /usr/sbin \
-						$QLEXEC /usr/local/lib /usr/local/lib32 /usr/local/libdata \
-						/usr/local/libexec /usr/local/sbin" ;;
-	esac
+    # Slightly hacky but resolv is an exception to schg. Services need to modify this.
+    [ -f "$R_MNT/etc/resolvconf.conf" ] && _resolvs="$R_MNT/etc/resolvconf.conf"
+    [ -f "$R_MNT/etc/resolv.conf" ]     && _resolvs="$_resolvs $R_MNT/etc/resolv.conf"
+    [ "$_resolvs" ] && _CMD_CHFLAGS_2="chflags noschg $_resolvs"
 
-	for _d in $_jdir; do
-		[ -e "${M_QROOT}/${JAIL}${_d}" ] && chflags -fR schg "${M_QROOT}/${JAIL}${_d}"
-	done
-
-	# Slightly hacky but resolv is an exception to schg. Services need to modify this.
-	[ -f "${M_QROOT}/${JAIL}/etc/resolv.conf" ] && chflags noschg ${M_QROOT}/${JAIL}/etc/resolv.conf
-	[ -f "${M_QROOT}/${JAIL}/etc/resolvconf.conf" ] && chflags noschg ${M_QROOT}/${JAIL}/etc/resolvconf.conf
-
-	# exec.poststart is always sent to background. Don't report seclvl change
-	jexec -l -U root $JAIL sysctl kern.securelevel="$SECLVL" > /dev/null 2>&1
+    # exec.poststart is always sent to background. Don't report seclvl change
+    _CMD_SECLVL="quiet jexec -l -U root $CELL sysctl kern.securelevel=$SECLVL"
 }
 
 main() {
-	resource_control
+    local _fn="main"
 
-	security_flags
+    MUTE ctx_load_runtime  || ctx_bootstrap_runtime $CELL || eval $(THROW 1)
+
+    compose_rctl_commands  || eval $(THROW 1)
+    compose_flags_commands || eval $(THROW 1)
+
+    _COMMANDS="_CMD_RM_RCTL _CMD_MAXMEM _CMD_CPUSET _CMD_CHFLAGS _CMD_CHFLAGS_2 _CMD_SECLVL"
+    execute_commands "$_COMMANDS" || eval $(THROW 1)
+
+    return 0
 }
 
+main || { cat $ERR ; exit 1 ;}
 
-get_global_variables
-
-get_options "$@"
-
-main
-
-exit 0
+exit 0   # Guarantee that `jail` does not abort startup

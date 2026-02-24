@@ -13,7 +13,9 @@ xephyr-xclip daemon still has demons
    - Pretty sure they're all related to the closing of windows. It gets corrupted or something when I close windows. probably I'm not sufficiently detecting all possible events -- Like, maybe the disappearance of a socket is still problematic or something?
    - You need to kill the clipboard ownership inside the source as well after releasing. Otherwise you get inconsistent waffling on lease expiry, where what FEELS like stale clipboard then can still paste if you're inside the same socket for a window. Causes problems
 
-look into grafana
+
+### Import things in the code as I overhaul that still need addressed
+exec.postart - "hacky exception to schg due to resolv and resolvconf"
 
 
 ### UPGRADES
