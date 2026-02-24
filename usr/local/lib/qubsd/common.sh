@@ -21,6 +21,7 @@
 [ -d "$D_QERR" ] || mkdir -p $D_QERR
 [ -d "$D_QX11" ] || mkdir -p $D_QX11
 [ -d "$D_XFER" ] || mkdir -p $D_XFER
+[ -d "$D_QTMP" ] || mkdir -p $D_QTMP
 
 
 # CURRENT (OLD) SYSTEM LIBRARIES TO EVENTUALLY BE REMOVED

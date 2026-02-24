@@ -77,19 +77,20 @@ ctx_initialize() {
 
 # Lazy loading is fast/convenient. Use prefix ($2) to modify global variable (PARAM) assignments
 ctx_load_params() {
-    local _fn="ctx_load_params" _pfx="$2" _cell _type _ALL_PARAMS _PARAMS _def_type _val
+    local _fn="ctx_load_params" _pfx="$2" _cell _type _params_type _param _val
     assert_args_set 1 $1 && _cell="$1"  || eval $(THROW 1)
 
-    # _CAPS here does not denote global, but that the [:upper:] case PARAM names are stored
-    _ALL_PARAMS="$PARAMS_COMN $PARAMS_JAIL $PARAMS_VM"
+    # For convenience, we also assign ALL_PARAMS and TYPE_PARAMS as global context variables
+    PARAMS_ALL="$PARAMS_COMN $PARAMS_JAIL $PARAMS_VM"
     _type=$(ctx_get ${_pfx}TYPE)
-    eval _PARAMS=\"\${PARAMS_COMN} \${PARAMS_${_type}}\"
+    eval ${_pfx}PARAMS_TYPE=\"\${PARAMS_COMN} \${PARAMS_${_type}}\"
+    _params_type=$(ctx_get ${_pfx}PARAMS_TYPE)
 
     # With prefix, protect globals from clobber. This MUST come first
-    [ "$_pfx" ] && local $_PARAMS
+    [ "$_pfx" ] && local $_params_type
 
     # Unset _ALL_PARAMS before sourcing new ones, to prevent stale accidents
-    unset $(echo "$_ALL_PARAMS" | sed "s/^/$_pfx/; s/ / $_pfx/g")
+    unset $(echo "$PARAMS_ALL" | sed "s/^/$_pfx/; s/ / $_pfx/g")
 
     # Source defaults and _cell conf. Order is important.
     . $DEF_BASE
@@ -97,9 +98,9 @@ ctx_load_params() {
     . $D_CELLS/$_cell
 
     # Assign the correct variable name based on _pfx
-    for _PARAM in $_PARAMS ; do
-        _val=$(ctx_get $_PARAM)
-        [ "$_val" ] && eval ${_pfx}${_PARAM}='${_val}'
+    for _param in $_params_type; do
+        _val=$(ctx_get $_param)
+        [ "$_val" ] && eval ${_pfx}${_param}='${_val}'
     done
 
     return 0

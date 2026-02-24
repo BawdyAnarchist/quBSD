@@ -41,17 +41,17 @@ EOF
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
 resolve_persist_snapname() {
     local _fn="resolve_persist_snapname" _dset="$1"
-    local _prstsnaps _psmod _lstart _line _snap _date _timestamp _now
+    local _persistsnaps _psmod _lstart _line _snap _date _timestamp _now
 
-    # Try existing PRSTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
-    [ $PRSTSNAPS ] && _prstsnaps=$(echo "$PRSTSNAPS" | grep $_dset)
-    [ -z "$_prstsnaps" ] && unset $PRSTSNAPS && query_prstsnaps $_dset
-    _prstsnaps=$(echo "$PRSTSNAPS" | grep $_dset \
+    # Try existing PERSISTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
+    [ $PERSISTSNAPS ] && _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset)
+    [ -z "$_persistsnaps" ] && unset $PERSISTSNAPS && query_persistsnaps $_dset
+    _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset \
                 | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--) print a[i]}')
 
     # Persist dataset can tolerate running ROOTENV. But ensure it's not stale, via 'written'
-    _snap=$(echo "$_prstsnaps" | head -1 | awk '{print $1}')
-    [ "$(echo $_prstsnaps | head -1 | awk '{print $2}')" = "0" ] && echo $_snap && return 0
+    _snap=$(echo "$_persistsnaps" | head -1 | awk '{print $1}')
+    [ "$(echo $_persistsnaps | head -1 | awk '{print $2}')" = "0" ] && echo $_snap && return 0
 
     # Last avail rootenv snap is in fact stale (or non-existent). Prepare a new one.
     _now=$(date +%s)

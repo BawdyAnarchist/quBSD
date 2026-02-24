@@ -12,6 +12,14 @@ trap_init() { trap 'eval "$TRAP"' $TRAP_SIGS ;}
 trap_push() { TRAP="$1 ; $TRAP" ;}
 trap_pop()  { TRAP=${TRAP#*;} ;}   # WARNING: Do not use semicolons in trap_push args
 
+# MKDIR STANDARDIZATION
+make_tmp() {
+    local _fn="make_tmp" _name
+    assert_args_set 1 "$1" && _name="$1"
+    eval $_name=$(mktemp $D_QTMP/${0##*/}.XXX)
+    eval trap_push \"rm -f \${$_name}\"
+}
+
 # ERROR/TRACING SYSTEM
 MUTE() { "$@" || { rm -f $ERR ; return 1 ;};}
 

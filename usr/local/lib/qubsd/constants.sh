@@ -19,11 +19,13 @@ export D_RUNTM="$QRUN/runtime"
 export D_QERR="$QRUN/err"
 export D_QX11="$QRUN/X11"
 export D_XFER="$QRUN/xfer"
+export D_QTMP="$QRUN/tmp"
 
 # Exception system and diagnostics
 export TRAP="rm_err"
 export TRAP_SIGS="HUP INT TERM QUIT EXIT"
-export ERR="$D_QERR/$(basename $0).$$.err"
+export BASENAME="$(basename $0)"
+export ERR="$D_QERR/$BASENAME.$$.err"
 export WARN_CNT=0
 export DEBUG1="/root/debug1"
 export DEBUG2="/root/debug2"
@@ -68,7 +70,7 @@ export CONTEXT="CALLER JCONF QCONF P_DSET P_MNT R_DSET R_MNT RT_CTX"   # Conveni
 export CLASSES="rootjail appjail dispjail rootVM appVM dispVM cjail"
 
 # Kernel-query results storage for rapid stacked/looped information retreival
-export SYS_QUERY="DATASETS MOUNTS NCPU ONJAILS ONVMS PCICONF ROOTSNAPS PRSTSNAPS SYSMEM"
+export SYS_QUERY="DATASETS MOUNTS NCPU ONJAILS ONVMS PCICONF ROOTSNAPS PERSISTSNAPS SYSMEM"
 
 
 

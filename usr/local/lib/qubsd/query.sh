@@ -176,12 +176,12 @@ query_rootsnaps() {
     return $?
 }
 
-query_prstsnaps() {
-    local _fn="query_prstsnaps"
-    if [ "$PRSTSNAPS" ] ; then
-        PRSTSNAPS=$(echo "$PRSTSNAPS" ; zfs list -Hrt snapshot -o name,written,creation $1)
+query_persistsnaps() {
+    local _fn="query_persistsnaps"
+    if [ "$PERSISTSNAPS" ] ; then
+        PERSISTSNAPS=$(echo "$PERSISTSNAPS" ; zfs list -Hrt snapshot -o name,written,creation $1)
     else
-        PRSTSNAPS=$(zfs list -Hrt snapshot -o name,written,creation $1)
+        PERSISTSNAPS=$(zfs list -Hrt snapshot -o name,written,creation $1)
     fi
     return $?
 }
