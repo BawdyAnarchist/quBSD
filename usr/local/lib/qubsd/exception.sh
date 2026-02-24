@@ -26,13 +26,13 @@ MUTE() { "$@" || { rm -f $ERR ; return 1 ;};}
 CLEAR() { WARN_CNT=0 ; rm -f $ERR ; return 0 ;}
 
 THROW() {
-    local _code="$1" _msg_code="$2" _trace _msg _args
+    local _code="$1" _msg_code="$2" _trace _msg _args _internal_err
 
     # Return code must always have a positive integer value
     if echo $_code | grep -Eqs '^[ \t]*[1-9]+[ \t]*$' ; then
         shift
     else
-        _msg="Internal error: THROW called without return code"
+        _internal_err="Internal error: THROW called without return code"
         _code=99
     fi
 
@@ -47,11 +47,13 @@ THROW() {
             found { print }' $D_QMSG/lib*.msg $D_QMSG/$BASENAME.msg 2>/dev/null)
         shift
         # If _msg_code is misformatted and _msg not found, printf errors. Send warning.
-        [ "$_msg" ] || _msg="Internal error: Message not found. Check lib_*.msg formatting"
+        [ "$_msg" ] || _internal_err="Internal error: Message not found. Check lib_*.msg formatting"
     fi
 
     # Record the trace and/or error message to the global ERR file
-    if [ "$_trace" ] || [ "$_msg" ] ; then
+    if [ "$_internal_err" ] ; then
+        printf "$_internal_err\n" >> $ERR
+    elif [ "$_trace" ] || [ "$_msg" ] ; then
         printf "$_trace $_msg\n" "$@" >> $ERR
     fi
 
