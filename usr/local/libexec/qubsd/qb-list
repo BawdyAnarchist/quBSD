@@ -2,212 +2,131 @@
 
 . $QCOMMON
 
-get_options() {
-	while getopts ahHj:lp:szZ opts ; do
-		case $opts in
-			a) _zparams="qubsd:autosnap" ; ZLIST="t" ;;
-			h) get_msg2 -eu ;;
-			H) NOHEAD="-H" ;;
-			j) JAIL="${OPTARG}" ;;
-			l) LIST="t" ;;
-			p) PARAM="${OPTARG}" ;;
-			s) _snaps="-t all" ; ZLIST="t" ;;
-			z) ZLIST="t" ;;
-			Z) ZLIST="t" ; ZONLY="t" ;;
-			*) exit 1 ;;
-		esac
-	done
+trap_init
 
-	shift $(( OPTIND - 1 ))
+parse_args() {
+    local _fn="parse_args" _opts _pos1 _pos2
+    while getopts c:hp:svz _opts ; do
+        case $_opts in
+            c) CELL="$OPTARG" ;;
+            h) eval $(THROW 1 usage) ;;
+            p) PARAM="$OPTARG" ;;
+            s) snaps="true" ;;
+            v) valid="true" ;;
+            z) zfs="true" ;;
+            *) exit 1 ;;
+        esac
+    done ; shift $(( OPTIND - 1 ))
+    _pos1="$1" ; _pos2="$2"
 
-	# Convert lower-case entered PARAM to upper (user-friendly)
-	[ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
+    # Be nice to the user and try to parse mix/matched options and positionals
+    if [ "$CELL" ] && [ -z "$PARAM" ] ; then
+        [ "$_pos1" ] && PARAM=$_pos1
 
-	# Assign zfs option for columns
-	_zparams="-o name,used,mountpoint,$_zparams"
+    elif [ "$PARAM" ] && [ -z "$CELL" ] ; then
+        [ "$_pos1" ] && CELL=$_pos1
 
-	# Case statements later, depend on 'none' and 'f' (false) being assignd instead of null
-	JAIL=${JAIL:=none}
-	PARAM=${PARAM:=none}
-	POS1="$1" ; POS1=${POS1:=none}
-	POS2="$2" ; POS2=${POS2:=none}
-	LIST=${LIST:=f}
-	ZLIST=${ZLIST:=f}
+    elif [ -z "$CELL" ] && [ -z "$PARAM" ] ; then
+        [ "$_pos1" ] && CELL=$_pos1
+        [ "$_pos2" ] && PARAM=$_pos2
+    fi
+
+    # Convert lower-case entered PARAM to upper (user-friendly)
+    [ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
+    return 0
 }
 
-check_and_adjust() {
-	# Script is intended to be robust for the user. This function
-	# merges any positional parameters with -j and -p options, when able.
+checks() {
+    local _fn="checks" _all_params
 
-	case "${JAIL}@${POS1}@${PARAM}@${POS2}" in
-		# No action. If POS1 wasnt assigned, then POS2 wasnt either
-		none@none@*|*@none@*@*) : ;;
+    if [ "$snaps" ] || [ "$zfs" ] ; then
+        [ -z "$CELL" ] && eval $(THROW 1 missing_cell)
+    fi
 
-		# In this case, we're nice to the user, and try to figure out if POS1 is JAIL or PARAM
-		none@*@none@none)
-
-			# Check if it's a parameter
-			awk '{print $2}' $QCONF | grep -Eqsi "[[:blank:]]${POS1}[[:blank:]]" && PARAM="$POS1"
-
-			# Check if it's an entry in QCONF
-			grep -Eqs "^${POS1}[[:blank:]]+" $QCONF && JAIL="$POS1"
-
-			# If jail=param (and not 'none'), then it's ambiguous what the user wanted
-			[ ! "$JAIL" = "none" ] && [ "$PARAM" = "$JAIL" ] && get_msg2 -Eum _e2
-
-			# If both are 'none', then continue, assuming POS1 as JAIL (could be zfs present)
-			[ "$JAIL" = "none" ] && [ "$PARAM" = "none" ] && JAIL="$POS1"
-		;;
-
-		# Both POS1&2 should be assigned
-		none@*@none@*) JAIL="$POS1" ; PARAM="$POS2" ;;
-
-		# POS1 is clearly JAIL, as -p was assigned. Even if POS2 exists, use the -p <PARAM>
-		none@*@*@*) JAIL="$POS1" ;;
-	esac
-
-	# Convert lower-case entered PARAM to upper, again, in case POS2 replaced it
-	[ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
+    if [ "$PARAM" ] ; then
+        _all_params="$PARAMS_COMN $PARAMS_JAIL $PARAMS_VM"
+        quiet echo_grep "$_all_params" "$PARAM" || eval $(THROW bad_param $PARAM)
+    fi
 }
 
-get_results() {
-	# Large case statement to handle the possible combinations
-	# Note: While there's some redundancy, it's a more clear/comprehensive solution
-	# Where possible, _$ZLIST_ is set as wildcard, with switch used inside case statement
+retrieve_data() {
+    local _fn="data_retrieval" _cells_files _defaults_files
 
-	case "${LIST}@${ZLIST}@${JAIL}@${PARAM}" in
+    # Cell retrieval has less work than parameter
+    if [ "$CELL" ] ; then
+        hush ctx_bootstrap_cell $CELL
+        [ "$snaps" ] && query_rootsnaps $R_DSET && query_persistsnaps $P_DSET
+        [ "$zfs" ] && query_datasets "$R_DSET $P_DSET"
+        return 0
+    fi
 
-		# ALL JAILS
-		*@f@none@NONE)
-				_RESULT=$(awk '{print $1}' $QCONF | uniq | grep -Ev "^(#|host)" | sort -k1)
-		;;
+    # All cells, in a single line
+    _cells_files=$(ls -1 $D_CELLS | tr '\n' ' ' | sed "s|^|$D_CELLS/|; s| | $D_CELLS/|g")
 
-		# ALL JAILS + ZFS
-		t@t@none@NONE)
-				_RESULT=$(awk '{print $1}' $QCONF | uniq | grep -Ev "^(#|host)" | sort -k1)
-				get_zresult
-		;;
+    # Define which files should be searched for the defaults
+    quiet echo_grep "$PARAMS_JAIL" $PARAM && _defaults_files="$DEF_BASE $DEF_JAIL"
+    quiet echo_grep "$PARAMS_VM"   $PARAM && _defaults_files="$DEF_BASE $DEF_VM"
+    quiet echo_grep "$PARAMS_COMN" $PARAM && _defaults_files="$DEF_BASE $DEF_JAIL $DEF_VM"
 
-		# ZFS ONLY
-		f@t@none@NONE)
-				get_zresult
-		;;
-
-		# SINGLE JAIL
-		*@*@*@NONE)
-			# Add in devfs if appropriate, and supplement missing values with #defaults
-			_RESULT=$(grep -E "^${JAIL}[[:blank:]]" $QCONF)
-			get_devfs_result "$JAIL"
-			supplement_jail
-			[ "$ZLIST" = "t" ] && get_zresult
-		;;
-
-		# SINGLE PARAMETER
-		*@*@none@*)
-			# Get list of all jails in QCONF (include #default).
-			_JAILS=$(echo '#default' ; awk '!/^#/{print $1}' $QCONF | uniq)
-			_default=$(\
-				sed -nE "s/#default[[:blank:]]+${PARAM}[[:blank:]]+([^[:blank:]]+)/\1/p" $QCONF)
-
-			# PARAMS set to #default arent enumerated in QCONF. So cant just grep/sed them.
-			for _jail in $_JAILS ; do
-				if [ "$PARAM" = "DEVFS_RULE" ] ; then
-					# Devfs is not inherently a QCONF, parameter, but we provide the info anyways
-					get_devfs_result "$_jail"
-				else
-					# Reconstruct PARAMS for all jails to include the non-enumerated #default values
-					unset _result
-					_result=$(grep -E "^${_jail}[[:blank:]]+${PARAM}[[:blank:]]" $QCONF)
-					[ -z "$_result" ] && _result="$_jail  $PARAM  $_default"
-					[ -z "$_RESULT" ] && _RESULT="$_result" || _RESULT=$(echo "$_RESULT" ; echo "$_result")
-				fi
-			done
-		;;
-
-		# Show a jail/parameter combo
-		*@f@*@*)
-			[ "$PARAM" = "DEVFS_RULE" ] && get_devfs_result "$JAIL" \
-				|| _RESULT=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]" $QCONF)
-
-			[ -z "$_RESULT" ] \
-					&& _RESULT=$(grep -E "^#default[[:blank:]]+${PARAM}[[:blank:]]" $QCONF)
-
-			[ "$ZLIST" = "t" ] && get_zresult
-		;;
-	esac
+    # Pull the parameters from the defaults first, and then the
+    defaults=$(grep -E "^$PARAM=" $_defaults_files \
+              | sed -E "s|.*/||" | tr -d '"' | tr '=:' ' ' | sed -E 's/.conf//')
+    params=$(grep -E "^$PARAM=" $_cells_files | sed -E "s|.*/||" | tr -d '"' | tr '=:' ' ')
 }
 
-get_zresult() {
-	# Switches between full zfs list of system, and just for jail (if set)
-	[ "$JAIL" = "none" ] && _jail='' || _jail="/$JAIL"
+write_results() {
+    local _fn="write_results" _param _val
 
-	_ZRESULT=$(zfs list -r $NOHEAD $_snaps ${_zparams%,} "${R_ZFS}${_jail}" 2>/dev/null; \
-					zfs list -r $NOHEAD $_snaps ${_zparams%,} "${U_ZFS}${_jail}" 2>/dev/null)
+    make_tmp RESULTS
 
-	[ -z "$_ZRESULT" ] && [ -z "$NOHEAD" ] && _ZRESULT="NO ZFS DATASETS WERE FOUND"
+    # Writing parameters (no cell) is easier, do them first
+    if [ -z "$CELL" ] ; then
+        echo "$defaults" >> $RESULTS
+        echo "$params"   >> $RESULTS
+        return 0
+    fi
+
+    #### The existence of $CELL is assumed now ###
+
+    if [ "$PARAM" ] ; then
+        # For just a single param, there's room to print the snapshots too
+        _param=$(ctx_get $PARAM)
+        echo "$CELL $PARAM $_param"                                  >> $RESULTS
+        [ "$zfs" ]   && echo "$DATASETS"                             >> $RESULTS
+        [ "$snaps" ] && echo "$ROOTSNAPS"        | awk '{print $1}'  >> $RESULTS
+        [ "$snaps" ] && echo "$PERSISTSNAPS"     | awk '{print $1}'  >> $RESULTS
+    else
+        # All PARAMS + SNAPS can be quite long. If [-s], prioritize only snaps.
+        if [ "$snaps" ] ; then
+            [ "$zfs" ]   && echo "$DATASETS"                         >> $RESULTS
+            [ "$snaps" ] && echo "$ROOTSNAPS"    | awk '{print $1}'  >> $RESULTS
+            [ "$snaps" ] && echo "$PERSISTSNAPS" | awk '{print $1}'  >> $RESULTS
+            return 0
+        fi
+
+        # Without PARAM specified and no snaps, assume user wants the full list
+        for _param in $PARAMS_TYPE ; do
+            _val=$(ctx_get $_param)
+            echo "$CELL $_param $_val"  >> $RESULTS
+        done
+        # There's room to print the zfs datasets too
+        [ "$zfs" ] && echo "$DATASETS"  >> $RESULTS
+    fi
 }
 
-get_devfs_result() {
-	local _jail="$1"
-	# Get the rule number from JCONF (this will just be blank for VMs)
-	_rulenum=$(sed -En "s/.*devfs_ruleset=\"([[:digit:]]+).*/\1/p" ${JCONF}/${_jail})
+main() {
+    local _fn="main"
 
-	# Then get the full name of the rulenumber from devfs.rules
-	if [ -n "$_rulenum" ] ; then
-		_rulename=$(sed -En "s/.*devfsrules_qubsd_(.*=${_rulenum}).*/\1/p" /etc/devfs.rules)
+    parse_args "$@" || eval $(THROW 1)
 
-		# Modify result
-		_RESULT=$(echo "$_RESULT" ; echo "$_jail  DEVFS_RULE  ${_rulename}")
-	fi
+    checks || eval $(THROW 1)
+
+    retrieve_data
+
+    write_results
+
+    cat $RESULTS | column -t
 }
 
-supplement_jail() {
-	# Will return globals: CLASS and FILT_PARAMS (which will change for jails vs VMs)
-	get_parameter_lists
-
-	# Parameters enumerated for the jail/VM
-	_current_params=$(echo "$_RESULT" | awk '{print $2}')
-
-	# Find the #defaults that will need to be added
-	for _param in $FILT_PARAMS ; do
-		! echo "$_current_params" | grep -qs "$_param" && _RESULT="$(echo "$_RESULT" \
-										; grep -E "^#default[[:blank:]]+${_param}[[:blank:]]" $QCONF)"
-	done
-
-	# Sort the result by the 2nd column
-	_RESULT=$(echo "$_RESULT" | awk '{$1=$1}1' | sort -k2)
-}
-
-print_results() {
-
-	if [ "$_RESULT" ] && [ -z "$ZONLY" ] ; then
-
-		# Accout for [-H]
-		[ "$NOHEAD" ] && _RESULT=$(echo -e "${_RESULT}" | column -t) \
-			|| _RESULT=$(echo -e "CONTAINER   PARAMETER   VALUE\n${_RESULT}" | column -t)
-
-		# Eliminate the extra space that can happen for BHYVE_CUSTM after the column -t
-		_RESULT=$(echo "$_RESULT" | sed -E \
-		's/^([^[:blank:]]+[[:blank:]]+[^[:blank:]]+[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /')
-
-		[ -z "$NOHEAD" ] && echo ''
-		echo "$_RESULT" | grep "CONTAINER"
-		echo "$_RESULT" | grep -Ev "^(#default|CONTAINER)"
-		echo "$_RESULT" | grep "#default"
-	fi
-
-	[ "$_ZRESULT" ] && echo -e "${_ZRESULT}\n" | column -t
-
-	[ -z "$_RESULT" ] && [ -z "$NOHEAD" ] && [ -z "$_ZRESULT" ] && get_msg2 -m _m1
-}
-
-get_global_variables
-
-get_options "$@"
-
-check_and_adjust
-
-get_results
-
-print_results
+main "$@" || { cat $ERR ; exit 1 ;}
 
