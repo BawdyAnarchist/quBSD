@@ -43,7 +43,7 @@ ctx_unset() {
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
-    [ -z "$_PARAMS" ] && _PARAMS="$PARAMS_COMN $PARAMS_JAIL $PARAMS_VM $CONTEXT"
+    [ -z "$_PARAMS" ] && _PARAMS="$PARAMS_BASE $PARAMS_JAIL $PARAMS_VM $CONTEXT"
 
     [ "$_pfx" ] && unset $_pfx
     unset $(echo "$_PARAMS" | sed "s/^/$_pfx/; s/ / $_pfx/g")
@@ -81,9 +81,9 @@ ctx_load_params() {
     assert_args_set 1 $1 && _cell="$1"  || eval $(THROW 1)
 
     # For convenience, we also assign ALL_PARAMS and TYPE_PARAMS as global context variables
-    PARAMS_ALL="$PARAMS_COMN $PARAMS_JAIL $PARAMS_VM"
+    PARAMS_ALL="$PARAMS_BASE $PARAMS_JAIL $PARAMS_VM"
     _type=$(ctx_get ${_pfx}TYPE)
-    eval ${_pfx}PARAMS_TYPE=\"\${PARAMS_COMN} \${PARAMS_${_type}}\"
+    eval ${_pfx}PARAMS_TYPE=\"\${PARAMS_BASE} \${PARAMS_${_type}}\"
     _params_type=$(ctx_get ${_pfx}PARAMS_TYPE)
 
     # With prefix, protect globals from clobber. This MUST come first
@@ -153,20 +153,19 @@ ctx_validate_params() {
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
     _type=$(ctx_get ${_pfx}TYPE)
-    [ -z "$_PARAMS" ] && eval _PARAMS=\"\${PARAMS_COMN} \${PARAMS_${_type}}\"
-#echo $_cell   # Too useful for testing right now
+    [ -z "$_PARAMS" ] && eval _PARAMS=\"\${PARAMS_BASE} \${PARAMS_${_type}}\"
+
     for _PARAM in $_PARAMS ; do
         _param=$(echo "$_PARAM" | tr '[:upper:]' '[:lower:]')
         _funct="validate_param_$_param"
         quiet type $_funct || eval $(THROW 1 ${_fn} $_PARAM $_funct)     # Verify _funct exists
-#echo $_funct  # Too useful for testing right now
+
         # Hard failures, throw fast
         eval $_funct \"\${${_pfx}${_PARAM}}\" "$_cell" "$_pfx" || eval $(THROW 1)
         [ "$_warn" = "2" ] && [ "$WARN_CNT" -gt "$_warn_start" ] && eval $(THROW 2)
     done
 
-    # Print warnings and return based on warning policy
-    is_path_exist -s $ERR && cat $ERR
+    # Return based on warning policy
     [ "$WARN_CNT" -gt "$_warn_start" ] && [ "$_warn" -gt 0 ] && CLEAR && return 2 || return 0
 }
 
@@ -189,7 +188,7 @@ ctx_write_runtime() {
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
     _type=$(ctx_get ${_pfx}TYPE)
-    [ -z "$_PARAMS" ] && eval _PARAMS=\"\${PARAMS_COMN} \${PARAMS_${_type}}\ \${CONTEXT}\"
+    [ -z "$_PARAMS" ] && eval _PARAMS=\"\${PARAMS_BASE} \${PARAMS_${_type}}\ \${CONTEXT}\"
 
     # Remove runtime context if it exists, make sure the directory exists
     rm -f $RT_CTX

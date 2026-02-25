@@ -20,6 +20,17 @@ make_tmp() {
     eval trap_push \"rm -f \${$_name}\"
 }
 
+# WARNING SUBR
+warning_subr() {
+    local _fn="warning_subr" _query="$1"
+    cat $ERR
+    CLEAR
+    if [ "$_query" ] ; then
+        printf "\n  Would you like to continue? (Y/n): "
+        is_user_response && return 0 || eval $(THROW 1)
+    fi
+}
+
 # ERROR/TRACING SYSTEM
 MUTE() { "$@" || { rm -f $ERR ; return 1 ;};}
 

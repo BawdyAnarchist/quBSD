@@ -16,6 +16,13 @@ validate_param_backup() {
     assert_bool_tf $1 || eval $(THROW 1)
 }
 
+validate_param_bhyve_custm() {
+    local _fn="validate_param_bhyve_custm"
+    # There is no validation. This option is so users aren't limited in their VMs.
+    # But we can't at all validate the possibilities here.
+    return 0
+}
+
 validate_param_class() {
     local _fn="validate_param_class"
     assert_class $1 || eval $(THROW 1)

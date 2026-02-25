@@ -2,6 +2,7 @@
 
 ############################################  HELPERS  #############################################
 
+# Either starts line or with blank, then has blank after or ends line
 echo_grep() {
     echo "$1" | grep -E "(^|[[:blank:]])$2([[:blank:]]|\$)"
 }

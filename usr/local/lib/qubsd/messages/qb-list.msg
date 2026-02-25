@@ -3,15 +3,11 @@
 [-s]|[-z] requires a cell to operate on for zfs
 /END/
 
-:invalid_cell:
-Cell < %s > does not exist in %s
-/END/
-
 :bad_param:
 < %s > is not a valid tunable cell parameter
 /END/
 
-:w:list_usage:
+:w:usage:
 
 qb list: List parameters or datasets associated with a cell 
 
