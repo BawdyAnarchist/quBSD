@@ -30,30 +30,16 @@ parse_args() {
         [ "$_pos2" ] && PARAM=$_pos2
     fi
 
+    # Sanitize missing cell
+    { [ "$snaps" ] || [ "$zfs" ] ;} && [ -z "$CELL" ] && eval $(THROW 1 missing_cell)
+
     # Convert lower-case entered PARAM to upper (user-friendly)
     [ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
     return 0
 }
 
-validate_args() {
-    local _fn="checks" _all_params
-
-    if [ "$snaps" ] || [ "$zfs" ] ; then
-        [ -z "$CELL" ] && eval $(THROW 1 missing_cell)
-    fi
-
-    if [ "$CELL" ] ; then
-        quiet echo_grep "$(ls -1 $D_CELLS)" "$CELL" || eval $(THROW 1 invalid_cell $CELL $D_CELLS)
-    fi
-
-    if [ "$PARAM" ] ; then
-        _all_params="$PARAMS_COMN $PARAMS_JAIL $PARAMS_VM"
-        quiet echo_grep "$_all_params" "$PARAM" || eval $(THROW 1 bad_param $PARAM)
-    fi
-}
-
 retrieve_data() {
-    local _fn="data_retrieval" _cells_files _defaults_files
+    local _fn="retrieve_data" _cells_files _defaults_files
 
     # Cell retrieval has less work than parameter
     if [ "$CELL" ] ; then
@@ -70,9 +56,11 @@ retrieve_data() {
     # Define which files should be searched for the defaults
     quiet echo_grep "$PARAMS_JAIL" $PARAM && _defaults_files="$DEF_BASE $DEF_JAIL"
     quiet echo_grep "$PARAMS_VM"   $PARAM && _defaults_files="$DEF_BASE $DEF_VM"
-    quiet echo_grep "$PARAMS_COMN" $PARAM && _defaults_files="$DEF_BASE $DEF_JAIL $DEF_VM"
+    quiet echo_grep "$PARAMS_BASE" $PARAM && _defaults_files="$DEF_BASE $DEF_JAIL $DEF_VM"
+    # If _defaults_files are still empty, it means the param is invalid (not found in constants)
+    [ -z "$_defaults_files" ] && eval $(THROW 1 bad_param $PARAM)
 
-    # Pull the parameters from the defaults first, and then the
+    # These variables allow for later separation regarding which PARAMS are default values
     defaults=$(grep -E "^$PARAM=" $_defaults_files \
               | sed -E "s|.*/||" | tr -d '"' | tr '=:' ' ' | sed -E 's/.conf//')
     params=$(grep -E "^$PARAM=" $_cells_files | sed -E "s|.*/||" | tr -d '"' | tr '=:' ' ')
@@ -95,10 +83,10 @@ write_results() {
     # For just a single param, there's room to print the snapshots too
     if [ "$PARAM" ] ; then
         _param=$(ctx_get $PARAM)
-        echo "$CELL $PARAM $_param"                                  >> $RESULTS
-        [ "$zfs" ]   && echo "$DATASETS"                             >> $RESULTS
-        [ "$snaps" ] && echo "$ROOTSNAPS"        | awk '{print $1}'  >> $RESULTS
-        [ "$snaps" ] && echo "$PERSISTSNAPS"     | awk '{print $1}'  >> $RESULTS
+        echo "$CELL $PARAM $_param"                              >> $RESULTS
+        [ "$zfs" ]   && echo "$DATASETS"                         >> $RESULTS
+        [ "$snaps" ] && echo "$ROOTSNAPS"    | awk '{print $1}'  >> $RESULTS
+        [ "$snaps" ] && echo "$PERSISTSNAPS" | awk '{print $1}'  >> $RESULTS
         return 0
     fi
 
@@ -116,7 +104,7 @@ write_results() {
 
         # Make special notation of lines which source from the default, vs directly
         if quiet echo_grep "$non_defaults" $_param ; then
-            echo "$CELL $_param $_val"  >> $RESULTS
+            echo "$CELL $_param $_val"     >> $RESULTS
         else
             echo "#default $_param $_val"  >> $RESULTS
         fi
@@ -133,8 +121,7 @@ main() {
     local _fn="main"
 
     parse_args "$@" || eval $(THROW 1)
-    validate_args   || eval $(THROW 1)
-    retrieve_data
+    retrieve_data   || eval $(THROW 1)
     write_results
 
     cat $RESULTS | column -t
