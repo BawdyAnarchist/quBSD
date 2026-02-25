@@ -5,10 +5,12 @@
 
 ## Variables
 
-CAPS: Critical globals from constants.sh or cell PARAMETERS expect to live through a script lifecycle 
+CAPS: Critical globals from 1) constants.sh ; 2) cell PARAMETERS expect to live through a script lifecycle ; or 3) parse_args level key globals for the lifecycle of an exec or qb script.
 \_CAPS: The execution commands intended for system mutation at the end of a script lifecycle. These should always wrap if necessary, as otherwise `DRY_RUN` and `VERBOSE` console printing becomes cumbersome
-lower: Rarely used
-\_lower: Always local to a function
+lower: Lesser global variables assigned in the process of an exec or qb script.
+\_lower: Always local to a function.
+
+Library functions should always be CAPS, or \_lower. The only globals assigned in lib functions are pre-defined in constants.sh. Everything else must be local.
 
 ### Passing context PARAMETERS into library functions
 The eval-based context.sh system can bootstraps multiple cells in the same script without clobber. It's also convenient to avoid prop-drilling.
