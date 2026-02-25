@@ -15,7 +15,9 @@ xephyr-xclip daemon still has demons
 
 
 ### Import things in the code as I overhaul that still need addressed
-exec.postart - "hacky exception to schg due to resolv and resolvconf"
+exec.postart
+  - "hacky exception to schg due to resolv and resolvconf"
+  - Verify the rctl parameters are actually working properly
 
 
 ### UPGRADES
