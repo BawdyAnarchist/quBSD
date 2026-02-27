@@ -18,6 +18,9 @@ xephyr-xclip daemon still has demons
 exec.postart
   - "hacky exception to schg due to resolv and resolvconf"
   - Verify the rctl parameters are actually working properly
+qb-list
+  - List IPV4 is chopping data due due to defaults files chopping. Need to be more sophisticated there
+  - with [-p] PARAM you should list ALL of the same type, not just the non-defaults, and note that it's the default value
 
 
 ### UPGRADES
