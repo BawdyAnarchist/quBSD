@@ -20,7 +20,7 @@ ctx_bootstrap_cell() {
     _type=$(ctx_get ${_pfx}TYPE)
     _jconf=$(ctx_get ${_pfx}JCONF)
     if [ "$_type" = "JAIL" ] ; then
-        is_path_exist -f $_jconf || eval $(THROW 1 $_fn $_cell)
+        is_path_exist -f $_jconf || eval $(THROW 4 $_fn $_cell)
     fi
     return 0
 }
@@ -105,6 +105,31 @@ ctx_load_params() {
 
     return 0
 }
+
+# Conviencience of loading a single file into context. Caller MUST manage their
+# own prefixes, as no protective measures are made in the function to clear stale.
+ctx_load_file() {
+    local _fn="ctx_load_file" _file _pfx="$2" _params
+    assert_args_set 1 $1 && _file="$1"  || eval $(THROW 1)
+    is_path_exist "$_file" || eval $(THROW 1)
+
+    # First read the file to get PARAMS, then local them to prevent clobber before pfx is assigned
+    if [ "$_pfx" ] ; then
+        _params=$(sed -E "s|^(.*)=.*|\1|" $_file)
+        local $_params
+    fi
+
+    # Source the file
+    . $_file
+
+    # Assign the correct variable name based on _pfx
+    for _param in $_params; do
+        _val=$(ctx_get $_param)
+        [ "$_val" ] && eval ${_pfx}${_param}='${_val}'
+    done
+    return 0
+}
+
 
 # REQUIRES: load_parameters_ctx() FIRST, due to use of R_ZFS and P_ZFS of the cell
 ctx_add_zfs() {
@@ -219,12 +244,8 @@ ctx_bootstrap_runtime() {
     local _fn="ctx_bootstrap_runtime" _cell _pfx="$2"
     assert_args_set 1 "$1" && _cell="$1" || eval $(THROW 1)
 
-    hush ctx_bootstrap_cell $_cell $_pfx  # hush because a zfs failure here might not be a problem
-    case $? in
-        0)  : ;;
-        3)  CLEAR ;;  # Clear ERR. '3' indicates no persistent dataset, which is not a requirement
-        *)  eval $(THROW 1 _generic "Cell < $_cell > bootstrap failed") ;;
-    esac
+    ctx_bootstrap_cell $_cell $_pfx || PASS -C 3 \
+        || eval $(THROW 1 _generic "Cell < $_cell > bootstrap failed")
 
     # Validation and CTX can tolerate the misisng datasets without throwing
     ctx_validate_params $_cell  || eval $(THROW 1 _generic "Cell validation failed")

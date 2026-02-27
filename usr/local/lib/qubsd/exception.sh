@@ -12,7 +12,7 @@ trap_init() { trap 'eval "$TRAP"' $TRAP_SIGS ;}
 trap_push() { TRAP="$1 ; $TRAP" ;}
 trap_pop()  { TRAP=${TRAP#*;} ;}   # WARNING: Do not use semicolons in trap_push args
 
-# MKDIR STANDARDIZATION
+# mktemp STANDARDIZATION
 make_tmp() {
     local _fn="make_tmp" _name
     assert_args_set 1 "$1" && _name="$1"
@@ -25,7 +25,7 @@ warning_subr() {
     local _fn="warning_subr" _query="$1"
     cat $ERR
     CLEAR
-    if [ "$_query" ] ; then
+    if [ "$_query" = "-r" ] ; then
         printf "\n  Would you like to continue? (Y/n): "
         is_user_response && return 0 || eval $(THROW 1)
     fi
@@ -35,6 +35,18 @@ warning_subr() {
 MUTE() { "$@" || { rm -f $ERR ; return 1 ;};}
 
 CLEAR() { WARN_CNT=0 ; rm -f $ERR ; return 0 ;}
+
+# MEANS OF IGNORING SPECIFIC ERROR CODES. SIMULTANEOUS -C CLEAR of ERR, IF DESIRED
+# RC INTENTIONALLY LEFT AS A GLOBAL SO THAT CALLERS RETAIN FLEXIBILITY
+PASS() {
+    RC=$?  # Exit code of function in question must be immediate
+    [ "$1" = "-C" ] && { _C=true ; shift ;}
+
+    case " $1 " in
+    *" $RC "*) [ "$_C" ] && CLEAR ; unset _C ; return 0  ;;
+    *) unset _C ; return 1 ;;
+    esac
+}
 
 THROW() {
     local _code="$1" _msg_code="$2" _trace _msg _args _internal_err

@@ -1,5 +1,9 @@
 #!/bin/sh
 
+### NOTES ON PROBLEMS STILL
+# IPV4 is being chopped down due to defaults files chopping (the grep). Need better sophistication there
+# with [-p] PARAM you should list ALL cells of the same type (noting the default value), not just the defaults themselves
+
 . $QCOMMON
 
 trap_init
@@ -39,7 +43,7 @@ parse_args() {
 }
 
 retrieve_data() {
-    local _fn="retrieve_data" _cells_files _defaults_files
+    local _fn="retrieve_data" _param_type _cells_files _defaults_files
 
     # Cell retrieval has less work than parameter
     if [ "$CELL" ] ; then
@@ -54,11 +58,13 @@ retrieve_data() {
     _cells_files=$(ls -1 $D_CELLS | tr '\n' ' ' | sed "s|^|$D_CELLS/|; s| | $D_CELLS/|g")
 
     # Define which files should be searched for the defaults
-    quiet echo_grep "$PARAMS_JAIL" $PARAM && _defaults_files="$DEF_BASE $DEF_JAIL"
-    quiet echo_grep "$PARAMS_VM"   $PARAM && _defaults_files="$DEF_BASE $DEF_VM"
-    quiet echo_grep "$PARAMS_BASE" $PARAM && _defaults_files="$DEF_BASE $DEF_JAIL $DEF_VM"
-    # If _defaults_files are still empty, it means the param is invalid (not found in constants)
-    [ -z "$_defaults_files" ] && eval $(THROW 1 bad_param $PARAM)
+    _param_type=$(query_param_type $PARAM)
+    case $_param_type in
+        base) _defaults_files="$DEF_BASE $DEF_JAIL $DEF_VM" ;;
+        jail) _defaults_files="$DEF_BASE $DEF_JAIL" ;;
+        vm)   _defaults_files="$DEF_BASE $DEF_VM" ;;
+        *)    eval $(THROW 1 bad_param $PARAM) ;;
+    esac
 
     # These variables allow for later separation regarding which PARAMS are default values
     defaults=$(grep -E "^$PARAM=" $_defaults_files \
@@ -112,7 +118,7 @@ write_results() {
         echo "$_results" > $RESULTS
     done
 
-    # There's room to print the zfs datasets too
+    # There's always room to print the zfs datasets at the bottom
     [ "$zfs" ] && echo "$DATASETS"  >> $RESULTS
     return 0
 }

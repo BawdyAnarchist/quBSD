@@ -1,5 +1,5 @@
 
-:bootstrap_cell_ctx:
+:ctx_bootstrap_cell:
 Cell < %s > is invalid - basic configuration problem
 /END/
 

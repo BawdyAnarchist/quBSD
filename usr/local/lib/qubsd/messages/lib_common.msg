@@ -1,3 +1,11 @@
+:_generic:
+%s
+/END/
+
+:w:_generic:
+%s
+/END/
+
 :_internal0:
 Internal bug: set_ctx() is missing positional parameter(s)
 /END/

@@ -104,6 +104,17 @@ query_cell_param() {
     eval $(THROW 1 ${_fn} $_param $_cell)
 }
 
+# Takes $1 PARAM and returns base|jail|vm, depending on where the highest level default lies
+query_param_type() {
+    local _fn="query_param_type"
+    assert_args_set 1 "$1" || eval $(THROW 1)
+
+    quiet echo_grep "$PARAMS_BASE" $1 && echo "base" && return 0
+    quiet echo_grep "$PARAMS_JAIL" $1 && echo "jail" && return 0
+    quiet echo_grep "$PARAMS_VM"   $1 && echo "vm"   && return 0
+    return 1
+}
+
 # All clients that a gateway serves
 query_gw_clients() {
     local _fn="query_gw_clients" _val
