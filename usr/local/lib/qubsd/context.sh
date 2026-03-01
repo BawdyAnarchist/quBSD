@@ -39,7 +39,7 @@ ctx_unset() {
     while getopts :p:P: _opts ; do case $_opts in
         p) _pfx="$OPTARG" ;;
         P) _PARAMS="$OPTARG" ;;
-        *) eval $(THROW 1 _internal1) ;;
+        *) eval $(THROW 8 _internal1) ;;
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
@@ -54,7 +54,7 @@ ctx_unset() {
 # Cell-specific derived paths, mountpoints, and datasets Reduces verbosity in later references
 ctx_initialize() {
     local _fn="ctx_initialize" _pfx="$2" _cell _type _caller
-    assert_args_set 1 $1 && _cell="$1"  || eval $(THROW 1)
+    assert_args_set 1 $1 && _cell="$1"  || eval $(THROW $?)
 
     # Cell-specific paths and datasets.
     eval ${_pfx}QCONF=$D_CELLS/$_cell            # qubsd.conf.d/cells

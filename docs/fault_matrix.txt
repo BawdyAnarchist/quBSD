@@ -1,3 +1,58 @@
+These codes are for use in the library functions and primitives. They inform higher level scripts exactly what/where the error was, as many scripts have differing boundaries for what is acceptable vs not; and what is repairable vs not.
+
+The operational principle is a 4-level system of errors:
+qubsd/internal  - Unhandled/undefined; framework bugs, internal code errors, useful messages for development bugs
+Syntax/Assert   - Invalid user input, missing arguments, bad formatting
+Config/Topology - Static dependenices: missing files, datasets, snapshots. 
+Runtime/State   - Dynamic system allocations: IP collisions, file locks, process state, system resource availability
+
 CODE  LEVEL      DESCRIPTION
-1 
-2
+1     internal   General errors
+2-7   internal   <UNUSED>
+8     internal   Function was passed an invalid option
+9     internal   Err/warn message not found 
+10    assert     <UNUSED>
+11    assert     Missing arguments (assert_args_set)
+12    assert     Boolean "TRUE|true|FALSE|false"
+13    assert     Integer, positive or negative
+14    assert     Integer valid, comparison failed
+15    assert     IPV4 CIDR invalid
+16    assert     General formatting failure
+17    assert     Jail parameter formatting failure 
+18    assert     BHYVE parameter formatting failure
+19    assert     Generic, all others
+
+210   config     Path invalid
+211   config     Cell jconf missing
+212   config     Cell qconf missing
+220   config     Unretrieved dataset
+221   config     Unretrieved snapshot 
+222   config     Root dataset missing 
+223   config     Root snapshot missing 
+224   config     Persist dataset missing
+225   config     Persist snapshot missing
+230   config     QCONF query failure 
+231   config     Parameter missing from QCONF
+232   config     Unable to determine TYPE from QCONF 
+233   config     No networking clients found for proposed gateway
+
+310   runtime    Cell not running
+320   runtime    Generic networking problem 
+321   runtime    Route not available
+322   runtime    No IP addresses found for any running jails
+330   runtime    Popup is needed 
+340   runtime    User resopnse negative 
+350   runtime    General system query error 
+351   runtime    jls error searching for ONJAILS
+352   runtime    pgrep error search for VMs 
+353   runtime    Query sysmem error
+354   runtime    Query sysctl error
+360   runtime    Generic error for X11 queries
+361   runtime    Failed to find XID for window 
+362   runtime    Failed to find WM_NAME/CLASS 
+363   runtime    Failed to find X11 socket 
+364   runtime    Failed to find X11 PID 
+365   runtime    Failed to find X11 cellname
+366   runtime    Failed to resolve popup dimensions
+
+

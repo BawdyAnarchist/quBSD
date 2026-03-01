@@ -3,17 +3,17 @@
 
 validate_param_autostart() {
     local _fn="validate_param_autostart"
-    assert_bool_tf $1 || eval $(THROW 1)
+    assert_bool_tf $1 || eval $(THROW $?)
 }
 
 validate_param_autosnap() {
     local _fn="validate_param_autosnap"
-    assert_bool_tf $1 || eval $(THROW 1)
+    assert_bool_tf $1 || eval $(THROW $?)
 }
 
 validate_param_backup() {
     local _fn="validate_param_backup"
-    assert_bool_tf $1 || eval $(THROW 1)
+    assert_bool_tf $1 || eval $(THROW $?)
 }
 
 validate_param_bhyve_custm() {
@@ -30,7 +30,10 @@ validate_param_class() {
 
 validate_param_control() {
     local _fn="validate_param_control"
+
     [ "$1" = "none" ] && return 0
+    [ "$_val_lvl" -le 1 ] && return 0  # Level 1 validation (assert
+
     ctx_bootstrap_cell $1 "val_" && return 0 || eval $(THROW 1 _cellref $2 CJAIL $1)
 }
 
@@ -40,11 +43,18 @@ validate_param_envsync() { ##########  STUB  FOR  NOW  #########################
 
 validate_param_gateway() {
     local _fn="validate_param_gateway"
+
     [ "$1" = "none" ] && return 0
+    [ "$_val_lvl" -le 1 ] && return 0  # Level 1 validation (assert
+
     ctx_bootstrap_cell $1 "val_" && return 0 || eval $(THROW 1 _cellref $2 GATEWAY $1)
 }
 
 validate_param_ipv4() {
+## Must integrate this line, doesnt belong in assert
+## Reserve a.b.c.1 (ending in .1) for the gateway  
+#[ "$_a3" = "1" ] && eval $(THROW 1 $_fn IPV4 $_val) || return 0
+
     local _fn="validate_param_ipv4" _val="$1" _cell="$2" _type _gw _gw_type _cli_confs
 
     case $_val in
