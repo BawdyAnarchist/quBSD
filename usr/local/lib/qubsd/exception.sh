@@ -48,8 +48,8 @@ PASS() {
     [ "$1" = "-C" ] && { _C=true ; shift ;}
 
     case " $1 " in
-    *" $RC "*) [ "$_C" ] && CLEAR ; unset _C ; return 0  ;;
-    *) unset _C ; return 1 ;;
+        *" $RC "*) [ "$_C" ] && CLEAR ; unset _C ; return 0  ;;
+        *) unset _C ; return 1 ;;
     esac
     # RC intentionally left as a global so that callers retain flexibility.
 }
@@ -59,7 +59,7 @@ THROW() {
     local _code="$1" _msg_code="$2" _trace _msg _args _internal_err
 
     # Return code must always have a positive integer value
-    if echo $_code | grep -Eqs '^[ \t]*[1-9]+[ \t]*$' ; then
+    if echo $_code | grep -Eqs '^[ \t]*[0-9]+[ \t]*$' ; then
         shift
     else
         _internal_err="Internal error: THROW called without return code"

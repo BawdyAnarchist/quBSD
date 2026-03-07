@@ -13,15 +13,18 @@ ctx_bootstrap_cell() {
     ctx_unset -p "$_pfx"  # Start from blank slate
 
     # Bootstrap a new cell context, which comes with basic checks for crucial parameters
-    ctx_initialize $_cell $_pfx   || eval $(THROW 1 $_fn $_cell)  # QCONF exists
-    ctx_load_params $_cell $_pfx  || eval $(THROW 2 $_fn $_cell)  # Source QCONF and defaults
-    ctx_add_zfs $_cell $_pfx      || eval $(THROW 3 $_fn $_cell)  # Cell-specific datasets
+    ctx_initialize $_cell $_pfx   || eval $(THROW $? $_fn $_cell)  # QCONF exists
+    ctx_load_params $_cell $_pfx  || eval $(THROW $? $_fn $_cell)  # Source QCONF and defaults
 
     _type=$(ctx_get ${_pfx}TYPE)
     _jconf=$(ctx_get ${_pfx}JCONF)
     if [ "$_type" = "JAIL" ] ; then
-        is_path_exist -f $_jconf || eval $(THROW 4 $_fn $_cell)
+        is_path_exist -f $_jconf || eval $(THROW $? $_fn $_cell)
     fi
+
+    # Save for last. If dataset is missing (will be recloned), all other checks have been completed
+    ctx_add_zfs $_cell $_pfx      || eval $(THROW $? $_fn $_cell)  # Cell-specific datasets
+
     return 0
 }
 
@@ -62,7 +65,7 @@ ctx_initialize() {
     eval ${_pfx}RT_CTX=$D_RUNTM/$_cell/ctx.conf  # /var/run/qubsd/cells/  # Runtime context
 
     # Derive the cell type and store in context (existence of QCONF path is verified here as well)
-    _type=$(query_cell_type $_cell) || eval $(THROW 1 ${_fn} $_cell)  # JAIL|VM, derived from CLASS
+    _type=$(query_cell_type $_cell) || eval $(THROW $? ${_fn} $_cell)  # JAIL|VM, derived from CLASS
     eval ${_pfx}TYPE=$_type
 
     # Store the root of the caller (qb|exec). Necessary for parsing control authority
@@ -78,7 +81,7 @@ ctx_initialize() {
 # Lazy loading is fast/convenient. Use prefix ($2) to modify global variable (PARAM) assignments
 ctx_load_params() {
     local _fn="ctx_load_params" _pfx="$2" _cell _type _params_type _param _val
-    assert_args_set 1 $1 && _cell="$1"  || eval $(THROW 1)
+    assert_args_set 1 $1 && _cell="$1"  || eval $(THROW $?)
 
     # For convenience, we also assign ALL_PARAMS and TYPE_PARAMS as global context variables
     PARAMS_ALL="$PARAMS_BASE $PARAMS_JAIL $PARAMS_VM"
@@ -110,8 +113,8 @@ ctx_load_params() {
 # own prefixes, as no protective measures are made in the function to clear stale.
 ctx_load_file() {
     local _fn="ctx_load_file" _file _pfx="$2" _params
-    assert_args_set 1 $1 && _file="$1"  || eval $(THROW 1)
-    is_path_exist "$_file" || eval $(THROW 1)
+    assert_args_set 1 $1 && _file="$1"  || eval $(THROW $?)
+    is_path_exist "$_file" || eval $(THROW $?)
 
     # First read the file to get PARAMS, then local them to prevent clobber before pfx is assigned
     if [ "$_pfx" ] ; then
@@ -134,14 +137,14 @@ ctx_load_file() {
 # REQUIRES: load_parameters_ctx() FIRST, due to use of R_ZFS and P_ZFS of the cell
 ctx_add_zfs() {
     local _fn="ctx_add_zfs" _cell _pfx="$2" _r_dset _p_dset _rmnt _pmnt
-    assert_args_set 1 $1 && _cell="$1" || eval $(THROW 1)
+    assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
 
     # Establish cell-specific dataset names based on R_ZFS and P_ZFS
     _r_dset=$(ctx_get ${_pfx}R_ZFS)/$_cell
     _p_dset=$(ctx_get ${_pfx}P_ZFS)/$_cell
 
     # Set the prefix-specific global context for the datasets and mountpoints
-    query_datasets "$_r_dset $_p_dset"
+    query_datasets "$_r_dset $_p_dset" 
     eval ${_pfx}R_DSET=$_r_dset
     eval ${_pfx}P_DSET=$_p_dset
     eval ${_pfx}R_MNT=$(query_zfs_mountpoint $_r_dset)
@@ -150,9 +153,9 @@ ctx_add_zfs() {
     # Guarantee datasets exist. Checks integrated here in zfs_ctx to avoid fragmentation
     _rmnt=$(ctx_get ${_pfx}R_MNT)
     _pmnt=$(ctx_get ${_pfx}P_MNT)
-    [ "$_rmnt" ] || eval $(THROW 1 $_fn $_cell $_r_dset)  # Even zvol has "-" for mountpoint
-    [ "$_pmnt" ] || eval $(THROW 1 $_fn $_cell $_p_dset)
-## NOTE: We hard-define _ZFS and _DSET. Only [ "$_MNT" ] can unequivocally attest to dataset existence ##
+    [ "$_rmnt" ] || eval $(THROW 121 $_fn $_cell $_r_dset)  # Even zvol has "-" for mountpoint
+    [ "$_pmnt" ] || eval $(THROW 121 $_fn $_cell $_p_dset)
+    # We hard-define _ZFS and _DSET. Only [ "$_MNT" ] can unequivocally attest to dataset existence #
 
     return 0
 }
@@ -160,21 +163,22 @@ ctx_add_zfs() {
 # Orchestrator to validate an arbitrary list of PARAMS. WARN behavior opts. REQUIRE $1 (cell)
 ctx_validate_params() {
     local _fn="ctx_validate_params" _opts OPTIND OPTARG
-    local _cell _type _pfx _PARAMS _params _funct _emit _ret _warn=0 _warn_start="$WARN_CNT"
+    local _cell _type _pfx _PARAMS _params _funct _emit _ret _val_lvl _warn=0 _warn_start="$WARN_CNT"
 
     while getopts :p:P:w: _opts ; do case $_opts in
+        L)  _val_lvl="$OPTARG" ;;    # Specify PARAM list, or use the list from constants.sh
         p)  _pfx="$OPTARG" ;         # Specify prefix, or use the raw PARAM name from constants.sh
             eval _cell=\${$_pfx} ;;  # Get the cellname stored in the prefix designator
         P)  _PARAMS="$OPTARG" ;;     # Specify PARAM list, or use the list from constants.sh
         w)  _warn="$OPTARG" ;        # On WARN: [0->return 0 (default)] [1->return 2] [2->THROW]
-            assert_int_comparison -g 0 -l 2 $_warn || eval $(THROW 1 _internal4) ;;
-        *)  eval $(THROW 1 _internal1) ;;
+            assert_int_comparison -g 0 -l 2 $_warn || eval $(THROW 7 _internal4) ;;
+        *)  eval $(THROW 8 _internal1) ;;
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
     # Double check the function usage by requiring $1 to be equivalent to the _pfx ctx
-    assert_args_set 1 $1 || eval $(THROW 1)
+    assert_args_set 1 $1 || eval $(THROW $?)
     [ -z "$_pfx" ] && _cell="$1" || _cell=$(ctx_get $_pfx)
-    [ "$_cell" = "$1" ] || eval $(THROW 1 _internal2 $_pfx $1 $_cell)
+    [ "$_cell" = "$1" ] || eval $(THROW 7 _internal2 $_pfx $1 $_cell)
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
     _type=$(ctx_get ${_pfx}TYPE)
@@ -186,7 +190,7 @@ ctx_validate_params() {
         quiet type $_funct || eval $(THROW 1 ${_fn} $_PARAM $_funct)     # Verify _funct exists
 
         # Hard failures, throw fast
-        eval $_funct \"\${${_pfx}${_PARAM}}\" "$_cell" "$_pfx" || eval $(THROW 1)
+        eval $_funct \"\${${_pfx}${_PARAM}}\" "$_cell" "$_pfx" || eval $(THROW $?)
         [ "$_warn" = "2" ] && [ "$WARN_CNT" -gt "$_warn_start" ] && eval $(THROW 2)
     done
 
@@ -203,13 +207,13 @@ ctx_write_runtime() {
         p)  _pfx="$OPTARG" ;         # Specify prefix, or use the raw PARAM name from constants.sh
             eval _cell=\${$_pfx} ;;  # Get the cellname stored in the prefix designator
         P)  _PARAMS="$OPTARG" ;;     # Specify PARAM list, or use the list from constants.sh
-        *)  eval $(THROW 1 _internal1) ;;
+        *)  eval $(THROW 8 _internal1) ;;
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
     # Double check the function usage by requiring $1 to be equivalent to the _pfx ctx
-    assert_args_set 1 $1 || eval $(THROW 1)
+    assert_args_set 1 $1 || eval $(THROW $?)
     [ -z "$_pfx" ] && _cell="$1" || _cell=$(ctx_get $_pfx)
-    [ "$_cell" = "$1" ] || eval $(THROW 1 _internal2 $_pfx $1 $_cell)
+    [ "$_cell" = "$1" ] || eval $(THROW 7 _internal2 $_pfx $1 $_cell)
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
     _type=$(ctx_get ${_pfx}TYPE)
@@ -235,17 +239,17 @@ ctx_runtime_upsert() {
 ctx_load_runtime() {
     local _fn="load_runtime_context" _pfx="$1"
     _rt_ctx=$(ctx_get ${_pfx}RT_CTX)
-    [ -f "$_rt_ctx" ] || eval $(THROW 1 _missing_context $_rt_ctx)
+    is_path_exist -f $_rt_ctx || eval $(THROW $? _missing_context $_rt_ctx)
     . $_rt_ctx   # source (load) the runtime
     return 0
 }
 
 ctx_bootstrap_runtime() {
     local _fn="ctx_bootstrap_runtime" _cell _pfx="$2"
-    assert_args_set 1 "$1" && _cell="$1" || eval $(THROW 1)
+    assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
 
-    ctx_bootstrap_cell $_cell $_pfx || PASS -C 3 \
-        || eval $(THROW 1 _generic "Cell < $_cell > bootstrap failed")
+    ctx_bootstrap_cell $_cell $_pfx || PASS -C 121 \
+        || eval $(THROW $? _generic "Cell < $_cell > bootstrap failed")
 
     # Validation and CTX can tolerate the misisng datasets without throwing
     ctx_validate_params $_cell  || eval $(THROW 1 _generic "Cell validation failed")

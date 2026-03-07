@@ -12,15 +12,15 @@ echo_grep() {
 is_path_exist() {
     local _fn="is_path_exist"
     assert_args_set 2 $1 $2 || eval $(THROW $?)
-#    [ $1 $2 ] && return 0 || return 21
+    [ $1 $2 ] && return 0 || return 11
 }
 
 is_zfs_exist() {
     local _fn="is_zfs_exist"
     assert_args_set 1 $1 || eval $(THROW $?)
     quiet echo_grep "$DATASETS" "$1" && return 0  # First check DATASETS
-    query_datasets "$1"  || eval $(THROW 220)     # Query if missing
-    quiet echo_grep "$DATASETS" "$1" && return 0 || return 220
+    query_datasets "$1"  || eval $(THROW 121)     # Query if missing
+    quiet echo_grep "$DATASETS" "$1" && return 0 || return 121
 }
 
 is_cell_running() {
@@ -32,19 +32,19 @@ is_cell_running() {
     query_onvms
     quiet echo_grep "$ONJAILS" "$_cell" && return 0
     quiet echo_grep "$ONVMS" "bhyve: $_cell" && return 0
-    return 310
+    return 200
 }
 
 # Method of discovering an IP collision in a gateway jail
 is_route_available() {
     local _fn="is_route_available"
     assert_args_set 2 $1 $2 || eval $(THROW $?)
-    route -nj "$1" get "${2%/*}" | grep -Eqs 'destination: (0|128.0.0.0)' && return 0 || return 321
+    route -nj "$1" get "${2%/*}" | grep -Eqs 'destination: (0|128.0.0.0)' && return 0 || return 211
 }
 
 # Determine if process is detached, but Xorg is running (needs a popup)
 is_needpop() {
-    ! ps -p $$ -o state | grep -qs -- '+' && pgrep -fq Xorg && return 0 || return 1
+    ! ps -p $$ -o state | grep -qs -- '+' && pgrep -fq Xorg && return 0 || return 2
 }
 
 # return 0 for "Y/y". Optional $1=`severe` for a hard-typed `yes` required from the user
@@ -57,7 +57,7 @@ is_user_response() {
     case "$1:$_response" in
         severe:yes) return 0 ;; # Positional param `severe` requires full `yes'
         :y|:yes) return 0 ;;
-        *) return 1 ;;
+        *) return 2 ;;
     esac
 }
 
@@ -67,14 +67,14 @@ is_user_response() {
 query_cell_type() {
     local _fn="query_cell_type" _cell _type
     assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
-    is_path_exist -f $D_CELLS/$_cell || eval $(THROW 212 $_fn $_cell $D_CELLS)
+    is_path_exist -f $D_CELLS/$_cell || eval $(THROW 112 $_fn $_cell $D_CELLS)
 
     # This function is used for bootstrap. Do not rely on external functions. Hardcode CLASS
     _type=$(sed -En "s/CLASS=\"(.*)\"/\1/p" $D_CELLS/$_cell)
     case $_type in
         *jail) echo "JAIL" ;;
         *VM) echo "VM" ;;
-        *) eval $(THROW 160 ${_fn}2 $_cell $_type) ;;  # Theoretically unreachable THROW
+        *) eval $(THROW 16 ${_fn}2 $_cell $_type) ;;  # Theoretically unreachable THROW
     esac
 
     return 0
@@ -101,7 +101,7 @@ query_cell_param() {
     [ "$_val" ] && echo "$_val" && return 0
 
     # Failed to find a value for the parameter
-    eval $(THROW 231 ${_fn} $_param $_cell)
+    eval $(THROW 131 ${_fn} $_param $_cell)
 }
 
 # Takes $1 PARAM and returns base|jail|vm, depending on where the highest level default lies
@@ -112,7 +112,7 @@ query_param_type() {
     quiet echo_grep "$PARAMS_BASE" $1 && echo "base" && return 0
     quiet echo_grep "$PARAMS_JAIL" $1 && echo "jail" && return 0
     quiet echo_grep "$PARAMS_VM"   $1 && echo "vm"   && return 0
-    return 232
+    return 132
 }
 
 # All clients that a gateway serves
@@ -120,7 +120,7 @@ query_gw_clients() {
     local _fn="query_gw_clients" _val
     assert_args_set 1 $1 || eval $(THROW $?)
     _val=$(grep -Eo "GATEWAY=\"$1\"" $D_CELLS/* | sed -En "s|$D_CELLS/(.*):.*|\1|p")
-    [ "$_val" ] && echo $_val && return 0 || return 233  # Not quoted -> returns single-line list
+    [ "$_val" ] && echo $_val && return 0 || return 133  # Not quoted -> returns single-line list
 }
 
 # Return the filenames of all the qubsd configs of a particular gateway
@@ -128,7 +128,7 @@ query_gw_client_configs() {
     local _fn="query_gw_client_configs" _val
     assert_args_set 1 $1 || eval $(THROW $?)
     _val=$(query_gw_clients $1 | sed "s|^|$D_CELLS/|; s| | $D_CELLS/|g")
-    [ "$_val" ] && echo $_val && return 0 || return 233  # Not quoted -> returns single-line list
+    [ "$_val" ] && echo $_val && return 0 || return 133  # Not quoted -> returns single-line list
 }
 
 # Provide either the explicit cell shell from /overlay, or use the 0env default
@@ -163,11 +163,12 @@ query_datasets() {
 
     # Either add to the existing, or generate new DATASETS
     if [ "$DATASETS" ] ; then
-        DATASETS=$(echo "$DATASETS" ; zfs list -rHo name,mountpoint,mounted,origin,encryption $_pull) \
-            || eval $(THROW 220)
+        DATASETS=$(echo "$DATASETS" \
+            ; hush zfs list -rHo name,mountpoint,mounted,origin,encryption $_pull) \
+            || eval $(THROW 121)
     else
-        DATASETS=$(zfs list -rHo name,mountpoint,mounted,origin $_pull) \
-            || eval $(THROW 220)
+        DATASETS=$(hush zfs list -rHo name,mountpoint,mounted,origin $_pull) \
+            || eval $(THROW 121)
     fi
     return 0
 }
@@ -177,17 +178,18 @@ query_rootsnaps() {
 
     # For each snapshot passed, see if it's present. Assemble list of non-present snapshot
     [ "$_dsets" ] && for _dset in $_dsets ; do
-        quiet echo_grep "$DATASETS" $_dset || _pull="$_pull $_dset"
+        quiet echo_grep "$ROOTSNAPS" $_dset || _pull="$_pull $_dset"
         [ -z "$_pull" ] && return 0    # All snapshots already present (no duplicate pull)
     done
 
     # Either add to the existing, or generate new ROOTSNAPS
     if [ "$ROOTSNAPS" ] ; then
-        ROOTSNAPS=$(echo "$ROOTSNAPS" ; zfs list -Hrt snapshot -o name,written,creation $1) \
-            || eval $(THROW 223)
+        ROOTSNAPS=$(echo "$ROOTSNAPS" \
+            ; hush zfs list -Hrt snapshot -o name,written,creation $1) \
+            || eval $(THROW 122)
     else
-        ROOTSNAPS=$(zfs list -Hrt snapshot -o name,written,creation $1) \
-            || eval $(THROW 223)
+        ROOTSNAPS=$(hush zfs list -Hrt snapshot -o name,written,creation $1) \
+            || eval $(THROW 122)
     fi
     return 0
 }
@@ -195,11 +197,12 @@ query_rootsnaps() {
 query_persistsnaps() {
     local _fn="query_persistsnaps"
     if [ "$PERSISTSNAPS" ] ; then
-        PERSISTSNAPS=$(echo "$PERSISTSNAPS" ; zfs list -Hrt snapshot -o name,written,creation $1) \
-            || eval $(THROW 225)
+        PERSISTSNAPS=$(echo "$PERSISTSNAPS" \
+            ; hush zfs list -Hrt snapshot -o name,written,creation $1) \
+            || eval $(THROW 123)
     else
         PERSISTSNAPS=$(zfs list -Hrt snapshot -o name,written,creation $1) \
-            || eval $(THROW 225)
+            || eval $(THROW 123)
     fi
     return $?
 }
@@ -207,37 +210,38 @@ query_persistsnaps() {
 query_zfs_mountpoint() {
     local _fn="query_zfs_mountpoint"
     assert_args_set 1 "$1" || eval $(THROW $?)
-    echo_grep "$DATASETS" "$1" | awk '{print $2}' && return 0 || return 220
+    echo_grep "$DATASETS" "$1" | awk '{print $2}' && return 0 || return 121
 }
 
 query_onjails() {
     local _fn="query_onjails" _onjails
     if [ "$ONJAILS" ] ; then
-        _onjails=$(jls | sed "1 d" | awk '{print $2}') || eval $(THROW 351)
+        _onjails=$(jls | sed "1 d" | awk '{print $2}') || eval $(THROW 201)
         ONJAILS=$(echo "$ONJAILS" ; echo "$_onjails")
     else
-        ONJAILS=$(jls | sed "1 d" | awk '{print $2}') || eval $(THROW 351)
+        ONJAILS=$(jls | sed "1 d" | awk '{print $2}') || eval $(THROW 201)
     fi
     return 0
 }
 
 query_onvms() {
     local _fn="query_onvms"
-    ONVMS=$(pgrep -fl "daemon: bhyve:" | sed "s/\[.*]\$//") || eval $(THROW 352)
+    ONVMS=$(pgrep -fl "daemon: bhyve:" | sed "s/\[.*]\$//") || eval $(THROW 202)
     return 0
 }
 
 query_sysmem() {
     local _fn="query_sysmem"
-    [ -z "$SYSMEM" ] && { SYSMEM=$(grep -s "avail memory" /var/run/dmesg.boot \
-                                  | sed "s/.* = //" | sed "s/ (.*//" | tail -1) \
-                                  || eval $(THROW 353) ;}
+    [ -z "$SYSMEM" ] && SYSMEM=$(grep -s "avail memory" /var/run/dmesg.boot \
+                                | sed "s/.* = //" | sed "s/ (.*//" | tail -1)
+    [ -z "$SYSMEM" ] && eval $(THROW 221)
     return 0
 }
 
 query_num_cpus() {
     local _fn="query_ncpu"
-    [ -z "$NCPU" ] && { NCPU=$(sysctl -n hw.ncpu) || eval $(THROW 354) ;}
+    [ -z "$NCPU" ] && NCPU=$(sysctl -n hw.ncpu)
+    [ -z "$NCPU" ] && eval $(THROW 222)
 }
 
 # With $1 < cell>, all active IPaddr of a running jail. Without $1, active IPs of all running jails
@@ -253,7 +257,7 @@ query_running_ips() {
             _val=$(printf "%b" "$_val" "\n" "$_jail_ips")
         done
     fi
-    [ "$_val" ] && echo $_val && return 0 || return 322  # Not quoted -> returns single-line list
+    [ "$_val" ] && echo $_val && return 0 || return 212  # Not quoted -> returns single-line list
 }
 
 
@@ -262,29 +266,29 @@ query_running_ips() {
 query_net_active_xid() {
     local _fn="query_net_active_xid" _val
     _val=$(xprop -root _NET_ACTIVE_WINDOW | sed "s/.*window id # //") \
-        || eval $(THROW 361 xfail XID)
-    [ "$_val" ] && echo "$_val" && return 0 || eval $(THROW 361 xfail XID)
+        || eval $(THROW 231 xfail XID)
+    [ "$_val" ] && echo "$_val" && return 0 || eval $(THROW 231 xfail XID)
 }
 
 query_xwin_name() {
     local _fn="query_xwin_name" _xid _val
     _xid=$(query_net_active_xid) || eval $(THROW $?)
-    _val=$(xprop -id "$_xid" WM_NAME _NET_WM_NAME WM_CLASS) || eval $(THROW 362) 
-    [ "$_val" ] && echo "$_val" && return 0 || eval $(THROW 362) 
+    _val=$(xprop -id "$_xid" WM_NAME _NET_WM_NAME WM_CLASS) || eval $(THROW 232)
+    [ "$_val" ] && echo "$_val" && return 0 || eval $(THROW 232)
 }
 
 query_xwin_socket() {
     local _fn="query_xwin_socket" _xid _val
     _xid=$(query_net_active_xid) || eval $(THORW $?)
-    _val=$(xprop -id $_xid | sed -En "s/^WM_NAME.*:([0-9]+)\..*/\1/p") || eval $(THROW 363) 
-    [ "$_val" ] && echo "$_val" && return 0 || eval $(THROW 363) 
+    _val=$(xprop -id $_xid | sed -En "s/^WM_NAME.*:([0-9]+)\..*/\1/p") || eval $(THROW 233)
+    [ "$_val" ] && echo "$_val" && return 0 || eval $(THROW 233)
 }
 
 query_xwin_pid() {
     local _fn="query_xwin_pid" _xid _val
     _xid=$(query_net_active_xid) || eval $(THROW $?)
-    _val=$(xprop -id $_xid _NET_WM_PID | grep -Eo "[[:alnum:]]+$") || eval $(THROW 364) 
-    [ "$_val" ] && echo "$_val" && return 0 || $(THROW 364) 
+    _val=$(xprop -id $_xid _NET_WM_PID | grep -Eo "[[:alnum:]]+$") || eval $(THROW 234)
+    [ "$_val" ] && echo "$_val" && return 0 || $(THROW 234)
 }
 
 query_xwin_cellname() {
@@ -299,7 +303,7 @@ query_xwin_cellname() {
         _val=$(pgrep -fl "X11-unix/X${_xsock}" | head -1 | sed -En \
               "s@.*var/run/qubsd/X11/(.*)/.X11-unix/X${_xsock},.*@\1@p")
     fi
-    [ "$_val" ] && echo "$_val" && return 0 || eval $(THROW 365) 
+    [ "$_val" ] && echo "$_val" && return 0 || eval $(THROW 235)
 }
 
 # Use vertical res to derive popup dimensions.
@@ -307,12 +311,12 @@ _resolve_popup_dimensions() {
     local _fn="_resolve_popup_dimensions" _h=.25 _w=2.5 _res
 
     # Adjust _res that based on inputs from the caller
-    local _res=$(xrandr | sed -En "s/.*connected primary.*x([0-9]+).*/\1/p") || eval $(THROW 366 $_fn)
+    local _res=$(xrandr | sed -En "s/.*connected primary.*x([0-9]+).*/\1/p") || eval $(THROW 236 $_fn)
     [ "$_res" ] || eval $(THROW 1 $_fn)
 
-    _h=$(echo "scale=0 ; $_res * $_h" | bc | cut -d. -f1) || eval $(THROW 366 $_fn)
-    _w=$(echo "scale=0 ; $_h * $_w" | bc | cut -d. -f1)   || eval $(THROW 366 $_fn)
-    [ "${_w}${_h}" ] && echo "$_w $_h" || eval $(THROW 366)
+    _h=$(echo "scale=0 ; $_res * $_h" | bc | cut -d. -f1) || eval $(THROW 236 $_fn)
+    _w=$(echo "scale=0 ; $_h * $_w" | bc | cut -d. -f1)   || eval $(THROW 236 $_fn)
+    [ "${_w}${_h}" ] && echo "$_w $_h" || eval $(THROW 236)
 }
 
 # Intelligently calculate fontsize for popups based on monitor vs system DPI

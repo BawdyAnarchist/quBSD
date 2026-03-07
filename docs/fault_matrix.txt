@@ -8,7 +8,9 @@ Runtime/State   - Dynamic system allocations: IP collisions, file locks, process
 
 CODE  LEVEL      DESCRIPTION
 1     internal   General errors
-2-7   internal   <UNUSED>
+2     internal   Negative responses that are not errors
+3-6   internal   <UNUSED>
+7     internal   Invalid value passed to a function
 8     internal   Function was passed an invalid option
 9     internal   Err/warn message not found 
 10    assert     <UNUSED>
@@ -22,37 +24,34 @@ CODE  LEVEL      DESCRIPTION
 18    assert     BHYVE parameter formatting failure
 19    assert     Generic, all others
 
-210   config     Path invalid
-211   config     Cell jconf missing
-212   config     Cell qconf missing
-220   config     Unretrieved dataset
-221   config     Unretrieved snapshot 
-222   config     Root dataset missing 
-223   config     Root snapshot missing 
-224   config     Persist dataset missing
-225   config     Persist snapshot missing
-230   config     QCONF query failure 
-231   config     Parameter missing from QCONF
-232   config     Unable to determine TYPE from QCONF 
-233   config     No networking clients found for proposed gateway
+110   config     Path invalid
+111   config     Cell jconf missing
+112   config     Cell qconf missing
+120   config     Generic ZFS failure
+121   config     Unretrieved dataset
+122   config     Root snapshot missing 
+123   config     Persist snapshot missing
+130   config     QCONF query failure 
+131   config     Parameter missing from QCONF
+132   config     Unable to determine TYPE from QCONF 
+133   config     No networking clients found for proposed gateway
 
-310   runtime    Cell not running
-320   runtime    Generic networking problem 
-321   runtime    Route not available
-322   runtime    No IP addresses found for any running jails
-330   runtime    Popup is needed 
-340   runtime    User resopnse negative 
-350   runtime    General system query error 
-351   runtime    jls error searching for ONJAILS
-352   runtime    pgrep error search for VMs 
-353   runtime    Query sysmem error
-354   runtime    Query sysctl error
-360   runtime    Generic error for X11 queries
-361   runtime    Failed to find XID for window 
-362   runtime    Failed to find WM_NAME/CLASS 
-363   runtime    Failed to find X11 socket 
-364   runtime    Failed to find X11 PID 
-365   runtime    Failed to find X11 cellname
-366   runtime    Failed to resolve popup dimensions
-
+200   runtime    Cell not running
+201   runtime    jls error searching for ONJAILS
+202   runtime    pgrep error search for VMs 
+210   runtime    Generic networking problem 
+211   runtime    Route not available
+212   runtime    No IP addresses found for any running jails
+220   runtime    General system query error 
+221   runtime    Query sysmem error
+222   runtime    num_cpus not found in sysctl
+230   runtime    Generic error for X11 queries
+231   runtime    Failed to find XID for window 
+232   runtime    Failed to find WM_NAME/CLASS 
+233   runtime    Failed to find X11 socket 
+234   runtime    Failed to find X11 PID 
+235   runtime    Failed to find X11 cellname
+236   runtime    Failed to resolve popup dimensions
+240   runtime    General runtime error
+241   runtime     
 

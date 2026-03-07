@@ -7,7 +7,7 @@ resolve_rootenv_snapname() {
 
     # Try existing ROOTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
     [ $ROOTSNAPS ] && _rootsnaps=$(echo "$ROOTSNAPS" | grep $_dset)
-    [ -z "$_rootsnaps" ] && unset $ROOTSNAPS && query_rootsnaps $_dset
+    [ -z "$_rootsnaps" ] && unset ROOTSNAPS && query_rootsnaps $_dset
     _rootsnaps=$(echo "$ROOTSNAPS" | grep $_dset \
                 | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--) print a[i]}')
 
