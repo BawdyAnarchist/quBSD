@@ -1,4 +1,6 @@
 
+
+
 VM PLAN: only remaining aspect is Linux and qb-create
  - Linux/ubuntu
     -- they actually have an overlayfs where you just add directories and it auto-tracks changes
@@ -16,10 +18,12 @@ xephyr-xclip daemon still has demons
 ### Import things in the code as I overhaul that still need addressed
 exec.postart
   - "hacky exception to schg due to resolv and resolvconf"
-  - Verify the rctl parameters are actually working properly
+  - `rctl -r jail:<jail>::` is failing after jail start
 qb-list
   - List IPV4 is chopping data due due to defaults files chopping. Need to be more sophisticated there
   - with [-p] PARAM you should list ALL of the same type, not just the non-defaults, and note that it's the default value
+exec.created
+  - I think I removed the chaining starts. Maybe think about adding that back in? Not sure. Maybe qb start should do that only
 
 
 ### UPGRADES
