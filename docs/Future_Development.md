@@ -26,13 +26,9 @@ exec.postart
 exec.created
   - I think I removed the chaining starts. Maybe think about adding that back in? Not sure. Maybe qb start should do that only
 exec.release (when with jail -vr <jail>)
-  - _CMD_DECRYPT is dubious -> this should be _CMD_ENCRYPT or _CMD_Z_UMOUNT. Also, does _CMD_UMOUNT already umount the dataset?doubt it
-  - still getting some reclone failures, for example:
-```
-cannot create 'zroot/qubsd/magfield': dataset already exists
- Failed Command: zfs clone -o qb:autosnap=false zroot/qubsd/0gui@Mar16_1840 zroot/qubsd/magfield
-jail: magfield: /usr/local/libexec/qubsd/exec.release magfield /usr/local/lib/qubsd/common.sh: failed
-```
+  - CMD_DECRYPT is dubious -> this should be CMD_ENCRYPT or CMD_Z_UMOUNT. Also, does CMD_UMOUNT already umount the dataset?doubt it
+exec.prepare
+  - the zfs mount -l commands arent working right
 
 
 
