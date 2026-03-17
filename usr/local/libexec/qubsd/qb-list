@@ -32,6 +32,12 @@ parse_args() {
     elif [ -z "$CELL" ] && [ -z "$PARAM" ] ; then
         [ "$_pos1" ] && CELL=$_pos1
         [ "$_pos2" ] && PARAM=$_pos2
+
+        # Final attempt at parsing CELL vs PARAM when no option is passed
+        if ! is_path_exist -f $D_CELLS/$CELL && [ -z "$PARAM" ] ; then
+            quiet echo_grep "$PARAMS_BASE $PARAMS_JAIL $PARAMS_VM" $CELL \
+                && PARAM=$CELL && unset CELL
+        fi
     fi
 
     # Sanitize missing cell

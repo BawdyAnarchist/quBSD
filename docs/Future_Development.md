@@ -15,15 +15,25 @@ xephyr-xclip daemon still has demons
    - You need to kill the clipboard ownership inside the source as well after releasing. Otherwise you get inconsistent waffling on lease expiry, where what FEELS like stale clipboard then can still paste if you're inside the same socket for a window. Causes problems
 
 
+THROW code enhancements:
+  - high level scripts still need throw codes integrated (including $?)
+
+
 ### Import things in the code as I overhaul that still need addressed
 exec.postart
   - "hacky exception to schg due to resolv and resolvconf"
-  - `rctl -r jail:<jail>::` is failing after jail start
 qb-list
-  - List IPV4 is chopping data due due to defaults files chopping. Need to be more sophisticated there
-  - with [-p] PARAM you should list ALL of the same type, not just the non-defaults, and note that it's the default value
+  - Not sure if the "automated" "user-friendly" CELL vs PARAM resolution is working properly
 exec.created
   - I think I removed the chaining starts. Maybe think about adding that back in? Not sure. Maybe qb start should do that only
+exec.release (when with jail -vr <jail>)
+  - still getting some reclone failures, for example:
+```
+cannot create 'zroot/qubsd/magfield': dataset already exists
+ Failed Command: zfs clone -o qb:autosnap=false zroot/qubsd/0gui@Mar16_1840 zroot/qubsd/magfield
+jail: magfield: /usr/local/libexec/qubsd/exec.release magfield /usr/local/lib/qubsd/common.sh: failed
+```
+
 
 
 ### UPGRADES
