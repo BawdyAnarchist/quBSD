@@ -136,7 +136,7 @@ ctx_load_file() {
 
 # REQUIRES: load_parameters_ctx() FIRST, due to use of R_ZFS and P_ZFS of the cell
 ctx_add_zfs() {
-    local _fn="ctx_add_zfs" _cell _pfx="$2" _r_dset _p_dset _rmnt _pmnt
+    local _fn="ctx_add_zfs" _cell _pfx="$2" _r_dset _p_dset _r_mnt _p_mnt
     assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
 
     # Establish cell-specific dataset names based on R_ZFS and P_ZFS
@@ -151,10 +151,10 @@ ctx_add_zfs() {
     eval ${_pfx}P_MNT=$(query_zfs_mountpoint $_p_dset)
 
     # Guarantee datasets exist. Checks integrated here in zfs_ctx to avoid fragmentation
-    _rmnt=$(ctx_get ${_pfx}R_MNT)
-    _pmnt=$(ctx_get ${_pfx}P_MNT)
-    [ "$_rmnt" ] || eval $(THROW 121 $_fn $_cell $_r_dset)  # Even zvol has "-" for mountpoint
-    [ "$_pmnt" ] || eval $(THROW 121 $_fn $_cell $_p_dset)
+    _r_mnt=$(ctx_get ${_pfx}R_MNT)
+    _p_mnt=$(ctx_get ${_pfx}P_MNT)
+    [ "$_r_mnt" ] || eval $(THROW 121 $_fn $_cell $_r_dset)  # Even zvol has "-" for mountpoint
+    [ "$_p_mnt" ] || eval $(THROW 121 $_fn $_cell $_p_dset)
     # We hard-define _ZFS and _DSET. Only [ "$_MNT" ] can unequivocally attest to dataset existence #
 
     return 0
