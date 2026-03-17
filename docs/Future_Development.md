@@ -16,17 +16,17 @@ xephyr-xclip daemon still has demons
 
 
 THROW code enhancements:
+  - you left of at validation primitives -> adding levels, and the PARAM validation function needs new options
   - high level scripts still need throw codes integrated (including $?)
 
 
 ### Import things in the code as I overhaul that still need addressed
 exec.postart
   - "hacky exception to schg due to resolv and resolvconf"
-qb-list
-  - Not sure if the "automated" "user-friendly" CELL vs PARAM resolution is working properly
 exec.created
   - I think I removed the chaining starts. Maybe think about adding that back in? Not sure. Maybe qb start should do that only
 exec.release (when with jail -vr <jail>)
+  - _CMD_DECRYPT is dubious -> this should be _CMD_ENCRYPT or _CMD_Z_UMOUNT. Also, does _CMD_UMOUNT already umount the dataset?doubt it
   - still getting some reclone failures, for example:
 ```
 cannot create 'zroot/qubsd/magfield': dataset already exists
