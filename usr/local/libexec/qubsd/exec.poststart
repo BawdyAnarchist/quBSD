@@ -9,9 +9,6 @@ trap_init
 compose_rctl_commands() {
     local _fn="compose_rctl_commands"
 
-    # Remove any existing rules for the jail
-    _CMD_RM_RCTL="quiet rctl -r jail:${CELL}::"
-
     # Establish max memory allocation and jail CPUs
     [ "$MAXMEM" = "none" ] || _CMD_MAXMEM="rctl -a jail:${CELL}:memoryuse:deny=${MAXMEM}"
     [ "$CPUSET" = "none" ] || _CMD_CPUSET="cpuset -j $CELL -cl $CPUSET"
@@ -52,7 +49,7 @@ main() {
     compose_rctl_commands  || eval $(THROW 1)
     compose_flags_commands || eval $(THROW 1)
 
-    _COMMANDS="_CMD_RM_RCTL _CMD_MAXMEM _CMD_CPUSET _CMD_CHFLAGS _CMD_CHFLAGS_2 _CMD_SECLVL"
+    _COMMANDS="_CMD_MAXMEM _CMD_CPUSET _CMD_CHFLAGS _CMD_CHFLAGS_2 _CMD_SECLVL"
     execute_commands "$_COMMANDS" || eval $(THROW 1)
 
     return 0
