@@ -69,7 +69,7 @@ retrieve_data() {
     # These variables allow for later separation regarding which PARAMS are default values
     defaults=$(grep -E "^$PARAM=" $_defaults_files \
               | sed -E "s|.*/||" | tr -d '"' | tr '=:' ' ' | sed -E 's/.conf//')
-    params=$(grep -E "^$PARAM=" $_cells_files | sed -E "s|.*/||" | tr -d '"' | tr '=:' ' ')
+    params=$(grep -E "^$PARAM=" $_cells_files | sed -E "s|^$D_CELLS/||" | tr -d '"' | tr '=:' ' ')
 }
 
 write_results() {
