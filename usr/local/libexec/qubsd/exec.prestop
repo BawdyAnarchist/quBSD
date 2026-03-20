@@ -25,12 +25,12 @@ compose_commands() {
 main() {
     local _fn="main"
 
-    MUTE ctx_load_runtime  || ctx_bootstrap_runtime $CELL || eval $(THROW 1)
+    MUTE ctx_load_runtime  || ctx_bootstrap_runtime $CELL || eval $(THROW $?)
 
-    compose_commands  || eval $(THROW 1)
+    compose_commands
 
     _COMMANDS="_CMD_RM_INTF _CMD_CHFLAGS"
-    execute_commands "$_COMMANDS" || eval $(THROW 1)
+    execute_commands "$_COMMANDS" || eval $(THROW $?)
 
     return 0
 }
