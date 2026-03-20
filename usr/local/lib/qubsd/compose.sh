@@ -3,7 +3,7 @@
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
 _resolve_rootenv_snapname() {
     local _fn="_resolve_rootenv_snapname" _dset="$1"
-    local _rootsnaps _psmod _lstart _line _snap _date _timestamp _now
+    local _rootsnaps _psmod _lstart _line _snap _date _timestamp _written
 
     # Try existing ROOTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
     [ $ROOTSNAPS ] && _rootsnaps=$(echo "$ROOTSNAPS" | grep $_dset)
@@ -30,20 +30,20 @@ _resolve_rootenv_snapname() {
 $_rootsnaps
 EOF
     else
-        # Ensure against stale rootenv snapshot by checking 'written'
+        # Ensure against stale rootenv snapshot by checking 'written@'
         _snap=$(echo "$_rootsnaps" | head -1 | awk '{print $1}')
-        [ "$(echo $_rootsnaps | head -1 | awk '{print $2}')" = "0" ] && echo $_snap && return 0
+        _written=$(zfs get -Hpo value written@${_snap##*@} $_dset)  # Most recent snap vs HEAD
+        [ "$_written" = "0" ] && echo $_snap && return 0
 
         # Last avail rootenv snap is in fact stale (or non-existent). Prepare a new one.
-        _now=$(date +%s)
-        echo "$_dset@${_now}" && return 2   # '2' tells caller to perform a new snapshot
+        echo "$_dset@$(date +%s)" && return 2   # '2' tells caller to perform a new snapshot
     fi
 }
 
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
 _resolve_persist_snapname() {
     local _fn="_resolve_persist_snapname" _dset="$1"
-    local _persistsnaps _psmod _lstart _line _snap _date _timestamp _now
+    local _persistsnaps _psmod _lstart _line _snap _date _timestamp _written
 
     # Try existing PERSISTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
     [ $PERSISTSNAPS ] && _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset)
@@ -53,13 +53,13 @@ _resolve_persist_snapname() {
     _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset \
                 | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--) print a[i]}')
 
-    # Persist dataset can tolerate running ROOTENV. But ensure it's not stale, via 'written'
+    # Persist dataset can tolerate running ROOTENV. But ensure it's not stale, via 'written@'
     _snap=$(echo "$_persistsnaps" | head -1 | awk '{print $1}')
-    [ "$(echo $_persistsnaps | head -1 | awk '{print $2}')" = "0" ] && echo $_snap && return 0
+    _written=$(zfs get -Hpo value written@${_snap##*@} $_dset)  # Most recent snap vs HEAD
+    [ "$_written" = "0" ] && echo $_snap && return 0
 
     # Last avail rootenv snap is in fact stale (or non-existent). Prepare a new one.
-    _now=$(date +%s)
-    echo "$_dset@$_now" && return 2   # '2' tells caller to perform a new snapshot
+    echo "$_dset@$(date +%s)" && return 2   # '2' tells caller to perform a new snapshot
 }
 
 # Caller should be careful if deconfliction via $1 (_pfx) is necessary
