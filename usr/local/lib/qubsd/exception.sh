@@ -1,40 +1,34 @@
 #!/bin/sh
 
-############### CONVENIENCE FUNCTIONS FOR FLOW MANAGEMENT AND GLOBAL HOUSEKEEPING ##################
+################################### AUTOMATED TRAP MANAGEMENT ######################################
+
+rm_err() { rm -f $ERR ;}
+
+trap_init() { trap 'eval "$TRAP"' $TRAP_SIGS ;}
+
+# This is the only truly dangerous aspect of exception.sh. Use with caution. 
+trap_push() {
+    # Minimal sanitization. Args must be present, no semicolons
+    if ! assert_args_set 1 "$1" ; then
+        echo "Internal Error: < $_fn >. Attempted trap_push without passing any arguments."
+        exit 3
+    elif echo_grep "$1" ';' ; then
+        echo "Internal Error: < $_fn >. trap_push was passed arguments containing a semicolon." 
+        echo "This is inherently dangerous for trap_pop and the eval embedded in trap management."
+        exit 3
+    fi
+
+    TRAP="$1 ; $TRAP"
+}
+
+trap_pop()  { TRAP=${TRAP#*;} ;}
+
+##################################### ERROR TRACING SYSTEM #########################################
 
 # Output redirects for internal library use
 quiet() { "$@" > /dev/null 2>&1 ;}     # Pure silence
 hush() { "$@" 2>/dev/null ;}           # Hush errors
 verbose() { echo ">> $*" >&2; "$@" ;}  # Command-specific debug tool
-
-# Automated trap management
-rm_err() { rm -f $ERR ;}
-rm_rt_ctx() { rm -f $RT_CTX ;}
-trap_init() { trap 'eval "$TRAP"' $TRAP_SIGS ;}
-trap_push() { TRAP="$1 ; $TRAP" ;}
-trap_pop()  { TRAP=${TRAP#*;} ;}   # WARNING: Do not use semicolons in trap_push args
-# Note about trap_push. This is the most dangerous part of the system. Use with care
-
-# mktemp standardization
-make_tmp() {
-    local _fn="make_tmp" _name
-    assert_args_set 1 "$1" && _name="$1"
-    eval $_name=$(mktemp $D_QTMP/${0##*/}.XXX)
-    eval trap_push \"rm -f \${$_name}\"
-}
-
-# User-Interactive response subroutine
-response_subr() {
-    local _fn="response_subr" _query="$1"
-    cat $ERR
-    CLEAR
-    if [ "$_query" = "-r" ] ; then
-        printf "\n  Would you like to continue? (Y/n): "
-        is_user_response && return 0 || eval $(THROW 1)
-    fi
-}
-
-##################################### ERROR TRACING SYSTEM #########################################
 
 # Silence all throws, remove $ERR file, but still return a failure
 MUTE() { "$@" || { rm -f $ERR ; return 1 ;};}
@@ -50,8 +44,7 @@ PASS() {
     case " $1 " in
         *" $RC "*) [ "$_C" ] && CLEAR ; unset _C ; return 0  ;;
         *) unset _C ; return 1 ;;
-    esac
-    # RC intentionally left as a global so that callers retain flexibility.
+    esac # RC intentionally left as a global so that callers retain flexibility.
 }
 
 # Primary error, message, and tracing system
@@ -113,6 +106,27 @@ WARN() {
         printf "$_trace $_msg\n" "$@" >> $ERR
     fi
     echo ': $(( WARN_CNT += 1 ))'   # Increment warn counter must be done by parent
+}
+
+############### CONVENIENCE FUNCTIONS FOR FLOW MANAGEMENT AND GLOBAL HOUSEKEEPING ##################
+
+# mktemp standardization
+make_tmp() {
+    local _fn="make_tmp" _name
+    assert_args_set 1 "$1" && _name="$1"
+    eval $_name=$(mktemp $D_QTMP/${0##*/}.XXX)
+    eval trap_push \"rm -f \${$_name}\"
+}
+
+# User-Interactive response subroutine
+response_subr() {
+    local _fn="response_subr" _query="$1"
+    cat $ERR
+    CLEAR
+    if [ "$_query" = "-r" ] ; then
+        printf "\n  Would you like to continue? (Y/n): "
+        is_user_response && return 0 || eval $(THROW 1)
+    fi
 }
 
 ############################ DEBUG FUNCTIONS FOR DEEPER ERROR PROBING ##############################

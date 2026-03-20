@@ -9,7 +9,8 @@ Runtime/State   - Dynamic system allocations: IP collisions, file locks, process
 CODE  LEVEL      DESCRIPTION
 1     internal   General errors
 2     internal   Negative responses that are not errors
-3-6   internal   <UNUSED>
+3     internal   trap_push sanitization failed 
+4-6   internal   <UNUSED>
 7     internal   Invalid value passed to a function
 8     internal   Function was passed an invalid option
 9     internal   Err/warn message not found 
