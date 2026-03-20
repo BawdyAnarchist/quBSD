@@ -7,7 +7,7 @@ execute_commands() {
     # Simple loop over all passed commands
     for _command in $_commands ; do
         _cmd=$(ctx_get $_command)
-        exec_cmd "$_cmd" || eval $(THROW 1 _generic "Failed Command: $_cmd")
+        exec_cmd "$_cmd" || eval $(THROW 241 _generic "Failed Command: $_cmd")
     done
 }
 
@@ -16,15 +16,15 @@ exec_cmd() {
     local _fn="exec_cmd" _cmd="$1"
     [ -z "$_cmd" ] && return 0   # Empty command would cause an error with printf
 
-    case $DRY_RUN:$VERBOSE in
-        true:*|TRUE:*)
+    case $DRY_RUN::$VERBOSE in
+        true::*|TRUE::*)
             printf " # %s\n" "$_cmd" >&2
             ;;
-        *:true|*:TRUE)
+        *::true|*::TRUE)
             printf " # %s\n" "$_cmd" >&2
-            eval "$_cmd" ; return $?
+            eval "$_cmd"
             ;;
-        ':') eval "$_cmd" ; return $?
+        '::') eval "$_cmd"
             ;;
         *)  echo "EXEC_MOD < $EXEC_MOD > global variable invalid. May only be [verbose|dry_run]"
             exit 1   # Do not allow misconfiguration over exec at runtime
