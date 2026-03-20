@@ -29,7 +29,7 @@ exec.release (when with jail -vr <jail>)
   - CMD_DECRYPT is dubious -> this should be CMD_ENCRYPT or CMD_Z_UMOUNT. Also, does CMD_UMOUNT already umount the dataset?doubt it
 exec.prepare
   - the zfs mount -l commands arent working right
-
+Need to consider the /compat in the flags. It's not totally straightforward coz you shouldnt just hardcode /compat/ubuntu as a path
 
 
 ### UPGRADES
