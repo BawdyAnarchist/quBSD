@@ -14,6 +14,7 @@ CODE  LEVEL      DESCRIPTION
 7     internal   Invalid value passed to a function
 8     internal   Function was passed an invalid option
 9     internal   Err/warn message not found 
+
 10    assert     <UNUSED>
 11    assert     Missing arguments (assert_args_set)
 12    assert     Boolean "TRUE|true|FALSE|false"
@@ -54,5 +55,5 @@ CODE  LEVEL      DESCRIPTION
 235   runtime    Failed to find X11 cellname
 236   runtime    Failed to resolve popup dimensions
 240   runtime    General runtime error
-241   runtime     
+241   runtime    exec_cmd() failure (lifecycle.sh)
 
