@@ -1,13 +1,16 @@
 #!/bin/sh
 
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
-resolve_rootenv_snapname() {
-    local _fn="resolve_rootenv_snapname" _dset="$1"
+_resolve_rootenv_snapname() {
+    local _fn="_resolve_rootenv_snapname" _dset="$1"
     local _rootsnaps _psmod _lstart _line _snap _date _timestamp _now
 
     # Try existing ROOTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
     [ $ROOTSNAPS ] && _rootsnaps=$(echo "$ROOTSNAPS" | grep $_dset)
-    [ -z "$_rootsnaps" ] && unset ROOTSNAPS && query_rootsnaps $_dset
+    if [ -z "$_rootsnaps" ] && unset ROOTSNAPS ; then
+        query_rootsnaps $_dset || eval $(THROW $?)
+    fi
+
     _rootsnaps=$(echo "$ROOTSNAPS" | grep $_dset \
                 | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--) print a[i]}')
 
@@ -26,7 +29,6 @@ resolve_rootenv_snapname() {
         done << EOF
 $_rootsnaps
 EOF
-
     else
         # Ensure against stale rootenv snapshot by checking 'written'
         _snap=$(echo "$_rootsnaps" | head -1 | awk '{print $1}')
@@ -39,13 +41,15 @@ EOF
 }
 
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
-resolve_persist_snapname() {
-    local _fn="resolve_persist_snapname" _dset="$1"
+_resolve_persist_snapname() {
+    local _fn="_resolve_persist_snapname" _dset="$1"
     local _persistsnaps _psmod _lstart _line _snap _date _timestamp _now
 
     # Try existing PERSISTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
     [ $PERSISTSNAPS ] && _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset)
-    [ -z "$_persistsnaps" ] && unset $PERSISTSNAPS && query_persistsnaps $_dset
+    if [ -z "$_persistsnaps" ] && unset $PERSISTSNAPS ; then
+        query_persistsnaps $_dset || eval $(THROW $?)
+    fi
     _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset \
                 | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--) print a[i]}')
 
@@ -73,13 +77,13 @@ compose_root_reclone_cmds() {
     # Need the root dataset of the rootenv, to choose the snapshot
     ctx_bootstrap_cell $_rootenv $_pfxloc || eval $(THROW $? _generic "< $_rootenv > bootstrap failed")
 
-    _snap=$(resolve_rootenv_snapname $(ctx_get ${_pfxloc}R_DSET))
+    _snap=$(_resolve_rootenv_snapname $(ctx_get ${_pfxloc}R_DSET))
     case $? in
         0)  : ;;
-        1)  eval $(THROW 1 _generic "failed to get root snapshot name") ;;
         2)  _die=$(( $(date +%s) + 30 ))
-            _CMD_SNAPSHOT_ROOT="zfs snapshot -o qb:dest_date=$_die -o qb:autosnap=- -o qb:autocreated=yes $_snap"
+            _CMD_SNAPSHOT_ROOT="zfs snapshot -o qb:destroy_date=$_die -o qb:autosnap=- -o qb:autocreated=yes $_snap"
             ;;
+        *)  eval $(THROW $? _generic "failed to get root snapshot name") ;;
     esac
 
     # R_MNT is null, then RT_CTX needs updated after clone. Otherwise, RT_CTX is fine, just destroy/reclone
@@ -105,14 +109,15 @@ compose_persist_reclone_cmds() {
     _p_mnt=$(ctx_get ${_pfx}P_MNT)
 
     # Need the persist dataset of the template, to choose the snapshot
-    ctx_bootstrap_cell $_template $_pfxloc || eval $(THROW 1 _generic "< $_template > bootstrap failed")
+    ctx_bootstrap_cell $_template $_pfxloc || eval $(THROW $? _generic "< $_template > bootstrap failed")
 
-    _snap=$(resolve_persist_snapname $(ctx_get ${_pfxloc}P_DSET))
+    _snap=$(_resolve_persist_snapname $(ctx_get ${_pfxloc}P_DSET))
     case $? in
-        1)  eval $(THROW 1 _generic "failed to get persistent snapshot name")  ;;
+        0) : ;;
         2)  _die=$(( $(date +%s) + 30 ))
-            _CMD_SNAPSHOT_PERSIST="zfs snapshot -o qb:dest_date=$_die -o qb:autosnap=- -o qb:autocreated=yes $_snap"
+            _CMD_SNAPSHOT_PERSIST="zfs snapshot -o qb:destroy_date=$_die -o qb:autosnap=- -o qb:autocreated=yes $_snap"
             ;;
+        *)  eval $(THROW $? _generic "failed to get persistent snapshot name")  ;;
     esac
 
     # P_MNT is null, then RT_CTX needs updated after clone. Otherwise, RT_CTX is fine, just destroy/reclone
