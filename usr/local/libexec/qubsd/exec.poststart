@@ -28,8 +28,8 @@ compose_flags_commands() {
                     /usr/local/libdata /usr/local/libexec /usr/local/sbin"
             ;;
     esac
-    for _d in $_jdir ; do
-        [ -e "$R_MNT/$_d" ] && _CMD_CHFLAGS="chflags -fR schg $_d ; $_CMD_CHFLAGS"
+    for _d in $_dirs ; do
+        [ -e "$R_MNT/$_d" ] && _CMD_CHFLAGS="chflags -fR schg $R_MNT/$_d ; $_CMD_CHFLAGS"
     done
 
     # Slightly hacky but resolv is an exception to schg. Services need to modify this.
@@ -44,13 +44,13 @@ compose_flags_commands() {
 main() {
     local _fn="main"
 
-    MUTE ctx_load_runtime  || ctx_bootstrap_runtime $CELL || eval $(THROW 1)
+    MUTE ctx_load_runtime  || ctx_bootstrap_runtime $CELL || eval $(THROW $?)
 
-    compose_rctl_commands  || eval $(THROW 1)
-    compose_flags_commands || eval $(THROW 1)
+    compose_rctl_commands
+    compose_flags_commands
 
     _COMMANDS="_CMD_MAXMEM _CMD_CPUSET _CMD_CHFLAGS _CMD_CHFLAGS_2 _CMD_SECLVL"
-    execute_commands "$_COMMANDS" || eval $(THROW 1)
+    execute_commands "$_COMMANDS" || eval $(THROW $?)
 
     return 0
 }
