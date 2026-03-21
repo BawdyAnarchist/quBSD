@@ -74,7 +74,7 @@ query_cell_type() {
     case $_type in
         *jail) echo "JAIL" ;;
         *VM) echo "VM" ;;
-        *) eval $(THROW 16 ${_fn}2 $_cell $_type) ;;  # Theoretically unreachable THROW
+        *) eval $(THROW 10 ${_fn}2 $_cell $_type) ;;
     esac
 
     return 0
