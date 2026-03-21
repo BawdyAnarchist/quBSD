@@ -15,7 +15,7 @@ Internal bug: Invalid getopts option
 /END/
 
 :_internal2:
-Internal bug: Mismatch between positional < $1 > and prefix < %s > cellnames.  < %s > vs < %s >
+Internal bug: Invalid value < %s > passed to function < %s >
 /END/
 
 :_internal3:
