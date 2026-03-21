@@ -77,7 +77,7 @@ THROW() {
     if [ "$_internal_err" ] ; then
         printf "$_internal_err\n" >> $ERR
     elif [ "$_trace" ] || [ "$_msg" ] ; then
-        printf "$_trace $_msg\n" "$@" >> $ERR
+        printf "$_trace [$_code] $_msg\n" "$@" >> $ERR
     fi
 
     # This echo gets `eval` on return to caller. $_code was sanitized, so this is safe.
