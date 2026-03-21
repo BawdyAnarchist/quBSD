@@ -25,15 +25,30 @@ assert_bool_tf() {
 
 assert_cellname() {
     local _fn="assert_cellname" _val="$1"
+    # Jail must start with :alnum: and afterwards, have only _ or - as special chars
+    echo "$_val" | grep -E -- '^[[:alnum:]]([-_[:alnum:]])*[[:alnum:]]$' \
+        | grep -Eqv '(--|-_|_-|__)' || eval $(THROW 16 $_fn $_val)
+}
 
-    # Trigger words to avoid, just in case.
+assert_new_cellname() {
+    local _fn="assert_cellname" _val="$1"
+
+    # Trigger words that shouldn't be used
     case $_val in
-        none|qubsd) eval $(THROW 1 _invalid2 cellname $_val "Cannot be 'none' or 'qubsd'") ;;
+        none|qubsd) eval $(THROW 16 _invalid2 cellname $_val "Cannot be 'none' or 'qubsd'") ;;
     esac
 
     # Jail must start with :alnum: and afterwards, have only _ or - as special chars
     echo "$_val" | grep -E -- '^[[:alnum:]]([-_[:alnum:]])*[[:alnum:]]$' \
         | grep -Eqv '(--|-_|_-|__)' || eval $(THROW 16 $_fn $_val)
+}
+
+assert_dataset_name() {
+    local _fn="assert_dataset_name" _val="$1"
+
+    echo "$_val" | grep -Eq "^[a-zA-Z][a-zA-Z0-9_.:-]*(/[a-zA-Z0-9_.:-]+)*$" \
+        || eval $(THROW 17 $_fn $_val)
+    return 0
 }
 
 assert_integer() {
@@ -54,22 +69,23 @@ assert_int_comparison() {
         *) eval $(THROW 8 _internal1) ;;  # getopts warning suppressed because we handle it here
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-    assert_integer "$1" && _val="$1" || eval $(THROW 1 _internal3 $1)
+    assert_integer "$1" && _val="$1" || eval $(THROW 13 _internal3 $1)
 
     # Check each option one by one. Opts and _val already sanitized as integer format -> no quotes
-    [ "$_g" ] && { [ $_val -ge $_g ] || eval $(THROW 11 ${_fn} $_val '<'  $_g) ;}
-    [ "$_G" ] && { [ $_val -gt $_G ] || eval $(THROW 11 ${_fn} $_val '<=' $_G) ;}
-    [ "$_l" ] && { [ $_val -le $_l ] || eval $(THROW 11 ${_fn} $_val '>'  $_l) ;}
-    [ "$_L" ] && { [ $_val -lt $_L ] || eval $(THROW 11 ${_fn} $_val '>=' $_L) ;}
+    [ "$_g" ] && { [ $_val -ge $_g ] || eval $(THROW 14 ${_fn} $_val '<'  $_g) ;}
+    [ "$_G" ] && { [ $_val -gt $_G ] || eval $(THROW 14 ${_fn} $_val '<=' $_G) ;}
+    [ "$_l" ] && { [ $_val -le $_l ] || eval $(THROW 14 ${_fn} $_val '>'  $_l) ;}
+    [ "$_L" ] && { [ $_val -lt $_L ] || eval $(THROW 14 ${_fn} $_val '>=' $_L) ;}
 
     return 0
 }
+
 
 ##################################  SECTION 2: COMMON PARAMETERS  ##################################
 
 assert_class() {
     local _fn="assert_class"
-    echo "$CLASSES" | grep -Eqs -- "(^| )$1( |\$)" || eval $(THROW 16 _invalid CLASS $1)
+    echo "$CLASSES" | grep -Eqs -- "(^| )$1( |\$)" || eval $(THROW 18 _invalid CLASS $1)
 }
 
 assert_ipv4() {
@@ -89,19 +105,19 @@ assert_ipv4() {
     # Ensures that each number is in the proper range
     echo "$_val" \
         | grep -Eqs "^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+/[[:digit:]]+\$" \
-        || eval $(THROW 1 _invalid2 IPV4 "$_val" "Use CIDR notation with subnet")
+        || eval $(THROW 15 _invalid2 IPV4 "$_val" "Use CIDR notation (with subnet)")
 
     # Ensures that each digit is within the proper range
     { [ "$_a0" -ge 0 ] && [ "$_a0" -le 255 ] && [ "$_a1" -ge 0 ] && [ "$_a1" -le 255 ] \
         && [ "$_a2" -ge 0 ] && [ "$_a2" -le 255 ] && [ "$_a3" -ge 0 ] && [ "$_a3" -le 255 ] \
         && [ "$_a4" -ge 0 ] && [ "$_a4" -le 32 ] ;} \
-        || eval $(THROW 15 _invalid2 IPV4 "$_val" "Use CIDR notation with subnet")
+        || eval $(THROW 15 _invalid2 IPV4 "$_val" "Use CIDR notation (with subnet)")
     return 0
 }
 
 assert_bytesize() {
     local _fn="assert_bytesize"
-    echo "$1" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" || eval $(THROW 16 _invalid bytesize $1)
+    echo "$1" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" || eval $(THROW 19 _invalid bytesize $1)
 }
 
 normalize_bytesize() {
@@ -121,7 +137,7 @@ normalize_bytesize() {
 assert_cpuset() {
     local _fn="assert_cpuset"
     # Test for negative numbers and dashes in the wrong place
-    echo "$1" | grep -Eq "(,,+|--+|,-|-,|,[ \t]*-|^[^[:digit:]])" && eval $(THROW 17 $_fn $1)
+    echo "$1" | grep -Eq "(,,+|--+|,-|-,|,[ \t]*-|^[^[:digit:]])" && eval $(THROW 21 $_fn $1)
     return 0
 }
 
@@ -129,7 +145,7 @@ assert_schg() {
     local _fn="assert_schg"
     case $1 in
         none|sys|all) return 0 ;;
-        *) eval $(THROW 17 _invalid2 SCHG $1 "Must be <none|sys|all>") ;;
+        *) eval $(THROW 22 _invalid2 SCHG $1 "Must be <none|sys|all>") ;;
     esac
 }
 
@@ -137,34 +153,46 @@ assert_seclvl() {
     local _fn="assert_seclvl"
     case $1 in
         none|-1|-0|0|1|2|3) return 0 ;;
-        *) eval $(THROW 17 _invalid2 SECLVL $1 "Must be <none|-1|0|1|2|3>") ;;
+        *) eval $(THROW 23 _invalid2 SECLVL $1 "Must be <none|-1|0|1|2|3>") ;;
     esac
 }
 
 
 ####################################  SECTION 4: VM PARAMETERS  ####################################
 
+# Impossible to fully assert bhyve_custm parameter user inputs. But some guarantees can be provided
+assert_bhyve_custm() {
+    local _fn="assert_bhyve_custm" _val="$1"
+    echo "$_val" | grep -Eqv "^[a-zA-Z0-9 \-/_:,.=+]*$" || eval $(THROW 31 $_fn)
+}
+
 assert_bhyveopts() {
     local _fn="assert_bhyveopts" _val="$1"
     _val=$(echo "$_val" | sed -E 's/^-//')   # Remove the leading dash
 
     # Only includes bhyve opts with no argument
-    echo "$_val" | grep -Eqs -- '^[AaCDeHhPSuWwxY]+$' || eval $(THROW 18 ${_fn}1 BHYVEOPTS $_val)
+    echo "$_val" | grep -Eqs -- '^[AaCDeHhPSuWwxY]+$' || eval $(THROW 32 ${_fn}1 BHYVEOPTS $_val)
 
     # No duplicate characters
     [ "$(echo "$_val" | fold -w1 | sort | uniq -d | wc -l)" -gt 0 ] \
-        && eval $(THROW 18 ${_fn}2 BHYVEOPTS $_val)
+        && eval $(THROW 33 ${_fn}2 BHYVEOPTS $_val)
 
     return 0
 }
 
+assert_ppt() {
+    local _fn="assert_ppt"
+    echo "$1" | grep -Eqs -- '^[ 0-9]+/[0-9]+/[0-9]+([[:blank:]]+[0-9]+/[0-9]+/[0-9]+)*[[:blank:]]*$' \
+        || eval $(THROW 33 $_fn $1)
+}
+
 assert_taps() {
     local _fn="assert_taps"
-    assert_int_comparison -g 0 -- "$1" || eval $(THROW $? _invalid2 TAPS $1 "Require: integer >= 0")
+    assert_int_comparison -g 0 -- "$1" || eval $(THROW 34 _invalid2 TAPS $1 "Require: integer >= 0")
 }
 
 assert_vcpus() {
     local _fn="assert_vcpus"
-    assert_int_comparison -G 0 -- "$1" || eval $(THROW $? _invalid2 VCPUS $1 "Require: integer > 0")
+    assert_int_comparison -G 0 -- "$1" || eval $(THROW 35 _invalid2 VCPUS $1 "Require: integer > 0")
 }
 
