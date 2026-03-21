@@ -15,6 +15,10 @@ Argument missing or blank
 Boolean string required: [true|false]
 /END/
 
+:assert_bhyve_custm:
+PARAM bhyve_custm may contain only the following characters: < a-Z 0-9 -_:,.=+ >
+/END/
+
 :assert_bhyveopts1:
 %s < %s > contains an invalid option. Permissible: <AaCDeHhPSuWwxY>.
 /END/
@@ -32,6 +36,10 @@ May contain '-' or '_', but not consecutively.
 Invalid cpuset format < %s >. Must be comma separated intergers, a range, or combination. See man 1 cpuset
 /END/
 
+:assert_dataset_name:
+Invalid dataset name < %s >. See man 8 zpool-create for valid naming rules
+/END/
+
 :assert_integer:
 Invalid input: < %s >. Integer required.
 /END/
@@ -44,3 +52,6 @@ Invalid input: < %s >. Integer required.
 %s < %s > is not CIDR. Use CIDR notation for IPV4 addr, or <none|DHCP|auto>.
 /END/
 
+:assert_ppt:
+Invalid PPT format < %s >. See `man 4 vmm` for correct pptdevs formatting
+/END/
