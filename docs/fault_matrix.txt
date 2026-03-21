@@ -1,30 +1,48 @@
 These codes are for use in the library functions and primitives. They inform higher level scripts exactly what/where the error was, as many scripts have differing boundaries for what is acceptable vs not; and what is repairable vs not.
 
 The operational principle is a 4-level system of errors:
-qubsd/internal  - Unhandled/undefined; framework bugs, internal code errors, useful messages for development bugs
-Syntax/Assert   - Invalid user input, missing arguments, bad formatting
-Config/Topology - Static dependenices: missing files, datasets, snapshots. 
-Runtime/State   - Dynamic system allocations: IP collisions, file locks, process state, system resource availability
+qubsd/internal
+  - Unhandled/undefined; framework bugs, internal code errors, useful messages for development bugs
+Syntax/Assert
+  - Invalid user input, missing arguments, bad formatting
+Config/Topology
+  - Static dependenices: missing files, datasets, snapshots. 
+Runtime/State
+  - Dynamic system allocations: IP collisions, file locks, process state, system resource availability
+
+Validate: An code type necessary for explicit exception PASS() related to ctx_validate_params()
+  - Specific to ctx_validate_params and validate.sh. Necessary for validation levels and exceptions
 
 CODE  LEVEL      DESCRIPTION
 1     internal   General errors
 2     internal   Negative responses that are not errors
 3     internal   trap_push sanitization failed 
-4-6   internal   <UNUSED>
+4-5   internal   <UNUSED>
+6     internal   Invalid function-call attempt
 7     internal   Invalid value passed to a function
 8     internal   Function was passed an invalid option
 9     internal   Err/warn message not found 
 
-10    assert     <UNUSED>
+10    assert     <UNUSED> 
 11    assert     Missing arguments (assert_args_set)
 12    assert     Boolean "TRUE|true|FALSE|false"
 13    assert     Integer, positive or negative
 14    assert     Integer valid, comparison failed
 15    assert     IPV4 CIDR invalid
-16    assert     General formatting failure
-17    assert     Jail parameter formatting failure 
-18    assert     BHYVE parameter formatting failure
-19    assert     Generic, all others
+16    assert     Cellname formatting failure
+17    assert     Dataset name formatting failure
+18    assert     Class formatting error
+19    assert     Bytsize format error
+20    assert     <UNUSED>
+21    assert     cpuset formatting error
+22    assert     schg formatting error
+23    assert     seclvl formatting error
+30    assert     <UNUSED>
+31    assert     bhyve_custm formatting error
+32    assert     bhyveopts formatting error
+33    assert     ppt formatting error
+34    assert     taps formatting error 
+35    assert     vcpus formatting error 
 
 110   config     Path invalid
 111   config     Cell jconf missing
@@ -38,6 +56,35 @@ CODE  LEVEL      DESCRIPTION
 132   config     Unable to determine TYPE from QCONF 
 133   config     No networking clients found for proposed gateway
 
+140   validate   <UNUSED>
+141   validate   autostart
+142   validate   autosnap
+143   validate   backup
+144   validate   bhyveopts
+145   validate   bhyve_custm
+146   validate   class
+147   validate   control
+148   validate   cpuset
+149   validate   envsync
+150   validate   gateway
+151   validate   ipv
+152   validate   maxmem
+153   validate   memsize
+154   validate   mtu
+155   validate   no_destroy
+156   validate   ppt
+157   validate   p_zfs
+158   validate   rootenv
+159   validate   r_zfs
+160   validate   schg
+161   validate   seclvl
+162   validate   taps
+163   validate   template
+164   validate   tmux
+165   validate   vcpus
+166   validate   vnc
+167   validate   wiremem
+
 200   runtime    Cell not running
 201   runtime    jls error searching for ONJAILS
 202   runtime    pgrep error search for VMs 
@@ -47,6 +94,7 @@ CODE  LEVEL      DESCRIPTION
 220   runtime    General system query error 
 221   runtime    Query sysmem error
 222   runtime    num_cpus not found in sysctl
+223   runtime    cpuset failure 
 230   runtime    Generic error for X11 queries
 231   runtime    Failed to find XID for window 
 232   runtime    Failed to find WM_NAME/CLASS 
