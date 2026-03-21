@@ -12,6 +12,6 @@ Cell < %s > missing dataset at < %s >
 /END/
 
 :ctx_validate_params:
-PARAM < %s > does not have a corresponding validation function < %s >
+internal error: < %s > does not have a corresponding validation function < %s >
 /END/
 
