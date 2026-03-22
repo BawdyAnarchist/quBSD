@@ -13,8 +13,8 @@ ctx_bootstrap_cell() {
     ctx_unset -p "$_pfx"  # Start from blank slate
 
     # Bootstrap a new cell context, which comes with basic checks for crucial parameters
-    ctx_initialize $_cell $_pfx   || eval $(THROW $? $_fn $_cell)  # QCONF exists
-    ctx_load_params $_cell $_pfx  || eval $(THROW $? $_fn $_cell)  # Source QCONF and defaults
+    ctx_initialize $_cell $_pfx  || eval $(THROW $? $_fn $_cell)  # Basic context definitions
+    ctx_load_params $_cell $_pfx || eval $(THROW $? $_fn $_cell)  # Source QCONF and defaults
 
     _type=$(ctx_get ${_pfx}TYPE)
     _jconf=$(ctx_get ${_pfx}JCONF)
@@ -23,7 +23,7 @@ ctx_bootstrap_cell() {
     fi
 
     # Save for last. If dataset is missing (will be recloned), all other checks have been completed
-    ctx_add_zfs $_cell $_pfx      || eval $(THROW $? $_fn $_cell)  # Cell-specific datasets
+    ctx_add_zfs $_cell $_pfx     || eval $(THROW $? $_fn $_cell)  # Cell-specific datasets
 
     return 0
 }
@@ -57,7 +57,7 @@ ctx_unset() {
 # Cell-specific derived paths, mountpoints, and datasets Reduces verbosity in later references
 ctx_initialize() {
     local _fn="ctx_initialize" _pfx="$2" _cell _type _caller
-    assert_args_set 1 $1 && _cell="$1"  || eval $(THROW $?)
+    assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
 
     # Cell-specific paths and datasets.
     eval ${_pfx}QCONF=$D_CELLS/$_cell            # qubsd.conf.d/cells
@@ -81,7 +81,7 @@ ctx_initialize() {
 # Lazy loading is fast/convenient. Use prefix ($2) to modify global variable (PARAM) assignments
 ctx_load_params() {
     local _fn="ctx_load_params" _pfx="$2" _cell _type _params_type _param _val
-    assert_args_set 1 $1 && _cell="$1"  || eval $(THROW $?)
+    assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
 
     # For convenience, we also assign ALL_PARAMS and TYPE_PARAMS as global context variables
     PARAMS_ALL="$PARAMS_BASE $PARAMS_JAIL $PARAMS_VM"
@@ -113,7 +113,7 @@ ctx_load_params() {
 # own prefixes, as no protective measures are made in the function to clear stale.
 ctx_load_file() {
     local _fn="ctx_load_file" _file _pfx="$2" _params
-    assert_args_set 1 $1 && _file="$1"  || eval $(THROW $?)
+    assert_args_set 1 $1 && _file="$1" || eval $(THROW $?)
     is_path_exist "$_file" || eval $(THROW $?)
 
     # First read the file to get PARAMS, then local them to prevent clobber before pfx is assigned
@@ -160,42 +160,39 @@ ctx_add_zfs() {
     return 0
 }
 
-# Orchestrator to validate an arbitrary list of PARAMS. WARN behavior opts. REQUIRE $1 (cell)
+# Validation orchestrator for arbitrary set of PARAMS.
+# REQUIRE: $1 (_level) [1 -> assert ; 2 -> config ; 3 -> runtime] and $2 (CELL).
+# OPTIONAL: $3 (_pass) -> which validation.sh error codes to ignore failures and continue
 ctx_validate_params() {
     local _fn="ctx_validate_params" _opts OPTIND OPTARG
-    local _cell _type _pfx _PARAMS _params _funct _emit _ret _val_lvl _warn=0 _warn_start="$WARN_CNT"
+    local _level _cell _pass="$3" _type _pfx _PARAMS _value _param _validation_function
 
-    while getopts :p:P:w: _opts ; do case $_opts in
-        L)  _val_lvl="$OPTARG" ;;    # Specify PARAM list, or use the list from constants.sh
+    while getopts :p:P: _opts ; do case $_opts in
         p)  _pfx="$OPTARG" ;         # Specify prefix, or use the raw PARAM name from constants.sh
             eval _cell=\${$_pfx} ;;  # Get the cellname stored in the prefix designator
         P)  _PARAMS="$OPTARG" ;;     # Specify PARAM list, or use the list from constants.sh
-        w)  _warn="$OPTARG" ;        # On WARN: [0->return 0 (default)] [1->return 2] [2->THROW]
-            assert_int_comparison -g 0 -l 2 $_warn || eval $(THROW 7 _internal4) ;;
         *)  eval $(THROW 8 _internal1) ;;
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-    # Double check the function usage by requiring $1 to be equivalent to the _pfx ctx
-    assert_args_set 1 $1 || eval $(THROW $?)
-    [ -z "$_pfx" ] && _cell="$1" || _cell=$(ctx_get $_pfx)
-    [ "$_cell" = "$1" ] || eval $(THROW 7 _internal2 $_pfx $1 $_cell)
+    # Internal assignments and sanitization
+    assert_args_set 2 "$1" "$2" && _level=$1 && _cell=$2 || eval $(THROW $?)
+    assert_int_comparison -g 1 -l 3 $_level || eval $(THROW 7 _internal2 $_level $_fn)
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
     _type=$(ctx_get ${_pfx}TYPE)
     [ -z "$_PARAMS" ] && eval _PARAMS=\"\${PARAMS_BASE} \${PARAMS_${_type}}\"
 
     for _PARAM in $_PARAMS ; do
+        unset _value  # Unset to prevent stale values from polluting the validation
+        eval  _value="\${${_pfx}${_PARAM}}"
+
         _param=$(echo "$_PARAM" | tr '[:upper:]' '[:lower:]')
-        _funct="validate_param_$_param"
-        quiet type $_funct || eval $(THROW 1 ${_fn} $_PARAM $_funct)     # Verify _funct exists
+        _validation_function="validate_param_$_param"
+        quiet type $_validation_function || eval $(THROW 6 ${_fn} $_PARAM $_funct)
 
-        # Hard failures, throw fast
-        eval $_funct \"\${${_pfx}${_PARAM}}\" "$_cell" "$_pfx" || eval $(THROW $?)
-        [ "$_warn" = "2" ] && [ "$WARN_CNT" -gt "$_warn_start" ] && eval $(THROW 2)
+        # _level _value _cell _pfx are downward-scoped to avoid 'parameter drilling' in validation
+        eval $_validation_function || PASS -C "$_pass" || eval $(THROW $?)
     done
-
-    # Return based on warning policy
-    [ "$WARN_CNT" -gt "$_warn_start" ] && [ "$_warn" -gt 0 ] && CLEAR && return 2 || return 0
 }
 
 # Initializes a new cell runtime in /var/run. This will clobber any existing runtime file
@@ -252,8 +249,8 @@ ctx_bootstrap_runtime() {
         || eval $(THROW $? _generic "Cell < $_cell > bootstrap failed")
 
     # Validation and CTX can tolerate the misisng datasets without throwing
-    ctx_validate_params $_cell  || eval $(THROW 1 _generic "Cell validation failed")
-    ctx_write_runtime $_cell    || eval $(THROW 1 _generic "Failed to write runtime context")
+    ctx_validate_params 3 $_cell  || eval $(THROW $? _generic "Cell validation failed")
+    ctx_write_runtime $_cell    || eval $(THROW $? _generic "Failed to write runtime context")
     return 0
 }
 
