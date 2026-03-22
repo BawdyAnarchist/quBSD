@@ -114,7 +114,7 @@ validate_param_maxmem() {
 
     query_sysmem
     _bytes=$(normalize_bytesize $_value)
-    assert_int_comparison -l "$_bytes" -- $SYSMEM || eval $(WARN $_fn $_cell $_value $_bytes $SYSMEM)
+    assert_int_comparison -l "$SYSMEM" -- $_bytes || eval $(WARN $_fn $_cell $_value $_bytes $SYSMEM)
 }
 
 validate_param_memsize() {
@@ -125,7 +125,7 @@ validate_param_memsize() {
 
     query_sysmem
     _bytes=$(normalize_bytesize $_value)
-    [ "$_bytes" -lt "$SYSMEM" ] || eval $(THROW 153 $_fn $_cell $_value $_bytes $SYSMEM)
+    assert_int_comparison -l "$SYSMEM" -- $_bytes || eval $(WARN $_fn $_cell $_value $_bytes $SYSMEM)
 }
 
 validate_param_mtu() {
