@@ -1,3 +1,4 @@
+#!/bin/sh
 
 validate_param_autostart() {
     local _fn="validate_param_autostart"
@@ -50,11 +51,13 @@ validate_param_cpuset() {
     assert_cpuset "$_value" || eval $(THROW 148)
     [ "$_level" -le 2 ] && return 0
 
-    quiet cpuset -l "$_value" && return 0 || eval $(THROW 149 $_fn $_cell $_value)
+    quiet cpuset -l "$_value" || eval $(THROW 148 $_fn $_cell $_value)
+    return 0
 }
 
 validate_param_envsync() { ##########  STUB  FOR  NOW  ################################################################
     local _fn="validate_param_envsync"
+    # [some test] || eval $(THROW 149 $_fn)
 }
 
 validate_param_gateway() {
@@ -66,45 +69,39 @@ validate_param_gateway() {
     [ "$_level" -le 1 ] && return 0
 
     ctx_bootstrap_cell $_value "val_" || eval $(THROW 150 _cellref $_cell GATEWAY $_value)
-    return 0
 }
 
 validate_param_ipv4() {
-## Must integrate this line, doesnt belong in assert
-## Reserve a.b.c.1 (ending in .1) for the gateway  
-#[ "$_a3" = "1" ] && eval $(THROW 1 $_fn IPV4 $_value) || return 0
-
     local _fn="validate_param_ipv4" _type _gw _gw_type _cli_confs
 
     case $_value in
-        none|auto|DHCP) return 0 ;;  # Control values must return early (cant offload to checks.sh)
-        *) assert_ipv4 $_value || eval $(THROW 151) ;;  # Purely checks for CIDR format
+        none|auto|DHCP) return 0 ;;
+        *) assert_ipv4 $_value "true" || eval $(THROW 151) ;;
     esac
+    [ "$_level" -le 1 ] && return 0
 
-    # Validation differs by TYPE. Guarantee value
+    # Validation differs by TYPE
     [ -z "$_type" ] && { _type=$(query_cell_type $_cell) || eval $(THROW 151) ;}
 
     # VM with CIDR is harmless, but warn user to prevent belief that it can be set like this
-    if [ "$_type" = "VM" ] ; then
-        eval $(WARN $_fn $_cell)
-        return 0
-    fi
+    [ "$_type" = "VM" ] && eval $(WARN $_fn $_cell) && return 0  # No addtl checks for impotent IPV4
 
-    # Jails only. Check for collisions against both config, and runtime (if there is one)
+    # Jails only. Pull relevant gateway information required for config/runtime guarantees
     _gw=$(query_cell_param $_cell GATEWAY) || eval $(THROW 151)
-    [ "$_gw" = "none" ] && return 0
     _gw_type=$(query_cell_type $_gw) || eval $(THROW 151)
     _cli_confs=$(query_gw_client_configs $_gw)
 
+    # Static config checks
+    [ "$_gw" = "none" ] && return 0   # Nothing further to check
+    [ "$_gw_type" = "VM" ] && eval $(WARN ${_fn}_2 $_gw) # VM-gw normally has DHCP (but not always)
+    [ "$_cli_confs" ] && grep -Eqs "$_value" $_cli_confs \
+        && eval $(THROW ${_fn} $_cell $_value $_gw)  # Direct config collision
+    [ "$_level" -le 2 ] && return 0
+
+    # Runtime collisions
     if is_cell_running $_gw ; then
-        is_route_available $_gw $_value || eval $(THROW 151 $_fn $_cell $_value $_gw)  # Runtime collision
+        is_route_available $_gw $_value || eval $(THROW 151 ${_fn}_2 $_cell $_value $_gw)
     fi
-
-    # Config collision
-    [ "$_cli_confs" ] && grep -Eqs "$_value" $_cli_confs && eval $(WARN ${_fn}2 $_cell $_value $_gw)
-
-    # Jails with a VM-gateway should usually be DHCP (but could have valid config with static CIDR)
-    [ "$_gw_type" = "VM" ] && eval $(WARN ${_fn}3 $_gw)
 }
 
 validate_param_maxmem() {
@@ -118,7 +115,6 @@ validate_param_maxmem() {
     query_sysmem
     _bytes=$(normalize_bytesize $_value)
     assert_int_comparison -l "$_bytes" -- $SYSMEM || eval $(WARN $_fn $_cell $_value $_bytes $SYSMEM)
-    return 0
 }
 
 validate_param_memsize() {
@@ -174,7 +170,7 @@ validate_param_rootenv() {
     assert_cellname "$_value" || eval $(THROW 158)
     [ "$_level" -le 1 ] && return 0
 
-    ctx_bootstrap_cell $_value "val_" && return 0 || eval $(THROW 158 _cellref $_cell ROOTENV $_value)
+    ctx_bootstrap_cell $_value "val_" || eval $(THROW 158 _cellref $_cell ROOTENV $_value)
 }
 
 validate_param_r_zfs() {
@@ -212,7 +208,8 @@ validate_param_template() {
 
     # Pivot the check based on CLASS
     _class=$(ctx_get ${_pfx}CLASS)
-    [ -z "$_class" ] && _class=$(query_cell_param $_cell CLASS) || eval $(THROW 163)
+
+    [ -z "$_class" ] && { _class=$(query_cell_param $_cell CLASS) || eval $(THROW 163) ;}
 
     case $_class in
         disp*) ctx_bootstrap_cell $_value "val_" || eval $(THROW 163 _cellref $_cell TEMPLATE $_value) ;;
