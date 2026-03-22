@@ -31,7 +31,7 @@ export DEBUG1="/root/debug1"
 export DEBUG2="/root/debug2"
 : ${VERBOSE:=}     # [true|false] Print commands to console before running them
 : ${DRY_RUN:=}     # [true|false] Do not execute, just print commands to the console
-: ${TRACE:=}       # [true|false] Show the function trace in error/warning messages
+: ${TRACE:=true}   # [true|false] Show the function trace in error/warning messages
 
 # Primary qubsd files
 export QCOMMON="$QLIB/common.sh"
