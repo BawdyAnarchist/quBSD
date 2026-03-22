@@ -37,13 +37,15 @@ MUTE() { "$@" || { rm -f $ERR ; return 1 ;};}
 CLEAR() { WARN_CNT=0 ; rm -f $ERR ; return 0 ;}
 
 # Means of ignoring specific error codes. Simultaneous [-C] CLEAR $ERR, if desired.
+# Example: my_funct || PASS -C "11 121 242" || eval $(THROW $?)
 PASS() {
     RC=$?  # Exit code of function in question must be immediate
+    [ -z "$1" ] && return $RC  # In some cases, $1 could be blank. Passthru error code in that case
     [ "$1" = "-C" ] && { _C=true ; shift ;}
 
     case " $1 " in
         *" $RC "*) [ "$_C" ] && CLEAR ; unset _C ; return 0  ;;
-        *) unset _C ; return 1 ;;
+        *) unset _C ; return $RC ;;
     esac # RC intentionally left as a global so that callers retain flexibility.
 }
 
