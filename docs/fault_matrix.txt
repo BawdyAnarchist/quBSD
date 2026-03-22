@@ -1,17 +1,19 @@
 These codes are for use in the library functions and primitives. They inform higher level scripts exactly what/where the error was, as many scripts have differing boundaries for what is acceptable vs not; and what is repairable vs not.
 
 The operational principle is a 4-level system of errors:
-qubsd/internal
+qubsd/internal:
   - Unhandled/undefined; framework bugs, internal code errors, useful messages for development bugs
-Syntax/Assert
+Syntax/Assert:   _level=1
   - Invalid user input, missing arguments, bad formatting
-Config/Topology
+Config/Topology: _level=2
   - Static dependenices: missing files, datasets, snapshots. 
-Runtime/State
+Runtime/State:   _level=3
   - Dynamic system allocations: IP collisions, file locks, process state, system resource availability
 
-Validate: An code type necessary for explicit exception PASS() related to ctx_validate_params()
-  - Specific to ctx_validate_params and validate.sh. Necessary for validation levels and exceptions
+Additional Category:
+Validate:
+  - Scripts of varying purposes need the ability to PASS (ignore) explicit ctx_validate_params()
+    failiures without THROWing ctx_validate_params(). Thus, validate.sh gets unique codes.
 
 CODE  LEVEL      DESCRIPTION
 1     internal   General errors
@@ -67,7 +69,7 @@ CODE  LEVEL      DESCRIPTION
 148   validate   cpuset
 149   validate   envsync
 150   validate   gateway
-151   validate   ipv
+151   validate   ipv4
 152   validate   maxmem
 153   validate   memsize
 154   validate   mtu
