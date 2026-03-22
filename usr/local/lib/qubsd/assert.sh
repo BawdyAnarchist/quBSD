@@ -88,8 +88,10 @@ assert_class() {
     echo "$CLASSES" | grep -Eqs -- "(^| )$1( |\$)" || eval $(THROW 18 _invalid CLASS $1)
 }
 
+# Optional $2: (_extra), to ensure that the last bit in the IP is not '1'.  It's required for the
+# automated gateway/client management. But some assert_ipv4() calls might not care about this.
 assert_ipv4() {
-    local _fn="assert_ipv4" _val="$1" _b1 _b2 _b3
+    local _fn="assert_ipv4" _val="$1" _b1 _b2 _b3 _extra="$1"
 
     # Not as technically correct as a regex, but it's readable and functional
     # IP represented by the form: a0.a1.a2.a3/a4 ; b-variables are local/ephemeral
@@ -112,6 +114,9 @@ assert_ipv4() {
         && [ "$_a2" -ge 0 ] && [ "$_a2" -le 255 ] && [ "$_a3" -ge 0 ] && [ "$_a3" -le 255 ] \
         && [ "$_a4" -ge 0 ] && [ "$_a4" -le 32 ] ;} \
         || eval $(THROW 15 _invalid2 IPV4 "$_val" "Use CIDR notation (with subnet)")
+
+    # With the $_extra flag, reserve a.b.c.1 (ending in .1) for the gateway
+    [ "$_extra" ] && [ "$_a3" = "1" ] && eval $(THROW 15 $_fn IPV4 $_value)
     return 0
 }
 
