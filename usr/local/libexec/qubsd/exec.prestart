@@ -99,6 +99,5 @@ RT_CTX=$D_RUNTM/$CELL/ctx.conf
 trap_init
 trap_push "$QLEXEC/exec.release $CELL"   # Cleanup mounts and runtime
 
-main1 || { cat $ERR ; exit 1 ;}
-
+main1 || FATAL
 exit 0   # Script exits success, to not abort jail startup

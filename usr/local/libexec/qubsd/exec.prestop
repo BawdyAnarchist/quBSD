@@ -35,6 +35,5 @@ main() {
     return 0
 }
 
-main || { cat $ERR ; exit 1 ;}
-
+main || FATAL
 exit 0   # Guarantee that `jail` does not abort startup
