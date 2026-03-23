@@ -14,12 +14,16 @@ compose_cleanup_cmds() {
     [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
     [ "$_mounts" ] && _CMD_UNMOUNT="unmount -f $_mounts"
 
-    # Make sure the persist dataset is mounted. [-l load-key] for encrypted datasets
-    [ "$P_MNT" ] && _mounted=$(echo_grep "$DATASETS" "$P_ZFS" | awk '{print $3}')
-    if [ ! "$_mounted" = "yes" ] ; then
-        is_needpop \
-            && _CMD_ZFS_MOUNT="create_popup -c \"zfs mount -l $P_ZFS\"" \
-            || _CMD_ZFS_MOUNT="zfs mount -l $P_ZFS"
+    # If the persist dataset was found (has P_MNT), then make sure its mounted
+    if [ "$P_MNT" ] ; then
+        _mounted=$(echo_grep "$DATASETS" "$P_DSET" | awk '{print $3}')
+
+        # Handles both mount and encryption password
+        if [ ! "$_mounted" = "yes" ] ; then
+            is_needpop \
+                && _CMD_ZFS_MOUNT="create_popup -c \"zfs mount -l $P_DSET\"" \
+                || _CMD_ZFS_MOUNT="zfs mount -l $P_DSET"
+        fi
     fi
 
     # Guarantee basic persistence directories. mkdir is idempotent
