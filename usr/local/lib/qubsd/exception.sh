@@ -5,7 +5,7 @@
 # Output redirects for internal library use. Prepend commands with quiet(), hush(), or mute()
 quiet() { "$@" > /dev/null 2>&1 ;}  # Suppress all stdout, $ERR still written
 hush() { "$@" 2>/dev/null ;}        # Suppress errors from stdout, $ERR still written
-mute() {                            # Suppress all stdout, and suppress $ERR writes
+mute() {                            # Suppress all stdout, and revert any $ERR writes
     local _return _err=$(cat $ERR 2>/dev/null)
     "$@" > /dev/null 2>&1 ; _return=$?
     [ "$_err" ] && printf '%s' "$_err" > $ERR || rm -f $ERR
