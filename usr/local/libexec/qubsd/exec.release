@@ -53,7 +53,8 @@ compose_commands() {
 main() {
     local _fn="main"
 
-    mute ctx_load_runtime || ctx_bootstrap_runtime $CELL || eval $(THROW $?)
+    # bootstrap only needs level 2. Otherwise established runtime might conflict with validation
+    mute ctx_load_runtime || ctx_bootstrap_runtime -l 2 $CELL || eval $(THROW $?)
 
     compose_commands || eval $(THROW $?)
 

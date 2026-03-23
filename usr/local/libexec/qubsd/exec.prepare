@@ -51,11 +51,11 @@ resolve_runtime_context() {
 
     # Load runtime context. 'exec' caller shouldn't exist, if it does, it's stale
     mute ctx_load_runtime   # Dont care if it fails, and dont want an $ERR if it fails
-    [ "$CALLER" = "exec" ] && rm -f $RT_CTX
+    [ "$CALLER" = "exec" ] && rm -f $RT_CTX && unset CALLER
 
     # If CALLER is empty, then qb isnt coordinating, and `jail` must initialize the runtime context
     if [ -z "$CALLER" ] ; then
-        ctx_bootstrap_runtime $CELL || eval $(THROW $?)
+        ctx_bootstrap_runtime -l 3 -P 121 $CELL || eval $(THROW $?)
     fi
     return 0
 }
