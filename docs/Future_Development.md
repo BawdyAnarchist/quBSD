@@ -15,11 +15,6 @@ xephyr-xclip daemon still has demons
    - You need to kill the clipboard ownership inside the source as well after releasing. Otherwise you get inconsistent waffling on lease expiry, where what FEELS like stale clipboard then can still paste if you're inside the same socket for a window. Causes problems
 
 
-THROW code enhancements:
-  - you left of at validation primitives -> adding levels, and the PARAM validation function needs new options
-  - high level scripts still need throw codes integrated (including $?)
-
-
 ### Import things in the code as I overhaul that still need addressed
 exec.postart
   - "hacky exception to schg due to resolv and resolvconf"
