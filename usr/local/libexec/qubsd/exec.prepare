@@ -8,8 +8,7 @@ trap_init
 trap_push "rm -rf $D_RUNTM/$CELL"  # Trap here, because RT_CTX might already exist
 
 compose_cleanup_cmds() {
-    local _fn="compose_cleanup_cmds" _mounts _mounted _rootsnap _die
-
+    local _fn="compose_cleanup_cmds" _mounts _mounted
     # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
     [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
     [ "$_mounts" ] && _CMD_UNMOUNT="unmount -f $_mounts"

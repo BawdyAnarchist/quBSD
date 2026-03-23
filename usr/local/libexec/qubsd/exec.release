@@ -9,7 +9,7 @@ trap_push "rm -rf $D_RUNTM/$CELL"
 
 # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
 compose_cleanup_cmds() {
-    local _fn="compose_cleanup_cmds" _mounts _rootsnap _die _encrypt _proc
+    local _fn="compose_cleanup_cmds" _mounts _encrypt _proc
 
     # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
     [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
@@ -19,8 +19,10 @@ compose_cleanup_cmds() {
     _CMD_CLEAN_VARRUN="hush rm -rf $D_RUNTM/$CELL"
 
     # Determine the mount status of the persistence
-    [ "$P_MNT" ] && _encrypt=$(echo_grep "$DATASETS" "$P_DSET" | awk '{print $5}')
-    { [ "$_encrypt" ] && [ ! "$_encrypt" = "off" ] ;} && _CMD_ENCRYPT="zfs umount -u $P_DSET"
+    if [ "$P_MNT" ] ; then
+        _encrypt=$(query_datasets $P_DSET ; echo_grep "$DATASETS" "$P_DSET" | awk '{print $5}')
+        { [ "$_encrypt" ] && [ ! "$_encrypt" = "off" ] ;} && _CMD_ENCRYPT="zfs umount -u $P_DSET"
+    fi
 
     # Flags come down after stopping, but fork process and silence, to reduce user lag
     [ -d "$P_MNT" ] && _CMD_CHFLAGS="exec chflags -fR noschg $P_MNT > /dev/null 2>&1"
