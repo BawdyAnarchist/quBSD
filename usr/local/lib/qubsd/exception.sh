@@ -13,7 +13,8 @@ mute() {                            # Suppress all stdout, and suppress $ERR wri
     return $_return
 }
 
-clear_err() { rm -f $ERR ; return 0 ;}  # Remove the $ERR file
+# Remove the $ERR file
+clear_err() { rm -f $ERR ; return 0 ;}
 
 # Primary error, message, and tracing system
 THROW() {
@@ -73,7 +74,6 @@ WARN() {
     if [ "$_trace" ] || [ "$_msg" ] ; then
         printf "$_trace $_msg\n" "$@" >> $ERR
     fi
-    echo ': $(( WARN_CNT += 1 ))'   # Increment warn counter must be done by parent
 }
 
 # Means of ignoring specific error codes. Simultaneous [-c] clear_err $ERR, if desired.
