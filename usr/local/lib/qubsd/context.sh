@@ -191,7 +191,7 @@ ctx_validate_params() {
         quiet type $_validation_function || eval $(THROW 6 ${_fn} $_PARAM $_funct)
 
         # _level _value _cell _pfx are downward-scoped to avoid 'parameter drilling' in validation
-        eval $_validation_function || PASS -C "$_pass" || eval $(THROW $?)
+        eval $_validation_function || PASS -c "$_pass" || eval $(THROW $?)
     done
 }
 
@@ -245,7 +245,7 @@ ctx_bootstrap_runtime() {
     local _fn="ctx_bootstrap_runtime" _cell _pfx="$2"
     assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
 
-    ctx_bootstrap_cell $_cell $_pfx || PASS -C 121 \
+    ctx_bootstrap_cell $_cell $_pfx || PASS -c 121 \
         || eval $(THROW $? _generic "Cell < $_cell > bootstrap failed")
 
     # Validation and CTX can tolerate the misisng datasets without throwing
