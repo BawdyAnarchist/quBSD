@@ -44,7 +44,7 @@ compose_flags_commands() {
 main() {
     local _fn="main"
 
-    MUTE ctx_load_runtime  || ctx_bootstrap_runtime $CELL || eval $(THROW $?)
+    mute ctx_load_runtime  || ctx_bootstrap_runtime $CELL || eval $(THROW $?)
 
     compose_rctl_commands
     compose_flags_commands
