@@ -242,15 +242,15 @@ ctx_load_runtime() {
 }
 
 ctx_bootstrap_runtime() {
-    local _fn="ctx_bootstrap_runtime" _opts OPTIND OPTARG _cell _level _pass _pfx="$2"
+    local _fn="ctx_bootstrap_runtime" _opts OPTIND OPTARG _cell _level _pass _pfx
 
-    while getopts :P: _opts ; do case $_opts in
+    while getopts :l:P: _opts ; do case $_opts in
         l)  _level="$OPTARG" ;;  # Validation level to pass ctx_validate_params
         P)  _pass="$OPTARG" ;;   # Failure codes to PASS after ctx_bootstrap_cell
         *)  eval $(THROW 8 _internal1) ;;
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-    assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
+    assert_args_set 1 "$1" && _cell="$1" && _pfx="$2" || eval $(THROW $?)
 
     ctx_bootstrap_cell $_cell $_pfx || PASS -c $_pass \
         || eval $(THROW $? _generic "Cell < $_cell > bootstrap failed")
