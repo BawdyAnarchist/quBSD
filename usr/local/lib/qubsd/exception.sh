@@ -158,6 +158,6 @@ elapsed() {
 # Activate full shell log for debugging. Use `set +x` to deactivate at a later point in a script
 debug() {
 	 set -x
-	 rm $DEBUG1 > /dev/null 2>&1
-	 exec > $DEBUG1 2>&1
+	 rm $DEBUG > /dev/null 2>&1
+	 exec > $DEBUG 2>&1
 }
