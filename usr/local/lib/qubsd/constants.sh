@@ -22,11 +22,10 @@ export D_XFER="$QRUN/xfer"
 export D_QTMP="$QRUN/tmp"
 
 # Exception system and diagnostics
-export TRAP="rm_err"
+export ERR="$D_QERR/$BASENAME.$$.err"
+export TRAP="rm -f $ERR"
 export TRAP_SIGS="HUP INT TERM QUIT EXIT"
 export BASENAME="$(basename $0)"
-export ERR="$D_QERR/$BASENAME.$$.err"
-export WARN_CNT=0
 export DEBUG1="/root/debug1"
 export DEBUG2="/root/debug2"
 : ${VERBOSE:=}     # [true|false] Print commands to console before running them
