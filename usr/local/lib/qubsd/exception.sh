@@ -1,16 +1,15 @@
 #!/bin/sh
 
-
-##################################### ERROR TRACING SYSTEM #########################################
+###################################### ERROR HANDLING SYSTEM #######################################
 
 # Output redirects for internal library use. Prepend commands with quiet(), hush(), or mute()
 quiet() { "$@" > /dev/null 2>&1 ;}  # Suppress all stdout, $ERR still written
 hush() { "$@" 2>/dev/null ;}        # Suppress errors from stdout, $ERR still written
 mute() {                            # Suppress all stdout, and suppress $ERR writes
-    "$@" && return 0
-    local _return=$?
-    rm -f $ERR
-    return $_return
+    local _return _err=$(cat $ERR 2>/dev/null)
+    "$@" > /dev/null 2>&1 ; _return=$?
+    [ "$_err" ] && printf '%s' "$_err" > $ERR || rm -f $ERR
+    return $_return  # Pass through the return code
 }
 
 # Remove the $ERR file
@@ -87,6 +86,12 @@ PASS() {
         *" $RC "*) [ "$_c" ] && clear_err ; unset _c ; return 0  ;;
         *) unset _c ; return $RC ;;
     esac # RC intentionally left as a global so that callers retain flexibility.
+}
+
+FATAL() {
+    local _exit=$?
+    [ -f "$ERR" ] && cat $ERR
+    exit $_exit
 }
 
 
