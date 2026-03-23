@@ -164,10 +164,10 @@ query_datasets() {
     # Either add to the existing, or generate new DATASETS
     if [ "$DATASETS" ] ; then
         DATASETS=$(echo "$DATASETS" \
-            ; hush zfs list -rHo name,mountpoint,mounted,origin,encryption $_pull) \
+            ; hush zfs list -Ho name,mountpoint,mounted,origin,encryption $_pull) \
             || eval $(THROW 121)
     else
-        DATASETS=$(hush zfs list -rHo name,mountpoint,mounted,origin $_pull) \
+        DATASETS=$(hush zfs list -Ho name,mountpoint,mounted,origin,encryption $_pull) \
             || eval $(THROW 121)
     fi
     return 0
