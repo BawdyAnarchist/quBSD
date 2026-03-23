@@ -20,11 +20,10 @@ exec.postart
   - "hacky exception to schg due to resolv and resolvconf"
 exec.created
   - I think I removed the chaining starts. Maybe think about adding that back in? Not sure. Maybe qb start should do that only
-exec.release (when with jail -vr <jail>)
-  - CMD_DECRYPT is dubious -> this should be CMD_ENCRYPT or CMD_Z_UMOUNT. Also, does CMD_UMOUNT already umount the dataset?doubt it
-exec.prepare
-  - the zfs mount -l commands arent working right
-Need to consider the /compat in the flags. It's not totally straightforward coz you shouldnt just hardcode /compat/ubuntu as a path
+
+
+### Bugs
+qubsd-dhcpd needs reviewed/fixed, because it's causing hanging and dropped packets due to being too aggressive
 
 
 ### UPGRADES
