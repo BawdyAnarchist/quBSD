@@ -9,26 +9,26 @@ trap_push "rm -rf $D_RUNTM/$CELL"
 
 # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
 compose_cleanup_cmds() {
-    local _fn="compose_cleanup_cmds" _mounts _rootsnap _die _encrypt
+    local _fn="compose_cleanup_cmds" _mounts _rootsnap _die _encrypt _proc
 
     # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
     [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
     [ "$_mounts" ] && _CMD_UNMOUNT="unmount -f $_mounts"
-    return 0
 
     # Clean up the jail's /var/run directory
-    _CMD_CLEAN_VARRUN="hush rm -rf $RUNTM/$CELL"
+    _CMD_CLEAN_VARRUN="hush rm -rf $D_RUNTM/$CELL"
 
     # Determine the mount status of the persistence
-    [ "$P_ZFS" ] && _encrypt=$(echo_grep "$DATASETS" "$P_ZFS" | awk '{print $5}')
-    { [ "$_encrypt" ] && [ ! "$_encrypt" = "off" ] ;} && _CMD_DECRYPT="zfs umount -u $P_ZFS"
+    [ "$P_MNT" ] && _encrypt=$(echo_grep "$DATASETS" "$P_DSET" | awk '{print $5}')
+    { [ "$_encrypt" ] && [ ! "$_encrypt" = "off" ] ;} && _CMD_ENCRYPT="zfs umount -u $P_DSET"
 
     # Flags come down after stopping, but fork process and silence, to reduce user lag
-    [ -d "$P_MNT" ] && _CMD_CHFLAGS="exec chflags -fR noschg $P_MNT"
+    [ -d "$P_MNT" ] && _CMD_CHFLAGS="exec chflags -fR noschg $P_MNT > /dev/null 2>&1"
 
     # If dhcp is never found for, exec.poststart runs forever, and stays even after jail -r
     # Neither pkill -15; nor pkill -9; nor kill -15 work here. Only kill -9
-    _CMD_KILL_POSTSTART="kill -9 $(hush pgrep -f "exec.poststart $CELL")"
+    _proc=$(hush pgrep -f "exec.poststart $CELL")
+    [ "$_proc" ] && _CMD_KILL_POSTSTART="kill -9 $_proc"
 
 }
 
@@ -55,10 +55,10 @@ main() {
 
     compose_commands || eval $(THROW $?)
 
-    _COMMANDS="_CMD_UNMOUNT _CMD_CLEAN_VARRUN _CMD_CHFLAGS _CMD_ENCRYPT
+    _COMMANDS="_CMD_UNMOUNT _CMD_CLEAN_VARRUN _CMD_ENCRYPT
                _CMD_SNAPSHOT_ROOT _CMD_DESTROY_ROOT _CMD_CLONE_ROOT _CMD_UPDATE_R_MNT_RTCTX
                _CMD_SNAPSHOT_PERSIST _CMD_DESTROY_PERSIST _CMD_CLONE_PERSIST _CMD_UPDATE_P_MNT_RTCTX _CMD_FIX_PW
-               _CMD_KILL_POSTSTART"
+               _CMD_KILL_POSTSTART _CMD_CHFLAGS"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
 
     return 0
