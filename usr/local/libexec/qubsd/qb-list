@@ -17,7 +17,7 @@ parse_args() {
             p) PARAM="$OPTARG" ;;
             s) snaps="true" ;;
             z) zfs="true" ;;
-            *) eval $(THROW 1 _generic "Invalid option") ;;
+            *) eval $(THROW 8 _generic "Invalid option") ;;
         esac
     done ; shift $(( OPTIND - 1 ))
     _pos1="$1" ; _pos2="$2"
@@ -41,7 +41,7 @@ parse_args() {
     fi
 
     # Sanitize missing cell
-    { [ "$snaps" ] || [ "$zfs" ] ;} && [ -z "$CELL" ] && eval $(THROW 1 missing_cell)
+    { [ "$snaps" ] || [ "$zfs" ] ;} && [ -z "$CELL" ] && eval $(THROW 4 missing_cell)
 
     # Convert lower-case entered PARAM to upper (user-friendly)
     [ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
@@ -64,12 +64,11 @@ retrieve_data() {
     _cells_files=$(ls -1 $D_CELLS | tr '\n' ' ' | sed "s|^|$D_CELLS/|; s| | $D_CELLS/|g")
 
     # Define which files should be searched for the defaults
-    _param_type=$(query_param_type $PARAM)
+    _param_type=$(query_param_type $PARAM) || eval $(THROW $?)
     case $_param_type in
         base) _defaults_files="$DEF_BASE $DEF_JAIL $DEF_VM" ;;
         jail) _defaults_files="$DEF_BASE $DEF_JAIL" ;;
         vm)   _defaults_files="$DEF_BASE $DEF_VM" ;;
-        *)    eval $(THROW 1 bad_param $PARAM) ;;
     esac
 
     # These variables allow for later separation regarding which PARAMS are default values
@@ -132,12 +131,12 @@ write_results() {
 main() {
     local _fn="main"
 
-    parse_args "$@" || eval $(THROW 1)
-    retrieve_data   || eval $(THROW 1)
+    parse_args "$@" || eval $(THROW $?)
+    retrieve_data   || eval $(THROW $?)
     write_results
 
     cat $RESULTS | column -t
 }
 
-main "$@" || { cat $ERR ; exit 1 ;}
+main "$@" || FATAL
 exit 0
