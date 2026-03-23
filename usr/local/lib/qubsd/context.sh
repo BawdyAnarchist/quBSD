@@ -22,7 +22,7 @@ ctx_bootstrap_cell() {
         is_path_exist -f $_jconf || eval $(THROW $? $_fn $_cell)
     fi
 
-    # Save for last. If dataset is missing (will be recloned), all other checks have been completed
+    # Save for last. If dataset missing, it can be recloned, all other checks have been completed
     ctx_add_zfs $_cell $_pfx     || eval $(THROW $? $_fn $_cell)  # Cell-specific datasets
 
     return 0
@@ -242,15 +242,22 @@ ctx_load_runtime() {
 }
 
 ctx_bootstrap_runtime() {
-    local _fn="ctx_bootstrap_runtime" _cell _pfx="$2"
+    local _fn="ctx_bootstrap_runtime" _opts OPTIND OPTARG _cell _level _pass _pfx="$2"
+
+    while getopts :P: _opts ; do case $_opts in
+        l)  _level="$OPTARG" ;;  # Validation level to pass ctx_validate_params
+        P)  _pass="$OPTARG" ;;   # Failure codes to PASS after ctx_bootstrap_cell
+        *)  eval $(THROW 8 _internal1) ;;
+    esac  ;  done  ;  shift $(( OPTIND - 1 ))
+
     assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
 
-    ctx_bootstrap_cell $_cell $_pfx || PASS -c 121 \
+    ctx_bootstrap_cell $_cell $_pfx || PASS -c $_pass \
         || eval $(THROW $? _generic "Cell < $_cell > bootstrap failed")
 
     # Validation and CTX can tolerate the misisng datasets without throwing
-    ctx_validate_params 3 $_cell  || eval $(THROW $? _generic "Cell validation failed")
-    ctx_write_runtime $_cell    || eval $(THROW $? _generic "Failed to write runtime context")
+    ctx_validate_params $_level $_cell || eval $(THROW $? _generic "Cell validation failed")
+    ctx_write_runtime $_cell || eval $(THROW $? _generic "Failed to write runtime context")
     return 0
 }
 
