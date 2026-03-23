@@ -19,7 +19,8 @@ CODE  LEVEL      DESCRIPTION
 1     internal   General errors
 2     internal   Negative responses that are not errors
 3     internal   trap_push sanitization failed 
-4-5   internal   <UNUSED>
+4     internal   qb-script THROWS (non-lib failures)
+5     internal   <UNUSED>
 6     internal   Invalid function-call attempt
 7     internal   Invalid value passed to a function
 8     internal   Function was passed an invalid option
