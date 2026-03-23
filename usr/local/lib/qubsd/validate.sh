@@ -253,7 +253,7 @@ validate_cellname() {
     local _cellpath=$D_CELLS/$_value _jailpath=$D_JAILS/$_value
     assert_new_cellname $_value || eval $(THROW 1)
 
-    # Check config file path and zfs dataset clobber. MUTE because failure of `is_`, is passing.
+    # Check config file path and zfs dataset clobber.
     is_path_exist -f $_cellpath && eval $(THROW 1 $_fn $_value path $_cellpath)
     is_path_exist -f $_jailpath && eval $(THROW 1 $_fn $_value path $_jailpath)
     is_zfs_exist "$_r_zfs" && eval $(THROW 1 $_fn $_value dataset $_r_zfs)
