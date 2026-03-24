@@ -46,7 +46,7 @@ ctx_unset() {
     esac ; done ; shift $(( OPTIND - 1 ))
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
-    [ -z "$_PARAMS" ] && _PARAMS="$PARAMS_BASE $PARAMS_JAIL $PARAMS_VM $CONTEXT"
+    [ -z "$_PARAMS" ] && _PARAMS="$PARAMS_ALL $CONTEXT"
 
     [ "$_pfx" ] && unset $_pfx
     unset $(echo "$_PARAMS" | sed "s/^/$_pfx/; s/ / $_pfx/g")
@@ -83,8 +83,7 @@ ctx_load_params() {
     local _fn="ctx_load_params" _pfx="$2" _cell _type _params_type _param _val
     assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
 
-    # For convenience, we also assign ALL_PARAMS and TYPE_PARAMS as global context variables
-    PARAMS_ALL="$PARAMS_BASE $PARAMS_JAIL $PARAMS_VM"
+    # For convenience, we assign PARAMS_TYPE as global
     _type=$(ctx_get ${_pfx}TYPE)
     eval ${_pfx}PARAMS_TYPE=\"\${PARAMS_BASE} \${PARAMS_${_type}}\"
     _params_type=$(ctx_get ${_pfx}PARAMS_TYPE)
