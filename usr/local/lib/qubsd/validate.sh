@@ -247,17 +247,25 @@ validate_param_wiremem() {
 
 ########################################  MISC VALIDATIONS  ########################################
 
-# Validates that proposed cellname does not collide with existing cells, files, or datasets
 validate_cellname() {
-    local _fn="validate_cellname" _value="$_value" _r_zfs="$_cell" _u_zfs="$3"
+    local _fn="validate_cellname" _value="$1"
+    assert_cellname "$_value" || eval $(THROW $?)
+    [ "$_level" -le 1 ] && return 0
+
+    is_path_exist -f $D_CELLS/$_value || eval $(THROW 181 $_fn $_value $D_CELLS)
+}
+
+# Validates that proposed cellname does not collide with existing cells, files, or datasets
+validate_cellname_new() {
+    local _fn="validate_cellname_new" _value="$_value" _r_zfs="$_cell" _u_zfs="$3"
     local _cellpath=$D_CELLS/$_value _jailpath=$D_JAILS/$_value
-    assert_new_cellname $_value || eval $(THROW 1)
+    assert_new_cellname $_value || eval $(THROW 182)
 
     # Check config file path and zfs dataset clobber.
-    is_path_exist -f $_cellpath && eval $(THROW 1 $_fn $_value path $_cellpath)
-    is_path_exist -f $_jailpath && eval $(THROW 1 $_fn $_value path $_jailpath)
-    is_zfs_exist "$_r_zfs" && eval $(THROW 1 $_fn $_value dataset $_r_zfs)
-    is_zfs_exist "$_u_zfs" && eval $(THROW 1 $_fn $_value dataset $_u_zfs)
+    is_path_exist -f $_cellpath && eval $(THROW 182 $_fn $_value path $_cellpath)
+    is_path_exist -f $_jailpath && eval $(THROW 182 $_fn $_value path $_jailpath)
+    is_zfs_exist "$_r_zfs" && eval $(THROW 182 $_fn $_value dataset $_r_zfs)
+    is_zfs_exist "$_u_zfs" && eval $(THROW 182 $_fn $_value dataset $_u_zfs)
     return 0      # No failures, cellname is available
 }
 

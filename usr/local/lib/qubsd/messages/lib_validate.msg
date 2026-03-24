@@ -1,5 +1,9 @@
 
 :validate_cellname:
+Cell < %s > has no config in %s
+/END/
+
+:validate_cellname_new:
 Cellname < %s > collides with existing %s < %s >
 /END/
 
@@ -16,6 +20,10 @@ Cell < %s >, invalid cpuset < %s >. `cpuset -g` for list of available CPUs
 /END/
 
 :validate_param_ipv4:
+Cell < %s > IPV4 < %s > collides with sibling client of gateway < %s >
+/END/
+
+:validate_param_ipv4_2:
 Cell < %s > IPV4 < %s > conflicts with running config of gateway < %s >
 /END/
 
@@ -23,11 +31,7 @@ Cell < %s > IPV4 < %s > conflicts with running config of gateway < %s >
 IPV4 assignment has no effect for VM < %s >. You must modify internal VM config
 /END/
 
-:w:validate_param_ipv42:
-Cell < %s > IPV4 < %s > collides with sibling client of gateway < %s >
-/END/
-
-:w:validate_param_ipv43:
+:w:validate_param_ipv4_2:
 GATEWAY < %s > is a VM. Most VM-gateways serve DHCP. Ensure GATEWAY is configured for this IP addr
 /END/
 

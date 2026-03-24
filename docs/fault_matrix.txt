@@ -26,7 +26,7 @@ CODE  LEVEL      DESCRIPTION
 8     internal   Function was passed an invalid option
 9     internal   Err/warn message not found 
 
-10    assert     <UNUSED> 
+10    assert     Parameter not part of static list
 11    assert     Missing arguments (assert_args_set)
 12    assert     Boolean "TRUE|true|FALSE|false"
 13    assert     Integer, positive or negative
@@ -87,6 +87,10 @@ CODE  LEVEL      DESCRIPTION
 165   validate   vcpus
 166   validate   vnc
 167   validate   wiremem
+167-  validate   <UNUSED>
+-180  validate   <UNUSED> 
+181   validate   Basic cellname validity failure
+182   validate   New cellname failure
 
 200   runtime    Cell not running
 201   runtime    jls error searching for ONJAILS

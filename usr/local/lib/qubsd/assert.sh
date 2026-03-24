@@ -96,6 +96,12 @@ assert_int_comparison() {
     return 0
 }
 
+assert_param() {
+    local _fn="assert_param" _val="$1"
+    echo "$PARAMS_ALL" | grep -Eqs "(^|[[:blank:]])$_val([[:blank:]]|\$)" \
+        || eval $(THROW 10 $_fn $_val)
+}
+
 assert_time_format() {
     local _fn="assert_time_format" _val="$1"
     echo "$_val" | grep -Eqs "^[1-9]+[0-9]*(s|m|H|D|W|Y)\$" || eval $(THROW  $_fn)

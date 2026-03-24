@@ -52,6 +52,10 @@ Invalid input: < %s >. Integer required.
 %s < %s > is not CIDR. Use CIDR notation for IPV4 addr, or <none|DHCP|auto>.
 /END/
 
+:assert_param:
+< %s > is not a valid tunable qubsd PARAMETER
+/END/
+
 :assert_ppt:
 Invalid PPT format < %s >. See `man 4 vmm` for correct pptdevs formatting
 /END/
