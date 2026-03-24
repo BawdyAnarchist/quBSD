@@ -55,3 +55,7 @@ Invalid input: < %s >. Integer required.
 :assert_ppt:
 Invalid PPT format < %s >. See `man 4 vmm` for correct pptdevs formatting
 /END/
+
+:assert_time_format:
+< %s > is an invalid time format. Must be: <integer><s|m|H|D|W|Y>. eg: '30m'
+/END/
