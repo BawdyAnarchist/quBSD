@@ -28,7 +28,7 @@ THROW() {
     fi
 
     # Activate stack trace
-    [ "$TRACE" ] && _trace="[ $_fn ]"
+    [ "$TRACE" ] && _trace="[$_fn]"
 
     # Code in *.msg library must have the form:   :_msg_code:
     if [ "$_msg_code" ] && [ ! "$_code" = 9 ]; then
@@ -45,7 +45,7 @@ THROW() {
     if [ "$_internal_err" ] ; then
         printf "$_internal_err\n" >> $ERR
     elif [ "$_trace" ] || [ "$_msg" ] ; then
-        printf "$_trace [$_code] $_msg\n" "$@" >> $ERR
+        printf "$_trace[$_code]: $_msg\n" "$@" >> $ERR
     fi
 
     # This echo gets `eval` on return to caller. $_code was sanitized, so this is safe.
