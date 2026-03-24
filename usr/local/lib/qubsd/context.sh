@@ -43,7 +43,7 @@ ctx_unset() {
         p) _pfx="$OPTARG" ;;
         P) _PARAMS="$OPTARG" ;;
         *) eval $(THROW 8 _internal1) ;;
-    esac  ;  done  ;  shift $(( OPTIND - 1 ))
+    esac ; done ; shift $(( OPTIND - 1 ))
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
     [ -z "$_PARAMS" ] && _PARAMS="$PARAMS_BASE $PARAMS_JAIL $PARAMS_VM $CONTEXT"
@@ -172,7 +172,7 @@ ctx_validate_params() {
             eval _cell=\${$_pfx} ;;  # Get the cellname stored in the prefix designator
         P)  _PARAMS="$OPTARG" ;;     # Specify PARAM list, or use the list from constants.sh
         *)  eval $(THROW 8 _internal1) ;;
-    esac  ;  done  ;  shift $(( OPTIND - 1 ))
+    esac ; done ; shift $(( OPTIND - 1 ))
 
     # Internal assignments and sanitization
     assert_args_set 2 "$1" "$2" && _level=$1 && _cell=$2 || eval $(THROW $?)
@@ -205,7 +205,7 @@ ctx_write_runtime() {
             eval _cell=\${$_pfx} ;;  # Get the cellname stored in the prefix designator
         P)  _PARAMS="$OPTARG" ;;     # Specify PARAM list, or use the list from constants.sh
         *)  eval $(THROW 8 _internal1) ;;
-    esac  ;  done  ;  shift $(( OPTIND - 1 ))
+    esac ; done ; shift $(( OPTIND - 1 ))
 
     # Double check the function usage by requiring $1 to be equivalent to the _pfx ctx
     assert_args_set 1 $1 || eval $(THROW $?)
@@ -248,7 +248,7 @@ ctx_bootstrap_runtime() {
         l)  _level="$OPTARG" ;;  # Validation level to pass ctx_validate_params
         P)  _pass="$OPTARG" ;;   # Failure codes to PASS after ctx_bootstrap_cell
         *)  eval $(THROW 8 _internal1) ;;
-    esac  ;  done  ;  shift $(( OPTIND - 1 ))
+    esac ; done ; shift $(( OPTIND - 1 ))
 
     assert_args_set 1 "$1" && _cell="$1" && _pfx="$2" || eval $(THROW $?)
 
