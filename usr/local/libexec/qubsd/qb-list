@@ -31,13 +31,19 @@ parse_args() {
 
         # Final attempt at parsing CELL vs PARAM when no option is passed
         if ! is_path_exist -f $D_CELLS/$CELL && [ -z "$PARAM" ] ; then
-            quiet echo_grep "$PARAMS_BASE $PARAMS_JAIL $PARAMS_VM" $CELL \
-                && PARAM=$CELL && unset CELL
+            quiet echo_grep "$PARAMS_ALL" $CELL && PARAM=$CELL && unset CELL
         fi
     fi
 
     # Sanitize missing cell
-    { [ "$snaps" ] || [ "$zfs" ] ;} && [ -z "$CELL" ] && eval $(THROW 4 missing_cell)
+    { [ "$snaps" ] || [ "$zfs" ] ;} && [ -z "$CELL" ] && eval $(THROW 4 blank_cell)
+
+    # Validate CELL and/or PARAM
+    if [ "$CELL" ] ; then
+        local _level=2
+        validate_cellname $CELL || eval $(THROW $?)
+    fi
+    [ "$PARAM" ] && { assert_param $PARAM || eval $(THROW $?) ;}
 
     # Convert lower-case entered PARAM to upper (user-friendly)
     [ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
@@ -45,30 +51,19 @@ parse_args() {
 }
 
 retrieve_data() {
-    local _fn="retrieve_data" _param_type _cells_files _defaults_files
+    local _fn="retrieve_data"
 
-    # Cell retrieval has less work than parameter
+    # Uses globals: $non_defaults and $params for simplicity
+    # If CELL, then we dont need to the full params list. Otherwise, params were requested
     if [ "$CELL" ] ; then
         hush ctx_bootstrap_cell $CELL
         non_defaults=$(grep -Eo "^.*=" $D_CELLS/$CELL | tr -d '=')
         [ "$snaps" ] && query_rootsnaps $R_DSET && query_persistsnaps $P_DSET
         [ "$zfs" ] && query_datasets "$R_DSET $P_DSET"
-        return 0
+    else
+        params=$(query_param_values_all $PARAM) || eval $(THROW $?)
     fi
-
-    # Define which files should be searched for the defaults
-    _param_type=$(query_param_type $PARAM) || eval $(THROW $?)
-    case $_param_type in
-        base) _defaults_files="$DEF_BASE $DEF_JAIL $DEF_VM" ;;
-        jail) _defaults_files="$DEF_BASE $DEF_JAIL" ;;
-        vm)   _defaults_files="$DEF_BASE $DEF_VM" ;;
-    esac
-
-    # These variables allow for later separation regarding which PARAMS are default values
-    _cells_files=$(query_qconf_filepaths)
-    defaults=$(grep -E "^$PARAM=" $_defaults_files \
-              | sed -E "s|.*/||" | tr -d '"' | tr '=:' ' ' | sed -E 's/.conf//')
-    params=$(grep -E "^$PARAM=" $_cells_files | sed -E "s|^$D_CELLS/||" | tr -d '"' | tr '=:' ' ')
+    return 0
 }
 
 write_results() {
@@ -78,7 +73,6 @@ write_results() {
 
     # Writing parameters (no cell) is easier, do them first
     if [ -z "$CELL" ] ; then
-        echo "$defaults" >> $RESULTS
         echo "$params"   >> $RESULTS
         return 0
     fi
@@ -129,7 +123,7 @@ main() {
     retrieve_data   || eval $(THROW $?)
     write_results
 
-    cat $RESULTS | column -t
+    cat $RESULTS | sort | column -t
 }
 
 main "$@" || FATAL
