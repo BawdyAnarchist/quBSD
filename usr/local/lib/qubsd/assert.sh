@@ -17,6 +17,22 @@ assert_args_set() {
     return 0
 }
 
+assert_bytesize() {
+    local _fn="assert_bytesize"
+    echo "$1" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" || eval $(THROW 19 _invalid bytesize $1)
+}
+
+normalize_bytesize() {
+    local _fn="normalize_bytesize" _val="$1" _raw
+    _raw=$(echo $_val | sed -nE "s/.\$//p")
+    case $_val in
+        *K|*k) echo $(( _raw * 1024 )) ;;
+        *M|*m) echo $(( _raw * 1024 * 1024 )) ;;
+        *G|*g) echo $(( _raw * 1024 * 1024 * 1024 )) ;;
+        *T|*t) echo $(( _raw * 1024 * 1024 * 1024 * 1024 )) ;;
+    esac
+}
+
 assert_bool_tf() {
     local _fn="assert_bool_tf"
     echo $1 | tr '[:upper:]' '[:lower:]' \
@@ -80,12 +96,43 @@ assert_int_comparison() {
     return 0
 }
 
+assert_time_format() {
+    local _fn="assert_time_format" _val="$1"
+    echo "$_val" | grep -Eqs "^[1-9]+[0-9]*(s|m|H|D|W|Y)\$" || eval $(THROW  $_fn)
+}
 
-##################################  SECTION 2: COMMON PARAMETERS  ##################################
+###################################  SECTION 2: CELL PARAMETERS  ###################################
+
+# Impossible to fully assert bhyve_custm parameter user inputs. But some guarantees can be provided
+assert_bhyve_custm() {
+    local _fn="assert_bhyve_custm" _val="$1"
+    echo "$_val" | grep -Eqv "^[a-zA-Z0-9 \-/_:,.=+]*$" || eval $(THROW 31 $_fn)
+}
+
+assert_bhyveopts() {
+    local _fn="assert_bhyveopts" _val="$1"
+    _val=$(echo "$_val" | sed -E 's/^-//')   # Remove the leading dash
+
+    # Only includes bhyve opts with no argument
+    echo "$_val" | grep -Eqs -- '^[AaCDeHhPSuWwxY]+$' || eval $(THROW 32 ${_fn}1 BHYVEOPTS $_val)
+
+    # No duplicate characters
+    [ "$(echo "$_val" | fold -w1 | sort | uniq -d | wc -l)" -gt 0 ] \
+        && eval $(THROW 33 ${_fn}2 BHYVEOPTS $_val)
+
+    return 0
+}
 
 assert_class() {
     local _fn="assert_class"
     echo "$CLASSES" | grep -Eqs -- "(^| )$1( |\$)" || eval $(THROW 18 _invalid CLASS $1)
+}
+
+assert_cpuset() {
+    local _fn="assert_cpuset"
+    # Test for negative numbers and dashes in the wrong place
+    echo "$1" | grep -Eq "(,,+|--+|,-|-,|,[ \t]*-|^[^[:digit:]])" && eval $(THROW 21 $_fn $1)
+    return 0
 }
 
 # Optional $2: (_extra), to ensure that the last bit in the IP is not '1'.  It's required for the
@@ -120,30 +167,10 @@ assert_ipv4() {
     return 0
 }
 
-assert_bytesize() {
-    local _fn="assert_bytesize"
-    echo "$1" | grep -Eqs "^[[:digit:]]+(T|t|G|g|M|m|K|k)\$" || eval $(THROW 19 _invalid bytesize $1)
-}
-
-normalize_bytesize() {
-    local _fn="normalize_bytesize" _val="$1" _raw
-    _raw=$(echo $_val | sed -nE "s/.\$//p")
-    case $_val in
-        *K|*k) echo $(( _raw * 1024 )) ;;
-        *M|*m) echo $(( _raw * 1024 * 1024 )) ;;
-        *G|*g) echo $(( _raw * 1024 * 1024 * 1024 )) ;;
-        *T|*t) echo $(( _raw * 1024 * 1024 * 1024 * 1024 )) ;;
-    esac
-}
-
-
-###################################  SECTION 3: JAIL PARAMETERS  ###################################
-
-assert_cpuset() {
-    local _fn="assert_cpuset"
-    # Test for negative numbers and dashes in the wrong place
-    echo "$1" | grep -Eq "(,,+|--+|,-|-,|,[ \t]*-|^[^[:digit:]])" && eval $(THROW 21 $_fn $1)
-    return 0
+assert_ppt() {
+    local _fn="assert_ppt"
+    echo "$1" | grep -Eqs -- '^[ 0-9]+/[0-9]+/[0-9]+([[:blank:]]+[0-9]+/[0-9]+/[0-9]+)*[[:blank:]]*$' \
+        || eval $(THROW 33 $_fn $1)
 }
 
 assert_schg() {
@@ -160,35 +187,6 @@ assert_seclvl() {
         none|-1|-0|0|1|2|3) return 0 ;;
         *) eval $(THROW 23 _invalid2 SECLVL $1 "Must be <none|-1|0|1|2|3>") ;;
     esac
-}
-
-
-####################################  SECTION 4: VM PARAMETERS  ####################################
-
-# Impossible to fully assert bhyve_custm parameter user inputs. But some guarantees can be provided
-assert_bhyve_custm() {
-    local _fn="assert_bhyve_custm" _val="$1"
-    echo "$_val" | grep -Eqv "^[a-zA-Z0-9 \-/_:,.=+]*$" || eval $(THROW 31 $_fn)
-}
-
-assert_bhyveopts() {
-    local _fn="assert_bhyveopts" _val="$1"
-    _val=$(echo "$_val" | sed -E 's/^-//')   # Remove the leading dash
-
-    # Only includes bhyve opts with no argument
-    echo "$_val" | grep -Eqs -- '^[AaCDeHhPSuWwxY]+$' || eval $(THROW 32 ${_fn}1 BHYVEOPTS $_val)
-
-    # No duplicate characters
-    [ "$(echo "$_val" | fold -w1 | sort | uniq -d | wc -l)" -gt 0 ] \
-        && eval $(THROW 33 ${_fn}2 BHYVEOPTS $_val)
-
-    return 0
-}
-
-assert_ppt() {
-    local _fn="assert_ppt"
-    echo "$1" | grep -Eqs -- '^[ 0-9]+/[0-9]+/[0-9]+([[:blank:]]+[0-9]+/[0-9]+/[0-9]+)*[[:blank:]]*$' \
-        || eval $(THROW 33 $_fn $1)
 }
 
 assert_taps() {
