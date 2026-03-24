@@ -149,11 +149,49 @@ query_cell_shell() {
     echo "$_val" && return 0
 }
 
-# All of the existing cell config filepaths, in a single line
-query_qconf_filepaths() {
+# All cells in the qconf. Newline delimited
+query_qconf_cells_and_paths() {
     local _fn="query_qconf_filepaths"
-    ls -1 $D_CELLS | tr '\n' ' ' | sed "s|^|$D_CELLS/|; s| | $D_CELLS/|g"
+    [ "$CELLS" ] && [ "$CELLS_QPATHS" ] && return 0  # No need to re-query
+    CELLS="$(ls -1 $D_CELLS)"
+    CELLS_QPATHS="$(ls -1 $D_CELLS | sed "s|^|$D_CELLS/|; s| | $D_CELLS/|g")"
 }
+
+# List the $1 (PARAM) value for all cells in $D_CELLS, with individual default-value resolution
+query_param_values_all() {
+    local _fn="query_param_values_all" _defval_base _defval_jail _defval_vm _nomatch _jails _vms _sub
+    assert_args_set 1 $1 && _param="$1" || eval $(THROW $?)
+
+    query_qconf_cells_and_paths  # Get list of all cells and their qconf paths
+    _param_type=$(query_param_type $_param) || eval $(THROW $?)
+
+    # Prepare default values for individual cell resolution
+    _defval_base=$(sed -En "s|^$_param=\"(.*)\"|\1|p" $DEF_BASE)
+    _defval_jail=$(sed -En "s|^$_param=\"(.*)\"|\1|p" $DEF_JAIL)
+    _defval_vm=$(  sed -En "s|^$_param=\"(.*)\"|\1|p" $DEF_VM)
+
+    # Cells without _param in qconf, need to be assigned to the default
+    _nomatch=$(grep -EL "^$_param=" $CELLS_QPATHS)
+    _jails=$(grep -E "^CLASS=\".*jail" $_nomatch)
+    _vms=$(grep -E "^CLASS=\".*VM" $_nomatch)
+
+    # Substitution priority: DEF_JAIL/VM -> DEF_BASE -> '#NULL'
+    [ "$_jails" ]  && _sub=$_defval_jail
+    [ -z "$_sub" ] && _sub=$_defval_base
+    [ -z "$_sub" ] && _sub='#NULL'
+    _jails=$(echo "$_jails" | tr -d '"' | sed -E "s|^$D_CELLS/||; s|:CLASS=.*| $_param $_sub|")
+
+    [ "$_vms" ]    && _sub=$_defval_vm
+    [ -z "$_sub" ] && _sub=$_defval_base
+    [ -z "$_sub" ] && _sub='#NULL'
+    _vms=$(echo "$_vms" | tr -d '"' | sed -E "s|^$D_CELLS/||; s|:CLASS=.*| $_param $_sub|")
+
+    # Echo the results back to caller
+    grep -E "^$_param=" $CELLS_QPATHS | sed -E "s|^$D_CELLS/||; s|:$_param=| $_param |" | tr -d '"'
+    echo "$_jails"
+    echo "$_vms"
+}
+
 
 #####################################  SYSTEM STATE QUERIES  #######################################
 # ZFS queries may be passed $1 optionally to toggle pulling ALL datasets or only some
