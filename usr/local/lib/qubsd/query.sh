@@ -159,7 +159,8 @@ query_qconf_cells_and_paths() {
 
 # List the $1 (PARAM) value for all cells in $D_CELLS, with individual default-value resolution
 query_param_values_all() {
-    local _fn="query_param_values_all" _defval_base _defval_jail _defval_vm _nomatch _jails _vms _sub
+    local _fn="query_param_values_all"
+    local _param _param_type _defval_base _defval_jail _defval_vm _nomatch _jails _vms _sub
     assert_args_set 1 $1 && _param="$1" || eval $(THROW $?)
 
     query_qconf_cells_and_paths  # Get list of all cells and their qconf paths
@@ -180,7 +181,7 @@ query_param_values_all() {
     [ -z "$_sub" ] && _sub=$_defval_base
     [ -z "$_sub" ] && _sub='#NULL'
     _jails=$(echo "$_jails" | tr -d '"' | sed -E "s|^$D_CELLS/||; s|:CLASS=.*| $_param $_sub|")
-
+    unset _sub
     [ "$_vms" ]    && _sub=$_defval_vm
     [ -z "$_sub" ] && _sub=$_defval_base
     [ -z "$_sub" ] && _sub='#NULL'
@@ -188,8 +189,8 @@ query_param_values_all() {
 
     # Echo the results back to caller
     grep -E "^$_param=" $CELLS_QPATHS | sed -E "s|^$D_CELLS/||; s|:$_param=| $_param |" | tr -d '"'
-    echo "$_jails"
-    echo "$_vms"
+    [ "$_jails" ] && echo "$_jails"
+    [ "$_vms" ]   && echo "$_vms"
 }
 
 
