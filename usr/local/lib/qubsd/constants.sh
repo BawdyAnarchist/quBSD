@@ -67,9 +67,8 @@ export PARAMS_VM="BHYVEOPTS BHYVE_CUSTM MEMSIZE PPT TAPS TMUX VCPUS VNC WIREMEM"
 export CONTEXT="CALLER JCONF QCONF P_DSET P_MNT R_DSET R_MNT RT_CTX"   # Convenient context paths
 export CLASSES="rootjail appjail dispjail rootVM appVM dispVM cjail"
 
-# Kernel-query results storage for rapid stacked/looped information retreival
-export SYS_QUERY="DATASETS MOUNTS NCPU ONJAILS ONVMS PCICONF ROOTSNAPS PERSISTSNAPS SYSMEM"
-
+# Query results storage for rapid stacked/looped information retreival
+export QUERY="CELLS CELLS_QPATHS DATASETS MOUNTS NCPU ONJAILS ONVMS PCICONF ROOTSNAPS PERSISTSNAPS SYSMEM"
 
 
 #########################################   OLD  SYSTEM  CONSTANTS / OVERRIDES  ##########################################
