@@ -1,15 +1,11 @@
 #!/bin/sh
 
-### NOTES ON PROBLEMS STILL
-# IPV4 is being chopped down due to defaults files chopping (the grep). Need better sophistication there
-# with [-p] PARAM you should list ALL cells of the same type (noting the default value), not just the defaults themselves
-
 . $QCOMMON
 
 trap_init
 
 parse_args() {
-    local _fn="parse_args" _opts _pos1 _pos2
+    local _fn="parse_args" _opts OPTARG OPTIND _pos1 _pos2
     while getopts :c:hp:sz _opts ; do
         case $_opts in
             c) CELL="$OPTARG" ;;
@@ -60,9 +56,6 @@ retrieve_data() {
         return 0
     fi
 
-    # All cells, in a single line
-    _cells_files=$(ls -1 $D_CELLS | tr '\n' ' ' | sed "s|^|$D_CELLS/|; s| | $D_CELLS/|g")
-
     # Define which files should be searched for the defaults
     _param_type=$(query_param_type $PARAM) || eval $(THROW $?)
     case $_param_type in
@@ -72,6 +65,7 @@ retrieve_data() {
     esac
 
     # These variables allow for later separation regarding which PARAMS are default values
+    _cells_files=$(query_qconf_filepaths)
     defaults=$(grep -E "^$PARAM=" $_defaults_files \
               | sed -E "s|.*/||" | tr -d '"' | tr '=:' ' ' | sed -E 's/.conf//')
     params=$(grep -E "^$PARAM=" $_cells_files | sed -E "s|^$D_CELLS/||" | tr -d '"' | tr '=:' ' ')
