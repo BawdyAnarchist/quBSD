@@ -149,6 +149,12 @@ query_cell_shell() {
     echo "$_val" && return 0
 }
 
+# All of the existing cell config filepaths, in a single line
+query_qconf_filepaths() {
+    local _fn="query_qconf_filepaths"
+    ls -1 $D_CELLS | tr '\n' ' ' | sed "s|^|$D_CELLS/|; s| | $D_CELLS/|g"
+}
+
 #####################################  SYSTEM STATE QUERIES  #######################################
 # ZFS queries may be passed $1 optionally to toggle pulling ALL datasets or only some
 
