@@ -1,18 +1,14 @@
 
+### Next up
+ctx_bootstrap_runtime and it's call to ctx_validate_params don't align correctly with _pfx
+if nicvm start breaks, it was probably probe_ppt(), changing assert_args_set
 
-
-VM PLAN: only remaining aspect is Linux and qb-create
- - Linux/ubuntu
-    -- they actually have an overlayfs where you just add directories and it auto-tracks changes
-    -- This can be used for internal /etc, and for persisting /home inside of Linux, without distro-level faggotry
- - Incorporate new VM / installer model to the installer script.
- - Incorporate new VM model to qb-create. Script needs reviewed and with better integration
- - qubsd-dhcpd or something equivalent in settings? 
- - dispVMs for Linux mount the ext4 and edit the pw
-
-xephyr-xclip daemon still has demons
-   - Pretty sure they're all related to the closing of windows. It gets corrupted or something when I close windows. probably I'm not sufficiently detecting all possible events - Maybe the disappearance of a socket is still problematic or something?
-   - You need to kill the clipboard ownership inside the source as well after releasing. Otherwise you get inconsistent waffling on lease expiry, where what FEELS like stale clipboard then can still paste if you're inside the same socket for a window. Causes problems
+make backups, then qb-autostart
+  - custom zfsprops: `qubsd:` needs to be just `qb:`
+    -- Rolling/thinning is all messed up due to the interim inconsistency
+    -- Fix in the code
+    -- Change your datasets
+qb-edit
 
 
 ### Import things in the code as I overhaul that still need addressed
@@ -24,6 +20,20 @@ exec.created
 
 ### Bugs
 qubsd-dhcpd needs reviewed/fixed, because it's causing hanging and dropped packets due to being too aggressive
+
+
+### VM PLAN: only remaining aspect is Linux and qb-create
+ - Linux/ubuntu
+    -- they actually have an overlayfs where you just add directories and it auto-tracks changes
+    -- This can be used for internal /etc, and for persisting /home inside of Linux, without distro-level faggotry
+ - Incorporate new VM / installer model to the installer script.
+ - Incorporate new VM model to qb-create. Script needs reviewed and with better integration
+ - qubsd-dhcpd or something equivalent in settings? 
+ - dispVMs for Linux mount the ext4 and edit the pw
+
+xephyr-xclip daemon still has demons
+   - Pretty sure they're all related to the closing of windows. It gets corrupted or something when I close windows. probably I'm not sufficiently detecting all possible events - Maybe the disappearance of a socket is still problematic or something?
+   - You need to kill the clipboard ownership inside the source as well after releasing. Otherwise you get inconsistent waffling on lease expiry, where what FEELS like stale clipboard then can still paste if you're inside the same socket for a window. Causes problems
 
 
 ### UPGRADES
