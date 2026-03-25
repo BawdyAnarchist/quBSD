@@ -83,6 +83,7 @@ main1() {
 	# Cleanup tmp file. Pop exec.release from the trap
 	rm -f "$R_MNT/tmp/qb_prestart.sh"
 	trap_pop
+   return 0
 }
 
 

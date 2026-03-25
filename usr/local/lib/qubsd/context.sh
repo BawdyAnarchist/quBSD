@@ -1,32 +1,5 @@
 #!/bin/sh
 
-#####################################  BOOTSTRAP ENTRY POINT  ######################################
-
-# qb / exec scripts should use this as the entry primitive for cell operations. System-related
-# queries are stored in globals, preventing bottlenecks for slowers operations like ZFS querires.
-# Thus, bootstrap is fast. It can be stacked, looped, or used validation side effects.
-# Return codes allow for more fine tuned caller decision making regarding failures.
-
-ctx_bootstrap_cell() {
-    local _fn="ctx_bootstrap_cell" _cell="$1" _pfx="$2" _type _jconf
-
-    ctx_unset -p "$_pfx"  # Start from blank slate
-
-    # Bootstrap a new cell context, which comes with basic checks for crucial parameters
-    ctx_initialize $_cell $_pfx  || eval $(THROW $? $_fn $_cell)  # Basic context definitions
-    ctx_load_params $_cell $_pfx || eval $(THROW $? $_fn $_cell)  # Source QCONF and defaults
-
-    _type=$(ctx_get ${_pfx}TYPE)
-    _jconf=$(ctx_get ${_pfx}JCONF)
-    if [ "$_type" = "JAIL" ] ; then
-        is_path_exist -f $_jconf || eval $(THROW $? $_fn $_cell)
-    fi
-
-    # Save for last. If dataset missing, it can be recloned, all other checks have been completed
-    ctx_add_zfs $_cell $_pfx     || eval $(THROW $? $_fn $_cell)  # Cell-specific datasets
-
-    return 0
-}
 
 ##################################  CONTEXT BUILDERS AND HELPERS  ##################################
 
@@ -233,6 +206,35 @@ ctx_load_runtime() {
     _rt_ctx=$(ctx_get ${_pfx}RT_CTX)
     is_path_exist -f $_rt_ctx || eval $(THROW $? _missing_context $_rt_ctx)
     . $_rt_ctx   # source (load) the runtime
+    return 0
+}
+
+#####################################  BOOTSTRAP ENTRY POINTS  #####################################
+
+# qb/exec scripts should use these entry points. The lib framework is designed for lazy-loading.
+# Return codes combined with PASS() allow for versatile load/validation turning by main callers.
+# Execution times:  bootstrap_cell: ~16ms, bootstrap_runtime: ~21ms
+# These can be looped/stacked, in which case it's recommended to pre-load $DATASETS global.
+  # For example, running `query_datasets_recursive_defaults()` can reduce exec times by 5-6ms.
+
+ctx_bootstrap_cell() {
+    local _fn="ctx_bootstrap_cell" _cell="$1" _pfx="$2" _type _jconf
+
+    ctx_unset -p "$_pfx"  # Start from blank slate
+
+    # Bootstrap a new cell context, which comes with basic checks for crucial parameters
+    ctx_initialize $_cell $_pfx  || eval $(THROW $? $_fn $_cell)  # Basic context definitions
+    ctx_load_params $_cell $_pfx || eval $(THROW $? $_fn $_cell)  # Source QCONF and defaults
+
+    _type=$(ctx_get ${_pfx}TYPE)
+    _jconf=$(ctx_get ${_pfx}JCONF)
+    if [ "$_type" = "JAIL" ] ; then
+        is_path_exist -f $_jconf || eval $(THROW 111 $_fn $_cell)
+    fi
+
+    # Save for last. If dataset missing, it can be recloned, all other checks have been completed
+    ctx_add_zfs $_cell $_pfx     || eval $(THROW $? $_fn $_cell)  # Cell-specific datasets
+
     return 0
 }
 

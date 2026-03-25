@@ -48,10 +48,10 @@ CODE  LEVEL      DESCRIPTION
 35    assert     vcpus formatting error 
 
 110   config     Path invalid
-111   config     Cell jconf missing
-112   config     Cell qconf missing
+111   config     Cell JCONF missing
+112   config     Cell QCONF missing
 120   config     Generic ZFS failure
-121   config     Unretrieved dataset
+121   config     Missing dataset
 122   config     Root snapshot missing 
 123   config     Persist snapshot missing
 130   config     QCONF query failure 

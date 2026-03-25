@@ -61,7 +61,6 @@ main() {
 
     _COMMANDS="_CMD_MAXMEM _CMD_CPUSET _CMD_CHFLAGS _CMD_CHFLAGS_2 _CMD_SECLVL"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
-
     return 0
 }
 

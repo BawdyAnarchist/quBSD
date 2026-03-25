@@ -32,7 +32,6 @@ main() {
 
     _COMMANDS="_CMD_RM_INTF _CMD_CHFLAGS"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
-
     return 0
 }
 

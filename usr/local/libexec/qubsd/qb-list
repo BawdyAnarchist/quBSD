@@ -122,7 +122,6 @@ main() {
     parse_args "$@" || eval $(THROW $?)
     retrieve_data   || eval $(THROW $?)
     write_results
-
     cat $RESULTS | sort | column -t
 }
 
