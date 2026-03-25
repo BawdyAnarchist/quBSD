@@ -572,8 +572,8 @@ create_popup() {
 }
 
 probe_ppt() {
-    _fn="probe_ppt" _val="$1"
-    assert_args_set 1 $_val
+    local _fn="probe_ppt" _val
+    assert_args_set 1 "$1" && _val="$1" || eval $(THROW $?)
 
     # Check all listed PPT devices from QCONF
     for _ppt in $_val ; do

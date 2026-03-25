@@ -57,7 +57,7 @@ ctx_unset() {
 # Cell-specific derived paths, mountpoints, and datasets Reduces verbosity in later references
 ctx_initialize() {
     local _fn="ctx_initialize" _pfx="$2" _cell _type _caller
-    assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
+    assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
 
     # Cell-specific paths and datasets.
     eval ${_pfx}QCONF=$D_CELLS/$_cell            # qubsd.conf.d/cells
@@ -81,7 +81,7 @@ ctx_initialize() {
 # Lazy loading is fast/convenient. Use prefix ($2) to modify global variable (PARAM) assignments
 ctx_load_params() {
     local _fn="ctx_load_params" _pfx="$2" _cell _type _params_type _params_eval
-    assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
+    assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
 
     # For convenience, we assign PARAMS_TYPE as global
     _type=$(ctx_get ${_pfx}TYPE)
@@ -110,7 +110,7 @@ ctx_load_params() {
 # own prefixes, as no protective measures are made in the function to clear stale.
 ctx_load_file() {
     local _fn="ctx_load_file" _file _pfx="$2" _params _params_eval
-    assert_args_set 1 $1 && _file="$1" || eval $(THROW $?)
+    assert_args_set 1 "$1" && _file="$1" || eval $(THROW $?)
     is_path_exist "$_file" || eval $(THROW $?)
 
     # First read the file to get PARAMS, then local them to prevent clobber before pfx is assigned
@@ -132,7 +132,7 @@ ctx_load_file() {
 # REQUIRES: ctx_load_parameters() FIRST, due to use of R_ZFS and P_ZFS of the cell
 ctx_add_zfs() {
     local _fn="ctx_add_zfs" _cell _pfx="$2" _r_dset _p_dset _r_mnt _p_mnt
-    assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
+    assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
 
     # Establish cell-specific dataset names based on R_ZFS and P_ZFS
     _r_dset=$(ctx_get ${_pfx}R_ZFS)/$_cell
@@ -170,7 +170,7 @@ ctx_validate_params() {
     esac ; done ; shift $(( OPTIND - 1 ))
 
     # Internal assignments and sanitization
-    assert_args_set 2 "$1" "$2" && _level=$1 && _cell=$2 || eval $(THROW $?)
+    assert_args_set 2 "$1" "$2" && _level=$1 _cell=$2 || eval $(THROW $?)
     assert_int_comparison -g 1 -l 3 $_level || eval $(THROW 7 _internal2 $_level $_fn)
 
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
@@ -203,7 +203,7 @@ ctx_write_runtime() {
     esac ; done ; shift $(( OPTIND - 1 ))
 
     # Double check the function usage by requiring $1 to be equivalent to the _pfx ctx
-    assert_args_set 1 $1 || eval $(THROW $?)
+    assert_args_set 1 "$1" || eval $(THROW $?)
     [ -z "$_pfx" ] && _cell="$1" || _cell=$(ctx_get $_pfx)
     [ "$_cell" = "$1" ] || eval $(THROW 7 _internal2 $_pfx $1 $_cell)
 
@@ -245,7 +245,7 @@ ctx_bootstrap_runtime() {
         *)  eval $(THROW 8 _internal1) ;;
     esac ; done ; shift $(( OPTIND - 1 ))
 
-    assert_args_set 1 "$1" && _cell="$1" && _pfx="$2" || eval $(THROW $?)
+    assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
 
     ctx_bootstrap_cell $_cell $_pfx || PASS -c $_pass \
         || eval $(THROW $? _generic "Cell < $_cell > bootstrap failed")
