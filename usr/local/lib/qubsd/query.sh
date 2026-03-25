@@ -221,6 +221,21 @@ query_datasets() {
     return 0
 }
 
+# Optimizes zfs queries when operating over on cells, by invoking just *one* zfs call, to populate
+# DATASETS with the recursive list of the defaults parent datasets. Will clobber existing DATASETS
+query_datasets_recursive_defaults() {
+    local _fn="query_datasets_recursive_defaults" _dsets
+
+    _dsets=$(query_file_param "R_ZFS" $DEF_BASE \
+            ;query_file_param "P_ZFS" $DEF_BASE \
+            ;query_file_param "R_ZFS" $DEF_JAIL \
+            ;query_file_param "P_ZFS" $DEF_JAIL \
+            ;query_file_param "R_ZFS" $DEF_VM   \
+            ;query_file_param "P_ZFS" $DEF_VM)
+    _dsets=$(echo "$_dsets" | sort | uniq)
+    DATASETS=$(zfs list -ro name,mountpoint,mounted,origin,encryption $_dsets)
+}
+
 query_rootsnaps() {
     local _fn="query_rootsnaps" _dsets="$1" _pull
 
