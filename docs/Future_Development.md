@@ -1,6 +1,7 @@
 
 ### Next up
-ctx_bootstrap_runtime and it's call to ctx_validate_params don't align correctly with _pfx
+ctx_bootstrap_runtime and it's call to ctx_validate_params might not align correctly with _pfx. I think it does actually. Double check
+  - furthermore, ctx_bootstrap_cell should probably come with the same options too. 
 if nicvm start breaks, it was probably probe_ppt(), changing assert_args_set
 
 make backups, then qb-autostart
@@ -16,6 +17,7 @@ exec.postart
   - "hacky exception to schg due to resolv and resolvconf"
 exec.created
   - I think I removed the chaining starts. Maybe think about adding that back in? Not sure. Maybe qb start should do that only
+When finished or near finish -> $D_CELLS/$_cell is just $QCONF. Replace everything
 
 
 ### Bugs
