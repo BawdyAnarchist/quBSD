@@ -80,7 +80,7 @@ ctx_initialize() {
 
 # Lazy loading is fast/convenient. Use prefix ($2) to modify global variable (PARAM) assignments
 ctx_load_params() {
-    local _fn="ctx_load_params" _pfx="$2" _cell _type _params_type _param _val
+    local _fn="ctx_load_params" _pfx="$2" _cell _type _params_type _params_eval
     assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
 
     # For convenience, we assign PARAMS_TYPE as global
@@ -92,18 +92,16 @@ ctx_load_params() {
     [ "$_pfx" ] && local $_params_type
 
     # Unset _ALL_PARAMS before sourcing new ones, to prevent stale accidents
-    unset $(echo "$PARAMS_ALL" | sed "s/^/$_pfx/; s/ / $_pfx/g")
+    unset $(echo "$PARAMS_ALL" | sed "s|^|$_pfx|; s| | $_pfx|g")
 
     # Source defaults and _cell conf. Order is important.
     . $DEF_BASE
     . $(ctx_get DEF_${_type})
     . $D_CELLS/$_cell
 
-    # Assign the correct variable name based on _pfx
-    for _param in $_params_type; do
-        _val=$(ctx_get $_param)
-        [ "$_val" ] && eval ${_pfx}${_param}='${_val}'
-    done
+    # Avoid looping over 20+ PARAMS. sed _params_type to look like _pfx_param=$_param ; then eval
+    _params_eval=$(echo $_params_type | sed -E "s|([^[:blank:]]+)|$_pfx\1=\\\$\1|g")
+    eval $_params_eval
 
     return 0
 }
@@ -111,7 +109,7 @@ ctx_load_params() {
 # Conviencience of loading a single file into context. Caller MUST manage their
 # own prefixes, as no protective measures are made in the function to clear stale.
 ctx_load_file() {
-    local _fn="ctx_load_file" _file _pfx="$2" _params
+    local _fn="ctx_load_file" _file _pfx="$2" _params _params_eval
     assert_args_set 1 $1 && _file="$1" || eval $(THROW $?)
     is_path_exist "$_file" || eval $(THROW $?)
 
@@ -124,16 +122,14 @@ ctx_load_file() {
     # Source the file
     . $_file
 
-    # Assign the correct variable name based on _pfx
-    for _param in $_params; do
-        _val=$(ctx_get $_param)
-        [ "$_val" ] && eval ${_pfx}${_param}='${_val}'
-    done
+    # Avoid looping over numerous PARAMS. sed _params_type to look like _pfx_param=$_param ; then eval
+    _params_eval=$(echo $_params | sed -E "s|([^[:blank:]]+)|$_pfx\1=\\\$\1|g")
+    eval $_params_eval
+
     return 0
 }
 
-
-# REQUIRES: load_parameters_ctx() FIRST, due to use of R_ZFS and P_ZFS of the cell
+# REQUIRES: ctx_load_parameters() FIRST, due to use of R_ZFS and P_ZFS of the cell
 ctx_add_zfs() {
     local _fn="ctx_add_zfs" _cell _pfx="$2" _r_dset _p_dset _r_mnt _p_mnt
     assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
