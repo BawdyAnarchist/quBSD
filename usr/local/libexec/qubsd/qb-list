@@ -61,7 +61,7 @@ retrieve_data() {
         [ "$snaps" ] && query_rootsnaps $R_DSET && query_persistsnaps $P_DSET
         [ "$zfs" ] && query_datasets "$R_DSET $P_DSET"
     else
-        params=$(query_param_values_all $PARAM) || eval $(THROW $?)
+        params=$(query_param_values $PARAM) || eval $(THROW $?)
     fi
     return 0
 }

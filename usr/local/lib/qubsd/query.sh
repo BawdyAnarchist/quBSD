@@ -158,8 +158,8 @@ query_qconf_cells_and_paths() {
 }
 
 # List the $1 (PARAM) value for all cells in $D_CELLS, with individual default-value resolution
-query_param_values_all() {
-    local _fn="query_param_values_all"
+query_param_values() {
+    local _fn="query_param_values"
     local _param _param_type _defval_base _defval_jail _defval_vm _nomatch _jails _vms _sub
     assert_args_set 1 $1 && _param="$1" || eval $(THROW $?)
 
