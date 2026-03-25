@@ -100,7 +100,7 @@ compose_root_reclone_cmds() {
 compose_persist_reclone_cmds() {
     local _fn="compose_persist_reclone_cmds" _pfx="$3" _pfxloc="prc_"
     local _cell _rt_ctx _snap _die _p_mnt _p_dset _p_zfs_mnt
-    assert_args_set 2 "$1" "$2" && _cell="$1" && _rt_ctx="$2" || $(THROW $?)
+    assert_args_set 2 "$1" "$2" && _cell="$1" _rt_ctx="$2" || $(THROW $?)
 
     # Compose the local vars based on their prefixes
     _template=$(ctx_get ${_pfx}TEMPLATE)
