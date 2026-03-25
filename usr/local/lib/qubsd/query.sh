@@ -11,21 +11,21 @@ echo_grep() {
 
 is_path_exist() {
     local _fn="is_path_exist"
-    assert_args_set 2 $1 $2 || eval $(THROW $?)
+    assert_args_set 2 "$1" "$2" || eval $(THROW $?)
     [ $1 $2 ] && return 0 || return 11
 }
 
 is_zfs_exist() {
     local _fn="is_zfs_exist"
-    assert_args_set 1 $1 || eval $(THROW $?)
+    assert_args_set 1 "$1" || eval $(THROW $?)
     quiet echo_grep "$DATASETS" "$1" && return 0  # First check DATASETS
     query_datasets "$1"  || eval $(THROW 121)     # Query if missing
     quiet echo_grep "$DATASETS" "$1" && return 0 || return 121
 }
 
 is_cell_running() {
-    local _fn="is_cell_running" _cell="$1"
-    assert_args_set 1 $_cell || eval $(THROW $?)
+    local _fn="is_cell_running" _cell
+    assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
 
     [ "$_cell" = "host" ] && return 0
     query_onjails
@@ -38,7 +38,7 @@ is_cell_running() {
 # Method of discovering an IP collision in a gateway jail
 is_route_available() {
     local _fn="is_route_available"
-    assert_args_set 2 $1 $2 || eval $(THROW $?)
+    assert_args_set 2 "$1" "$2" || eval $(THROW $?)
     route -nj "$1" get "${2%/*}" | grep -Eqs 'destination: (0|128.0.0.0)' && return 0 || return 211
 }
 
@@ -66,7 +66,7 @@ is_user_response() {
 # Return [JAIL|VM] based on $1 CLASS. Bootstraps parameter sourcing
 query_cell_type() {
     local _fn="query_cell_type" _cell _type
-    assert_args_set 1 $1 && _cell="$1" || eval $(THROW $?)
+    assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
     is_path_exist -f $D_CELLS/$_cell || eval $(THROW 112 $_fn $_cell $D_CELLS)
 
     # This function is used for bootstrap. Do not rely on external functions. Hardcode CLASS
@@ -82,26 +82,29 @@ query_cell_type() {
 
 # Single parameter extraction from cell config
 query_cell_param() {
-    local _fn="query_cell_param" _cell="$1" _param="$2" _val _type _def_type
-    assert_args_set 2 $_cell $_param || eval $(THROW $?)
+    local _fn="query_cell_param" _cell _param _val _type _def_type
+    assert_args_set 2 "$1" "$2" && _cell="$1" _param="$2" || eval $(THROW $?)
 
     # Happy path -> parameter found immediately in the cell conf
-    _val=$(sed -En "s/^[ \t]*$_param=\"(.*)\"[ \t]*/\1/p" $D_CELLS/$_cell)
-    [ "$_val" ] && echo "$_val" && return 0
+    query_file_param $_param $D_CELLS/$_cell && return 0
 
-    # Backup path -> check the defaults
+    # Backup path -> check the defaults. type defaults prioritized over base defaults
     _type=$(query_cell_type $_cell) || eval $(THROW $?)
     eval _def_type=\${DEF_${_type}}
-
-    # _type defaults are prioritized over base defaults
-    _val=$(sed -En "s/^[ \t]*$_param=\"(.*)\"[ \t]*/\1/p" $_def_type)
-    [ "$_val" ] && echo "$_val" && return 0
-
-    _val=$(sed -En "s/^[ \t]*$_param=\"(.*)\"[ \t]*/\1/p" $DEF_BASE)
-    [ "$_val" ] && echo "$_val" && return 0
+    query_file_param $_param $_def_type && return 0
+    query_file_param $_param $_def_base && return 0
 
     # Failed to find a value for the parameter
     eval $(THROW 131 ${_fn} $_param $_cell)
+}
+
+query_file_param() {
+    local _fn="query_file_param" _param _file _val
+    assert_args_set 2 "$1" "$2" && _param="$1" _file="$2" || eval $(THROW $?)
+
+    _val=$(sed -En "s/^[ \t]*$_param=\"(.*)\"[ \t]*/\1/p" $_file)
+    [ "$_val" ] && echo $_val && return 0
+    return 1
 }
 
 # Takes $1 PARAM and returns base|jail|vm, depending on where the highest level default lies
@@ -118,7 +121,7 @@ query_param_type() {
 # All clients that a gateway serves
 query_gw_clients() {
     local _fn="query_gw_clients" _val
-    assert_args_set 1 $1 || eval $(THROW $?)
+    assert_args_set 1 "$1" || eval $(THROW $?)
     _val=$(grep -Eo "GATEWAY=\"$1\"" $D_CELLS/* | sed -En "s|$D_CELLS/(.*):.*|\1|p")
     [ "$_val" ] && echo $_val && return 0 || return 133  # Not quoted -> returns single-line list
 }
@@ -126,15 +129,15 @@ query_gw_clients() {
 # Return the filenames of all the qubsd configs of a particular gateway
 query_gw_client_configs() {
     local _fn="query_gw_client_configs" _val
-    assert_args_set 1 $1 || eval $(THROW $?)
+    assert_args_set 1 "$1" || eval $(THROW $?)
     _val=$(query_gw_clients $1 | sed "s|^|$D_CELLS/|; s| | $D_CELLS/|g")
     [ "$_val" ] && echo $_val && return 0 || return 133  # Not quoted -> returns single-line list
 }
 
 # Provide either the explicit cell shell from /overlay, or use the 0env default
 query_cell_shell() {
-    local _fn="query_cell_shell" _cell="$1" _user="$2" _val
-    assert_args_set 2 $_cell $_user || eval $(THROW $?)
+    local _fn="query_cell_shell" _cell _user _val
+    assert_args_set 2 "$1" "$2" && _cell="$1" _user="$2" || eval $(THROW $?)
 
     # First check $_user at the source
     if [ "$_user" = "root" ] ; then
@@ -161,7 +164,7 @@ query_qconf_cells_and_paths() {
 query_param_values() {
     local _fn="query_param_values"
     local _param _param_type _defval_base _defval_jail _defval_vm _nomatch _jails _vms _sub
-    assert_args_set 1 $1 && _param="$1" || eval $(THROW $?)
+    assert_args_set 1 "$1" && _param="$1" || eval $(THROW $?)
 
     query_qconf_cells_and_paths  # Get list of all cells and their qconf paths
     _param_type=$(query_param_type $_param) || eval $(THROW $?)
