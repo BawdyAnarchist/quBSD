@@ -88,7 +88,7 @@ CODE  LEVEL      DESCRIPTION
 166   validate   vnc
 167   validate   wiremem
 167-  validate   <UNUSED>
--180  validate   <UNUSED> 
+-180  validate   <UNUSED>
 181   validate   Basic cellname validity failure
 182   validate   New cellname failure
 
