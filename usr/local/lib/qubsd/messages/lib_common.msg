@@ -11,7 +11,7 @@ Internal bug: set_ctx() is missing positional parameter(s)
 /END/
 
 :_internal1:
-Internal bug: Invalid getopts option
+Internal bug: Invalid getopts
 /END/
 
 :_internal2:
