@@ -3,7 +3,7 @@
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
 _resolve_rootenv_snapname() {
     local _fn="_resolve_rootenv_snapname" _dset="$1"
-    local _rootsnaps _psmod _lstart _line _snap _date _timestamp _written
+    local _rootsnaps _psmod _lstart _line _snap _creation _crea_unix _written
 
     # Try existing ROOTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
     [ $ROOTSNAPS ] && _rootsnaps=$(echo "$ROOTSNAPS" | grep $_dset)
@@ -21,11 +21,11 @@ _resolve_rootenv_snapname() {
         while IFS= read -r _line ; do
             # Extract snapshot, date string, and covert the timestamp
             _snap=$(echo "$_line" | awk '{print $1}')
-            _date=$(echo "$_line" | awk '{print $3, $4, $5, $6, $7}')
-            _timestamp=$(date -j -f "%a %b %d %H:%M %Y" "$_date" +"%s")
+            _creation=$(echo "$_line" | awk '{print $3, $4, $5, $6, $7}')
+            _crea_unix=$(date -j -f "%a %b %d %H:%M %Y" "$_creation" +"%s")
 
             # Compare data, continue or break
-            [ "$_lstart" -gt "$_timestamp" ] && echo $_snap && return 0
+            [ "$_lstart" -gt "$_crea_unix" ] && echo $_snap && return 0
         done << EOF
 $_rootsnaps
 EOF
@@ -42,8 +42,7 @@ EOF
 
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
 _resolve_persist_snapname() {
-    local _fn="_resolve_persist_snapname" _dset="$1"
-    local _persistsnaps _psmod _lstart _line _snap _date _timestamp _written
+    local _fn="_resolve_persist_snapname" _dset="$1" _persistsnaps _snap _written
 
     # Try existing PERSISTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
     [ $PERSISTSNAPS ] && _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset)
