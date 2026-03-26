@@ -28,8 +28,8 @@ is_cell_running() {
     assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
 
     [ "$_cell" = "host" ] && return 0
-    query_onjails
-    query_onvms
+    [ -z "$ONJAILS" ] && query_onjails
+    [ -z "$ONVMS" ] && query_onvms
     quiet echo_grep "$ONJAILS" "$_cell" && return 0
     quiet echo_grep "$ONVMS" "bhyve: $_cell" && return 0
     return 200
