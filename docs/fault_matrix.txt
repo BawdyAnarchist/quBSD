@@ -50,7 +50,7 @@ CODE  LEVEL      DESCRIPTION
 110   config     Path invalid
 111   config     Cell JCONF missing
 112   config     Cell QCONF missing
-120   config     Generic ZFS failure
+120   config     Generic ZFS command failure
 121   config     Missing dataset
 122   config     Root snapshot missing 
 123   config     Persist snapshot missing
