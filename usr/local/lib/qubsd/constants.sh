@@ -69,8 +69,12 @@ export CONTEXT="CALLER JCONF QCONF P_DSET P_MNT R_DSET R_MNT RT_CTX"   # Conveni
 export CLASSES="rootjail appjail dispjail rootVM appVM dispVM cjail"
 
 # Query results storage for rapid stacked/looped information retreival
-export QUERY="CELLS CELLS_QPATHS DATASETS MOUNTS NCPU ONJAILS ONVMS PCICONF ROOTSNAPS PERSISTSNAPS SYSMEM"
+export QUERY="CELLS CELLS_QPATHS DATASETS MOUNTS NCPU ONJAILS ONVMS PCICONF PERSISTSNAPS ROOTSNAPS SNAPSHOTS SYSMEM"
 
+# zfs props relevant to qubsd operations. Used in `zfs list` queries
+# DO NOT REORDER. Append only for new zfsprops, because awk uses this column ordering for parsing
+export DSET_PROPS="name,mountpoint,mounted,origin,encryption"
+export SNAP_PROPS="name,written,creation,qubsd:time-to-live"
 
 #########################################   OLD  SYSTEM  CONSTANTS / OVERRIDES  ##########################################
 
