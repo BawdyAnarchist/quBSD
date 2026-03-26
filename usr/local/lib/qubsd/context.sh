@@ -152,7 +152,7 @@ ctx_validate_params() {
 
     for _PARAM in $_PARAMS ; do
         unset _value  # Unset to prevent stale values from polluting the validation
-        eval  _value="\${${_pfx}${_PARAM}}"
+        eval  _value="\${${_pfx}$_PARAM}"
 
         _param=$(echo "$_PARAM" | tr '[:upper:]' '[:lower:]')
         _validation_function="validate_param_$_param"
@@ -190,7 +190,7 @@ ctx_write_runtime() {
 
     # Write PARAMS to the runtime context file
     for _PARAM in $_PARAMS ; do
-        _val=$(ctx_get ${_pfx}${_PARAM})
+        _val=$(ctx_get ${_pfx}$_PARAM)
         _line='$_PARAM=\"$_val\"'
         eval echo $_line >> $RT_CTX
     done
@@ -227,9 +227,8 @@ ctx_bootstrap_cell() {
     ctx_load_params $_cell $_pfx || eval $(THROW $? $_fn $_cell)  # Source QCONF and defaults
 
     _type=$(ctx_get ${_pfx}TYPE)
-    _jconf=$(ctx_get ${_pfx}JCONF)
     if [ "$_type" = "JAIL" ] ; then
-        is_path_exist -f $_jconf || eval $(THROW 111 $_fn $_cell)
+        is_path_exist -f $(ctx_get ${_pfx}JCONF) || eval $(THROW 111 $_fn $_cell)
     fi
 
     # Save for last. If dataset missing, it can be recloned, all other checks have been completed
