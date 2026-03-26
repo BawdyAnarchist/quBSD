@@ -146,12 +146,14 @@ response_subr() {
 # Command-specific debug tool for viewing what exactly was run for a given command
 verbose() { echo ">> $*" >&2; "$@" ;}
 
-# Probe the time it takes to run a command
+# Milliseconds to complete a command. Assuming low system load, should usually be +/- .5ms precision
+# FreeBSD /bin/sh `time` builtin only provides centiseconds
 elapsed() {
-    local _date=$(date +%s.%N) _return
+    local _return _date=$(date +%s.%N)
     "$@"
     _return=$?
-    echo "$_fn: Elapsed: $(echo "scale=3 ; ( ($(date +%s.%N) - $_date) * 1000) / 1" | bc) ms"
+    # Subtract .0008 to account for (appx) delay of the command itself. Close enough for this tool
+    echo "$_fn: Elapsed: $(echo "scale=3 ; (($(date +%s.%N) - $_date - .0008) * 1000) / 1" | bc) ms"
     return $?
 }
 
