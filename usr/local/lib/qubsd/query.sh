@@ -74,7 +74,7 @@ query_cell_type() {
     case $_type in
         *jail) echo "JAIL" ;;
         *VM) echo "VM" ;;
-        *) eval $(THROW 10 ${_fn}2 $_cell $_type) ;;
+        *) eval $(THROW 18 ${_fn}2 $_cell $_type) ;;
     esac
 
     return 0
@@ -211,20 +211,20 @@ query_datasets() {
 
     # Either add to the existing, or generate new DATASETS
     if [ "$DATASETS" ] ; then
-        DATASETS=$(echo "$DATASETS" \
-            ; hush zfs list -Ho name,mountpoint,mounted,origin,encryption $_pull) \
+        DATASETS=$(echo "$DATASETS" ; hush zfs list -Ho $DSET_PROPS $_pull) \
             || eval $(THROW 121)
     else
-        DATASETS=$(hush zfs list -Ho name,mountpoint,mounted,origin,encryption $_pull) \
-            || eval $(THROW 121)
+        DATASETS=$(hush zfs list -Ho $DSET_PROPS $_pull) || eval $(THROW 121)
     fi
     return 0
 }
 
-# Optimizes zfs queries when operating over on cells, by invoking just *one* zfs call, to populate
-# DATASETS with the recursive list of the defaults parent datasets. Will clobber existing DATASETS
-query_datasets_recursive_defaults() {
-    local _fn="query_datasets_recursive_defaults" _dsets
+# Optimizes zfs queries when operating on multiple cells, by invoking just *one* zfs call.
+# List recursive datasets of defaults parents. Will clobber old GLOBAL.
+# OPTIONAL $1 [-s]: Pull and populate recursive SNAPSHOTS instead of DATASETS
+query_zfs_recursive_defaults() {
+    local _fn="query_datasets_recursive_defaults" _dsets _snaps
+    [ "$1" = "-s" ] && _snaps_only='true'
 
     _dsets=$(query_file_param "R_ZFS" $DEF_BASE \
             ;query_file_param "P_ZFS" $DEF_BASE \
@@ -233,7 +233,13 @@ query_datasets_recursive_defaults() {
             ;query_file_param "R_ZFS" $DEF_VM   \
             ;query_file_param "P_ZFS" $DEF_VM)
     _dsets=$(echo "$_dsets" | sort | uniq)
-    DATASETS=$(zfs list -ro name,mountpoint,mounted,origin,encryption $_dsets)
+
+    if [ -z "$_snaps_only" ] ; then
+        DATASETS=$(hush zfs list -Hro $DSET_PROPS $_dsets) || eval $(THROW 120)
+    else
+        SNAPSHOTS=$(hush zfs list -t snapshot -Hro $SNAP_PROPS $_dsets) || eval $(THROW 120)
+    fi
+    return 0
 }
 
 query_rootsnaps() {
@@ -247,11 +253,10 @@ query_rootsnaps() {
 
     # Either add to the existing, or generate new ROOTSNAPS
     if [ "$ROOTSNAPS" ] ; then
-        ROOTSNAPS=$(echo "$ROOTSNAPS" \
-            ; hush zfs list -Hrt snapshot -o name,written,creation $1) \
+        ROOTSNAPS=$(echo "$ROOTSNAPS" ; hush zfs list -Hrt snapshot -o $SNAP_PROPS $1) \
             || eval $(THROW 122)
     else
-        ROOTSNAPS=$(hush zfs list -Hrt snapshot -o name,written,creation $1) \
+        ROOTSNAPS=$(hush zfs list -Hrt snapshot -o $SNAP_PROPS $1) \
             || eval $(THROW 122)
     fi
     return 0
@@ -260,12 +265,10 @@ query_rootsnaps() {
 query_persistsnaps() {
     local _fn="query_persistsnaps"
     if [ "$PERSISTSNAPS" ] ; then
-        PERSISTSNAPS=$(echo "$PERSISTSNAPS" \
-            ; hush zfs list -Hrt snapshot -o name,written,creation $1) \
+        PERSISTSNAPS=$(echo "$PERSISTSNAPS" ; hush zfs list -Hrt snapshot -o $SNAP_PROPS $1) \
             || eval $(THROW 123)
     else
-        PERSISTSNAPS=$(zfs list -Hrt snapshot -o name,written,creation $1) \
-            || eval $(THROW 123)
+        PERSISTSNAPS=$(zfs list -Hrt snapshot -o $SNAP_PROPS $1) || eval $(THROW 123)
     fi
     return $?
 }
