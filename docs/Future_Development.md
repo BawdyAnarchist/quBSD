@@ -11,7 +11,6 @@ make backups, then qb-autostart
     -- Change your datasets
 qb-edit
 
-
 ### Import things in the code as I overhaul that still need addressed
 exec.postart
   - "hacky exception to schg due to resolv and resolvconf"
