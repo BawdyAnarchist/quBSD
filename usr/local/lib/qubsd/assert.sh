@@ -72,9 +72,9 @@ assert_integer() {
     echo "$1" | grep -Eqs -- '^(-|[0-9])[0-9]*$' || eval $(THROW 13 $_fn $1)
 }
 
+# Checks that $1 is integer, and comparison boundaries are valid
+# Prefer this implementation because error reporting is vastly better than [ x -gt y ] inbuilt
 assert_int_comparison() {
-    # Checks that _value is integer, and can checks boundaries. [-n] is a descriptive variable name
-    # from caller, for error message. Assumes that integers have been provided by the caller.
     local _fn="assert_int_comparison" _opts OPTARG OPTIND _val _g _G _l _L
 
     while getopts :g:G:l:L: opts ; do case $opts in
@@ -96,6 +96,7 @@ assert_int_comparison() {
     return 0
 }
 
+# Ensures that $1 is part of the static PARAMS_ALL list
 assert_param() {
     local _fn="assert_param" _val="$1"
     echo "$PARAMS_ALL" | grep -Eqs "(^|[[:blank:]])$_val([[:blank:]]|\$)" \
