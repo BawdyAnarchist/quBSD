@@ -51,9 +51,11 @@ CODE  LEVEL      DESCRIPTION
 111   config     Cell JCONF missing
 112   config     Cell QCONF missing
 120   config     Generic ZFS command failure
-121   config     Missing dataset
+121   config     Generic missing dataset
 122   config     Root snapshot missing 
 123   config     Persist snapshot missing
+124   config     Root dataset missing 
+125   config     Persist dataset missing
 130   config     QCONF query failure 
 131   config     Parameter missing from QCONF
 132   config     Unable to determine TYPE from QCONF 
