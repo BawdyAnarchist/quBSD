@@ -121,8 +121,8 @@ ctx_add_zfs() {
     # Guarantee datasets exist. Checks integrated here in zfs_ctx to avoid fragmentation
     _r_mnt=$(ctx_get ${_pfx}R_MNT)
     _p_mnt=$(ctx_get ${_pfx}P_MNT)
-    [ "$_r_mnt" ] || eval $(THROW 121 $_fn $_cell $_r_dset)  # Even zvol has "-" for mountpoint
-    [ "$_p_mnt" ] || eval $(THROW 121 $_fn $_cell $_p_dset)
+    [ "$_r_mnt" ] || eval $(THROW 124 $_fn $_cell $_r_dset)  # Even zvol has "-" for mountpoint
+    [ "$_p_mnt" ] || eval $(THROW 125 $_fn $_cell $_p_dset)
     # We hard-define _ZFS and _DSET. Only [ "$_MNT" ] can unequivocally attest to dataset existence #
 
     return 0
@@ -248,7 +248,7 @@ ctx_bootstrap_runtime() {
 
     assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
 
-    ctx_bootstrap_cell $_cell $_pfx || PASS -c $_pass \
+    ctx_bootstrap_cell $_cell $_pfx || PASS -c "$_pass" \
         || eval $(THROW $? _generic "Cell < $_cell > bootstrap failed")
 
     # Validation and CTX can tolerate the misisng datasets without throwing
