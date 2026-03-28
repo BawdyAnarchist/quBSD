@@ -73,8 +73,9 @@ export QUERY="CELLS CELLS_QPATHS DATASETS MOUNTS NCPU ONJAILS ONVMS PCICONF PERS
 
 # zfs props relevant to qubsd operations. Used in `zfs list` queries
 # DO NOT REORDER. Append only for new zfsprops, because awk uses this column ordering for parsing
+# zfsprop creation takes up 5 cols ($3-$7)
 export DSET_PROPS="name,mountpoint,mounted,origin,encryption"
-export SNAP_PROPS="name,written,creation,qubsd:time-to-live"
+export SNAP_PROPS="name,written,creation,qb:ttl"
 
 #########################################   OLD  SYSTEM  CONSTANTS / OVERRIDES  ##########################################
 
