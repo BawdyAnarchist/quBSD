@@ -80,16 +80,17 @@ compose_thin_old_snaps_cmds() {
     local _fn="compose_thin_old_snaps_cmds"
     local _rsnaps _psnaps _snapshots _snap _clones _ttl _integer _creation _crea_unix _destroy
 
-    # Only rootenvs will have root-dataset snapshots
+    # Most _dsets should be found in SNAPSHOTS. Fallback to query_* if not found.
     _class=$(ctx_get ${_pfx}CLASS)
     if [ "$_r_dset" ] && [ "$_class" ] && [ -z ${_class##root*} ] ; then
+        # Only rootenvs will have root-dataset snapshots
         _rsnaps=$(echo "$SNAPSHOTS" | grep -E "^$_r_dset@") \
-            || _rsnaps=$(hush zfs list -Ht snapshot -o $SNAP_PROPS $_r_dset)
+            || _rsnaps=$(query_rootsnaps $_r_dset)
     fi
     # Even rootenvs typically have a persistent dataset. However, skip disp cells.
     if [ "$_p_dset" ] && [ "$_class" ] && [ -n "${_class#disp*}" ] ; then
         _psnaps=$(echo "$SNAPSHOTS" | grep -E "^$_p_dset@") \
-            || _psnaps=$(hush zfs list -Ht snapshot -o $SNAP_PROPS $_p_dset)
+            || _psnaps=$(query_persistsnaps $_p_dset)
     fi
     _snapshots="$(echo "$_rsnaps" ; echo "$_psnaps")"
 
