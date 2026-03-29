@@ -2,217 +2,163 @@
 
 . $QCOMMON
 
-get_options() {
-	while getopts ':dhl:st:' opts ; do case $opts in
-		d) 	DESTROY=true ;;
-		h) 	get_msg2 -eu ;;
-		l) 	LIST=${OPTARG} ;;
-		s) 	SNAPSHOT=true ;;
-		t) 	TTL="${OPTARG}" ;;
-		:) 	LIST="all" ;;
-		*)   get_msg2 -Eum _e2
-	esac done  ;  shift $(( OPTIND - 1 ))
+trap_init
 
-	DATE_UNIX=$(date +%s)
+parse_args() {
+    local _fn="parse_args" _opts OPTARG OPTIND
+    while getopts dhs: _opts ; do case $_opts in
+        d) DESTROY=true ;;
+        h) eval $(WARN usage) ; cat $ERR ; exit 0 ;;
+        s) TTL="$OPTARG" ;;
+        *) exit 1 ;;
+    esac done ; shift $(( OPTIND - 1 ))
+
+    # Must provide [-d] and/or [-t]
+    [ -z "$DESTROY" ] && [ -z "$TTL" ] && eval $(THROW 4 $_fn)
+
+    # Sanitize TTL
+    [ "$TTL" ] && { assert_time_format "$TTL" || eval $(THROW $? ${_fn}_2) ;}
+
+    # Convenience globals
+    DATE=$(date +%s)
 }
 
-checks() {
-	# Separate integer from the units for checks
-	_INT="${TTL%?}"
-	_UNITS="${TTL##*[0-9]}"
+calculate_snap_suffix() {
+    local _fn="calculate_snap_suffix" _date
 
-	# Ensure that <_INT><_UNITS> is an integer and proper time unit
-	if [ -n "$TTL" ] ; then
-		! chk_integer -q -g 0 -- "$_INT" && get_msg2 -Eum _e1
-		! echo "$_UNITS" | grep -Eq "m|H|D|W|Y" && get_msg2 -Eum _e1
-	fi
+    # Use the TTL timeframe for modifying the snapname
+    case ${TTL##*[0-9]} in
+        s) _date='+%b%d_%H%M' ;;
+        m) _date='+%b%d_%H%M' ;;
+        H) _date='+%b%d_%H_H' ;;
+        D) _date='+%b%d_%H_D' ;;
+        W) _date='+%b%d_%H_W' ;;
+        M) _date='+%Y_%b%d_M' ;;
+        Y) _date='+%Y_%b%d_Y' ;;
+    esac
+    echo $(date $_date)  # Snap will have this @name
 }
 
-calculate_variables() {
-	# SNAPNAME format is unique for each timeframe, for clear visual separation
-	# Calculates the destroy-date in unix time, to be stored with snapshot
+calculate_destroy_date() {
+    local _fn="calculate_destroy_date"
 
-	if [ -n "$TTL" ] ; then
-		case $_UNITS in
-			m)	SNAPNAME=$(date +%b%d_%H%M)
-				_ttl_unix=$(( _INT * 60 ))
-				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
-
-			H)	SNAPNAME=$(date +%b%d_%H_H)
-				_ttl_unix=$(( _INT * 3600 ))
-				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
-
-			D)	SNAPNAME=$(date +%b%d_%H_D)
-				_ttl_unix=$(( _INT * 3600 * 24 ))
-				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
-
-			W)	SNAPNAME=$(date +%b%d_%H_W)
-				_ttl_unix=$(( _INT * 3600 * 24 * 7 ))
-				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
-
-			M)	SNAPNAME=$(date +%b%d_M)
-				_ttl_unix=$(( _INT * 3600 * 24 * 31 ))
-				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
-
-			Y)	SNAPNAME=$(date +%Y%b%d_Annual)
-				_ttl_unix=$(( _INT * 3600 * 24 * 365 ))
-				_ddate_unix=$(( _ttl_unix + DATE_UNIX)) ;;
-		esac
-	else
-		# If there's no [-t], tag snapshot as manually created, and set '-' for TTL, ddate
-		SNAPNAME=$(date +%b%d_%H:%M_Indef)
-		TTL='-' ; _ddate_unix='-'
-	fi
+    case ${_ttl##*[0-9]} in
+        s) _mult="1" ;;
+        m) _mult="60" ;;
+        H) _mult="3600" ;;
+        D) _mult="3600*24" ;;
+        W) _mult="3600*24*7" ;;
+        M) _mult="3600*24*31" ;;
+        Y) _mult="3600*24*365" ;;
+        *) return 1 ;;
+    esac
+    echo "(${_ttl%?} * $_mult) + $_crea_unix" | bc  # Final destroy date in unix time
 }
 
-sync_from_qconf() {
+compose_new_snapshots_cmds() {
+    local _fn="compose_new_snapshots_cmds" _r_snap _p_snap _zfs_r_cmd _zfs_p_cmd
 
-	# Get list of all jails with an AUTOSNAP setting in QCONF
-	_jlist=$($QLEXEC/qb list -Hp AUTOSNAP | awk '/.*true$/{print $1}')
-	for _jail in $_jlist ; do
+    # Make sure the cell is flagged for autosnap, or return silently back to caller
+    echo "$_autosnaps" | grep -Eqs "^$_cell\$" || return 1
 
-		# Pull the value of the AUTOSNAP, and conform datasets to QCONF
-		_value=$(sed -En "s/^${_jail}[[:blank:]]+AUTOSNAP[[:blank:]]+//gp" $QCONF)
-		case "$(get_jail_parameter -deqs CLASS "$_jail")" in
+    # Generate notional snap names
+    [ "$_p_dset" ] && _p_snap="$_p_dset@$_suffix"
+    [ "$_r_dset" ] && _r_snap="$_r_dset@$_suffix"
 
-			app*)  chk_valid_zfs "${U_ZFS}/${_jail}" \
-							 && zfs set qubsd:autosnap="$_value" "${U_ZFS}/${_jail}"
-			;;
-			root*) chk_valid_zfs "${ROOT_ZFS}/${_jail}" \
-							 && zfs set qubsd:autosnap="$_value" "${R_ZFS}/${_jail}"
-			;;
-		esac
-	done
+    # Don't snapshot running rootenv where updates/installs could cause partial/inconsistent state
+    [ "${_class##root*}" ] && { quiet echo_grep "$ONJAILS" "$_cell" \
+        || quiet echo_grep "$ONVMS" "$_cell" ;} && unset _r_snap
+
+    # Update the primary _CMD. Note that the space in front of " $_r_snap" is required
+    [ -z "$_CMD_R_SNAPSHOT" ] && _zfs_r_cmd="zfs snapshot -o qb:ttl=$TTL"
+    [ -z "$_CMD_P_SNAPSHOT" ] && _zfs_p_cmd="zfs snapshot -o qb:ttl=$TTL"
+    _CMD_R_SNAPSHOT="$(printf "%b" "$_zfs_r_cmd" "$_CMD_R_SNAPSHOT" " $_r_snap")"
+    _CMD_P_SNAPSHOT="$(printf "%b" "$_zfs_p_cmd" "$_CMD_P_SNAPSHOT" " $_p_snap")"
 }
 
-list_datasets() {
+compose_thin_old_snaps_cmds() {
+    local _fn="compose_thin_old_snaps_cmds"
+    local _rsnaps _psnaps _snapshots _snap _clones _ttl _integer _creation _crea_unix _destroy
 
-	if [ "$LIST" != "snapshot" ] ; then
-		# Get list of datasets tagged for autosnap
-		ZLIST=$(zfs list -rH -o name,qubsd:autosnap,qubsd:backup-location \
-													| grep -E "[[:blank:]]+true[[:blank:]]")
-		# Print with formatted header
-		printf "%b" "\nDATASET_NAME QUBSD:AUTOSNAP QUBSD:BACKUP-LOC\n" \
-				  		"$ZLIST" "\n" | column -t
-		echo ""
-	fi
+    # Only rootenvs will have root-dataset snapshots
+    _class=$(ctx_get ${_pfx}CLASS)
+    if [ "$_r_dset" ] && [ "$_class" ] && [ -z ${_class##root*} ] ; then
+        _rsnaps=$(echo "$SNAPSHOTS" | grep -E "^$_r_dset@") \
+            || _rsnaps=$(hush zfs list -Ht snapshot -o $SNAP_PROPS $_r_dset)
+    fi
+    # Even rootenvs typically have a persistent dataset. However, skip disp cells.
+    if [ "$_p_dset" ] && [ "$_class" ] && [ -n "${_class#disp*}" ] ; then
+        _psnaps=$(echo "$SNAPSHOTS" | grep -E "^$_p_dset@") \
+            || _psnaps=$(hush zfs list -Ht snapshot -o $SNAP_PROPS $_p_dset)
+    fi
+    _snapshots="$(echo "$_rsnaps" ; echo "$_psnaps")"
 
-	if [ "$LIST" != "dataset" ] ; then
-		# Get list of snapshots created by autosnap
-		SNAPLIST=$(zfs list -H -t snapshot -o \
-						name,qubsd:time-to-live,qubsd:destroy-date,qubsd:autocreated \
-												| grep -E "yes$" | awk '{print $1, $2, $3}')
-		# Print with formatted header
-		printf "%b" "\nSNAPSHOT_NAME QUBSD:TIME-TO-LIVE QUBSD:DESTROY-DATE\n" \
-				  		"$SNAPLIST" "\n" | column -t
-		echo ""
-	fi
+    # Resolve each line's destroy date, and add to the list if old
+    while IFS= read -r _line ; do
+        [ -z "$_line" ] && continue   # Some lines are blank. Ignore/continue
+        _snap=$(echo $_line | awk '{print $1}')
+        _clones=$(echo $_line | awk '{print $9}')
+        _ttl=$(echo $_line | awk '{print $8}')
+        _creation=$(echo "$_line" | awk '{print $3, $4, $5, $6, $7}')
+        _crea_unix=$(date -j -f "%a %b %d %H:%M %Y" "$_creation" +"%s")
+        _destroy=$(calculate_destroy_date)
+
+        # Final command addition. Mute the comparison to not pollute $ERR
+        mute assert_int_comparison -G $_destroy -- $DATE && [ "$_clones" = "-" ] \
+            && _CMD_DESTROY="$(printf "%b" "$_CMD_DESTROY\n" "hush zfs destroy $_snap")"
+    done << EOF
+$_snapshots
+EOF
 }
 
-new_snapshots() {
-	# Calculate unix-time destroy-dates based on user input time-to-live.
-	calculate_variables
+manage_composition_loop() {
+    local _fn="manage_composition_loop" _class _autosnaps _suffix _r_dset _p_dset _pfx="t_"
 
-	# Datasets tagged with qubsd:autosnap.
-	ZLIST=$(zfs list -rH -o name,qubsd:autosnap ${R_ZFS%%/*} ${U_ZFS} \
-								| grep -E "[[:blank:]]+true\$" | awk '{print $1}')
+    query_qconf_cells_and_paths     # Populate globals: $CELLS and $CELLS_QPATHS
+    query_zfs_recursive_defaults    # Sets global DATASETS. Prevents repeat/excess zfs calls
+    _class=$(ctx_get ${_pfx}CLASS)
 
-	for _dataset in $ZLIST ; do
-		# If the dataset is a zroot dataset (a ROOTENV), skip the snapshot if it's running
-		{ [ -z "${_dataset##"${R_ZFS}"*}" ] && chk_isrunning "${_dataset##*/}" ;} && continue
+    # Common/aggragated data necessary for efficient resolution of snapshot names/commands
+    if [ "$TTL" ] ; then
+        query_onjails                     # Sets global ONJAILS
+        query_onvms                       # Sets global ONVMS
+        _suffix=$(calculate_snap_suffix)  # "@<name>" to append to the snapshot
+        _autosnaps=$(query_param_values AUTOSNAP | grep 'true' | awk '{print $1}')
+    fi
+    if [ "$DESTROY" ] ; then
+        query_zfs_recursive_defaults -s   # Set global SNAPSHOTS. Prevents repeat/excess zfs calls
+        query_qconf_cells_and_paths       # Make sure globals are set: $CELLS and $CELLS_QPATHS
+        SNAPSHOTS=$(echo "$SNAPSHOTS" | awk '$8 ~ /^[0-9]+[smHDWY]$/')
+    fi
 
-		zfs snapshot \
-			-o qubsd:autocreated=yes \
-			-o qubsd:autosnap="-" \
-			-o qubsd:time-to-live="$TTL" \
-			-o qubsd:destroy-date="$_ddate_unix" \
-			"${_dataset}@${SNAPNAME}"
-	done
+    # More efficient to run a single loop, than two separate loops for TTL vs DESTROY.
+    # We can't trust that all dsets/snaps were queried with `query_zfs_recursive_defaults`.
+    # Must loop over all cells. Will grep cached globals, and fallback to zfs when necessary.
+    for _cell in $CELLS ; do
+
+        # Acquire the dataset data for each cell. Tolerate missing jconf, or missing dataset
+        ctx_bootstrap_cell $_cell $_pfx || PASS -c "111 124 125" || continue
+        [ "$(ctx_get ${_pfx}R_MNT)" ] && _r_dset=$(ctx_get ${_pfx}R_DSET)
+        [ "$(ctx_get ${_pfx}P_MNT)" ] && _p_dset=$(ctx_get ${_pfx}P_DSET)
+
+        # Prepare the commands
+        [ "$TTL" ] && compose_new_snapshots_cmds
+        [ "$DESTROY" ] && compose_thin_old_snaps_cmds
+        unset _r_dset _p_dset  # Keep the variables clean
+    done
 }
 
-update_stale_clones() {
-	# Assemble list of children datasets and their origin (parent)
-	_rclonelist=$(zfs list -Hro name,origin ${R_ZFS} | grep -Ev -- '-$' | awk '{print $1}')
-	_uclonelist=$(zfs list -Hro name,origin ${U_ZFS} | grep -Ev -- '-$' | awk '{print $1}')
-
-	# Update stale zroot clones with latest parent snap (zfs lists chronolgically)
-	for _clone in $_rclonelist ; do
-		if ! chk_isrunning "${_clone##*/}" ; then
-			_origin=$(zfs list -Ho origin $_clone)
-			_newsnap=$(zfs list -t snapshot -o name ${_origin%%@*} | tail -1)
-			zfs destroy $_clone
-			zfs clone -o qubsd:autosnap='false' "$_newsnap" $_clone
-		fi
-	done
-
-	# Update stale zusr clones. They might need fstab replacement and home directory change
-	for _clone in $_uclonelist ; do
-		_origin=$(zfs list -Ho origin $_clone | sed -E "s/${U_ZFS}\///")
-		reclone_zusr ${_clone##*/} "${_origin%%@*}" || get_msg2 -m _e3
-	done
-}
-
-thin_old_snapshots() {
-	# All zroot / zusr datasets
-	ZLIST=$(zfs list -rH -o name ${R_ZFS%%/*} ; zfs list -rH -o name ${U_ZFS})
-
-	for _dataset in $ZLIST ; do
-		_snaplist=$(zfs list -Ht snapshot -o name,qubsd:destroy-date $_dataset \
-								| grep -E "[[:blank:]]+[[:digit:]]+\$" | awk '{print $1}')
-
-		# Prevent snapshot clutter. If prev snap has 0B written and destroty-date sooner than
-		# newest snap, and the newest snap also wrote 0B; then prev snap can be destroyed
-		_snap0=$(echo "$_snaplist" | tail -1)
-		[ -n "$_snap0" ] \
-			&& _dd0=$(zfs list -H -o qubsd:destroy-date $_snap0) \
-			&&	_writ0=$(zfs list -H -o written $_snap0)
-
-		_snaplist_temp=$(echo "$_snaplist" | sed '$ d')
-		_snap1=$(echo "$_snaplist_temp" | tail -1)
-		[ -n "$_snap1" ] \
-			&& _dd1=$(zfs list -H -o qubsd:destroy-date $_snap1) \
-			&&	_writ1=$(zfs list -H -o written $_snap1)
-
-		while [ -n "$_snap1" ] && [ "$_dd0" -ge "$_dd1" ] && [ "${_writ0}${_writ1}" = "00" ] ; do
-			zfs destroy $_snap1 > /dev/null 2>&1 \
-					&& _snaplist_temp=$(echo "$_snaplist_temp" | sed '$d') || break
-			_snap1=$(echo "$_snaplist_temp" | tail -1)
-			_dd1=$(zfs list -H -o qubsd:destroy-date $_snap1 2>&1) || break
-			_writ1=$(zfs list -H -o written $_snap1 2>&1) || break
-		done
-
-		# Trim all snapshots past their destroy-date
-		for _snap in $_snaplist ; do
-			# If dataset is still in use; `zfs destroy` without [-rRf], will fail to /dev/null
-			_snap_dd=$(zfs list -Ho qubsd:destroy-date $_snap 2>&1) \
-				&& [ "$_snap_dd" -le "$DATE_UNIX" ] && zfs destroy $_snap > /dev/null 2>&1
-		done
-	done
-}
 
 main() {
-	# Sync from QCONF just in case of differences or hand jammed updates
-	sync_from_qconf
+    local _fn="main"
 
-	# List first
-	[ -n "$LIST" ] && list_datasets && exit 0
+    parse_args "$@" || eval $(THROW $?)
+    manage_composition_loop
 
-	# Make new snapshots, then update stale jails/VMs to latest snapshot
-	if [ -n "$SNAPSHOT" ] ; then
-		new_snapshots
-		update_stale_clones
-	fi
-
-	# Destroy snaps with a TTL, or null `zfs-diff` to parent
-	[ -n "$DESTROY" ] && thin_old_snapshots
+    _COMMANDS="_CMD_R_SNAPSHOT _CMD_P_SNAPSHOT _CMD_DESTROY"
+    execute_commands "$_COMMANDS" || eval $(THROW $?)
+    return 0
 }
 
-get_global_variables
-
-get_options "$@"
-
-checks
-
-main
-
+main "$@" || FATAL
 exit 0
