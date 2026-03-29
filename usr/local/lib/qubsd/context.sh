@@ -218,21 +218,27 @@ ctx_load_runtime() {
   # For example, running `query_datasets_recursive_defaults()` can reduce exec times by 5-6ms.
 
 ctx_bootstrap_cell() {
-    local _fn="ctx_bootstrap_cell" _cell="$1" _pfx="$2" _type _jconf
+    local _fn="ctx_bootstrap_cell" _cell _pfx _level _pass _type _jconf
 
+    while getopts :l:P: _opts ; do case $_opts in
+        P)  _pass="$OPTARG" ;;   # Failure codes to PASS after ctx_bootstrap_cell
+        *)  eval $(THROW 8 _internal1) ;;
+    esac ; done ; shift $(( OPTIND - 1 ))
+
+    assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
     ctx_unset -p "$_pfx"  # Start from blank slate
 
     # Bootstrap a new cell context, which comes with basic checks for crucial parameters
-    ctx_initialize $_cell $_pfx  || eval $(THROW $? $_fn $_cell)  # Basic context definitions
-    ctx_load_params $_cell $_pfx || eval $(THROW $? $_fn $_cell)  # Source QCONF and defaults
+    ctx_initialize  $_cell $_pfx || PASS -c "$_pass" || eval $(THROW $? $_fn $_cell)
+    ctx_load_params $_cell $_pfx || PASS -c "$_pass" || eval $(THROW $? $_fn $_cell)
 
     _type=$(ctx_get ${_pfx}TYPE)
     if [ "$_type" = "JAIL" ] ; then
-        is_path_exist -f $(ctx_get ${_pfx}JCONF) || eval $(THROW 111 $_fn $_cell)
+        is_path_exist -f $(ctx_get ${_pfx}JCONF) || PASS -c "$_pass" || eval $(THROW 111 $_fn $_cell)
     fi
 
     # Save for last. If dataset missing, it can be recloned, all other checks have been completed
-    ctx_add_zfs $_cell $_pfx     || eval $(THROW $? $_fn $_cell)  # Cell-specific datasets
+    ctx_add_zfs $_cell $_pfx || PASS -c "$_pass" || eval $(THROW $? $_fn $_cell)
 
     return 0
 }
