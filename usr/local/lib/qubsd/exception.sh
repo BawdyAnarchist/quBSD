@@ -110,7 +110,7 @@ trap_push() {
     if ! assert_args_set 1 "$1" ; then
         echo "Internal Error: < $_fn >. Attempted trap_push without passing any arguments."
         exit 3
-    elif echo_grep "$1" ';' ; then
+    elif echo "$1" | grep -qs ';' ; then
         echo "Internal Error: < $_fn >. trap_push was passed arguments containing a semicolon."
         echo "This is inherently dangerous for trap_pop and the eval embedded in trap management."
         exit 3
