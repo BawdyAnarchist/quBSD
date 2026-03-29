@@ -34,18 +34,18 @@ CODE  LEVEL      DESCRIPTION
 15    assert     IPV4 CIDR invalid
 16    assert     Cellname formatting failure
 17    assert     Dataset name formatting failure
-18    assert     Class formatting error
-19    assert     Bytsize format error
-20    assert     <UNUSED>
-21    assert     cpuset formatting error
-22    assert     schg formatting error
-23    assert     seclvl formatting error
+18    assert     Class formatting failure
+19    assert     Bytsize format failure
+20    assert     Time format failure
+21    assert     cpuset formatting failure
+22    assert     schg formatting failure
+23    assert     seclvl formatting failure
 30    assert     <UNUSED>
-31    assert     bhyve_custm formatting error
-32    assert     bhyveopts formatting error
-33    assert     ppt formatting error
-34    assert     taps formatting error 
-35    assert     vcpus formatting error 
+31    assert     bhyve_custm formatting failure
+32    assert     bhyveopts formatting failure
+33    assert     ppt formatting failure
+34    assert     taps formatting failure 
+35    assert     vcpus formatting failure 
 
 110   config     Path invalid
 111   config     Cell JCONF missing
