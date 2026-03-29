@@ -105,7 +105,7 @@ assert_param() {
 
 assert_time_format() {
     local _fn="assert_time_format" _val="$1"
-    echo "$_val" | grep -Eqs "^[1-9]+[0-9]*(s|m|H|D|W|Y)\$" || eval $(THROW  $_fn)
+    echo "$_val" | grep -Eqs "^[1-9]+[0-9]*(s|m|H|D|W|Y)\$" || eval $(THROW 20 $_fn)
 }
 
 ###################################  SECTION 2: CELL PARAMETERS  ###################################
