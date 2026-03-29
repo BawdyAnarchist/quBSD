@@ -13,7 +13,7 @@ compose_cleanup_cmds() {
 
     # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
     [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
-    [ "$_mounts" ] && _CMD_UNMOUNT="unmount -f $_mounts"
+    [ "$_mounts" ] && _CMD_UNMOUNT="umount -f $_mounts"
 
     # Clean up the jail's /var/run directory
     _CMD_CLEAN_VARRUN="hush rm -rf $D_RUNTM/$CELL"

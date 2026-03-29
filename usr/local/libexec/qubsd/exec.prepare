@@ -11,7 +11,7 @@ compose_cleanup_cmds() {
     local _fn="compose_cleanup_cmds" _mounts _mounted
     # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
     [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
-    [ "$_mounts" ] && _CMD_UNMOUNT="unmount -f $_mounts"
+    [ "$_mounts" ] && _CMD_UNMOUNT="umount -f $_mounts"
 
     # If the persist dataset was found (has P_MNT), then make sure its mounted
     if [ "$P_MNT" ] ; then
