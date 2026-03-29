@@ -47,7 +47,7 @@ rootstrap_bsdvm() {
 	[ "$(grep -o "[[:digit:]].*" $distdir/GITBRANCH)" = "$release" ] || bsdinstall distfetch
 
 	# Create the zvol and partitions
-	zfs create -V $volsize -o volmode=geom -o $vm_zroot
+	zfs create -V $volsize -o volmode=geom $vm_zroot
 	gpart create -s gpt "$zvol"
 	gpart add -t efi -s 200M -l efiboot "$zvol"
 	gpart add -t freebsd-zfs -l rootfs "$zvol"
@@ -134,8 +134,8 @@ configure_bsdvm_zusr() {
 	local mnt="/mnt/$_VM"
 
 	# Create the zvol, filesystem, and mount it
-	zfs create -o atime=off -o $U_ZFS/$_VM
-	zfs create -V $volsize -o volmode=geom -o $vm_zusr
+	zfs create -o atime=off $U_ZFS/$_VM
+	zfs create -V $volsize -o volmode=geom $vm_zusr
 	newfs -L zusr $zvol	  # Creates a label used in qubsd-init to identify the primary persistence drive
 	mkdir -p $mnt
 	mount $zvol $mnt

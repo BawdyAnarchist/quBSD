@@ -190,7 +190,7 @@ reclone_zroot() {
 
    # Destroy the dataset and reclone it
 	zfs destroy -rRf "${_jailzfs}" > /dev/null 2>&1
-	zfs clone -o "${_rootsnap}" ${_jailzfs}
+	zfs clone "${_rootsnap}" ${_jailzfs}
 
 	eval $_R0
 }
@@ -503,7 +503,7 @@ select_snapshot() {
 		local _rootsnap=$(zfs list -t snapshot -Ho name $_rootzfs | tail -1)
 
 		# Perform the snapshot
-		zfs snapshot qb:ttl=1m "${_newsnap}"
+		zfs snapshot -o qb:ttl=1m "${_newsnap}"
 
 		# Use zfsprop 'written' to detect any new data. Destroy _newsnap if it has no new data.
 		if [ ! "$(zfs list -Ho written $_newsnap)" = "0" ] || [ -z "$_rootsnap" ] ; then
