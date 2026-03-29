@@ -176,7 +176,7 @@ execute_backup() {
 			zfs send -nvw $REPL $_snap | tee -a $BAK_LOG
 		else
 			zfs send -wv $REPL ${_snap} \
-				| zfs recv $FORCE -vo qubsd:autosnap=- $MOUNT ${ZBAK}/${_dataset} >> $BAK_LOG
+				| zfs recv $FORCE -v $MOUNT ${ZBAK}/${_dataset} >> $BAK_LOG
 		fi
 	done
 }

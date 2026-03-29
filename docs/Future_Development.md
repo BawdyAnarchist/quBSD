@@ -1,6 +1,8 @@
 
 ### Next up
+
 ctx_bootstrap_runtime and it's call to ctx_validate_params might not align correctly with _pfx. I think it does actually. Double check
+
 if nicvm start breaks, it was probably probe_ppt(), changing assert_args_set
 
 qb-edit
