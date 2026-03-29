@@ -60,8 +60,8 @@ export OV_RC_L="$OVETC/rc.local"
 export OV_PW_L="$OVETC/master.passwd.local"
 export OV_GP_L="$OVETC/group.local"
 
-# Runtime invariant lists
-export PARAMS_BASE="AUTOSTART AUTOSNAP BACKUP CLASS CONTROL ENVSYNC GATEWAY IPV4 MTU NO_DESTROY P_ZFS R_ZFS ROOTENV TEMPLATE"
+# Runtime invariant lists. "CONTROL" is in the framework, but not added here. Uncertain about it's future.
+export PARAMS_BASE="AUTOSTART AUTOSNAP BACKUP CLASS ENVSYNC GATEWAY IPV4 MTU NO_DESTROY P_ZFS R_ZFS ROOTENV TEMPLATE"
 export PARAMS_JAIL="CPUSET MAXMEM SCHG SECLVL"
 export PARAMS_VM="BHYVEOPTS BHYVE_CUSTM MEMSIZE PPT TAPS TMUX VCPUS VNC WIREMEM"
 export PARAMS_ALL="$PARAMS_BASE $PARAMS_JAIL $PARAMS_VM"
@@ -75,7 +75,7 @@ export QUERY="CELLS CELLS_QPATHS DATASETS MOUNTS NCPU ONJAILS ONVMS PCICONF PERS
 # DO NOT REORDER. Append only for new zfsprops, because awk uses this column ordering for parsing
 # zfsprop creation takes up 5 cols ($3-$7)
 export DSET_PROPS="name,mountpoint,mounted,origin,encryption"
-export SNAP_PROPS="name,written,creation,qb:ttl"
+export SNAP_PROPS="name,written,creation,qb:ttl,clones"
 
 #########################################   OLD  SYSTEM  CONSTANTS / OVERRIDES  ##########################################
 
