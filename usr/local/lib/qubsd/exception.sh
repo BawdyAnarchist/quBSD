@@ -82,8 +82,8 @@ PASS() {
     [ -z "$1" ] && return $RC  # In some cases, $1 could be blank. Passthru error code in that case
     [ "$1" = "-c" ] && { _c=true ; shift ;}
 
-    case " $1 " in
-        *" $RC "*) [ "$_c" ] && clear_err ; unset _c ; return 0  ;;
+    case ",$1," in
+        *",$RC,"*) [ "$_c" ] && clear_err ; unset _c ; return 0  ;;
         *) unset _c ; return $RC ;;
     esac # RC intentionally left as a global so that callers retain flexibility.
 }
@@ -154,7 +154,7 @@ elapsed() {
     _return=$?
     # Subtract .0008 to account for (appx) delay of the command itself. Close enough for this tool
     echo "$_fn: Elapsed: $(echo "scale=3 ; (($(date +%s.%N) - $_date - .0008) * 1000) / 1" | bc) ms"
-    return $?
+    return $_return
 }
 
 # Activate full shell log for debugging. Use `set +x` to deactivate at a later point in a script
