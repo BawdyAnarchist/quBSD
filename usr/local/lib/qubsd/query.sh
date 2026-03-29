@@ -253,10 +253,10 @@ query_rootsnaps() {
 
     # Either add to the existing, or generate new ROOTSNAPS
     if [ "$ROOTSNAPS" ] ; then
-        ROOTSNAPS=$(echo "$ROOTSNAPS" ; hush zfs list -Hrt snapshot -o $SNAP_PROPS $1) \
+        ROOTSNAPS=$(echo "$ROOTSNAPS" ; hush zfs list -Ht snapshot -o $SNAP_PROPS $1) \
             || eval $(THROW 122)
     else
-        ROOTSNAPS=$(hush zfs list -Hrt snapshot -o $SNAP_PROPS $1) \
+        ROOTSNAPS=$(hush zfs list -Ht snapshot -o $SNAP_PROPS $1) \
             || eval $(THROW 122)
     fi
     return 0
@@ -265,10 +265,10 @@ query_rootsnaps() {
 query_persistsnaps() {
     local _fn="query_persistsnaps"
     if [ "$PERSISTSNAPS" ] ; then
-        PERSISTSNAPS=$(echo "$PERSISTSNAPS" ; hush zfs list -Hrt snapshot -o $SNAP_PROPS $1) \
+        PERSISTSNAPS=$(echo "$PERSISTSNAPS" ; hush zfs list -Ht snapshot -o $SNAP_PROPS $1) \
             || eval $(THROW 123)
     else
-        PERSISTSNAPS=$(zfs list -Hrt snapshot -o $SNAP_PROPS $1) || eval $(THROW 123)
+        PERSISTSNAPS=$(zfs list -Ht snapshot -o $SNAP_PROPS $1) || eval $(THROW 123)
     fi
     return $?
 }
