@@ -98,7 +98,7 @@ compose_root_reclone_cmds() {
 # $1 required. Caller should be careful if deconfliction via $2 (_pfx) is necessary
 compose_persist_reclone_cmds() {
     local _fn="compose_persist_reclone_cmds" _pfx="$3" _pfxloc="prc_"
-    local _cell _rt_ctx _snap _die _p_mnt _p_dset _p_zfs_mnt
+    local _cell _rt_ctx _snap _die _p_mnt _p_dset
     assert_args_set 2 "$1" "$2" && _cell="$1" _rt_ctx="$2" || $(THROW $?)
 
     # Compose the local vars based on their prefixes
@@ -121,8 +121,9 @@ compose_persist_reclone_cmds() {
 
     # P_MNT is null, then RT_CTX needs updated after clone. Otherwise, RT_CTX is fine, just destroy/reclone
     if [ -z "$_p_mnt" ] ; then
-        _p_zfs_mnt="$(query_zfs_mountpoint $_p_zfs)/$_cell"
-        _CMD_UPDATE_P_MNT_RTCTX="sed -i '' -E \"s|^(P_MNT=\\\")|\1$_p_zfs_mnt|\" $_rt_ctx"
+        _p_mnt="$(query_zfs_mountpoint $_p_zfs)/$_cell"
+        _CMD_UPDATE_P_MNT_RTCTX="sed -i '' -E \"s|^(P_MNT=\\\")|\1$_p_mnt|\" $_rt_ctx"
+        eval ${_pfx}P_MNT=$_p_mnt   # Update the globals with P_MNT since it will be created in _CMDS
     else
         _CMD_DESTROY_PERSIST="zfs destroy -rRf $_p_dset"
     fi
