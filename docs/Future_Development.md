@@ -1,14 +1,8 @@
 
 ### Next up
 ctx_bootstrap_runtime and it's call to ctx_validate_params might not align correctly with _pfx. I think it does actually. Double check
-  - furthermore, ctx_bootstrap_cell should probably come with the same options too. 
 if nicvm start breaks, it was probably probe_ppt(), changing assert_args_set
 
-make backups, then qb-autostart
-  - custom zfsprops: `qubsd:` needs to be just `qb:`
-    -- Rolling/thinning is all messed up due to the interim inconsistency
-    -- Fix in the code
-    -- Change your datasets
 qb-edit
 
 ### Import things in the code as I overhaul that still need addressed
