@@ -31,7 +31,7 @@ parse_args() {
 
         # Final attempt at parsing CELL vs PARAM when no option is passed
         if ! is_path_exist -f $D_CELLS/$CELL && [ -z "$PARAM" ] ; then
-            quiet echo_grep "$PARAMS_ALL" $CELL && PARAM=$CELL && unset CELL
+            echo_grep -qd , "$PARAMS_ALL" "$CELL" && PARAM=$CELL && unset CELL
         fi
     fi
 
@@ -56,7 +56,7 @@ retrieve_data() {
     # Uses globals: $non_defaults and $params for simplicity
     # If CELL, then we dont need to the full params list. Otherwise, params were requested
     if [ "$CELL" ] ; then
-        hush ctx_bootstrap_cell $CELL
+        ctx_bootstrap_cell -p 111,124,125 $CELL
         non_defaults=$(grep -Eo "^.*=" $D_CELLS/$CELL | tr -d '=')
         [ "$snaps" ] && query_rootsnaps $R_DSET && query_persistsnaps $P_DSET
         [ "$zfs" ] && query_datasets "$R_DSET $P_DSET"
@@ -102,7 +102,7 @@ write_results() {
         _val=$(ctx_get $_param)
 
         # Make special notation of lines which source from the default, vs directly
-        if quiet echo_grep "$non_defaults" $_param ; then
+        if echo_grep -q "$non_defaults" $_param ; then
             echo "$CELL $_param $_val"     >> $RESULTS
         else
             echo "#default $_param $_val"  >> $RESULTS

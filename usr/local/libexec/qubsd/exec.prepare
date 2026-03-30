@@ -55,7 +55,7 @@ resolve_runtime_context() {
 
     # If CALLER is empty, then qb isnt coordinating, and `jail` must initialize the runtime context
     if [ -z "$CALLER" ] ; then
-        ctx_bootstrap_runtime -l 3 -P "124 125" $CELL || eval $(THROW $?)
+        ctx_bootstrap_runtime -l 3 -p 124,125 $CELL || eval $(THROW $?)
     fi
     return 0
 }

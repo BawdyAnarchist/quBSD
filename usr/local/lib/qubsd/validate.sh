@@ -69,7 +69,7 @@ validate_param_gateway() {
 
 #COMMENTING THIS FOR NOW. Not sure if gateway problems should prevent a jail start.
 #[ "$_level" -le 1 ] && return 0
-#ctx_bootstrap_cell -P 124 $_value "val_" || eval $(THROW 150 _cellref $_cell GATEWAY $_value)
+#ctx_bootstrap_cell -p 124 $_value "val_" || eval $(THROW 150 _cellref $_cell GATEWAY $_value)
 }
 
 validate_param_ipv4() {
@@ -172,7 +172,7 @@ validate_param_rootenv() {
     [ "$_level" -le 1 ] && return 0
 
     # Check the rootenv, but don't fault for a missing persistent dataset for the rootenv [-P 125]
-    ctx_bootstrap_cell -P 125 $_value "val_" || eval $(THROW 158 _cellref $_cell ROOTENV $_value)
+    ctx_bootstrap_cell -p 125 $_value "val_" || eval $(THROW 158 _cellref $_cell ROOTENV $_value)
 }
 
 validate_param_r_zfs() {
@@ -214,7 +214,7 @@ validate_param_template() {
     [ -z "$_class" ] && { _class=$(query_cell_param $_cell CLASS) || eval $(THROW 163) ;}
 
     case $_class in
-        disp*) ctx_bootstrap_cell -P 124 $_value "val_" \
+        disp*) ctx_bootstrap_cell -p 124 $_value "val_" \
                    || eval $(THROW 163 _cellref $_cell TEMPLATE $_value) ;;
         *)  : ;;  # Not a dispjail
     esac

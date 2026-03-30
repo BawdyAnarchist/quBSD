@@ -66,8 +66,8 @@ compose_new_snapshots_cmds() {
     [ "$_r_dset" ] && _r_snap="$_r_dset@$_suffix"
 
     # Don't snapshot running rootenv where updates/installs could cause partial/inconsistent state
-    [ "${_class##root*}" ] && { quiet echo_grep "$ONJAILS" "$_cell" \
-        || quiet echo_grep "$ONVMS" "$_cell" ;} && unset _r_snap
+    [ "${_class##root*}" ] && { echo_grep -q "$ONJAILS" "$_cell" \
+        || echo_grep -q "$ONVMS" "$_cell" ;} && unset _r_snap
 
     # Update the primary _CMD. Note that the space in front of " $_r_snap" is required
     [ -z "$_CMD_R_SNAPSHOT" ] && _zfs_r_cmd="zfs snapshot -o qb:ttl=$TTL"
@@ -138,7 +138,7 @@ manage_composition_loop() {
     for _cell in $CELLS ; do
 
         # Acquire the dataset data for each cell. Tolerate missing jconf, or missing dataset
-        ctx_bootstrap_cell $_cell $_pfx || PASS -c "111 124 125" || continue
+        ctx_bootstrap_cell -p 111,124,125 $_cell $_pfx || continue
         [ "$(ctx_get ${_pfx}R_MNT)" ] && _r_dset=$(ctx_get ${_pfx}R_DSET)
         [ "$(ctx_get ${_pfx}P_MNT)" ] && _p_dset=$(ctx_get ${_pfx}P_DSET)
 
