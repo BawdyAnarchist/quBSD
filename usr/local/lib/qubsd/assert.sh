@@ -98,9 +98,8 @@ assert_int_comparison() {
 
 # Ensures that $1 is part of the static PARAMS_ALL list
 assert_param() {
-    local _fn="assert_param" _val="$1"
-    echo "$PARAMS_ALL" | grep -Eqs "(^|[[:blank:]])$_val([[:blank:]]|\$)" \
-        || eval $(THROW 10 $_fn $_val)
+    local _fn="assert_param"
+    echo_grep -qd , "$PARAMS_ALL" "$1" || eval $(THROW 10 $_fn "$1")
 }
 
 assert_time_format() {
@@ -132,7 +131,7 @@ assert_bhyveopts() {
 
 assert_class() {
     local _fn="assert_class"
-    echo "$CLASSES" | grep -Eqs -- "(^| )$1( |\$)" || eval $(THROW 18 _invalid CLASS $1)
+    echo_grep -qd , "$CLASSES" "$1" || eval $(THROW 18 _invalid CLASS $1)
 }
 
 assert_cpuset() {

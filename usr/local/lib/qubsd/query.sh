@@ -2,9 +2,21 @@
 
 ############################################  HELPERS  #############################################
 
-# Either starts line or with blank, then has blank after or ends line
+# Simplify common `echo | grep` operations, while still providing a quiet and delimiter option
 echo_grep() {
-    echo "$1" | grep -E "(^|[[:blank:]])$2([[:blank:]]|\$)"
+    local _opts OPTARG OPTIND _delim _quiet
+
+    while getopts :d:q _opts ; do case $_opts in
+        d)  _delim="$OPTARG" ;;
+        q)  _quiet="-qs" ;;
+        *)  eval $(THROW 8 _internal1) ;;
+    esac ; done ; shift $(( OPTIND - 1 ))
+
+    if [ -z "$_delim" ] ; then
+        echo "$1" | grep -E $_quiet "(^|[[:blank:]])$2([[:blank:]]|\$)"
+    else
+        echo "$1" | grep -E $_quiet "(^|$_delim)$2($_delim|\$)"
+    fi
 }
 
 ###################################  BOOLEAN RESPONSE QUERIES  #####################################
@@ -18,9 +30,9 @@ is_path_exist() {
 is_zfs_exist() {
     local _fn="is_zfs_exist"
     assert_args_set 1 "$1" || eval $(THROW $?)
-    quiet echo_grep "$DATASETS" "$1" && return 0  # First check DATASETS
+    echo_grep -q "$DATASETS" "$1" && return 0  # First check DATASETS
     query_datasets "$1"  || eval $(THROW 121)     # Query if missing
-    quiet echo_grep "$DATASETS" "$1" && return 0 || return 121
+    echo_grep -q "$DATASETS" "$1" && return 0 || return 121
 }
 
 is_cell_running() {
@@ -30,8 +42,8 @@ is_cell_running() {
     [ "$_cell" = "host" ] && return 0
     [ -z "$ONJAILS" ] && query_onjails
     [ -z "$ONVMS" ] && query_onvms
-    quiet echo_grep "$ONJAILS" "$_cell" && return 0
-    quiet echo_grep "$ONVMS" "bhyve: $_cell" && return 0
+    echo_grep -q "$ONJAILS" "$_cell" && return 0
+    echo_grep -q "$ONVMS" "bhyve: $_cell" && return 0
     return 200
 }
 
@@ -111,10 +123,9 @@ query_file_param() {
 query_param_type() {
     local _fn="query_param_type"
     assert_args_set 1 "$1" || eval $(THROW $?)
-
-    quiet echo_grep "$PARAMS_BASE" $1 && echo "base" && return 0
-    quiet echo_grep "$PARAMS_JAIL" $1 && echo "jail" && return 0
-    quiet echo_grep "$PARAMS_VM"   $1 && echo "vm"   && return 0
+    echo_grep -qd , "$PARAMS_BASE" "$1" && echo "base" && return 0
+    echo_grep -qd , "$PARAMS_JAIL" "$1" && echo "jail" && return 0
+    echo_grep -qd , "$PARAMS_VM"   "$1" && echo "vm"   && return 0
     return 132
 }
 
@@ -205,7 +216,7 @@ query_datasets() {
 
     # For each dataset passed, see if it's present. Assemble list of non-present datasets
     [ "$_dsets" ] && for _dset in $_dsets ; do
-        quiet echo_grep "$DATASETS" $_dset || _pull="$_pull $_dset"
+        echo_grep -q "$DATASETS" $_dset || _pull="$_pull $_dset"
         [ -z "$_pull" ] && return 0   # All datasets already present (no duplicate pull)
     done
 
@@ -247,7 +258,7 @@ query_rootsnaps() {
 
     # For each snapshot passed, see if it's present. Assemble list of non-present snapshot
     [ "$_dsets" ] && for _dset in $_dsets ; do
-        quiet echo_grep "$ROOTSNAPS" $_dset || _pull="$_pull $_dset"
+        echo_grep -q "$ROOTSNAPS" $_dset || _pull="$_pull $_dset"
         [ -z "$_pull" ] && return 0    # All snapshots already present (no duplicate pull)
     done
 
