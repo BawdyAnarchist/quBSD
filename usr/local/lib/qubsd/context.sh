@@ -10,10 +10,9 @@ ctx_get() {
 
 # Unset PARAMS based on optional prefix [-p] and PARAM_LIST [-P], or defaults to global constants
 ctx_unset() {
-    local _fn="ctx_unset" _opts OPTARG OPTIND _pfx _PARAMS
+    local _fn="ctx_unset" _opts OPTARG OPTIND _pfx="$1" _PARAMS
 
-    while getopts :p:P: _opts ; do case $_opts in
-        p) _pfx="$OPTARG" ;;
+    while getopts :P: _opts ; do case $_opts in
         P) _PARAMS="$OPTARG" ;;
         *) eval $(THROW 8 _internal1) ;;
     esac ; done ; shift $(( OPTIND - 1 ))
@@ -112,7 +111,7 @@ ctx_add_zfs() {
     _p_dset=$(ctx_get ${_pfx}P_ZFS)/$_cell
 
     # Set the prefix-specific global context for the datasets and mountpoints
-    query_datasets "$_r_dset $_p_dset" 
+    query_datasets "$_r_dset $_p_dset"
     eval ${_pfx}R_DSET=$_r_dset
     eval ${_pfx}P_DSET=$_p_dset
     eval ${_pfx}R_MNT=$(query_zfs_mountpoint $_r_dset)
@@ -208,7 +207,7 @@ ctx_bootstrap_cell() {
     local _fn="ctx_bootstrap_cell" _cell _pfx
     assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
 
-    ctx_unset -p "$_pfx"   # Start from blank slate
+    ctx_unset $_pfx    # Start from blank slate
     ctx_initialize  $_cell $_pfx || eval $(THROW $? $_fn $_cell)
     ctx_load_params $_cell $_pfx || eval $(THROW $? $_fn $_cell)
     ctx_add_zfs $_cell $_pfx
