@@ -142,7 +142,9 @@ validate_param_memsize() {
 validate_param_mtu() {
     local _fn="validate_param_mtu"
     assert_integer "$_value" || eval $(THROW 154)
-    assert_int_comparison -g 1200 -l 1600 -- "$_value" || eval $(THROW 154 $_fn $_cell $_value 1200 1600)
+    # THROW for IPv4 spec violations. WARN for IPv6 spec violation and > typical jumbo packet size
+    assert_int_comparison -g 68 -l 65535 -- "$_value" || eval $(THROW 154 $_fn $_cell $_value 68 65535)
+    assert_int_comparison -g 1280 -l 9000 -- "$_value" || eval $(WARN $_fn $_cell $_value 1280 9000)
 }
 
 validate_param_no_destroy() {

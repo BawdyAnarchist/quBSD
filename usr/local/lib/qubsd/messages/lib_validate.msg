@@ -41,16 +41,20 @@ Failed to find "avail memory" in dmesg.boot. Couldn't validate that cell < %s > 
 
 :w:validate_param_maxmem:
 Cell < %s > MAXMEM < %s > (%s bytes)
-is greater than avail memory < %s bytes > 
+is greater than avail memory < %s bytes >
 /END/
 
 :validate_param_memsize:
 Cell < %s > MEMSIZE < %s > (%s bytes)
-is greater than avail memory < %s bytes > 
+is greater than avail memory < %s bytes >
 /END/
 
 :validate_param_mtu:
-Cell < %s > MTU < %s > is outside of sanity bounds: %s to %s
+Cell < %s > MTU < %s > is outside of IPv4 spec boundaries: %s to %s
+/END/
+
+:w:validate_param_mtu:
+Cell < %s > MTU < %s > is outside of normal boundaries: %s to %s (IPv6 min to jumbo packet normal max)
 /END/
 
 :validate_param_ppt:

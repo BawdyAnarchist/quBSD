@@ -1,8 +1,6 @@
 
 ### Next up
 
-Review *all* of the PASS handling. It probably might still need to be drilled even further, particularly into validate.sh, for fine grained handling of specific validation errors.
-
 if nicvm start breaks, it was probably probe_ppt(), changing assert_args_set
 
 qb-edit
@@ -18,8 +16,6 @@ When finished or near finish -> $D_CELLS/$_cell is just $QCONF. Replace everythi
 ### Bugs
 qubsd-dhcpd needs reviewed/fixed, because it's causing hanging and dropped packets due to being too aggressive
 
-param_mtu probably should just be a WARN not a THROW
-
 
 ### VM PLAN: only remaining aspect is Linux and qb-create
  - Linux/ubuntu
@@ -27,7 +23,7 @@ param_mtu probably should just be a WARN not a THROW
     -- This can be used for internal /etc, and for persisting /home inside of Linux, without distro-level faggotry
  - Incorporate new VM / installer model to the installer script.
  - Incorporate new VM model to qb-create. Script needs reviewed and with better integration
- - qubsd-dhcpd or something equivalent in settings? 
+ - qubsd-dhcpd or something equivalent in settings?
  - dispVMs for Linux mount the ext4 and edit the pw
 
 xephyr-xclip daemon still has demons
@@ -37,7 +33,7 @@ xephyr-xclip daemon still has demons
 
 ### UPGRADES
 
-Make jail locations just another parameter. Example: I almost needed a separate vdev for data 
+Make jail locations just another parameter. Example: I almost needed a separate vdev for data
 
 Constrain the memory and CPU that the jails "see." This might require a kernel change to intercept the sysctl call for jails.
 
@@ -45,16 +41,16 @@ CREATE MANPAGES:  /usr/local/man/man1/qb-scripts
 	- Replaces /share/quBSD
 	- PARAMS should have manpage
 
-Host as Unprivileged user     
+Host as Unprivileged user
 	- doas commands allowed by unprivileged user
-	- Unprivileged user on host will pass jails SSH commands via Control Jail     
-	- Control jail pf will block all, except port 22 between host and jails     
+	- Unprivileged user on host will pass jails SSH commands via Control Jail
+	- Control jail pf will block all, except port 22 between host and jails
 
-NICVM - Linux VM (probably alpine) so that it can use all the wireless cards. 
+NICVM - Linux VM (probably alpine) so that it can use all the wireless cards.
 
 I2P Gateway
 
-0serv 
+0serv
 
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
@@ -62,13 +58,13 @@ I2P Gateway
 /usr/local/bin/qb and /usr/local/bin/qubsd should both be there. qb symlinks to qubsd
 
 qb-edit
-	- chk_isqubsd_ipv4 - [-x] isnt used anywhere, but a check for quBSD IP convention would be a good addon 
+	- chk_isqubsd_ipv4 - [-x] isnt used anywhere, but a check for quBSD IP convention would be a good addon
 	- Make changing of parameters without jail restarts, like for gateway. Use the new/improved functions.
 	- with NIC, make qb-edit so that a new NIC also updates loader.conf.
 
 qb-ivpn
-	- no need to restart jail, simply pfctl the EP 
-	- the ivpn server directory info needs its own directory for correctness, not stuffed in wireguard	
+	- no need to restart jail, simply pfctl the EP
+	- the ivpn server directory info needs its own directory for correctness, not stuffed in wireguard
 	- also, it is isnt synced on my system and the repo. Not even synced between my jails and $ubin
 
 qb-connect
@@ -77,19 +73,19 @@ qb-connect
 qb-i3-launch - overhauled now that I'm using Xephyr
 
 qb-cmd -e [ephm]
-   - Ideally you would also clone the zroot from whatever jail you're ephm'ing. 
+   - Ideally you would also clone the zroot from whatever jail you're ephm'ing.
 
 qb-start
 	- Needs updated with new networking functions in mind
 	- Simultaneous starts of clients could mess up wireguard restarting
 
 qb-create
-	- [-z dupl] still needs to create and copy the fstab of the template jail, and maybe the rc.conf too. 
-	- It needs further and more extensive testing 
+	- [-z dupl] still needs to create and copy the fstab of the template jail, and maybe the rc.conf too.
+	- It needs further and more extensive testing
 	- -z dirs recreated files too, not just directories
 	- qb-create removal of achi-hd might not be working. I dunno I changed it to hd so maybe that was why
 	- There needs to be a template for parameters, and a template for zusr
-	- You can in install a brand new rootjail via tar base.txz, and this should be an opt coz of the little qubSD required adjustments 
+	- You can in install a brand new rootjail via tar base.txz, and this should be an opt coz of the little qubSD required adjustments
 
 qb-pci
 	- summary of PCI devices relevant to user
@@ -146,11 +142,11 @@ roots
 	mkdir /usr/local/etc/rc.d && cp qubsd_dhcp
 	/etc/rc.conf qubsd_dhcp_enable="YES"
 	touch /qubsd/0base/etc/resolv.conf
-	dbus added to host when GUI option is selected 
+	dbus added to host when GUI option is selected
 
 X11 segregation
   install socat on host, bspwm in 0gui
-  copy the bspwmrc to 0gui /usr/local/etc/X11/ 
+  copy the bspwmrc to 0gui /usr/local/etc/X11/
   copy /etc/login.conf to 0gui, then chroot and cap_mkdb (for GLX etc problems and avoidance)
 
 Linuxulator:
