@@ -105,12 +105,6 @@ ctx_load_file() {
 # REQUIRES: ctx_load_parameters() FIRST, due to use of R_ZFS and P_ZFS of the cell
 ctx_add_zfs() {
     local _fn="ctx_add_zfs" _cell _pfx _r_dset _p_dset _r_mnt _p_mnt
-
-    while getopts :p: _opts ; do case $_opts in
-        p)  _pass="$OPTARG" ;;
-        *)  eval $(THROW 8 _internal1) ;;
-    esac ; done ; shift $(( OPTIND - 1 ))
-
     assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
 
     # Establish cell-specific dataset names based on R_ZFS and P_ZFS
@@ -123,14 +117,7 @@ ctx_add_zfs() {
     eval ${_pfx}P_DSET=$_p_dset
     eval ${_pfx}R_MNT=$(query_zfs_mountpoint $_r_dset)
     eval ${_pfx}P_MNT=$(query_zfs_mountpoint $_p_dset)
-
-    # zfs mountpoint proves dataset existence. Checked here to avoid fragmentation of zfs handling
-    # Some call scenarios can tolerate one missing dataset but not the other. Thus separate 124/125
-    _r_mnt=$(ctx_get ${_pfx}R_MNT)
-    _p_mnt=$(ctx_get ${_pfx}P_MNT)
-    # We hard-define _ZFS and _DSET. Only [ "$_MNT" ] can unequivocally attest to dataset existence #
-    [ "$_r_mnt" ] || echo_grep -qd , "$_pass" 124 || eval $(THROW 124 $_fn $_cell $_r_dset)
-    [ "$_p_mnt" ] || echo_grep -qd , "$_pass" 125 || eval $(THROW 125 $_fn $_cell $_p_dset)
+    # Side effect of R_MNT and P_MNT is the unequivocal attestation to dataset existence
     return 0
 }
 
@@ -152,9 +139,9 @@ ctx_validate_params() {
     assert_args_set 1 "$1" && _cell=$1 _pfx=$2 || eval $(THROW $?)
     assert_int_comparison -g 1 -l 3 $_level || eval $(THROW 7 _internal2 $_level $_fn)
 
+    _type=$(ctx_get ${_pfx}TYPE)  # Multiple validations use _type as downward-scoped
     # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
-    _type=$(ctx_get ${_pfx}TYPE)
-    [ -z "$_PARAMS" ] && eval _PARAMS=\"\${PARAMS_BASE},\${PARAMS_${_type}}\"
+    [ -z "$_PARAMS" ] && _PARAMS="$(ctx_get ${_pfx}PARAMS_TYPE),$CTX_VALIDATE"
 
     for _PARAM in $(echo $_PARAMS | tr ',' ' ') ; do
         unset _value  # Unset to prevent stale values from polluting the validation
@@ -164,7 +151,7 @@ ctx_validate_params() {
         _validation_function="validate_param_$_param"
         quiet type $_validation_function || eval $(THROW 6 ${_fn} $_PARAM $_funct)
 
-        # _level _value _cell _pfx are downward-scoped to avoid 'parameter drilling' in validation
+        # _level _value _cell _pfx _type are downward-scoped to avoid 'param drilling' in validation
         eval $_validation_function || PASS -c $_pass || eval $(THROW $?)
     done
 }
@@ -216,53 +203,35 @@ ctx_load_runtime() {
     # bootstrap_cell: ~19ms.  ~17ms with $DATASETS
     # bootstrap_runtime: ~60-100ms.  ~50-75ms with $DATASETS (validation is long)
 
+# Load a new cell context. The only THROWS here are absolutely non-negotiable, fatal for bootstrap
 ctx_bootstrap_cell() {
-    local _fn="ctx_bootstrap_cell" _cell _pfx _pass _passopt _type _jconf
-
-    while getopts :p: _opts ; do case $_opts in
-        p)  _pass="$OPTARG" ; _passopt="-p $_pass" ;; # Escape required to pass multiple codes
-        *)  eval $(THROW 8 _internal1) ;;
-    esac ; done ; shift $(( OPTIND - 1 ))
-
+    local _fn="ctx_bootstrap_cell" _cell _pfx
     assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
-    ctx_unset -p "$_pfx"  # Start from blank slate
 
-    # New cell context. Has basic checks for crucial parameters. Non-negotiable, fatal for bootstrap
+    ctx_unset -p "$_pfx"   # Start from blank slate
     ctx_initialize  $_cell $_pfx || eval $(THROW $? $_fn $_cell)
     ctx_load_params $_cell $_pfx || eval $(THROW $? $_fn $_cell)
-
-    # There are circumstances where scripts can tolerate a missing JCONF. Apply PASS
-    _type=$(ctx_get ${_pfx}TYPE)
-    if [ "$_type" = "JAIL" ] ; then
-        is_path_exist -f $(ctx_get ${_pfx}JCONF) || PASS -c $_pass || eval $(THROW 111 $_fn $_cell)
-    fi
-
-    # Save for last. If dataset missing, it can be recloned, all other checks have been completed
-    ctx_add_zfs $_passopt $_cell $_pfx || PASS -c $_pass || eval $(THROW $? $_fn $_cell)
-
+    ctx_add_zfs $_cell $_pfx
     return 0
 }
 
+# Load the cell context, validate the parameters based on options, and write the RT_CTX
 ctx_bootstrap_runtime() {
-    local _fn="ctx_bootstrap_runtime" _opts OPTIND OPTARG
-    local _cell _pfx _levelopt _pass _passopt _PARAMS _POPT
+    local _fn="ctx_bootstrap_runtime" _opts OPTIND OPTARG _cell _pfx _levelopt _passopt _paramsopt
 
     while getopts :l:p:P: _opts ; do case $_opts in
         l)  _levelopt="-l $OPTARG" ;;
-        p)  _pass="$OPTARG" ; _passopt="-p $_pass" ;;
+        p)  _passopt="-p $OPTARG" ;;
         P)  _paramsopt="-P $OPTARG" ;;
         *)  eval $(THROW 8 _internal1) ;;
     esac ; done ; shift $(( OPTIND - 1 ))
-
     assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
 
-    ctx_bootstrap_cell $_passopt $_cell $_pfx || PASS -c $_pass \
-        || eval $(THROW $? _generic "Cell < $_cell > bootstrap failed")
-
-    # Validation and CTX can tolerate the misisng datasets without throwing
+    # Validation and CTX can tolerate the missing datasets without throwing
+    ctx_bootstrap_cell $_cell $_pfx || eval $(THROW $? _generic "Cell < $_cell > bootstrap failed")
     ctx_validate_params $_levelopt $_passopt $_paramsopt $_cell $_pfx \
         || eval $(THROW $? _generic "Cell validation failed")
-    ctx_write_runtime $_PARAMSopt $_cell $_pfx \
+    ctx_write_runtime $_paramsopt $_cell $_pfx \
         || eval $(THROW $? _generic "Failed to write runtime context")
     return 0
 }

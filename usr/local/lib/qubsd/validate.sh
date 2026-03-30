@@ -69,7 +69,7 @@ validate_param_gateway() {
 
 #COMMENTING THIS FOR NOW. Not sure if gateway problems should prevent a jail start.
 #[ "$_level" -le 1 ] && return 0
-#ctx_bootstrap_cell -p 124 $_value "val_" || eval $(THROW 150 _cellref $_cell GATEWAY $_value)
+#ctx_bootstrap_cell $_value "val_" || eval $(THROW 150 _cellref $_cell GATEWAY $_value)
 }
 
 validate_param_ipv4() {
@@ -103,6 +103,16 @@ validate_param_ipv4() {
     if is_cell_running $_gw ; then
         is_route_available $_gw $_value || eval $(THROW 151 ${_fn}_2 $_cell $_value $_gw)
     fi
+}
+
+validate_param_jconf() {
+    local _fn="validate_param_jconf"
+
+    # There is no JCONF for VMs. Return early
+    [ -z "$_type" ] && { _type=$(query_cell_type $_cell) || eval $(THROW 151) ;}
+    [ "$_type" = "VM" ] && return 0
+
+    is_path_exist -f $_value || eval $(THROW 168)
 }
 
 validate_param_maxmem() {
@@ -156,13 +166,14 @@ validate_param_ppt() {
     return 0
 }
 
+validate_param_p_dset() {
+    local _fn="validate_param_p_dset"
+    validate_dataset_generic || eval $(THROW 170)
+}
+
 validate_param_p_zfs() {
     local _fn="validate_param_p_zfs"
-
-    assert_dataset_name $_value || eval $(THROW 157)
-    [ "$_level" -le 1 ] && return 0
-
-    is_zfs_exist "$_value" || eval $(THROW 157 _missing_zfs $_cell $_value)
+    validate_dataset_generic || eval $(THROW 157)
 }
 
 validate_param_rootenv() {
@@ -171,17 +182,18 @@ validate_param_rootenv() {
     assert_cellname "$_value" || eval $(THROW 158)
     [ "$_level" -le 1 ] && return 0
 
-    # Check the rootenv, but don't fault for a missing persistent dataset for the rootenv [-P 125]
-    ctx_bootstrap_cell -p 125 $_value "val_" || eval $(THROW 158 _cellref $_cell ROOTENV $_value)
+    # Check the rootenv
+    ctx_bootstrap_cell $_value "val_" || eval $(THROW 158 _cellref $_cell ROOTENV $_value)
+}
+
+validate_param_r_dset() {
+    local _fn="validate_param_r_dset"
+    validate_dataset_generic || eval $(THROW 169)
 }
 
 validate_param_r_zfs() {
     local _fn="validate_param_r_zfs"
-
-    assert_dataset_name $_value || eval $(THROW 159)
-    [ "$_level" -le 1 ] && return 0
-
-    is_zfs_exist "$_value" || eval $(THROW 159 _missing_zfs $_cell $_value)
+    validate_dataset_generic || eval $(THROW 159)
 }
 
 validate_param_schg() {
@@ -214,7 +226,7 @@ validate_param_template() {
     [ -z "$_class" ] && { _class=$(query_cell_param $_cell CLASS) || eval $(THROW 163) ;}
 
     case $_class in
-        disp*) ctx_bootstrap_cell -p 124 $_value "val_" \
+        disp*) ctx_bootstrap_cell $_value "val_" \
                    || eval $(THROW 163 _cellref $_cell TEMPLATE $_value) ;;
         *)  : ;;  # Not a dispjail
     esac
@@ -249,6 +261,16 @@ validate_param_wiremem() {
 }
 
 ########################################  MISC VALIDATIONS  ########################################
+
+validate_dataset_generic() {
+    local _fn="validate_dataset_generic"
+
+    assert_dataset_name $_value || eval $(THROW $?)
+    [ "$_level" -le 1 ] && return 0
+
+    is_zfs_exist "$_value" || eval $(THROW $? _missing_zfs $_cell $_value)
+    return 0
+}
 
 validate_cellname() {
     local _fn="validate_cellname" _value="$1"

@@ -56,7 +56,7 @@ retrieve_data() {
     # Uses globals: $non_defaults and $params for simplicity
     # If CELL, then we dont need to the full params list. Otherwise, params were requested
     if [ "$CELL" ] ; then
-        ctx_bootstrap_cell -p 111,124,125 $CELL
+        ctx_bootstrap_cell $CELL
         non_defaults=$(grep -Eo "^.*=" $D_CELLS/$CELL | tr -d '=')
         [ "$snaps" ] && query_rootsnaps $R_DSET && query_persistsnaps $P_DSET
         [ "$zfs" ] && query_datasets "$R_DSET $P_DSET"

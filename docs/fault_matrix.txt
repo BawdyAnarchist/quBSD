@@ -89,7 +89,10 @@ CODE  LEVEL      DESCRIPTION
 165   validate   vcpus
 166   validate   vnc
 167   validate   wiremem
-167-  validate   <UNUSED>
+168   validate   jconf
+169   validate   r_dset
+170   validate   p_dset 
+171-  validate   <UNUSED>
 -180  validate   <UNUSED>
 181   validate   Basic cellname validity failure
 182   validate   New cellname failure

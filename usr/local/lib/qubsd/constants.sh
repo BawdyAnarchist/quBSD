@@ -66,6 +66,7 @@ export PARAMS_JAIL="CPUSET,MAXMEM,SCHG,SECLVL"
 export PARAMS_VM="BHYVEOPTS,BHYVE_CUSTM,MEMSIZE,PPT,TAPS,TMUX,VCPUS,VNC,WIREMEM"
 export PARAMS_ALL="$PARAMS_BASE,$PARAMS_JAIL,$PARAMS_VM"
 export CONTEXT="CALLER,JCONF,QCONF,P_DSET,P_MNT,R_DSET,R_MNT,RT_CTX"   # Convenient context paths
+export CTX_VALIDATE="JCONF,P_DSET,R_DSET"     # Necessary validations in addition to PARAMS_
 export CLASSES="rootjail,appjail,dispjail,rootVM,appVM,dispVM,cjail"
 
 # Query results storage for rapid stacked/looped information retreival

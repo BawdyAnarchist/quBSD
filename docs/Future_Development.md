@@ -3,8 +3,6 @@
 
 Review *all* of the PASS handling. It probably might still need to be drilled even further, particularly into validate.sh, for fine grained handling of specific validation errors.
 
-Review the ctx_get_zfs() function THROW. Now that there's a fault matrix, this error check is probably confounded at a place that it shouldnt exist. 
-
 if nicvm start breaks, it was probably probe_ppt(), changing assert_args_set
 
 qb-edit
@@ -19,6 +17,8 @@ When finished or near finish -> $D_CELLS/$_cell is just $QCONF. Replace everythi
 
 ### Bugs
 qubsd-dhcpd needs reviewed/fixed, because it's causing hanging and dropped packets due to being too aggressive
+
+param_mtu probably should just be a WARN not a THROW
 
 
 ### VM PLAN: only remaining aspect is Linux and qb-create

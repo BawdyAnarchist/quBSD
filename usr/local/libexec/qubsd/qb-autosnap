@@ -138,7 +138,7 @@ manage_composition_loop() {
     for _cell in $CELLS ; do
 
         # Acquire the dataset data for each cell. Tolerate missing jconf, or missing dataset
-        ctx_bootstrap_cell -p 111,124,125 $_cell $_pfx || continue
+        ctx_bootstrap_cell $_cell $_pfx || continue
         [ "$(ctx_get ${_pfx}R_MNT)" ] && _r_dset=$(ctx_get ${_pfx}R_DSET)
         [ "$(ctx_get ${_pfx}P_MNT)" ] && _p_dset=$(ctx_get ${_pfx}P_DSET)
 
