@@ -6,7 +6,7 @@ qubsd/internal:
 Syntax/Assert:   _level=1
   - Invalid user input, missing arguments, bad formatting
 Config/Topology: _level=2
-  - Static dependenices: missing files, datasets, snapshots. 
+  - Static dependenices: missing files, datasets, snapshots.
 Runtime/State:   _level=3
   - Dynamic system allocations: IP collisions, file locks, process state, system resource availability
 
@@ -18,13 +18,13 @@ Validate:
 CODE  LEVEL      DESCRIPTION
 1     internal   General errors
 2     internal   Negative responses that are not errors
-3     internal   trap_push sanitization failed 
+3     internal   trap_push sanitization failed
 4     internal   qb-script THROWS (non-lib failures)
 5     internal   <UNUSED>
 6     internal   Invalid function-call attempt
 7     internal   Invalid value passed to a function
 8     internal   Function was passed an invalid option
-9     internal   Err/warn message not found 
+9     internal   Err/warn message not found
 
 10    assert     Parameter not part of static list
 11    assert     Missing arguments (assert_args_set)
@@ -44,21 +44,21 @@ CODE  LEVEL      DESCRIPTION
 31    assert     bhyve_custm formatting failure
 32    assert     bhyveopts formatting failure
 33    assert     ppt formatting failure
-34    assert     taps formatting failure 
-35    assert     vcpus formatting failure 
+34    assert     taps formatting failure
+35    assert     vcpus formatting failure
 
 110   config     Path invalid
 111   config     Cell JCONF missing
 112   config     Cell QCONF missing
 120   config     Generic ZFS command failure
 121   config     Generic missing dataset
-122   config     Root snapshot missing 
+122   config     Root snapshot missing
 123   config     Persist snapshot missing
-124   config     Root dataset missing 
+124   config     Root dataset missing
 125   config     Persist dataset missing
-130   config     QCONF query failure 
+130   config     QCONF query failure
 131   config     Parameter missing from QCONF
-132   config     Unable to determine TYPE from QCONF 
+132   config     Unable to determine TYPE from QCONF
 133   config     No networking clients found for proposed gateway
 
 140   validate   <UNUSED>
@@ -91,7 +91,7 @@ CODE  LEVEL      DESCRIPTION
 167   validate   wiremem
 168   validate   jconf
 169   validate   r_dset
-170   validate   p_dset 
+170   validate   p_dset
 171-  validate   <UNUSED>
 -180  validate   <UNUSED>
 181   validate   Basic cellname validity failure
@@ -99,19 +99,19 @@ CODE  LEVEL      DESCRIPTION
 
 200   runtime    Cell not running
 201   runtime    jls error searching for ONJAILS
-202   runtime    pgrep error search for VMs 
-210   runtime    Generic networking problem 
+202   runtime    pgrep error search for VMs
+210   runtime    Generic networking problem
 211   runtime    Route not available
 212   runtime    No IP addresses found for any running jails
-220   runtime    General system query error 
+220   runtime    General system query error
 221   runtime    Query sysmem error
 222   runtime    num_cpus not found in sysctl
-223   runtime    cpuset failure 
+223   runtime    cpuset failure
 230   runtime    Generic error for X11 queries
-231   runtime    Failed to find XID for window 
-232   runtime    Failed to find WM_NAME/CLASS 
-233   runtime    Failed to find X11 socket 
-234   runtime    Failed to find X11 PID 
+231   runtime    Failed to find XID for window
+232   runtime    Failed to find WM_NAME/CLASS
+233   runtime    Failed to find X11 socket
+234   runtime    Failed to find X11 PID
 235   runtime    Failed to find X11 cellname
 236   runtime    Failed to resolve popup dimensions
 240   runtime    General runtime error
