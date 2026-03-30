@@ -61,15 +61,15 @@ export OV_PW_L="$OVETC/master.passwd.local"
 export OV_GP_L="$OVETC/group.local"
 
 # Runtime invariant lists. "CONTROL" is in the framework, but not added here. Uncertain about it's future.
-export PARAMS_BASE="AUTOSTART AUTOSNAP BACKUP CLASS ENVSYNC GATEWAY IPV4 MTU NO_DESTROY P_ZFS R_ZFS ROOTENV TEMPLATE"
-export PARAMS_JAIL="CPUSET MAXMEM SCHG SECLVL"
-export PARAMS_VM="BHYVEOPTS BHYVE_CUSTM MEMSIZE PPT TAPS TMUX VCPUS VNC WIREMEM"
-export PARAMS_ALL="$PARAMS_BASE $PARAMS_JAIL $PARAMS_VM"
-export CONTEXT="CALLER JCONF QCONF P_DSET P_MNT R_DSET R_MNT RT_CTX"   # Convenient context paths
-export CLASSES="rootjail appjail dispjail rootVM appVM dispVM cjail"
+export PARAMS_BASE="AUTOSTART,AUTOSNAP,BACKUP,CLASS,ENVSYNC,GATEWAY,IPV4,MTU,NO_DESTROY,P_ZFS,R_ZFS,ROOTENV,TEMPLATE"
+export PARAMS_JAIL="CPUSET,MAXMEM,SCHG,SECLVL"
+export PARAMS_VM="BHYVEOPTS,BHYVE_CUSTM,MEMSIZE,PPT,TAPS,TMUX,VCPUS,VNC,WIREMEM"
+export PARAMS_ALL="$PARAMS_BASE,$PARAMS_JAIL,$PARAMS_VM"
+export CONTEXT="CALLER,JCONF,QCONF,P_DSET,P_MNT,R_DSET,R_MNT,RT_CTX"   # Convenient context paths
+export CLASSES="rootjail,appjail,dispjail,rootVM,appVM,dispVM,cjail"
 
 # Query results storage for rapid stacked/looped information retreival
-export QUERY="CELLS CELLS_QPATHS DATASETS MOUNTS NCPU ONJAILS ONVMS PCICONF PERSISTSNAPS ROOTSNAPS SNAPSHOTS SYSMEM"
+export QUERY="CELLS,CELLS_QPATHS,DATASETS,MOUNTS,NCPU,ONJAILS,ONVMS,PCICONF,PERSISTSNAPS,ROOTSNAPS,SNAPSHOTS,SYSMEM"
 
 # zfs props relevant to qubsd operations. Used in `zfs list` queries
 # DO NOT REORDER. Append only for new zfsprops, because awk uses this column ordering for parsing
