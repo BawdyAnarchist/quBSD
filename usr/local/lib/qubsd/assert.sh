@@ -35,8 +35,7 @@ normalize_bytesize() {
 
 assert_bool_tf() {
     local _fn="assert_bool_tf"
-    echo $1 | tr '[:upper:]' '[:lower:]' \
-            | grep -Eqs "^(true|false)\$" || eval $(THROW 12 $_fn)
+    echo "$1" | grep -Eqs "^(true|TRUE|FALSE|false)\$" || eval $(THROW 12 $_fn)
 }
 
 assert_cellname() {
@@ -105,6 +104,11 @@ assert_param() {
 assert_time_format() {
     local _fn="assert_time_format" _val="$1"
     echo "$_val" | grep -Eqs "^[1-9]+[0-9]*(s|m|H|D|W|Y)\$" || eval $(THROW 20 $_fn)
+}
+
+assert_type() {
+    local _fn="assert_type" _val="$1"
+    echo "$_val" | grep -Eqs "^(base|BASE|jail|JAIL|vm|VM)\$" || eval $(THROW 24 $_fn)
 }
 
 ###################################  SECTION 2: CELL PARAMETERS  ###################################
