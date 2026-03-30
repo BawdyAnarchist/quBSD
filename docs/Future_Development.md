@@ -1,7 +1,7 @@
 
 ### Next up
 
-ctx_bootstrap_runtime and it's call to ctx_validate_params might not align correctly with _pfx. I think it does actually. Double check
+ctx_write_runtime -> this could be made more efficient with a single sed-> then eval, which writes all parameters in one-shot to the file, instead of looping.
 
 if nicvm start breaks, it was probably probe_ppt(), changing assert_args_set
 
