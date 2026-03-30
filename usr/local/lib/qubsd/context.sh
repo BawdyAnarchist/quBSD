@@ -3,7 +3,7 @@
 
 ##################################  CONTEXT BUILDERS AND HELPERS  ##################################
 
-# Semantic parser that reduces eval clutter
+# Dereferences a variable name (resolves the indirection to its final value)
 ctx_get() {
     eval echo \"\${$1}\"
 }
@@ -172,7 +172,7 @@ ctx_validate_params() {
 # Initializes a new cell runtime in /var/run. This will clobber any existing runtime file
 ctx_write_runtime() {
     local _fn="ctx_write_runtime" _opts OPTIND OPTARG
-    local _cell _pfx _rt_ctx _runtime _param _val _line
+    local _cell _pfx _rt_ctx _runtime _param _val _line _ctx
 
     # Double check the function usage by requiring $1 to be equivalent to the _pfx ctx
     assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
@@ -183,13 +183,15 @@ ctx_write_runtime() {
     rm -f $_rt_ctx
     mkdir -p $D_RUNTM/$_cell
 
-    # Write PARAMS and CONTEXT to the runtime context file
+    # Resolve the context values, generate the _rt_ctx lines, and write it
     _runtime="$(ctx_get ${_pfx}PARAMS_TYPE),$(ctx_get ${_pfx}CONTEXT)"
     for _param in $(echo "$_runtime" | tr ',' ' ') ; do
         _val=$(ctx_get ${_pfx}$_param)
-        _line='$_param=\"$_val\"'
-        eval echo $_line >> $_rt_ctx
+        eval _line='$_param=\"$_val\"'
+        _ctx="$(printf "%b" "$_ctx" "\n$_line")"
     done
+    echo "$_ctx" > $_rt_ctx
+    return 0
 }
 
 ctx_runtime_upsert() {
