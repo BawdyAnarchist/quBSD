@@ -14,7 +14,6 @@ When finished or near finish -> $D_CELLS/$_cell is just $QCONF. Replace everythi
 
 
 ### Bugs
-qubsd-dhcpd needs reviewed/fixed, because it's causing hanging and dropped packets due to being too aggressive
 
 
 ### VM PLAN: only remaining aspect is Linux and qb-create
