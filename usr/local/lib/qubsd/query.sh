@@ -24,7 +24,7 @@ conv_to_upper() {
 }
 
 conv_to_lower() {
-    echo "$1" | tr '[:upper:]' '[:upper:]'
+    echo "$1" | tr '[:upper:]' '[:lower:]'
 }
 
 ###################################  BOOLEAN RESPONSE QUERIES  #####################################
