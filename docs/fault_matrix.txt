@@ -40,6 +40,7 @@ CODE  LEVEL      DESCRIPTION
 21    assert     cpuset formatting failure
 22    assert     schg formatting failure
 23    assert     seclvl formatting failure
+24    assert     type (base|jail|vm) failure
 30    assert     <UNUSED>
 31    assert     bhyve_custm formatting failure
 32    assert     bhyveopts formatting failure
