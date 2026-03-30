@@ -1,7 +1,9 @@
 
 ### Next up
 
-ctx_write_runtime -> this could be made more efficient with a single sed-> then eval, which writes all parameters in one-shot to the file, instead of looping.
+Review *all* of the PASS handling. It probably might still need to be drilled even further, particularly into validate.sh, for fine grained handling of specific validation errors.
+
+Review the ctx_get_zfs() function THROW. Now that there's a fault matrix, this error check is probably confounded at a place that it shouldnt exist. 
 
 if nicvm start breaks, it was probably probe_ppt(), changing assert_args_set
 
