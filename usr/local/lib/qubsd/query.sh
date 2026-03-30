@@ -19,6 +19,14 @@ echo_grep() {
     fi
 }
 
+conv_to_upper() {
+    echo "$1" | tr '[:lower:]' '[:upper:]'
+}
+
+conv_to_lower() {
+    echo "$1" | tr '[:upper:]' '[:upper:]'
+}
+
 ###################################  BOOLEAN RESPONSE QUERIES  #####################################
 
 is_path_exist() {
@@ -64,7 +72,7 @@ is_user_response() {
     local _fn="query_user_response" _response
 
     read _response
-    _response=$(echo $_response | tr '[:upper:]' '[:lower:]')
+    _response=$(conv_to_lower "$_response")
 
     case "$1:$_response" in
         severe:yes) return 0 ;; # Positional param `severe` requires full `yes'

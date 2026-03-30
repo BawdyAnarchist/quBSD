@@ -146,7 +146,7 @@ ctx_validate_params() {
         unset _value  # Unset to prevent stale values from polluting the validation
         eval  _value="\${${_pfx}$_PARAM}"
 
-        _param=$(echo "$_PARAM" | tr '[:upper:]' '[:lower:]')
+        _param=$(conv_to_lower "$_PARAM")
         _validation_function="validate_param_$_param"
         quiet type $_validation_function || eval $(THROW 6 ${_fn} $_PARAM $_funct)
 

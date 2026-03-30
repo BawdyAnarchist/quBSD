@@ -46,7 +46,7 @@ parse_args() {
     [ "$PARAM" ] && { assert_param $PARAM || eval $(THROW $?) ;}
 
     # Convert lower-case entered PARAM to upper (user-friendly)
-    [ "$PARAM" ] && PARAM=$(echo "$PARAM" | tr '[:lower:]' '[:upper:]')
+    [ "$PARAM" ] && PARAM=$(conv_to_upper "$PARAM")
     return 0
 }
 
