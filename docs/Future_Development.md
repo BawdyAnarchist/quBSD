@@ -1,8 +1,6 @@
 
 ### Next up
 
-if nicvm start breaks, it was probably probe_ppt(), changing assert_args_set
-
 qb-edit
 
 ### Import things in the code as I overhaul that still need addressed
