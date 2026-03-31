@@ -26,55 +26,41 @@ ctx_unset() {
     return 0
 }
 
-# Cell-specific derived paths, mountpoints, and datasets Reduces verbosity in later references
-ctx_initialize() {
-    local _fn="ctx_initialize" _pfx _cell _type _caller
+# This is the heart of the global context namespace. We deconflict global PARAM assignments with
+# _pfx ($2), which must be managed by callers. Lazy loading (sourcing) is fast/convenient. ~3ms.
+ctx_load_params() {
+    local _fn="ctx_load_params" _pfx _cell _type _caller _params_type
     assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
 
-    # Cell-specific paths and datasets.
+    # Derive the cell type and store in context (existence of QCONF path is verified here as well)
+    _type=$(query_cell_type $_cell) || eval $(THROW $? ${_fn} $_cell)  # JAIL|VM
+    _caller="${0##*/}"  # jail needs the caller (qb|exec) to determine who owns the runtime context
+
+    # CONTEXT variables
+    eval ${_pfx}TYPE=$_type
+    eval ${_pfx}CALLER=${_caller%%[.-]*}
+    eval ${_pfx}PARAMS_TYPE=\"$PARAMS_BASE,\${PARAMS_${_type}}\"
     eval ${_pfx}QCONF=$D_CELLS/$_cell            # qubsd.conf.d/cells
     eval ${_pfx}JCONF=$D_JAILS/$_cell            # jail.conf.d/jails
     eval ${_pfx}RT_CTX=$D_RUNTM/$_cell/ctx.conf  # /var/run/qubsd/cells/  # Runtime context
 
-    # Derive the cell type and store in context (existence of QCONF path is verified here as well)
-    _type=$(query_cell_type $_cell) || eval $(THROW $? ${_fn} $_cell)  # JAIL|VM, derived from CLASS
-    eval ${_pfx}TYPE=$_type
+    # Convert PARAMS_TYPE to space delimited with prefixes attached. Protect globals,
+    _params_type=$(ctx_get ${_pfx}PARAMS_TYPE | sed "s|^|$_pfx|; s|,| $_pfx|g")
+    unset $_params_type  # Unset the prefixed params to prevent accidents on stale variables
 
-    # Store the root of the caller (qb|exec). Necessary for parsing control authority
-    _caller="${0##*/}"
-    eval ${_pfx}CALLER=${_caller%%[.-]*}
+    # Don't clobber globals during sourcing. This MUST come first
+    if [ "$_pfx" ] ; then
+        local $(echo $PARAMS_TYPE | sed "s/,/ /g")
+        eval $_pfx=$_cell    # Simple way to get the cellname of a loaded context prefix
+    fi
 
-    # Load the cellname directly into the prefix
-    [ "$_pfx" ] && eval $_pfx=$_cell
-
-    return 0
-}
-
-# Lazy loading is fast/convenient. Use prefix ($2) to modify global variable (PARAM) assignments
-ctx_load_params() {
-    local _fn="ctx_load_params" _pfx _cell _type _params_type _params_eval
-    assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
-
-    # For convenience, we assign PARAMS_TYPE as global
-    _type=$(ctx_get ${_pfx}TYPE)
-    eval ${_pfx}PARAMS_TYPE=\"\${PARAMS_BASE},\${PARAMS_${_type}}\"
-    _params_type=$(ctx_get ${_pfx}PARAMS_TYPE | sed "s/,/ /g")
-
-    # With prefix, protect globals from clobber. This MUST come first
-    [ "$_pfx" ] && local $_params_type
-
-    # Unset _ALL_PARAMS before sourcing new ones, to prevent stale accidents
-    unset $(echo "$PARAMS_ALL" | sed "s|^|$_pfx|; s| | $_pfx|g")
-
-    # Source defaults and _cell conf. Order is important.
+    # Source base defaults, type defaults, and finally cell QCONF. Order matters
     . $DEF_BASE
     . $(ctx_get DEF_${_type})
     . $D_CELLS/$_cell
 
-    # Avoid looping over 20+ PARAMS. sed _params_type to look like _pfx_param=$_param ; then eval
-    _params_eval=$(echo $_params_type | sed -E "s|([^[:blank:]]+)|$_pfx\1=\\\$\1|g")
-    eval $_params_eval
-
+    # Avoid looping over PARAMS. Sed prints a variable assignment expression, then we evaluate it
+    eval $(echo $_params_type | sed -E "s|$_pfx([^[:blank:]]+)|$_pfx\1=\\\$\1|g")  # Good magic
     return 0
 }
 
@@ -91,13 +77,10 @@ ctx_load_file() {
         local $_params
     fi
 
-    # Source the file
-    . $_file
+    . $_file  # Source the file
 
-    # Avoid looping over numerous PARAMS. sed _params_type to look like _pfx_param=$_param ; then eval
-    _params_eval=$(echo $_params | sed -E "s|([^[:blank:]]+)|$_pfx\1=\\\$\1|g")
-    eval $_params_eval
-
+    # Avoid looping over PARAMS. Sed resolves a valid expression, then evaluate it
+    eval $(echo $_params | sed -E "s|([^[:blank:]]+)|$_pfx\1=\\\$\1|g")
     return 0
 }
 
@@ -208,7 +191,6 @@ ctx_bootstrap_cell() {
     assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
 
     ctx_unset $_pfx    # Start from blank slate
-    ctx_initialize  $_cell $_pfx || eval $(THROW $? $_fn $_cell)
     ctx_load_params $_cell $_pfx || eval $(THROW $? $_fn $_cell)
     ctx_add_zfs $_cell $_pfx
     return 0
