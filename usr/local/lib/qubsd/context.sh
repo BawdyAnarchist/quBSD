@@ -10,26 +10,26 @@ ctx_get() {
 
 # Unset PARAMS based on optional prefix [-p] and PARAM_LIST [-P], or defaults to global constants
 ctx_unset() {
-    local _fn="ctx_unset" _opts OPTARG OPTIND _pfx="$1" _PARAMS
+    local _fn="ctx_unset" _opts OPTARG OPTIND _pfx _params
 
     while getopts :P: _opts ; do case $_opts in
-        P) _PARAMS="$OPTARG" ;;
+        P) _params="$OPTARG" ;;
         *) eval $(THROW 8 _internal1) ;;
     esac ; done ; shift $(( OPTIND - 1 ))
 
-    # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
-    [ -z "$_PARAMS" ] && _PARAMS="$PARAMS_ALL $CONTEXT"
+    # Handle prefix. Unset cellname inside _pfx
+    _pfx="$1" && [ "$_pfx" ] && unset $_pfx
 
-    [ "$_pfx" ] && unset $_pfx
-    unset $(echo "$_PARAMS" | sed "s/,/ /g; s/^/$_pfx/; s/ / $_pfx/g")
-
+    # Assemble _params and unset them.
+    [ -z "$_params" ] && _params="$PARAMS_ALL,$CONTEXT"
+    unset $(echo "$_params" | sed "s/,/ /g; s/^/$_pfx/; s/ / $_pfx/g")
     return 0
 }
 
 # This is the heart of the global context namespace. We deconflict global PARAM assignments with
 # _pfx ($2), which must be managed by callers. Lazy loading (sourcing) is fast/convenient. ~3ms.
 ctx_load_params() {
-    local _fn="ctx_load_params" _pfx _cell _type _caller _params_type
+    local _fn="ctx_load_params" _pfx _cell _type _caller _params_type _r_dset _p_dset
     assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
 
     # Derive the cell type and store in context (existence of QCONF path is verified here as well)
@@ -61,6 +61,13 @@ ctx_load_params() {
 
     # Avoid looping over PARAMS. Sed prints a variable assignment expression, then we evaluate it
     eval $(echo $_params_type | sed -E "s|$_pfx([^[:blank:]]+)|$_pfx\1=\\\$\1|g")  # Good magic
+
+    # Establish cell-specific dataset names based on R_ZFS and P_ZFS
+    _r_dset=$(ctx_get ${_pfx}R_ZFS)/$_cell
+    _p_dset=$(ctx_get ${_pfx}P_ZFS)/$_cell
+    eval ${_pfx}R_DSET=$_r_dset
+    eval ${_pfx}P_DSET=$_p_dset
+
     return 0
 }
 
@@ -84,22 +91,17 @@ ctx_load_file() {
     return 0
 }
 
-# REQUIRES: ctx_load_parameters() FIRST, due to use of R_ZFS and P_ZFS of the cell
-ctx_add_zfs() {
-    local _fn="ctx_add_zfs" _cell _pfx _r_dset _p_dset _r_mnt _p_mnt
+# Actual mountpoints should always be sourced from zfs directly, not presumed.
+# Side effect of not-null R_MNT and P_MNT is the unequivocal attestation to dataset existence
+ctx_load_mountpoints() {
+    local _fn="ctx_add_zfs" _cell _pfx _r_dset _p_dset
     assert_args_set 1 "$1" && _cell="$1" _pfx="$2" || eval $(THROW $?)
 
-    # Establish cell-specific dataset names based on R_ZFS and P_ZFS
-    _r_dset=$(ctx_get ${_pfx}R_ZFS)/$_cell
-    _p_dset=$(ctx_get ${_pfx}P_ZFS)/$_cell
-
-    # Set the prefix-specific global context for the datasets and mountpoints
+    _r_dset=$(ctx_get ${_pfx}R_DSET)
+    _p_dset=$(ctx_get ${_pfx}P_DSET)
     query_datasets "$_r_dset $_p_dset"
-    eval ${_pfx}R_DSET=$_r_dset
-    eval ${_pfx}P_DSET=$_p_dset
     eval ${_pfx}R_MNT=$(query_zfs_mountpoint $_r_dset)
     eval ${_pfx}P_MNT=$(query_zfs_mountpoint $_p_dset)
-    # Side effect of R_MNT and P_MNT is the unequivocal attestation to dataset existence
     return 0
 }
 
@@ -108,12 +110,12 @@ ctx_add_zfs() {
 # OPTIONAL: $3 (_pass) -> which validation.sh error codes to ignore failures and continue
 ctx_validate_params() {
     local _fn="ctx_validate_params" _opts OPTIND OPTARG
-    local _cell _pfx _level _pass _PARAMS _type _value _param _validation_function
+    local _cell _pfx _level _pass _params _type _value _param _validation_function
 
     while getopts :l:p:P: _opts ; do case $_opts in
         l)  _level="$OPTARG" ;;
         p)  _pass="$OPTARG" ;;
-        P)  _PARAMS="$OPTARG" ;;     # Specify PARAM list, or use the list from constants.sh
+        P)  _params="$OPTARG" ;;     # Specify PARAM list, or use the list from constants.sh
         *)  eval $(THROW 8 _internal1) ;;
     esac ; done ; shift $(( OPTIND - 1 ))
 
@@ -122,16 +124,15 @@ ctx_validate_params() {
     assert_int_comparison -g 1 -l 3 $_level || eval $(THROW 7 _internal2 $_level $_fn)
 
     _type=$(ctx_get ${_pfx}TYPE)  # Multiple validations use _type as downward-scoped
-    # Assemble PARAM names. $_PARAMS isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
-    [ -z "$_PARAMS" ] && _PARAMS="$(ctx_get ${_pfx}PARAMS_TYPE),$CTX_VALIDATE"
+    # Assemble PARAM names. $_params isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
+    [ -z "$_params" ] && _params="$(ctx_get ${_pfx}PARAMS_TYPE),$CTX_VALIDATE"
 
-    for _PARAM in $(echo $_PARAMS | tr ',' ' ') ; do
+    for _param in $(echo $_params | tr ',' ' ') ; do
         unset _value  # Unset to prevent stale values from polluting the validation
-        eval  _value="\${${_pfx}$_PARAM}"
+        eval  _value="\${${_pfx}$_param}"
 
-        _param=$(conv_to_lower "$_PARAM")
-        _validation_function="validate_param_$_param"
-        quiet type $_validation_function || eval $(THROW 6 ${_fn} $_PARAM $_funct)
+        _validation_function="validate_param_$(conv_to_lower $_param)"
+        quiet type $_validation_function || eval $(THROW 6 ${_fn} $_param $_funct)
 
         # _level _value _cell _pfx _type are downward-scoped to avoid 'param drilling' in validation
         eval $_validation_function || PASS -c $_pass || eval $(THROW $?)
@@ -192,7 +193,7 @@ ctx_bootstrap_cell() {
 
     ctx_unset $_pfx    # Start from blank slate
     ctx_load_params $_cell $_pfx || eval $(THROW $? $_fn $_cell)
-    ctx_add_zfs $_cell $_pfx
+    ctx_load_mountpoints $_cell $_pfx
     return 0
 }
 
@@ -216,6 +217,4 @@ ctx_bootstrap_runtime() {
         || eval $(THROW $? _generic "Failed to write runtime context")
     return 0
 }
-
-
 
