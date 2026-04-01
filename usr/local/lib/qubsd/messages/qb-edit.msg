@@ -1,43 +1,49 @@
 
-:val_missing:
-Must propose a value 
-/END/
-
-:mutual_exclusive:
-[-d] and [-c] are mutually exclusive. Either modify the defaults, or modify a cell
-/END/
-
 :cell_missing:
-Must provide either [-c <cell>] or [-d <base|jail|VM>] as target to act upon
+Must provide either [-c <cell>] or [-d <base|jail|VM>] default file to act upon
 /END/
 
 :param_missing:
 Must provide [-p <PARAMETER>] to change
 /END/
 
-:defaults_mismatch:
+:value_missing:
+Must provide a <VALUE> for %s
+/END/
+
+:mutual_exclusive:
+[-d] and [-c] are mutually exclusive. Either modify the defaults, or modify a cell
+/END/
+
+:extra_args:
+Extra (useless) args provided. Double check your usage
+/END/
+
+:type:
+Type mismatch. PARAM < %s > is %s, but target file:
+  < %s > is %s
+/END/
+
+:default_invalid:
 [-d] is incompatible with PARAMETER < %s >. May only be applied to a specific cell.
 /END/
 
-:defaults:
-[-d] < %s > is invalid. Must be one of: < jail|vm|all >
+:delete_class:
+CLASS is a hard requirement for each individual cell config.
+  Defaults are for convenience, not config/fallback guarantees
 /END/
 
-:delete:
-PARAM < %s > may not be deleted. Only: BHYVE_CUSTM and PPT may be deleted
-/END/
-
-:delete2:
-Cannot use [-D] without -c <cell> to operate on
-/END/
-
-:delete3:
-PARAM < %s > is already not present in cell < %s > config
+:delete_nothing:
+PARAM < %s > is already not present in file: %s
 /END/
 
 :no_change:
 New value is equal to the old
 /END/
+
+
+
+
 
 :param_invalid:
 PARAM < %s > is invalid
@@ -53,7 +59,7 @@ PARAM < %s > is not part of the allowable defaults.base.conf params
 
 :w:usage:
 
-qb list: List parameters of a cell 
+qb list: List parameters of a cell
 
 Usage:
   qb edit [-z] [-c <cell>] [-p <param>]
@@ -64,8 +70,8 @@ Usage:
 
   -h: (h)elp: Outputs this help message
   -c: (c)ell: Show settings for <cell>
-  -p: (p)aram: Show values for all cells of <param> 
+  -p: (p)aram: Show values for all cells of <param>
   -s: (s)napshots: Show zfs snapshots for <cell>. This will
       suppress bulk params, and print only snapshots.
-  -z: (z)fs: Show zfs datasets for <cell> 
+  -z: (z)fs: Show zfs datasets for <cell>
 /END/
