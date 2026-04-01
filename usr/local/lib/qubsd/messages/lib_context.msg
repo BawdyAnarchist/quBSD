@@ -3,7 +3,7 @@
 Cell < %s > is invalid - basic configuration problem
 /END/
 
-:ctx_initialize:
+:ctx_load_params:
 Failed to acquire valid TYPE for cell < %s >
 /END/
 
