@@ -98,6 +98,7 @@ write_results() {
     fi
 
     # Without PARAM specified and no snaps, assume user wants the full list
+    local IFS=,
     for _param in $PARAMS_TYPE ; do
         _val=$(ctx_get $_param)
 
