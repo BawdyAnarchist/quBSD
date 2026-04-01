@@ -55,6 +55,12 @@ validate_param_cpuset() {
     return 0
 }
 
+validate_param_devfs_rule() {
+    local _fn="validate_devfs_rule"
+    assert_devfs_rule $_value || eval $(THROW 145)
+    return 0
+}
+
 validate_param_envsync() { ##########  STUB  FOR  NOW  ################################################################
     local _fn="validate_param_envsync"
     # [some test] || eval $(THROW 149 $_fn)
