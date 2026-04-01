@@ -89,7 +89,7 @@ query_cell_type() {
     assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
     is_path_exist -f $D_CELLS/$_cell || eval $(THROW 112 $_fn $_cell $D_CELLS)
 
-    # This function is used for bootstrap. Do not rely on external functions. Hardcode CLASS
+    # This function is used for bootstrap. Do not rely on external functions, direct `sed`
     _type=$(sed -En "s/CLASS=\"(.*)\"/\1/p" $D_CELLS/$_cell)
     case $_type in
         *jail) echo "JAIL" ;;
