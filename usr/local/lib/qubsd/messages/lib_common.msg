@@ -23,6 +23,6 @@ Internal bug: Non-integer < %s > passed to assert_int_comparison()
 /END/
 
 :_internal4:
-Internal bug: Invalid [-w _warn] behavior code passed to validate_cell_parameters
+Internal bug: Mismatch between $1 provided (_cell), and _pfx value
 /END/
 
