@@ -101,15 +101,24 @@ assert_param() {
     echo_grep -qd , "$PARAMS_ALL" "$1" || eval $(THROW 10 $_fn "$1")
 }
 
+# getopts needs improved. Guarantee $GETOPTS was provided.
+assert_optarg() {
+    local _fn="assert_optarg"
+    [ -z "$OPTARG" ] && eval $(THROW 25 $_fn)
+    echo "$OPTARG" | grep -Eqs -- "^-" && eval $(THROW 25 $_fn)
+    unset OPTARG  # Must unset, or stale value lingers (coz it's local-scoped)
+}
+
+assert_ptype() {
+    local _fn="assert_type" _val="$1"
+    echo_grep -q "base BASE jail JAIL vm VM" "$_val" || eval $(THROW 24)
+}
+
 assert_time_format() {
     local _fn="assert_time_format" _val="$1"
     echo "$_val" | grep -Eqs "^[1-9]+[0-9]*(s|m|H|D|W|Y)\$" || eval $(THROW 20 $_fn)
 }
 
-assert_type() {
-    local _fn="assert_type" _val="$1"
-    echo "$_val" | grep -Eqs "^(base|BASE|jail|JAIL|vm|VM)\$" || eval $(THROW 24 $_fn)
-}
 
 ###################################  SECTION 2: CELL PARAMETERS  ###################################
 
@@ -143,6 +152,11 @@ assert_cpuset() {
     # Test for negative numbers and dashes in the wrong place
     echo "$1" | grep -Eq "(,,+|--+|,-|-,|,[ \t]*-|^[^[:digit:]])" && eval $(THROW 21 $_fn $1)
     return 0
+}
+
+assert_devfs_rule() {
+    local _fn="assert_devfs_rule"
+    assert_int_comparison -g 0 "$1" || eval $(THROW $?)
 }
 
 # Optional $2: (_extra), to ensure that the last bit in the IP is not '1'.  It's required for the
