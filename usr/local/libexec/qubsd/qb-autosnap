@@ -9,7 +9,7 @@ parse_args() {
     while getopts dhs: _opts ; do case $_opts in
         d) DESTROY=true ;;
         h) eval $(WARN usage) ; cat $ERR ; exit 0 ;;
-        s) TTL="$OPTARG" ;;
+        s) TTL="$OPTARG" ; assert_optarg || eval $(THROW $?) ;;
         *) exit 1 ;;
     esac done ; shift $(( OPTIND - 1 ))
 
@@ -137,7 +137,7 @@ manage_composition_loop() {
     # Must loop over all cells. Will grep cached globals, and fallback to zfs when necessary.
     for _cell in $CELLS ; do
 
-        # Acquire the dataset data for each cell. Tolerate missing jconf, or missing dataset
+        # Acquire the dataset data for each cell.
         ctx_bootstrap_cell $_cell $_pfx || continue
         [ "$(ctx_get ${_pfx}R_MNT)" ] && _r_dset=$(ctx_get ${_pfx}R_DSET)
         [ "$(ctx_get ${_pfx}P_MNT)" ] && _p_dset=$(ctx_get ${_pfx}P_DSET)
