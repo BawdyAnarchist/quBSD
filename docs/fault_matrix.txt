@@ -40,8 +40,10 @@ CODE  LEVEL      DESCRIPTION
 21    assert     cpuset formatting failure
 22    assert     schg formatting failure
 23    assert     seclvl formatting failure
-24    assert     type (base|jail|vm) failure
-30    assert     <UNUSED>
+24    assert     ptype (base|jail|vm) failure
+25    assert     user failed to provide $OPTARG
+26-   assert     <UNUSED>
+-30   assert     <UNUSED>
 31    assert     bhyve_custm formatting failure
 32    assert     bhyveopts formatting failure
 33    assert     ppt formatting failure
@@ -93,7 +95,8 @@ CODE  LEVEL      DESCRIPTION
 168   validate   jconf
 169   validate   r_dset
 170   validate   p_dset
-171-  validate   <UNUSED>
+171   validate   devfs_rule
+172-  validate   <UNUSED>
 -180  validate   <UNUSED>
 181   validate   Basic cellname validity failure
 182   validate   New cellname failure
