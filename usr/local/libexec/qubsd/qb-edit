@@ -1,234 +1,136 @@
 #!/bin/sh
 
+# quBSD model is sane defaults, easy correct paths, warn when dangerous. Thus, qb-edit sanitizes/
+# THROWs bad input syntax, but only warns for bad config/topology. It does not provide default
+# fallback guarantees for missing PARAMS. It would only be a false sense of security fallback
+# anyways. However, qb-edit does warn when a deleted PARAM results in a cell with a missing PARAM.
+
+
+### UNFINISHED WORK ###
+# Add PARAM specific running-jail changes
+# Add restarts where running-jail cant be changed
+# devfs_rules change in the jconfs
+# if [ $CELL ] ; then level2 (or 3?) validate full config after change and report it
+# if [ $DELETE $DEFAULT ] ; then provide list of cells that no longer have a resolved value for that deleted PARAM
+# PPT is unique in that, it could have a VALUE to be deleted, in which case surgery should be performed
+
 . $QCOMMON
 
-get_options() {
-	while getopts dfhqr opts ; do case $opts in
-		d) ACTION="delete" ;;
-		f) _F='-F' ;;
-		h) get_msg2 -eu ;;
-		q) _q='-q' ;;
-		r) RESTART="true" ;;
-		*) exit 1 ;;
-   esac  ;  done  ;  shift $(( OPTIND - 1 ))
+trap_init
 
-	# Script variables
-	JAIL="$1" ; [ -z "$JAIL" ] && get_msg2 $_q -Eum _e0
-	PARAM="$2"
+parse_args() {
+    local _fn="parse_args" _opts OPTARG OPTIND
+    while getopts c:d:Dhp: _opts ; do case $_opts in
+        c) CELL="$OPTARG" ; assert_optarg || eval $(THROW $?) ;;
+        d) DEFAULT="$OPTARG" ; assert_optarg || eval $(THROW $?) ;;
+        D) DELETE="true" ;;
+        h) eval $(WARN usage) ; cat $ERR ; exit 0 ;;
+        p) PARAM="$OPTARG" ; assert_optarg || eval $(THROW $?) ;;
+        *) eval $(THROW 8 _generic "Invalid option") ;;
+    esac ; done ; shift $(( OPTIND - 1 ))
 
-	# If adding	a line, it might be '-s opt' for bhyve, need full line
-	if [ "$PARAM" = "BHYVE_CUSTM" ] ; then
-		shift 2
-		VALUE="$@"
-	else
-		VALUE="$3"
-	fi
+    # Resolve user input assignments. Continuously shift so the next assignment is always in $1
+    [ -z "$CELL" ] && [ -z "$DEFAULT" ] && [ "$1" ] && CELL="$1" && shift
+    [ -z "$PARAM" ] && [ "$1" ] && PARAM="$1" && shift
+    [ -z "$DELETE" ] && [ "$1" ] && VALUE="$1" && shift
 
-	# Create both (upper/lower) for VALUE. User convenience, and for checks later on
-	PARAM=$(echo  "$PARAM" | tr '[:lower:]' '[:upper:]')
-	_param=$(echo "$PARAM" | tr '[:upper:]' '[:lower:]')
+    # Final checks on raw user options/args
+    [ "$CELL" ] || [ "$DEFAULT" ] || eval $(THROW 4 cell_missing)
+    [ "$PARAM" ] || eval $(THROW 4 param_missing)
+    [ -z "$DELETE" ] && [ -z "$VALUE" ] && eval $(THROW 4 value_missing $PARAM)
+    [ "$1" ] && eval $(THROW 4 extra_args)  # No args should remain. If there are assume user error
 
-	# Necessary for editing lines vs adding lines
-	OLDVALUE=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]].*" $QCONF)
-	DEFAULT=$(sed -En "s/^#default[[:blank:]]+${PARAM}[[:blank:]]+//p" $QCONF)
+    # Sanitize CELL/DEFAULT
+    if [ "$CELL" ] && [ "$DEFAULT" ] ; then
+        eval $(THROW 4 mutual_exclusive)           # Cant be both CELL and DEFAULT
+    elif [ "$CELL" ] ; then
+        assert_cellname $CELL || eval $(THROW $?)  # Sanitize user input
+        TYPE=$(query_cell_type $CELL)              # Needed later for PARAM sanitization
+        FILE=$D_CELLS/$CELL                        # CELL file to operate on
+    elif [ "$DEFAULT" ] ; then
+        assert_ptype $DEFAULT || eval $(THROW $?)  # Sanitize user input
+        DTYPE=$(conv_to_upper $DEFAULT)            # Needed later for PARAM sanitization
+        FILE=$D_QCONF/defaults.$(conv_to_lower $DTYPE).conf  # Defaults file to operate on
+    fi
+
+    # Sanitize PARAM
+    PARAM=$(conv_to_upper "$PARAM")  # Standardize user input (user-friendly :upper/lower: input)
+    PTYPE=$(conv_to_upper $(query_param_type $PARAM))
+    _type="${TYPE}$DTYPE"            # PTYPE=BASE can go anywhere. Otherwise types must align
+    case $PTYPE in
+        JAIL) [ "$_type" = "JAIL" ] || eval $(THROW 4 type $PARAM $PTYPE $FILE $_type) ;;
+        VM)   [ "$_type" = "VM" ]   || eval $(THROW 4 type $PARAM $PTYPE $FILE $_type) ;;
+    esac
+    # Certain PARAMS are excluded from being defaults, either for safety or sensibility
+    [ "$DEFAULT" ] && echo_grep -qd , "$PARAMS_EXCL_DEFAULT" "$PARAM" \
+        && eval $(THROW 4 default_invalid $PARAM)
+
+    # CLASS is a hard CELL requirement. Defaults are for convenience, not config/fallback guarantees
+    [ "$DELETE" ] && [ "$CELL" ] && [ "$PARAM" = "CLASS" ] && eval $(THROW 4 delete_class)
+
+    # Provide syntax assertion (level 1) that user-input PARAM is valid
+    ctx_validate_params -l 1 -P $PARAM || eval $(THROW $?)
+
+    return 0
 }
 
-checks() {
-	# Check that the jail/VM exists in QCONF
-	! grep -Eqs "^${JAIL}[[:blank:]]" $QCONF && get_msg2 $_q -Em _e1
-
-	# This will return global variables: CLASS and FILT_PARAMS
-	get_parameter_lists $JAIL
-
-		# Multi-line parameters receive a new line
-	if [ "$ACTION" = "delete" ] ; then
-		# Make sure that at least JAIL and PARAM exist
-		[ -n "$JAIL" ] && [ -n "$PARAM" ] || get_msg2 $_q -Eum _e0
-
-		# Make sure at least one line exists to delete
-		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QCONF \
-				|| get_msg2 $_q -Em _e3
-
-	else
-		# Need all 3 parameters
-		{ [ -z "$JAIL" ] || [ -z "$PARAM" ] || [ -z "$VALUE" ] ;} && get_msg2 $_q -Eum _e0
-
-		# Exit if proposed entry already exists
-		grep -Eqs "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}[[:blank:]]*\$" $QCONF \
-				&& get_msg2 $_q -em _m1
-
-		if echo "$MULT_LN_PARAMS" | grep -Eqs "$PARAM" ; then
-			ACTION="add"
-
-		# All other PARAMs must be checked for validity, and determine if new line is needed
-		elif echo "$FILT_PARAMS" | grep -Eqs "$PARAM" ; then
-			# If there was no OLDVALUE, add a new line. However, if VALUE is equal to the default,
-			# then we'll delete the line and rely on the default. EXCEPT for CLASS and ROOTENV.
-			# For safety reasons, jails/VMs should always specify this, even if equal to default.
-
-			[ -z "$OLDVALUE" ] && ACTION="add"
-			[ "$VALUE" = "$DEFAULT" ] && [ ! "$PARAM" = "CLASS" ] \
-				&& [ ! "$PARAM" = "ROOTENV" ] && ACTION="revert_to_default"
-
-		elif echo "$NON_QCONF" | grep -Eqs "$PARAM" ; then
-			ACTION="none"
-
-		# Values of the #default can be modified regardless of CLASS
-		elif [ "$JAIL" = "#default" ] ; then :
-
-		# Otherwise, PARAM was not found to be valid for the jail/VM
-		else
-			get_msg2 $_q -Em _e2 $_F
-		fi
-
-		# BHYVE_CUSTM is special, but everything else can test for chk_valid_param
-		[ ! "$PARAM" = "BHYVE_CUSTM" ] \
-				&& ! eval "chk_valid_${_param}" $_q '--' \"$VALUE\" \"$JAIL\" \
-				&& get_msg2 $_q -m _e $_F && get_msg2 $_q -Em _m2 $_F
-	fi
-
-	# Extra checks/interaction for certain parameters and IPV4
-	case $PARAM in
-
-		# Should not be changing class, unless you really know what you're doing
-		CLASS) get_msg2 $_q -m _e4 $_F ; get_msg2 $_q -Em _m2 $_F ;;
-
-		# Warn about changing ROOTENV
-		ROOTENV) get_msg2 $_q -m _w1 $_F ;;
-
-		GATEWAY) # Offer to change IPV4 from 'none' to 'auto', if gateway is valid
-				get_jail_parameter -dqs IPV4 "$JAIL"
-
-				if [ ! "$VALUE" = "none" ] && [ "$IPV4" = "none" ] && [ -z "$_q" ] ; then
-					get_msg2 -m _w0
-					get_user_response && _IPAUTO="true"
-				fi
-			;;
-		IPV4) # Extra check for quBSD IPV4 convention.
-				chk_isqubsd_ipv4 $_q -- "$VALUE" "$JAIL" || get_msg2 $_q -Em _m2 $_F
-			;;
-	esac
+# Repeat commands. DEL/ADD avoids potential syntax pollution inherent to sed search-and-replace.
+_compose_del_param() {
+    local _fn="compose_cmd_helper"
+    _CMD_DEL="sed -i '' -E \"/^$PARAM=/d\" $1"
+    return 0
+}
+_compose_add_param() {
+    local _fn="compose_cmd_helper" _tmpfile
+    make_tmp _tmpfile
+    _CMD_ADD="{ cat $1 ; echo $PARAM=\"$VALUE\" ;} | sort > $_tmpfile && mv $_tmpfile $1"
+    return 0
+}
+_compose_warnings_cmd() {
+    local _fn="compose_warnings_cmd" _warnings
+    _warnings=$(cat $ERR)
+    clear_err
+    _CMD_WARNINGS="echo \"WARNING: Potential issues due to changes\" ; echo \"$_warnings\"")
 }
 
-modify_qconf() {
+conduct_cells_param_reassessment() {
+    local _fn="conduct_cells_param_reassessment"
 
-	case $ACTION in
-		delete)
-			_delline=$(grep -E "^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}" $QCONF)
-			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+${VALUE}@ d" $QCONF
-			;;
-		revert_to_default)
-			_default=$(grep -E "^#default[[:blank:]]+${PARAM}[[:blank:]]" $QCONF)
-			sed -i '' -E "\@^${JAIL}[[:blank:]]+${PARAM}[[:blank:]]@ d" $QCONF
-			;;
-		add)
-			echo "$JAIL  $PARAM  $VALUE" >> $QCONF
-			;;
-		none) :  # No action to take (devfs_ruleset)
-			;;
-		*) # Modify QCONF and print new settings on success
-			sed -i '' -E "s@^(${JAIL}[[:blank:]]+${PARAM}[[:blank:]]+).*@\1${VALUE}@" $QCONF
-			;;
-	esac
-
-	# Set IPV4 to auto in QCONF, if the user approved it
-	[ "$_IPAUTO" ] \
-		&& sed -i '' -E "\@^${JAIL}[[:blank:]]+IPV4@s@[^[:blank:]]+\$@auto@" $QCONF
-
-	# Clean up the columns and sorting. Make sure there's no duplicates
-	_newQCONF=$(column -t $QCONF | uniq)
-	_newQCONF=$(echo "$_newQCONF" | sort -k1,1 -k2,2)
-	echo "$_newQCONF" > $QCONF
-
-	# BHYVE_CUSTM has extra spaces. At least remove the first space
-	sed -i '' -E "s/(BHYVE_CUSTM[[:blank:]]+[^[:blank:]]+)[[:blank:]]+/\1 /" $QCONF
 }
 
-modify_autosnap() {
+_compose
 
-	# Class tells us which dataset to operate on (zroot or zusr)
-	case $CLASS in
+compose_cmds() {
+    local _fn="compose_cmds" _pfx=old_
 
-		# Rootjail only needs zroot operation
-		rootjail)
-			_ZFS="${R_ZFS}/${JAIL}"
-			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
-					&& zfs get qubsd:autosnap "$_ZFS"
-			;;
+    # Deletion is simplest, start here
+    if [ "$DELETE" ] ; then
+        grep -Eqs "^$PARAM=" $FILE || eval $(THROW 4 delete_nothing)
+        _compose_del_param $FILE
+        [ "$DEFAULT" ] && _conduct_cells_param_reassessment
+        return 0
+    fi
 
-		# Appjail/VM will have zusr. Dispjail might, but if not will fail to continue
-		appjail|cjail|dispjail|appVM)
-			_ZFS="${U_ZFS}/${JAIL}"
-			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
-					&& zfs get qubsd:autosnap "$_ZFS"
-			;;
+    # Provide final checks and warnings
+    ctx_load_file $FILE $_pfx
+    _old_val=$(ctx_get ${_pfx}$PARAM)
+    [ "$_old_val" = "$VALUE" ] && eval $(THROW 4 no_change)
+    ctx_validate_params -l 2 -P $PARAM $VALUE || _compose_warning_cmd
 
-		# RootVM will almost certainly have both zroot and zusr (due to /vmusr mounted)
-		rootVM)
-			_ZFS="${R_ZFS}/${JAIL}"
-			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
-					&& zfs get qubsd:autosnap "$_ZFS"
-
-			_ZFS="${U_ZFS}/${JAIL}"
-			chk_valid_zfs "$_ZFS" && zfs set qubsd:autosnap="${VALUE}" "$_ZFS" \
-					&& zfs get qubsd:autosnap "$_ZFS"
-			;;
-	esac
-}
-
-modify_jconf_devfs() {
-
-	# First convert the to just the numerical value if the user entered the long format
-	VALUE=$(echo "$VALUE" | grep -Eo '[[:digit:]]+$')
-	sed -i '' -E "s/(.*devfs_ruleset=).*/\1\"${VALUE}\";/" ${JCONF}/${JAIL}
-}
-
-handle_restarts() {
-	# Logic could be written to change running jails, but simpler just to restart.
-
-	echo "$PARAM" | grep -Eqs "CPUSET|MAXMEM|MTU|ROOTENV|SCHG|SECLVL|TEMPLATE|IPV4|GATEWAY" \
-		&&	chk_isrunning $JAIL && _restart1="$JAIL"
-
-	# If there are no jails to restart, exit
-	[ -z "$_restart1" ] && exit 0
-
-	# If [-q] tagged, only continue if user specified a restart
-	[ -n "$_q" ] && [ -z "$RESTART" ] && exit 0
-
-	if [ -z "$_q" ] ; then
-		get_msg2 -m _w2
-		get_user_response || return 0
-	fi
-
-	# Restart jails (otherwise, would've already exited)
-	[ "$_jail" = "none" ] || restart_jail "$_jail"
+    _compose_del_param $FILE
+    _compose_add_param $FILE
 }
 
 main() {
+    local _fn="main"
 
-	# Some edits are coordinated across other quBSD configs/params, for user-facing simplicity
-	case "$PARAM" in
-		AUTOSNAP)  modify_autosnap ; modify_qconf  ;;
-		DEVFS_RULE) modify_jconf_devfs  ;;
-		*) modify_qconf  ;;
-	esac
+    parse_args "$@"  || eval $(THROW $?)
+    compose_cmds     || eval $(THROW $?)
 
-	# Print the new value
-	case $ACTION in
-		delete) get_msg2 $_q -m _m4  ;;
-		revert_to_default) get_msg2 $_q -m _m5  ;;
-		*) get_msg2 $_q -m _m3  ;;
-	esac
-
-	handle_restarts
+    _COMMANDS="_CMD_DEL _CMD_ADD"
+    execute_commands "$_COMMANDS" || eval $(THROW $?)
 }
 
-get_global_variables
+main "$@" || FATAL
 
-get_options "$@"
-
-checks
-
-main
-
-
+exit 0
