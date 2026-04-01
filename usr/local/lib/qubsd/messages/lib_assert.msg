@@ -7,6 +7,10 @@ Invalid %s < %s >
 Invalid %s < %s >. %s
 /END/
 
+:assert_optarg:
+User Error: Bad options usage
+/END/
+
 :assert_args_set:
 Argument missing or blank
 /END/
