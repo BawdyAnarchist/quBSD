@@ -76,7 +76,7 @@ ctx_load_params() {
 ctx_load_file() {
     local _fn="ctx_load_file" _file _pfx _params _params_eval
     assert_args_set 1 "$1" && _file="$1" _pfx="$2" || eval $(THROW $?)
-    is_path_exist "$_file" || eval $(THROW $?)
+    is_path_exist -f "$_file" || eval $(THROW $?)
 
     # First read the file to get PARAMS, then local them to prevent clobber before pfx is assigned
     if [ "$_pfx" ] ; then
