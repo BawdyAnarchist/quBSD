@@ -11,7 +11,7 @@ parse_args() {
         h) eval $(WARN usage) ; cat $ERR ; exit 0 ;;
         s) TTL="$OPTARG" ; assert_optarg || eval $(THROW $?) ;;
         *) exit 1 ;;
-    esac done ; shift $(( OPTIND - 1 ))
+    esac ; done ; shift $(( OPTIND - 1 ))
 
     # Must provide [-d] and/or [-t]
     [ -z "$DESTROY" ] && [ -z "$TTL" ] && eval $(THROW 4 $_fn)

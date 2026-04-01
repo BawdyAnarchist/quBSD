@@ -6,16 +6,14 @@ trap_init
 
 parse_args() {
     local _fn="parse_args" _opts OPTARG OPTIND _pos1 _pos2
-    while getopts c:hp:sz _opts ; do
-        case $_opts in
-				c) CELL="$OPTARG" ; assert_optarg || eval $(THROW $?) ;;
-            h) eval $(WARN usage) ; cat $ERR ; exit 0 ;;
-            p) PARAM="$OPTARG" ; assert_optarg || eval $(THROW $?) ;;
-            s) snaps="true" ;;
-            z) zfs="true" ;;
-            *) exit 1 ;;
-        esac
-    done ; shift $(( OPTIND - 1 ))
+    while getopts c:hp:sz _opts ; do case $_opts in
+        c) CELL="$OPTARG" ; assert_optarg || eval $(THROW $?) ;;
+        h) eval $(WARN usage) ; cat $ERR ; exit 0 ;;
+        p) PARAM="$OPTARG" ; assert_optarg || eval $(THROW $?) ;;
+        s) snaps="true" ;;
+        z) zfs="true" ;;
+        *) exit 1 ;;
+    esac ; done ; shift $(( OPTIND - 1 ))
     _pos1="$1" ; _pos2="$2"
 
     # Be nice to the user and try to parse mix/matched options and positionals
