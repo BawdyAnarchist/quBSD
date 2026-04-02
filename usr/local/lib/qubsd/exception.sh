@@ -17,11 +17,10 @@ clear_err() { rm -f $ERR ; return 0 ;}
 
 # Primary error, message, and tracing system
 THROW() {
-    local _err_code="$1" _msg_code="$2" _trace _msg _args
+    local _err_code="$1" _msg_code="$2" _msg _args
 
-    # printf needs "$@". Shift out the control codes. Activate the stack trace
+    # printf needs "$@". Shift out the control codes.
     [ "$_err_code" ] && shift && [ "$_msg_code" ] && shift
-    [ "$TRACE" ] && _trace="[$_fn]"
 
     # _err_code must have a positive integer value. This guarantees `eval` safety on return.
     ! echo $_err_code | grep -Eqs '^[ \t]*[0-9]+[ \t]*$' \
@@ -43,9 +42,10 @@ THROW() {
         fi
     fi
 
-    # Send to $ERR. It's safe for the caller to `eval` the return echo, because it was sanitized
-    printf "$_trace[$_err_code]: $_msg\n" "$@" >> $ERR
-    echo "return $_err_code"
+    # Include the trace, print to $ERR, and echo the return code command.
+    [ "$TRACE" ] && _msg="[$_fn][$_err_code]: $_msg"
+    printf "$_msg\n" "$@" | sed "s/^/  /" >> $ERR
+    echo "return $_err_code"  # Safe for caller to `eval` this echo. $_err_code was sanitized
 }
 
 # Warning system writes to the same $ERR file as THROW
