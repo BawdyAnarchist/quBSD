@@ -22,10 +22,11 @@ export D_XFER="$QRUN/xfer"
 export D_QTMP="$QRUN/tmp"
 
 # Exception system and diagnostics
+export BASENAME="$(basename $0)"
 export ERR="$D_QERR/$BASENAME.$$.err"
+export MESSAGES="$D_QMSG/lib*.msg $D_QMSG/$BASENAME.msg"
 export TRAP="rm -f $ERR"
 export TRAP_SIGS="HUP INT TERM QUIT EXIT"
-export BASENAME="$(basename $0)"
 export DEBUG="/root/debug"
 : ${VERBOSE:=}     # [true|false] Print commands to console before running them
 : ${DRY_RUN:=}     # [true|false] Do not execute, just print commands to the console
@@ -65,7 +66,7 @@ export PARAMS_BASE="AUTOSTART,AUTOSNAP,BACKUP,CLASS,ENVSYNC,GATEWAY,IPV4,MTU,NO_
 export PARAMS_JAIL="CPUSET,DEVFS_RULE,MAXMEM,SCHG,SECLVL"
 export PARAMS_VM="BHYVEOPTS,BHYVE_CUSTM,MEMSIZE,PPT,TAPS,TMUX,VCPUS,VNC,WIREMEM"
 export PARAMS_ALL="$PARAMS_BASE,$PARAMS_JAIL,$PARAMS_VM"
-export PARAMS_EXCL_DEFAULT="CLASS,TEMPLATE,PPT"
+export PARAMS_EXCL_DEFAULT="CLASS,PPT,TEMPLATE"
 export CONTEXT="CALLER,JCONF,QCONF,P_DSET,P_MNT,R_DSET,R_MNT,RT_CTX"   # Convenient context paths
 export CTX_VALIDATE="JCONF,P_DSET,R_DSET"     # Necessary validations in addition to PARAMS_
 export CLASSES="rootjail,appjail,dispjail,rootVM,appVM,dispVM,cjail"
