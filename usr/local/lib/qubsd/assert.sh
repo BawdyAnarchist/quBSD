@@ -187,7 +187,7 @@ assert_ipv4() {
         || eval $(THROW 15 _invalid2 IPV4 "$_val" "Use CIDR notation (with subnet)")
 
     # With the $_extra flag, reserve a.b.c.1 (ending in .1) for the gateway
-    [ "$_a3" = "1" ] && eval $(THROW 15 $_value)
+    [ "$_a3" = "1" ] && eval $(THROW 15 ${_fn}_2 $_value)
     return 0
 }
 
