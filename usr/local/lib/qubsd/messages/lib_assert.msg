@@ -56,6 +56,11 @@ Invalid input: < %s >. Integer required.
 %s < %s > is not CIDR. Use CIDR notation for IPV4 addr, or <none|DHCP|auto>.
 /END/
 
+:assert_ipv4_2:
+IPaddr: < %s > is CIDR; however, quBSD reserves the '.1' ending for the gateway.
+   If you MUST use '.1', then use IPV4="none" , and configure a persistent rc.conf.local
+/END/
+
 :assert_param:
 < %s > is not a valid tunable qubsd PARAMETER
 /END/

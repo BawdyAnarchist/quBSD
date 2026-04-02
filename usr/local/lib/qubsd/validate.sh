@@ -83,7 +83,7 @@ validate_param_ipv4() {
 
     case $_value in
         none|auto|DHCP) return 0 ;;
-        *) assert_ipv4 $_value "true" || eval $(THROW 151) ;;
+        *) assert_ipv4 $_value || eval $(THROW 151) ;;
     esac
     [ "$_level" -le 1 ] && return 0
 

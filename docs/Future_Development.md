@@ -50,6 +50,9 @@ I2P Gateway
 
 0serv
 
+consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-in-freebsds-vnet-jails/
+	- It's for vnet jails and NAT. Disables hardware checksums for virtual interfaces, and extra filtering on bridges
+
 
 ### SPECIFIC SCRIPTS OR FUNCTIONS
 
@@ -100,8 +103,6 @@ qb-stat
 	- Give a popup option that can be closed with any key (quickview kinda stuff)
 	- Add a column for worspace location of active windows
 
-consider - https://it-notes.dragas.net/2023/08/14/boosting-network-performance-in-freebsds-vnet-jails/
-	- It's for vnet jails and NAT. Disables hardware checksums for virtual interfaces, and extra filtering on bridges
 
 
 ### GENERAL PROBLEMS / BEST PRACTICES / CLEANUP
@@ -111,8 +112,6 @@ It sounds like I still need magic cookies because some jails will still have opt
 TIMEOUT overhaul - timeout is a real command that will exit a command after a certain time. wow that would've been useful a long time ago
 
 rc.conf -nmdm cuse , I dont know if I need them or what for
-
-When you restore, the datasets dont inherit their qubsd:autosnap properties
 
 Take another hack at the recording device problems
 
@@ -159,17 +158,5 @@ Linuxulator:
   /etc/environment - newline: `_JAVA_AWT_WM_NONREPARENTING=1`
     - coz java refuses to honor bspwm
   ?? Do I need to change the env for GUI programs in Linux as well?? Like with /etc/login.conf? Maybe.
-
-
-### GENERIC SHELL LIBRARY FUNCTIONS
-exists_then_copy "<file>" "<location>"
-check_yesno
-get_user_response
-
-
-### TEMPORARY DUPLICATES AND SURGICAL SUPPORTS DURING THE OVERHAUL
-constants.sh -> _R0 and _RET0
-
-
 
 
