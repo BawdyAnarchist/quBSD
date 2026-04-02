@@ -106,25 +106,22 @@ ctx_load_mountpoints() {
 }
 
 # Validation orchestrator for arbitrary set of PARAMS.
-# REQUIRE: $1 (_level) [1 -> assert ; 2 -> config ; 3 -> runtime] and $2 (CELL).
-# OPTIONAL: $3 (_pass) -> which validation.sh error codes to ignore failures and continue
+# REQUIRE: [-l <level>] [1 -> assert ; 2 -> config ; 3 -> runtime].
+# Even _cell ($1) is optional, as most validations do not require _cell
 ctx_validate_params() {
     local _fn="ctx_validate_params" _opts OPTIND OPTARG
-    local _cell _pfx _level _pass _params _type _value _param _validation_function
+    local _cell _pfx _level _pass _params _value _param _validation_function
 
     while getopts :l:p:P: _opts ; do case $_opts in
-        l)  _level="$OPTARG" ;;
-        p)  _pass="$OPTARG" ;;
+        l)  _level="$OPTARG"  ;;
+        p)  _pass="$OPTARG"   ;;
         P)  _params="$OPTARG" ;;     # Specify PARAM list, or use the list from constants.sh
         *)  eval $(THROW 8 _internal1) ;;
     esac ; done ; shift $(( OPTIND - 1 ))
+    _cell=$1 _pfx=$2
 
-    # Internal assignments and sanitization
-    assert_args_set 1 "$1" && _cell=$1 _pfx=$2 || eval $(THROW $?)
+    # Internal sanitization, and _params resolution (fallback to all if no [-P]
     assert_int_comparison -g 1 -l 3 $_level || eval $(THROW 7 _internal2 $_level $_fn)
-
-    _type=$(ctx_get ${_pfx}TYPE)  # Multiple validations use _type as downward-scoped
-    # Assemble PARAM names. $_params isnt global, CAPS distinguishes [:upper:] vs [:lower:] name
     [ -z "$_params" ] && _params="$(ctx_get ${_pfx}PARAMS_TYPE),$CTX_VALIDATE"
 
     for _param in $(echo $_params | tr ',' ' ') ; do
@@ -134,7 +131,7 @@ ctx_validate_params() {
         _validation_function="validate_param_$(conv_to_lower $_param)"
         quiet type $_validation_function || eval $(THROW 6 ${_fn} $_param $_funct)
 
-        # _level _value _cell _pfx _type are downward-scoped to avoid 'param drilling' in validation
+        # _level _value _cell _pfx are downward-scoped to avoid 'param drilling' in validation
         eval $_validation_function || PASS -c $_pass || eval $(THROW $?)
     done
 }
