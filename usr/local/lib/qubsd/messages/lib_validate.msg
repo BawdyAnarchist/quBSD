@@ -7,16 +7,12 @@ Cell < %s > has no config in %s
 Cellname < %s > collides with existing %s < %s >
 /END/
 
-:_cellref:
-Cell < %s > has an invalid %s < %s >
-/END/
-
-:w:_cellref:
-Cell < %s > %s < %s > is an invalid cell
+:_invalid:
+Invalid %s: < %s >
 /END/
 
 :validate_param_cpuset:
-Cell < %s >, invalid cpuset < %s >. `cpuset -g` for list of available CPUs
+Invalid cpuset: < %s >. For a list of available CPUs: cpuset -g
 /END/
 
 :validate_param_ipv4:
@@ -28,7 +24,7 @@ Cell < %s > IPV4 < %s > conflicts with running config of gateway < %s >
 /END/
 
 :w:validate_param_ipv4:
-IPV4 assignment has no effect for VM < %s >. You must modify internal VM config
+IPV4 CIDR assignment has no effect on VMs. You must modify internal VM config
 /END/
 
 :w:validate_param_ipv4_2:
@@ -40,36 +36,27 @@ Failed to find "avail memory" in dmesg.boot. Couldn't validate that cell < %s > 
 /END/
 
 :w:validate_param_maxmem:
-Cell < %s > MAXMEM < %s > (%s bytes)
+MAXMEM < %s > (%s bytes)
 is greater than avail memory < %s bytes >
 /END/
 
 :validate_param_memsize:
-Cell < %s > MEMSIZE < %s > (%s bytes)
+MEMSIZE < %s > (%s bytes)
 is greater than avail memory < %s bytes >
 /END/
 
 :validate_param_mtu:
-Cell < %s > MTU < %s > is outside of IPv4 spec boundaries: %s to %s
+MTU < %s > is outside of IPv4 spec boundaries: %s to %s
 /END/
 
 :w:validate_param_mtu:
-Cell < %s > MTU < %s > is outside of normal boundaries: %s to %s (IPv6 min to jumbo packet normal max)
-/END/
-
-:validate_param_ppt:
-Cell < %s > has invalid PPT < %s >
-/END/
-
-:validate_param_template:
-Cell < %s > CLASS not found. Could not validate TEMPLATE < %s >
+MTU < %s > is outside of normal boundaries: %s to %s (IPv6 min to jumbo packet normal max)
 /END/
 
 :validate_param_vcpus:
-Cell < %s >, invalid VCPUS < %s >
-Must be less than cores on the host < %s >, and less than bhyve limit of 16
+Invalid VCPUS: < %s >.  Must be less than cores on host < %s >, and less than bhyve limit: 16
 /END/
 
 :_missing_zfs:
-Cell < %s > is missing dataset < %s >
+Dataset: < %s > could not be found
 /END/
