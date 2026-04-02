@@ -17,39 +17,35 @@ clear_err() { rm -f $ERR ; return 0 ;}
 
 # Primary error, message, and tracing system
 THROW() {
-    local _code="$1" _msg_code="$2" _trace _msg _args _internal_err
+    local _err_code="$1" _msg_code="$2" _trace _msg _args
 
-    # Return code must always have a positive integer value
-    if echo $_code | grep -Eqs '^[ \t]*[0-9]+[ \t]*$' ; then
-        shift
-    else
-        _internal_err="Internal error: THROW called without return code"
-        _code=9
-    fi
-
-    # Activate stack trace
+    # printf needs "$@". Shift out the control codes. Activate the stack trace
+    [ "$_err_code" ] && shift && [ "$_msg_code" ] && shift
     [ "$TRACE" ] && _trace="[$_fn]"
 
-    # Code in *.msg library must have the form:   :_msg_code:
-    if [ "$_msg_code" ] && [ ! "$_code" = 9 ]; then
+    # _err_code must have a positive integer value. This guarantees `eval` safety on return.
+    ! echo $_err_code | grep -Eqs '^[ \t]*[0-9]+[ \t]*$' \
+        && _err_code=9 && _msg="Internal error: THROW called with missing or invalid error code"
+
+    # Find the message in $MESSAGES. It must be surrounded by colons `:_msg_code:`
+    if [ "$_msg_code" ] && [ ! "$_err_code" = 9 ]; then
         _msg=$(awk -v code=":$_msg_code:" '
             $1 == code { found=1; next }
             found && /^\/END\// { exit }
-            found { print }' $D_QMSG/lib*.msg $D_QMSG/$BASENAME.msg 2>/dev/null)
-        shift
-        # If _msg_code is misformatted and _msg not found, printf errors. Send warning.
-        [ "$_msg" ] || _internal_err="Internal error: Message not found. Check lib_*.msg formatting"
+            found { print }' $MESSAGES 2>/dev/null)
+
+        if [ -z "$_msg" ] ; then
+            _msg="Internal error: Message not found. Check \$MESSAGES"
+        else
+            # The count of '%s' in the $MESSAGE should match the positionals passed to THROW
+            _args=$(echo "$_msg" | awk -F '%s' '{n+=NF-1} END{print n}')
+            [ "$_args" = "$#" ] || _msg="Internal Error: THROW arg_count ($_args) != MESSAGES arg_count ($#)"
+        fi
     fi
 
-    # Record the trace and/or error message to the global ERR file
-    if [ "$_internal_err" ] ; then
-        printf "$_internal_err\n" >> $ERR
-    elif [ "$_trace" ] || [ "$_msg" ] ; then
-        printf "$_trace[$_code]: $_msg\n" "$@" >> $ERR
-    fi
-
-    # This echo gets `eval` on return to caller. $_code was sanitized, so this is safe.
-    echo "return $_code"
+    # Send to $ERR. It's safe for the caller to `eval` the return echo, because it was sanitized
+    printf "$_trace[$_err_code]: $_msg\n" "$@" >> $ERR
+    echo "return $_err_code"
 }
 
 # Warning system writes to the same $ERR file as THROW
