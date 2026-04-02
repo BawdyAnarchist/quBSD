@@ -166,7 +166,7 @@ validate_param_ppt() {
     _value=$(echo $_value | sed "s#/#:#g")
     for _ppt in $_value ; do
         _result=$(hush pciconf -l "pci$_ppt")
-        [ "$_result" ] || eval $(THROW 156 $_fn $_ppt)
+        [ "$_result" ] || eval $(THROW 156 _invalid $_ppt)
     done
     return 0
 }
