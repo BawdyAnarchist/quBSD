@@ -66,7 +66,7 @@ IPaddr: < %s > is CIDR; however, quBSD reserves the '.1' ending for the gateway.
 /END/
 
 :assert_ppt:
-Invalid PPT format < %s >. See `man 4 vmm` for correct pptdevs formatting
+Invalid PPT format < %s >. For correct pptdevs formatting see:  man 4 vmm
 /END/
 
 :assert_time_format:
