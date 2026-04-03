@@ -2,26 +2,31 @@
 
 validate_param_autostart() {
     local _fn="validate_param_autostart"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_bool_tf $_value || eval $(THROW 141)
 }
 
 validate_param_autosnap() {
     local _fn="validate_param_autosnap"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_bool_tf $_value || eval $(THROW 142)
 }
 
 validate_param_backup() {
     local _fn="validate_param_backup"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_bool_tf $_value || eval $(THROW 143)
 }
 
 validate_param_bhyveopts() {
     local _fn="validate_param_bhyveopts"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_bhyveopts $_value || eval $(THROW 144)
 }
 
 validate_param_bhyve_custm() {
     local _fn="validate_param_bhyve_custm"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_bhyve_custm $_value || eval $(THROW 145)
     return 0
 }
@@ -45,6 +50,7 @@ validate_param_control() {
 
 validate_param_cpuset() {
     local _fn="validate_param_cpuset"
+    [ -z "$_value" ] && return 0  # Not critical
     [ "$_value" = "none" ] && return 0  # Must come first or will THROW cpuset
 
     assert_cpuset "$_value" || eval $(THROW 148)
@@ -68,6 +74,7 @@ validate_param_envsync() { ##########  STUB  FOR  NOW  #########################
 validate_param_gateway() {
     local _fn="validate_param_gateway"
 
+    [ -z "$_value" ] && return 0  # Not critical
     [ "$_value" = "none" ] && return 0
 
     assert_cellname "$_value" || eval $(THROW 150)
@@ -81,7 +88,7 @@ validate_param_ipv4() {
     local _fn="validate_param_ipv4" _type _gw _gw_type _cli_confs
 
     case $_value in
-        none|auto|DHCP) return 0 ;;
+        ''|none|auto|DHCP) return 0 ;;
         *) assert_ipv4 $_value || eval $(THROW 151) ;;
     esac
     [ "$_level" -le 1 ] && return 0
@@ -118,6 +125,7 @@ validate_param_jconf() {
 validate_param_maxmem() {
     local _fn="validate_param_maxmem"
 
+    [ -z "$_value" ] && return 0  # Not critical
     [ "$_value" = "none" ] && return 0  # Must come first or will THROW bytesize
 
     assert_bytesize $_value || eval $(THROW 152)
@@ -142,6 +150,7 @@ validate_param_memsize() {
 validate_param_mtu() {
     local _fn="validate_param_mtu"
 
+    [ -z "$_value" ] && return 0  # Not critical
     assert_integer "$_value" || eval $(THROW 154)
     [ "$_level" -le 1 ] && return 0
 
@@ -152,12 +161,14 @@ validate_param_mtu() {
 
 validate_param_no_destroy() {
     local _fn="validate_param_no_destroy"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_bool_tf $_value || eval $(THROW 155)
 }
 
 validate_param_ppt() {
     local _fn="validate_param_ppt"
 
+    [ -z "$_value" ] && return 0  # Not critical
     [ "$_value" = "none" ] && return 0
 
     assert_ppt "$_value" || eval $(THROW 156)
@@ -203,23 +214,26 @@ validate_param_r_zfs() {
 
 validate_param_schg() {
     local _fn="validate_param_schg"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_schg $_value || eval $(THROW 160)
 }
 
 validate_param_seclvl() {
     local _fn="validate_param_seclvl"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_seclvl $_value || eval $(THROW 161)
 }
 
 validate_param_taps() {
     local _fn="validate_param_taps"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_taps $_value || eval $(THROW 162)
 }
 
-# NOTES: _pfx ($3) isnt required, but speeds validation.
 validate_param_template() {
     local _fn="validate_param_template" _class
 
+    [ -z "$_value" ] && return 0  # Not critical
     [ "$_value" = "none" ] && return 0
 
     assert_cellname "$_value" || eval $(THROW 163)
@@ -237,6 +251,7 @@ validate_param_template() {
 
 validate_param_tmux() {
     local _fn="validate_param_tmux"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_bool_tf $_value || eval $(THROW 164)
 }
 
@@ -254,11 +269,13 @@ validate_param_vcpus() {
 
 validate_param_vnc() {
     local _fn="validate_param_vnc"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_bool_tf $_value || eval $(THROW 166)
 }
 
 validate_param_wiremem() {
     local _fn="validate_param_wiremem"
+    [ -z "$_value" ] && return 0  # Not critical
     assert_bool_tf $_value || eval $(THROW 167)
 }
 
