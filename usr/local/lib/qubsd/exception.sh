@@ -43,7 +43,7 @@ THROW() {
     fi
 
     # Include the trace, print to $ERR, and echo the return code command.
-    [ "$TRACE" ] && _msg="[$_fn][$_err_code]: $_msg"
+    { [ -z "${TRACE##TRUE}" ] || [ -z "${TRACE##true}" ] ;} && _msg="[$_fn][$_err_code]: $_msg"
     printf "$_msg\n" "$@" | sed "s/^/  /" >> $ERR
     echo "return $_err_code"  # Safe for caller to `eval` this echo. $_err_code was sanitized
 }
@@ -72,7 +72,7 @@ WARN() {
 }
 
 # Means of ignoring specific error codes. Simultaneous [-c] clear_err $ERR, if desired.
-# Example: my_funct || PASS -c "11 121 242" || eval $(THROW $?)
+# Example: my_funct || PASS -c "11,121,242" || eval $(THROW $?)
 PASS() {
     RC=$?  # Exit code of function in question must be immediate
     [ -z "$1" ] && return $RC  # In some cases, $1 could be blank. Passthru error code in that case
