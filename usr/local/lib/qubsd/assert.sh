@@ -50,7 +50,7 @@ assert_new_cellname() {
 
     # Trigger words that shouldn't be used
     case $_val in
-        none|qubsd) eval $(THROW 16 _invalid2 cellname $_val "Cannot be 'none' or 'qubsd'") ;;
+        none|qubsd|host) eval $(THROW 16 _invalid2 cellname $_val "Cannot be 'none' or 'qubsd'") ;;
     esac
 
     # Jail must start with :alnum: and afterwards, have only _ or - as special chars

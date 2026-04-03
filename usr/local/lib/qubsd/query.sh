@@ -175,7 +175,7 @@ query_cell_shell() {
 query_qconf_cells_and_paths() {
     local _fn="query_qconf_filepaths"
     [ "$CELLS" ] && [ "$CELLS_QPATHS" ] && return 0  # No need to re-query
-    CELLS="$(ls -1 $D_CELLS)"
+    CELLS="$(ls -1 $D_CELLS | grep -v "^host\$")"
     CELLS_QPATHS="$(ls -1 $D_CELLS | sed "s|^|$D_CELLS/|; s| | $D_CELLS/|g")"
 }
 

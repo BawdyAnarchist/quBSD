@@ -135,7 +135,7 @@ manage_composition_loop() {
     # More efficient to run a single loop, than two separate loops for TTL vs DESTROY.
     # We can't trust that all dsets/snaps were queried with `query_zfs_recursive_defaults`.
     # Must loop over all cells. Will grep cached globals, and fallback to zfs when necessary.
-    for _cell in $CELLS ; do
+    for _cell in $CELLS host ; do
 
         # Acquire the dataset data for each cell.
         ctx_bootstrap_cell $_cell $_pfx || continue
