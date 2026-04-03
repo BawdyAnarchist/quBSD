@@ -37,12 +37,12 @@ Failed to find "avail memory" in dmesg.boot. Couldn't validate that cell < %s > 
 
 :w:validate_param_maxmem:
 MAXMEM < %s > (%s bytes)
-is greater than avail memory < %s bytes >
+  is greater than avail memory < %s bytes >
 /END/
 
 :validate_param_memsize:
 MEMSIZE < %s > (%s bytes)
-is greater than avail memory < %s bytes >
+  is greater than avail memory < %s bytes >
 /END/
 
 :validate_param_mtu:

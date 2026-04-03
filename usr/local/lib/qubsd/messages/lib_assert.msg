@@ -33,7 +33,7 @@ PARAM bhyve_custm may contain only the following characters: < a-Z 0-9 -_:,.=+ >
 
 :assert_cellname:
 Invalid cellname < %s >. Must start/end with alpha-numeric.
-May contain '-' or '_', but not consecutively.
+  May contain '-' or '_', but not consecutively.
 /END/
 
 :assert_cpuset:
@@ -58,7 +58,7 @@ Invalid input: < %s >. Integer required.
 
 :assert_ipv4_2:
 IPaddr: < %s > is CIDR; however, quBSD reserves the '.1' ending for the gateway.
-   If you MUST use '.1', then use IPV4="none" , and configure a persistent rc.conf.local
+  If you MUST use '.1', then use IPV4="none" , and configure a persistent rc.conf.local
 /END/
 
 :assert_param:

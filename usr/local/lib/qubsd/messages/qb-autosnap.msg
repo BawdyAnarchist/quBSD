@@ -7,11 +7,6 @@ Must provide a command. [-d] and/or [-s]
 Invalid [-s <time-to-live>]. Must include a TTL for autosnaps
 /END/
 
-::
-There was a problem when attempting to replace an old $U_ZFS clone.
-dataset: < $_clone > ; origin: < $_origin >
-/END/
-
 :w:usage:
 qb-autosnap:  Tool for automated cell dataset snapshots/thinning
 Usage:  qb-autosnap [-d][-s <integer><m|H|D|W|M>]

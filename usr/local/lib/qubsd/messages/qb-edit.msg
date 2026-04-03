@@ -21,7 +21,7 @@ Extra (useless) args provided. Double check your usage
 
 :type:
 Type mismatch. PARAM < %s > is %s, but target file:
-  < %s > is %s
+< %s > is %s
 /END/
 
 :default_invalid:
@@ -33,28 +33,22 @@ CLASS is a hard requirement for each individual cell config.
   Defaults are for convenience, not config/fallback guarantees
 /END/
 
+:host:
+The only modifiable PARAMS for host are: <%s>
+/END/
+
 :delete_nothing:
-PARAM < %s > is already not present in file: %s
+PARAM < %s > is already not present in file:
+  %s
 /END/
 
 :no_change:
 New value is equal to the old
 /END/
 
-
-
-
-
-:param_invalid:
-PARAM < %s > is invalid
-/END/
-
-:param_warn:
-PARAM < %s >. Use [-f] to force dangerous value (will throw on jail launc
-/END/
-
-:defaults_base:
-PARAM < %s > is not part of the allowable defaults.base.conf params
+:ipv4:
+Do not assign a unique CIDR to %s. This will cause networking breakage.
+  IPV4 defaults can only be one of the following:  <none|auto|DHCP>
 /END/
 
 :w:usage:
