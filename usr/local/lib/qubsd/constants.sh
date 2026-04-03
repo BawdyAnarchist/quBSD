@@ -28,9 +28,9 @@ export MESSAGES="$D_QMSG/lib*.msg $D_QMSG/$BASENAME.msg"
 export TRAP="rm -f $ERR"
 export TRAP_SIGS="HUP INT TERM QUIT EXIT"
 export DEBUG="/root/debug"
-: ${VERBOSE:=}     # [true|false] Print commands to console before running them
-: ${DRY_RUN:=}     # [true|false] Do not execute, just print commands to the console
-: ${TRACE:=true}   # [true|false] Show the function trace in error/warning messages
+: ${VERBOSE:=false}  # [true|false] Print commands to console before running them
+: ${DRY_RUN:=false}  # [true|false] Do not execute, just print commands to the console
+: ${TRACE:=true}     # [true|false] Show the function trace in error/warning messages
 
 # Primary qubsd files
 export QCOMMON="$QLIB/common.sh"
@@ -66,6 +66,8 @@ export PARAMS_BASE="AUTOSTART,AUTOSNAP,BACKUP,CLASS,ENVSYNC,GATEWAY,IPV4,MTU,NO_
 export PARAMS_JAIL="CPUSET,DEVFS_RULE,MAXMEM,SCHG,SECLVL"
 export PARAMS_VM="BHYVEOPTS,BHYVE_CUSTM,MEMSIZE,PPT,TAPS,TMUX,VCPUS,VNC,WIREMEM"
 export PARAMS_ALL="$PARAMS_BASE,$PARAMS_JAIL,$PARAMS_VM"
+export PARAMS_HOST="AUTOSNAP,GATEWAY,IPV4,MTU"  # Only modifiable params for "cell" `host'
+export PARAMS_CRIT="BHYVEOPTS,BHYVE_CUSTM,CLASS,CPUSET,DEVFS_RULE,GATEWAY,IPV4,MAXMEM,MEMSIZE,MTU,P_ZFS,R_ZFS,ROOTENV,SCHG,SECLVL,TEMPLATE"
 export PARAMS_EXCL_DEFAULT="CLASS,PPT,TEMPLATE"
 export CONTEXT="CALLER,JCONF,QCONF,P_DSET,P_MNT,R_DSET,R_MNT,RT_CTX"   # Convenient context paths
 export CTX_VALIDATE="JCONF,P_DSET,R_DSET"     # Necessary validations in addition to PARAMS_
