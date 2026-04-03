@@ -73,10 +73,10 @@ main() {
     execute_commands "$_COMMANDS" || eval $(THROW $?)
 
     # Successful completion of all tasks. Keep RT_CTX by removing it from the trap stack
-    [ "$CALLER" = "exec" ] && [ -z "$DRY_RUN" ] && trap_pop
+    [ "$CALLER" = "exec" ] && ! echo_grep "$DRY_RUN" '(true|TRUE)' && trap_pop
 
     return 0
 }
 
-main || FATAL 
+main || FATAL
 exit 0   # Guarantee that `jail` does not abort startup
