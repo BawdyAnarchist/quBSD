@@ -129,7 +129,7 @@ ctx_validate_params() {
         eval  _value="\${${_pfx}$_param}"
 
         _validation_function="validate_param_$(conv_to_lower $_param)"
-        quiet type $_validation_function || eval $(THROW 6 ${_fn} $_param $_funct)
+        quiet type $_validation_function || eval $(THROW 6 $_fn $_param $_funct)
 
         # _level _value _cell _pfx are downward-scoped to avoid 'param drilling' in validation
         eval $_validation_function || PASS -c $_pass || eval $(THROW $?)
