@@ -4,6 +4,12 @@ execute_commands() {
     local _func="execute_commands" _commands _cmd
     assert_args_set 1 "$1" && _commands="$1"
 
+    # Sanitize execution globals to ensure against user typos like 'fals'
+    [ "$DRY_RUN" ] && ! echo_grep -q "$DRY_RUN" '(true|TRUE|false|FALSE)' \
+        && echo "DRY_RUN must be <true|false>" && exit 1
+    [ "$VERBOSE" ] && ! echo_grep -q "$VERBOSE" '(true|TRUE|false|FALSE)' \
+        && echo "DRY_RUN must be <true|false>" && exit 1
+
     # Simple loop over all passed commands
     for _command in $_commands ; do
         _cmd=$(ctx_get $_command)
@@ -24,11 +30,7 @@ exec_cmd() {
             printf " # %s\n" "$_cmd" >&2
             eval "$_cmd"
             ;;
-        '::') eval "$_cmd"
-            ;;
-        *)  echo "EXEC_MOD < $EXEC_MOD > global variable invalid. May only be [verbose|dry_run]"
-            exit 1   # Do not allow misconfiguration over exec at runtime
-            ;;
+        *)  eval "$_cmd" ;;
     esac
 }
 
