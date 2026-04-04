@@ -65,7 +65,7 @@ validate_param_devfs_rule() {
     assert_devfs_rule $_value || eval $(THROW $? _invalid $_param $_value)
     [ "$_level" -le 1 ] && return 0
 
-    grep -Eqs "^\[.*=$_value\]" || eval $(THROW 171 $_fn $_param $_value $DEVFS)
+    grep -Eqs "^\[.*=$_value\]" $DEVFS || eval $(THROW 171 $_fn $_param $_value $DEVFS)
 
     return 0
 }
@@ -189,12 +189,20 @@ validate_param_ppt() {
 
 validate_param_p_dset() {
     local _fn="validate_param_p_dset"
-    validate_dataset_generic || eval $(THROW $? _invalid $_param $_value)
+
+    assert_dataset_name $_value || eval $(THROW $? _invalid $_param $_value)
+    [ "$_level" -le 1 ] && return 0
+
+    is_zfs_exist "$_value" || eval $(THROW 170 _missing_zfs $_value)
 }
 
 validate_param_p_zfs() {
     local _fn="validate_param_p_zfs"
-    validate_dataset_generic || eval $(THROW $? _invalid $_param $_value)
+
+    assert_dataset_name $_value || eval $(THROW $? _invalid $_param $_value)
+    [ "$_level" -le 1 ] && return 0
+
+    is_zfs_exist "$_value" || eval $(THROW 170 _missing_zfs $_value)
 }
 
 validate_param_rootenv() {
@@ -209,12 +217,20 @@ validate_param_rootenv() {
 
 validate_param_r_dset() {
     local _fn="validate_param_r_dset"
-    validate_dataset_generic || eval $(THROW $? _invalid $_param $_value)
+
+    assert_dataset_name $_value || eval $(THROW $? _invalid $_param $_value)
+    [ "$_level" -le 1 ] && return 0
+
+    is_zfs_exist "$_value" || eval $(THROW 169 _missing_zfs $_value)
 }
 
 validate_param_r_zfs() {
     local _fn="validate_param_r_zfs"
-    validate_dataset_generic || eval $(THROW $? _invalid $_param $_value)
+
+    assert_dataset_name $_value || eval $(THROW $? _invalid $_param $_value)
+    [ "$_level" -le 1 ] && return 0
+
+    is_zfs_exist "$_value" || eval $(THROW 169 _missing_zfs $_value)
 }
 
 validate_param_schg() {
@@ -285,16 +301,6 @@ validate_param_wiremem() {
 }
 
 ########################################  MISC VALIDATIONS  ########################################
-
-validate_dataset_generic() {
-    local _fn="validate_dataset_generic"
-
-    assert_dataset_name $_value || eval $(THROW $?)
-    [ "$_level" -le 1 ] && return 0
-
-    is_zfs_exist "$_value" || eval $(THROW $? missing_zfs $_value)
-    return 0
-}
 
 validate_cellname() {
     local _fn="validate_cellname" _value="$1"

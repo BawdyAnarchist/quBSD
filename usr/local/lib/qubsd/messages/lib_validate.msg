@@ -3,6 +3,10 @@
 Parameter: < %s > has invalid value: < %s >
 /END/
 
+:_missing_zfs:
+Dataset: < %s > could not be found
+/END/
+
 :validate_cellname:
 Cell < %s > has no config in %s
 /END/
@@ -58,6 +62,3 @@ MTU < %s > is outside of normal boundaries: %s to %s (IPv6 min to jumbo packet n
 Invalid %s: < %s >.  Must be less than cores on host (%s), and less than bhyve limit (16)
 /END/
 
-:missing_zfs:
-Dataset: < %s > could not be found
-/END/
