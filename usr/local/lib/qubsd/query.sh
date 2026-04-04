@@ -83,18 +83,28 @@ query_user_continue() {
 
 ########################################  GET CELL CONFIG  #########################################
 
+# Simple function for grepping the PARAM="..." convention in config files
+query_file_param() {
+    local _fn="query_file_param" _param _file _val
+    assert_args_set 2 "$1" "$2" && _param="$1" _file="$2" || eval $(THROW $?)
+
+    _val=$(sed -En "s/^[ \t]*$_param=\"(.*)\"[ \t]*/\1/p" $_file)
+    [ "$_val" ] && echo $_val && return 0
+    return 1
+}
+
 # Return [JAIL|VM] based on $1 CLASS. Bootstraps parameter sourcing
 query_cell_type() {
     local _fn="query_cell_type" _cell _type
     assert_args_set 1 "$1" && _cell="$1" || eval $(THROW $?)
-    is_path_exist -f $D_CELLS/$_cell || eval $(THROW 112 $_fn $_cell $D_CELLS)
+    is_path_exist -f $D_CELLS/$_cell || eval $(THROW 112 $_fn "$_cell" "$D_CELLS")
 
     # This function is used for bootstrap. Do not rely on external functions, direct `sed`
     _type=$(sed -En "s/CLASS=\"(.*)\"/\1/p" $D_CELLS/$_cell)
     case $_type in
         *jail) echo "JAIL" ;;
         *VM) echo "VM" ;;
-        *) eval $(THROW 18 ${_fn}2 $_cell $_type) ;;
+        *) eval $(THROW 18 ${_fn}2 "$_cell") ;;
     esac
 
     return 0
@@ -115,16 +125,7 @@ query_cell_param() {
     query_file_param $_param $_def_base && return 0
 
     # Failed to find a value for the parameter
-    eval $(THROW 131 ${_fn} $_param $_cell)
-}
-
-query_file_param() {
-    local _fn="query_file_param" _param _file _val
-    assert_args_set 2 "$1" "$2" && _param="$1" _file="$2" || eval $(THROW $?)
-
-    _val=$(sed -En "s/^[ \t]*$_param=\"(.*)\"[ \t]*/\1/p" $_file)
-    [ "$_val" ] && echo $_val && return 0
-    return 1
+    eval $(THROW 131 ${_fn} "$_param" "$_cell")
 }
 
 # Takes $1 PARAM and returns base|jail|vm, depending on where the highest level default lies
@@ -245,12 +246,12 @@ query_zfs_recursive_defaults() {
     local _fn="query_datasets_recursive_defaults" _dsets _snaps
     [ "$1" = "-s" ] && _snaps_only='true'
 
-    _dsets=$(query_file_param "R_ZFS" $DEF_BASE \
-            ;query_file_param "P_ZFS" $DEF_BASE \
-            ;query_file_param "R_ZFS" $DEF_JAIL \
-            ;query_file_param "P_ZFS" $DEF_JAIL \
-            ;query_file_param "R_ZFS" $DEF_VM   \
-            ;query_file_param "P_ZFS" $DEF_VM)
+    _dsets=$(query_file_param R_ZFS $DEF_BASE \
+            ;query_file_param P_ZFS $DEF_BASE \
+            ;query_file_param R_ZFS $DEF_JAIL \
+            ;query_file_param P_ZFS $DEF_JAIL \
+            ;query_file_param R_ZFS $DEF_VM   \
+            ;query_file_param P_ZFS $DEF_VM)
     _dsets=$(echo "$_dsets" | sort | uniq)
 
     if [ -z "$_snaps_only" ] ; then
