@@ -1,4 +1,8 @@
 
+:_invalid:
+Parameter: < %s > has invalid value: < %s >
+/END/
+
 :validate_cellname:
 Cell < %s > has no config in %s
 /END/
@@ -7,12 +11,13 @@ Cell < %s > has no config in %s
 Cellname < %s > collides with existing %s < %s >
 /END/
 
-:_invalid:
-Invalid %s: < %s >
+:validate_param_cpuset:
+Invalid %s: < %s >. One or more listed cores was not found.
+  For a list of available CPUs run: cpuset -g
 /END/
 
-:validate_param_cpuset:
-Invalid cpuset: < %s >. For a list of available CPUs: cpuset -g
+:validate_param_devfs_rule:
+Invalid %s. Rule number < %s > was not found in %s
 /END/
 
 :validate_param_ipv4:
@@ -32,13 +37,13 @@ Cell < %s > IPV4 < %s > conflicts with running config of gateway < %s >
 /END/
 
 :validate_param_maxmem:
-MAXMEM < %s > (%s bytes)
-  is greater than avail memory < %s bytes >
+< %s > (%s < %s >) is greater than avail memory:
+  %s
 /END/
 
 :validate_param_memsize:
-MEMSIZE < %s > (%s bytes)
-  is greater than avail memory < %s bytes >
+< %s > (%s < %s >) is greater than avail memory:
+  %s
 /END/
 
 :validate_param_mtu:
@@ -50,7 +55,7 @@ MTU < %s > is outside of normal boundaries: %s to %s (IPv6 min to jumbo packet n
 /END/
 
 :validate_param_vcpus:
-Invalid VCPUS: < %s >.  Must be less than cores on host < %s >, and less than bhyve limit: 16
+Invalid %s: < %s >.  Must be less than cores on host (%s), and less than bhyve limit (16)
 /END/
 
 :missing_zfs:
