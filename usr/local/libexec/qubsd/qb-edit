@@ -1,23 +1,14 @@
 #!/bin/sh
 
-# quBSD model is sane defaults, easy correct paths, warn when dangerous. Thus, qb-edit sanitizes/
-# THROWs bad input syntax, but only warns for bad config/topology. It does not provide default
-# fallback guarantees for missing PARAMS. It would only be a false sense of security fallback
-# anyways. However, qb-edit does warn when a deleted PARAM results in a cell with a missing PARAM.
-
-
-### UNFINISHED WORK ###
-# Add PARAM specific running-jail changes
-# Add restarts where running-jail cant be changed
-# devfs_rules change in the jconfs
-# if [ $CELL ] ; then level2 (or 3?) validate full config after change and report it
-# if [ $DELETE $DEFAULT ] ; then provide list of cells that no longer have a resolved value for that deleted PARAM
-# PPT is unique in that, it could have a VALUE to be deleted, in which case surgery should be performed
+# quBSD model is sane defaults, warn when dangerous, but preserve user control. Thus, qb-edit
+# THROWs on bad input syntax, but only warns for bad config/topology. It does not provide default
+# fallback guarantees for missing PARAMS. It'd only be a false sense of security fallback anyways.
+# However, qb-edit does warn when a deleted PARAM results in ctx_load_param with missing PARAM.
 
 . $QCOMMON
 
 trap_init
-
+#DRY_RUN=true
 parse_args() {
     local _fn="parse_args" _opts OPTARG OPTIND
     while getopts c:d:Dhp: _opts ; do case $_opts in
@@ -32,44 +23,51 @@ parse_args() {
     # Resolve user input assignments. Continuously shift so the next assignment is always in $1
     [ -z "$CELL" ] && [ -z "$DEFAULT" ] && [ "$1" ] && CELL="$1" && shift
     [ -z "$PARAM" ] && [ "$1" ] && PARAM="$1" && shift
-    [ -z "$DELETE" ] && [ "$1" ] && VALUE="$1" && shift
+    [ "$1" ] && VALUE="$1" && shift
 
     # Final checks on raw user options/args
+    [ "$1" ] && eval $(THROW 4 extra_args)  # No args should remain. If there are assume user error
     [ "$CELL" ] || [ "$DEFAULT" ] || eval $(THROW 4 cell_missing)
     [ "$PARAM" ] || eval $(THROW 4 param_missing)
     [ -z "$DELETE" ] && [ -z "$VALUE" ] && eval $(THROW 4 value_missing $PARAM)
-    [ "$1" ] && eval $(THROW 4 extra_args)  # No args should remain. If there are assume user error
 
     # Sanitize CELL/DEFAULT
     if [ "$CELL" ] && [ "$DEFAULT" ] ; then
         eval $(THROW 4 mutual_exclusive)           # Cant be both CELL and DEFAULT
+    elif [ "$CELL" = "host" ] ; then
+        # Host is special case. Has file in $D_CELLS, but a small set of modifiable params
+        echo_grep -qd , "$PARAMS_HOST" "$PARAM" || eval $(THROW 4 host $PARAMS_HOST)
+        FILE=$D_CELLS/$CELL
     elif [ "$CELL" ] ; then
         assert_cellname $CELL || eval $(THROW $?)  # Sanitize user input
         TYPE=$(query_cell_type $CELL)              # Needed later for PARAM sanitization
         FILE=$D_CELLS/$CELL                        # CELL file to operate on
     elif [ "$DEFAULT" ] ; then
         assert_ptype $DEFAULT || eval $(THROW $?)  # Sanitize user input
-        DTYPE=$(conv_to_upper $DEFAULT)            # Needed later for PARAM sanitization
-        FILE=$D_QCONF/defaults.$(conv_to_lower $DTYPE).conf  # Defaults file to operate on
+        TYPE=$(conv_to_upper $DEFAULT)             # Needed later for PARAM sanitization
+        FILE=$D_QCONF/defaults.$(conv_to_lower $TYPE).conf  # Defaults file to operate on
     fi
 
     # Sanitize PARAM
     PARAM=$(conv_to_upper "$PARAM")  # Standardize user input (user-friendly :upper/lower: input)
+    assert_param $PARAM || eval $(THROW $?)        # Sanitize user input
     PTYPE=$(conv_to_upper $(query_param_type $PARAM))
-    _type="${TYPE}$DTYPE"            # PTYPE=BASE can go anywhere. Otherwise types must align
     case $PTYPE in
-        JAIL) [ "$_type" = "JAIL" ] || eval $(THROW 4 type $PARAM $PTYPE $FILE $_type) ;;
-        VM)   [ "$_type" = "VM" ]   || eval $(THROW 4 type $PARAM $PTYPE $FILE $_type) ;;
+        JAIL) [ "$TYPE" = "JAIL" ] || eval $(THROW 4 type $PARAM $PTYPE ${FILE##*/} $TYPE) ;;
+        VM)   [ "$TYPE" = "VM" ]   || eval $(THROW 4 type $PARAM $PTYPE ${FILE##*/} $TYPE) ;;
     esac
     # Certain PARAMS are excluded from being defaults, either for safety or sensibility
     [ "$DEFAULT" ] && echo_grep -qd , "$PARAMS_EXCL_DEFAULT" "$PARAM" \
         && eval $(THROW 4 default_invalid $PARAM)
 
     # CLASS is a hard CELL requirement. Defaults are for convenience, not config/fallback guarantees
-    [ "$DELETE" ] && [ "$CELL" ] && [ "$PARAM" = "CLASS" ] && eval $(THROW 4 delete_class)
-
-    # Provide syntax assertion (level 1) that user-input PARAM is valid
-    ctx_validate_params -l 1 -P $PARAM || eval $(THROW $?)
+    if [ "$DELETE" ] ; then
+        [ "$CELL" ] && [ "$PARAM" = "CLASS" ] && eval $(THROW 4 delete_class)
+    else
+        # Basic syntax validation of user inputs. Save the higher level checks for later
+        eval $PARAM=\"$VALUE\"
+        ctx_validate_params -l 1 -P $PARAM || eval $(THROW $?)  # Syntax validation
+    fi
 
     return 0
 }
@@ -77,48 +75,90 @@ parse_args() {
 # Repeat commands. DEL/ADD avoids potential syntax pollution inherent to sed search-and-replace.
 _compose_del_param() {
     local _fn="compose_cmd_helper"
-    _CMD_DEL="sed -i '' -E \"/^$PARAM=/d\" $1"
+    _CMD_DEL="sed -i '' -E \"/^$PARAM=/d\" $FILE"
     return 0
 }
 _compose_add_param() {
     local _fn="compose_cmd_helper" _tmpfile
     make_tmp _tmpfile
-    _CMD_ADD="{ cat $1 ; echo $PARAM=\"$VALUE\" ;} | sort > $_tmpfile && mv $_tmpfile $1"
+    _CMD_ADD="{ cat $FILE ; echo $PARAM=\\\"$VALUE\\\" ;} | sort > $_tmpfile && mv $_tmpfile $FILE"
     return 0
 }
-_compose_warnings_cmd() {
-    local _fn="compose_warnings_cmd" _warnings
-    _warnings=$(cat $ERR)
-    clear_err
-    _CMD_WARNINGS="echo \"WARNING: Potential issues due to changes\" ; echo \"$_warnings\"")
+# Putting this sed command into a variable would be escape-char hell. Offload to function
+_CMD_jconf_mod() {
+    sed -i '' -E "/^[[:blank:]]*$CELL[[:blank:]]*\{/a\\
+	devfs_ruleset=\"$VALUE\"" $D_JAILS/$CELL   # Leading tab here is literal. Do not change
 }
 
-conduct_cells_param_reassessment() {
-    local _fn="conduct_cells_param_reassessment"
+conduct_cells_reassessment() {
+    local _fn="conduct_cells_param_reassessment" _cells
 
+    [ -z "$CELL" ] && query_qconf_cells_and_paths   # Load global: CELLS
+
+    # Either CELL or CELLS will be true, but not both
+    for _cell in ${CELL} $CELLS ; do
+        ctx_load_params $_cell
+        ctx_validate_params -l 1 -P $PARAM $_cell \
+            || _badcells=$(printf "%b" "  $_cell\n$_badcells" | sed '/^$/d')
+    done
+
+    [ "$_badcells" ] && clear_err && _CMD_WARN=" \
+        echo WARNING: Changed defaults.$TYPE.conf, but the following cells have config problems: ;
+        echo \"$_badcells\""
+    return 0
 }
 
-_compose
-
+# Due to the extensive checks in parse_args,
 compose_cmds() {
-    local _fn="compose_cmds" _pfx=old_
+    local _fn="compose_cmds" _old_val _pfx=old_
+
+    # Relevant, or potentially relevant variables
+    ctx_load_file $FILE $_pfx
+    _old_val=$(ctx_get ${_pfx}$PARAM)
 
     # Deletion is simplest, start here
     if [ "$DELETE" ] ; then
-        grep -Eqs "^$PARAM=" $FILE || eval $(THROW 4 delete_nothing)
-        _compose_del_param $FILE
-        [ "$DEFAULT" ] && _conduct_cells_param_reassessment
+        # Check that there's something to delete, or inform the user if not
+        grep -Eqs "^$PARAM=" $FILE || eval $(THROW 4 delete_nothing $PARAM $FILE)
+
+        # PPT could have multiple values. If user gave VALUE, only delete that one, keep the others
+        if [ "$PARAM" = "PPT" ] && [ "$VALUE" ] ; then
+            _old_val="$(ctx_get ${_pfx}PPT)"
+            VALUE=$(echo "$_old_val" | sed -E "s|[ ]*$VALUE[ ]*||")
+            [ "$VALUE" ] && _compose_add_param
+        fi
+
+        _compose_del_param
+        _CMD_REASSESS="conduct_cells_reassessment"
         return 0
     fi
 
-    # Provide final checks and warnings
-    ctx_load_file $FILE $_pfx
-    _old_val=$(ctx_get ${_pfx}$PARAM)
+    # Final check, and possible warning. `hush` due to possibly invalid cell (filename) being passed
     [ "$_old_val" = "$VALUE" ] && eval $(THROW 4 no_change)
-    ctx_validate_params -l 2 -P $PARAM $VALUE || _compose_warning_cmd
+    hush ctx_validate_params -l 3 -P $PARAM $CELL
 
-    _compose_del_param $FILE
-    _compose_add_param $FILE
+    # PARAMS that require special handling.
+    case $PARAM in
+        IPV4) #(none|auto|DHCP) are fine for defaults. But unique CIDR should not be a default
+            [ "$DEFAULT" ] && clear_err && eval $(THROW 4 ipv4 ${FILE##*/})
+            ;;
+        PPT) [ "$_old_val" ] && VALUE="$_old_val $VALUE" ;;  # If pre-existing PPT, just += $VALUE
+        DEVFS_RULE)
+            _CMD_JCONF_DEL="sed -i '' -E \"/.*devfs_ruleset=/d\" $D_JAILS/$CELL"
+            _CMD_JCONF_ADD="_CMD_jconf_mod"
+            ;;
+    esac
+
+    # Modify the QCONF
+    _compose_del_param
+    _compose_add_param
+
+    # If modifying defaults,
+    if is_path_exist -s $ERR ; then
+        [ "$DEFAULTS" ] && _CMD_REASSESS="conduct_cells_reassessment"
+        _CMD_WARN="echo WARNING: Change complete, but there are config issues with the new value ; cat $ERR"
+    fi
+    return 0
 }
 
 main() {
@@ -127,7 +167,7 @@ main() {
     parse_args "$@"  || eval $(THROW $?)
     compose_cmds     || eval $(THROW $?)
 
-    _COMMANDS="_CMD_DEL _CMD_ADD"
+    _COMMANDS="_CMD_DEL _CMD_ADD _CMD_JCONF_DEL _CMD_JCONF_ADD _CMD_REASSESS _CMD_WARN"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
 }
 
