@@ -7,16 +7,18 @@
 < %s > doesnt exist in %s
 /END/
 
-:w:usage:
+:usage:
 
 qb list: List parameters or datasets associated with a cell
 
 Usage:
   qb list [-z] [-c <cell>] [-p <param>]
   qb list [-s][-z] [-c <cell>]
+
+  # Can also be used without [-c] or [-p]
   qb list <cell>
+  qb list <param>
   qb list <cell> <param>
-  # Will generally work without [-c][-p]
 
   -h: (h)elp: Outputs this help message
   -c: (c)ell: Show settings for <cell>

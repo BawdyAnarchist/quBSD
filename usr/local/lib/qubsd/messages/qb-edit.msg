@@ -1,4 +1,8 @@
 
+:extra_args:
+Extra (useless) args provided. Double check your usage
+/END/
+
 :cell_missing:
 Must provide either [-c <cell>] or [-d <base|jail|VM>] default file to act upon
 /END/
@@ -15,13 +19,12 @@ Must provide a <VALUE> for %s
 [-d] and [-c] are mutually exclusive. Either modify the defaults, or modify a cell
 /END/
 
-:extra_args:
-Extra (useless) args provided. Double check your usage
+:host:
+The only modifiable PARAMS for host are: <%s>
 /END/
 
 :type:
-Type mismatch. PARAM < %s > is %s, but target file:
-< %s > is %s
+Type mismatch. PARAM < %s > is for %s, but target < %s > is a %s
 /END/
 
 :default_invalid:
@@ -31,10 +34,6 @@ Type mismatch. PARAM < %s > is %s, but target file:
 :delete_class:
 CLASS is a hard requirement for each individual cell config.
   Defaults are for convenience, not config/fallback guarantees
-/END/
-
-:host:
-The only modifiable PARAMS for host are: <%s>
 /END/
 
 :delete_nothing:
@@ -51,21 +50,20 @@ Do not assign a unique CIDR to %s. This will cause networking breakage.
   IPV4 defaults can only be one of the following:  <none|auto|DHCP>
 /END/
 
-:w:usage:
+:usage:
 
-qb list: List parameters of a cell
+qb edit: Edit the parameters of a cell, or defaults files
 
 Usage:
-  qb edit [-z] [-c <cell>] [-p <param>]
-  qb edit [-s][-z] [-c <cell>]
-  qb edit <cell>
-  qb edit <cell> <param>
-  # Will generally work without [-c][-p]
+  qb edit [-c <cell>|-d <base|jail|vm>] [-D] [-p <param>] <value>
 
+  # Can generally use positionals instead of options. In this order:
+  qb edit [-D] [-d <base|jail|vm>]|<cell> <param> <value>
+
+  -c: (c)ell: Cell to edit. Mutually exclusive with [-d]
+  -d: (d)efault: Default file to change <base|jail|vm>
+  -D: (D)elete: Remove the specified <param> from <cell>|<default>
+      Specify <value> to delete only that. Othewise entirely removed
   -h: (h)elp: Outputs this help message
-  -c: (c)ell: Show settings for <cell>
-  -p: (p)aram: Show values for all cells of <param>
-  -s: (s)napshots: Show zfs snapshots for <cell>. This will
-      suppress bulk params, and print only snapshots.
-  -z: (z)fs: Show zfs datasets for <cell>
+  -p: (p)aram: Parameter to operate on
 /END/

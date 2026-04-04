@@ -51,24 +51,27 @@ THROW() {
 # Warning system writes to the same $ERR file as THROW
 WARN() {
     local _msg_code="$1" _msg _trace
+    [ "$_msg_code" ] && shift  # printf needs "$@". Shift out the control codes.
 
-    # Activate stack trace
-    [ "$TRACE" ] && _trace="[ $_fn ]"
-
-    # Warning code in *.msg libs must have the form:  :w:_msg_code:
+    # Find the message in $MESSAGES. It must be surrounded by colons `:_msg_code:`
     if [ "$_msg_code" ] ; then
-        _msg=$(awk -v code=":w:$_msg_code:" '
+        _msg=$(awk -v code=":$_msg_code:" '
             $1 == code { found=1; next }
             found && /^\/END\// { exit }
             found { print }' $D_QMSG/lib*.msg $D_QMSG/$BASENAME.msg 2>/dev/null)
-        shift
-        # If _msg_code is misformatted and _msg not found, printf errors. Send warning.
-        [ "$_msg" ] || _msg="Warn message not found. Check lib_*.msg formatting"
+
+        if [ -z "$_msg" ] ; then
+            _msg="Internal error: Message not found. Check \$MESSAGES"
+        else
+            # The count of '%s' in the $MESSAGE should match the positionals passed to THROW
+            _args=$(echo "$_msg" | awk -F '%s' '{n+=NF-1} END{print n}')
+            [ "$_args" = "$#" ] || _msg="Internal Error: THROW arg_count ($_args) != MESSAGES arg_count ($#)"
+        fi
     fi
 
-    if [ "$_trace" ] || [ "$_msg" ] ; then
-        printf "$_trace $_msg\n" "$@" >> $ERR
-    fi
+    # Include the trace, print to $ERR, and indicate [0] (no error)
+    { [ -z "${TRACE##TRUE}" ] || [ -z "${TRACE##true}" ] ;} && _msg="[$_fn][0]: $_msg"
+    [ "$_msg" ] && printf "$_msg\n" "$@" | sed "s/^/  /" >> $ERR
 }
 
 # Means of ignoring specific error codes. Simultaneous [-c] clear_err $ERR, if desired.

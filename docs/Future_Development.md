@@ -3,6 +3,9 @@
 
 qb-edit
 
+qb-list
+  - something i did for qb-edit broke qb-list
+
 ### Import things in the code as I overhaul that still need addressed
 exec.postart
   - "hacky exception to schg due to resolv and resolvconf"

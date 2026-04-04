@@ -78,10 +78,9 @@ validate_param_gateway() {
     [ "$_value" = "none" ] && return 0
 
     assert_cellname "$_value" || eval $(THROW 150)
+    [ "$_level" -le 1 ] && return 0
 
-#COMMENTING THIS FOR NOW. Not sure if gateway problems should prevent a jail start.
-#[ "$_level" -le 1 ] && return 0
-#ctx_bootstrap_cell $_value "val_" || eval $(THROW 150 invalid GATEWAY $_value)
+    ctx_bootstrap_cell $_value "val_" || eval $(WARN _invalid GATEWAY $_value)
 }
 
 validate_param_ipv4() {
@@ -106,12 +105,12 @@ validate_param_ipv4() {
     [ "$_gw" = "none" ] && return 0   # Nothing further to check
     [ "$_gw_type" = "VM" ] && eval $(WARN ${_fn}_2 $_gw) # VM-gw normally has DHCP (but not always)
     [ "$_cli_confs" ] && grep -Eqs "$_value" $_cli_confs \
-        && eval $(THROW ${_fn} "$_cell" $_value $_gw)  # Direct config collision
+        && eval $(THROW ${_fn}_3 "$_cell" $_value $_gw)  # Direct config collision
     [ "$_level" -le 2 ] && return 0
 
     # Runtime collisions
     if is_cell_running $_gw ; then
-        is_route_available $_gw $_value || eval $(THROW 151 ${_fn}_2 "$_cell" $_value $_gw)
+        is_route_available $_gw $_value || eval $(THROW 151 ${_fn}_4 "$_cell" $_value $_gw)
     fi
 }
 
@@ -144,7 +143,7 @@ validate_param_memsize() {
 
     query_sysmem
     _bytes=$(normalize_bytesize $_value)
-    assert_int_comparison -l "$SYSMEM" -- $_bytes || eval $(WARN $_fn $_value $_bytes $SYSMEM)
+    assert_int_comparison -l "$SYSMEM" -- $_bytes || eval $(THROW 153 $_fn $_value $_bytes $SYSMEM)
 }
 
 validate_param_mtu() {
@@ -156,7 +155,7 @@ validate_param_mtu() {
 
     # THROW for IPv4 spec violations. WARN for IPv6 spec violation and > typical jumbo packet size
     assert_int_comparison -g 68 -l 65535 -- "$_value" || eval $(THROW 154 $_fn $_value 68 65535)
-    assert_int_comparison -g 1280 -l 9000 -- "$_value" || eval $(WARN $_fn $_value 1280 9000)
+    assert_int_comparison -g 1280 -l 9000 -- "$_value" || eval $(WARN ${_fn}_2 $_value 1280 9000)
 }
 
 validate_param_no_destroy() {
@@ -287,7 +286,7 @@ validate_dataset_generic() {
     assert_dataset_name $_value || eval $(THROW $?)
     [ "$_level" -le 1 ] && return 0
 
-    is_zfs_exist "$_value" || eval $(THROW $? _missing_zfs $_value)
+    is_zfs_exist "$_value" || eval $(THROW $? missing_zfs $_value)
     return 0
 }
 
