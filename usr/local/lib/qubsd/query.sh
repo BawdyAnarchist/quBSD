@@ -67,16 +67,16 @@ is_needpop() {
     ! ps -p $$ -o state | grep -qs -- '+' && pgrep -fq Xorg && return 0 || return 2
 }
 
-# return 0 for "Y/y". Optional $1=`severe` for a hard-typed `yes` required from the user
-is_user_response() {
+# Query the user for continuation. Optional $1='-s' to require a hard-type `yes' to continue
+query_user_continue() {
     local _fn="query_user_response" _response
+    [ "$1" ] && [ ! "$1" = '-s' ] && eval $(THROW _internal2 $1 $_fn)
 
+    printf "%b" "    CONTINUE? (Y/n): "
     read _response
-    _response=$(conv_to_lower "$_response")
-
     case "$1:$_response" in
-        severe:yes) return 0 ;; # Positional param `severe` requires full `yes'
-        :y|:yes) return 0 ;;
+        '-s':yes|'-s':YES) return 0 ;;
+        :y|:yes|:Y|:YES) return 0 ;;
         *) return 2 ;;
     esac
 }
