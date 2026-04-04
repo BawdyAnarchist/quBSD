@@ -62,7 +62,7 @@ IPaddr: < %s > is CIDR; however, quBSD reserves the '.1' ending for the gateway.
 /END/
 
 :assert_param:
-< %s > is not a valid tunable qubsd PARAMETER
+< %s > is not a valid tunable PARAMETER
 /END/
 
 :assert_ppt:
