@@ -1,7 +1,9 @@
 
 ### Next up
 
+
 qb-edit
+  - conduct_cells_reassessment should be done before the config change, and THROW/warn
 
 qb-list
   - something i did for qb-edit broke qb-list
