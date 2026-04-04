@@ -44,7 +44,7 @@ THROW() {
 
     # Include the trace, print to $ERR, and echo the return code command.
     { [ -z "${TRACE##TRUE}" ] || [ -z "${TRACE##true}" ] ;} && _msg="[$_fn][$_err_code]: $_msg"
-    printf "$_msg\n" "$@" | sed "s/^/  /" >> $ERR
+    [ "$_msg" ] && printf "$_msg\n" "$@" | sed "s/^/  /" >> $ERR
     echo "return $_err_code"  # Safe for caller to `eval` this echo. $_err_code was sanitized
 }
 
