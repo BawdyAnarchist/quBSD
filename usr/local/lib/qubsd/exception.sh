@@ -89,7 +89,7 @@ PASS() {
 
 FATAL() {
     local _exit=$?
-    [ -f "$ERR" ] && cat $ERR
+    [ -z "$QUIET" ] && [ -f "$ERR" ] && cat $ERR
     exit $_exit
 }
 
