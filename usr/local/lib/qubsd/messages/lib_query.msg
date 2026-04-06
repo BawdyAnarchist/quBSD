@@ -4,7 +4,7 @@ Cell < %s > has no config file in < %s >
 /END/
 
 :query_cell_type2:
-Cell < %s > has invalid CLASS < %s >
+Cell < %s > has invalid CLASS
 /END/
 
 :query_cell_param:
