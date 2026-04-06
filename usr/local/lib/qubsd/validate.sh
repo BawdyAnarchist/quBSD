@@ -103,13 +103,13 @@ validate_param_ipv4() {
     # Jails only. Pull relevant gateway information required for config/runtime guarantees
     _gw=$(query_cell_param "$_cell" GATEWAY) || eval $(THROW 151 _invalid $_param $_value)
     _gw_type=$(query_cell_type $_gw) || eval $(THROW 151 _invalid $_param $_value)
-    _cli_confs=$(query_gw_client_configs $_gw)
+    _cli_confs=$(query_gw_client_configs $_gw | sed -E "s|$D_CELLS/$_cell||")
 
     # Static config checks
     [ "$_gw" = "none" ] && return 0   # Nothing further to check
     [ "$_gw_type" = "VM" ] && eval $(WARN ${_fn}_2 $_gw) # VM-gw normally has DHCP (but not always)
     [ "$_cli_confs" ] && grep -Eqs "$_value" $_cli_confs \
-        && eval $(THROW ${_fn}_3 "$_cell" $_value $_gw)  # Direct config collision
+        && eval $(THROW 151 ${_fn}_3 "$_cell" $_value $_gw)  # Direct config collision
     [ "$_level" -le 2 ] && return 0
 
     # Runtime collisions
