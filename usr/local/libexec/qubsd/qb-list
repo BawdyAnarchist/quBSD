@@ -29,9 +29,12 @@ parse_args() {
 
         # Final attempt at parsing CELL vs PARAM when no option is passed
         if ! is_path_exist -f $D_CELLS/$CELL && [ -z "$PARAM" ] ; then
-            echo_grep -qd , "$PARAMS_ALL" "$CELL" && PARAM=$CELL && unset CELL
+            echo_grep -qd , "$PARAMS_ALL" "$(conv_to_upper $CELL)" && PARAM=$CELL && unset CELL
         fi
     fi
+
+    # Convert lower-case entered PARAM to upper (user-friendly)
+    [ "$PARAM" ] && PARAM=$(conv_to_upper "$PARAM")
 
     # Sanitize missing cell
     { [ "$snaps" ] || [ "$zfs" ] ;} && [ -z "$CELL" ] && eval $(THROW 4 blank_cell)
@@ -39,9 +42,6 @@ parse_args() {
     # Validate CELL and/or PARAM
     [ "$CELL" ] && { _level=2 validate_cellname $CELL || eval $(THROW $?) ;}
     [ "$PARAM" ] && { assert_param $PARAM || eval $(THROW $?) ;}
-
-    # Convert lower-case entered PARAM to upper (user-friendly)
-    [ "$PARAM" ] && PARAM=$(conv_to_upper "$PARAM")
     return 0
 }
 
