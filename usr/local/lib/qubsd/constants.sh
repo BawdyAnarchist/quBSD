@@ -8,6 +8,7 @@ export QLIB="/usr/local/lib/qubsd"
 export QLEXEC="/usr/local/libexec/qubsd"
 export QSHARE="/usr/local/share/qubsd"
 export QRUN="/var/run/qubsd"
+export DEVFS="/etc/devfs.rules"
 
 # Supporting directories
 export D_QMSG="$QLIB/messages"
@@ -30,7 +31,7 @@ export TRAP_SIGS="HUP INT TERM QUIT EXIT"
 export DEBUG="/root/debug"
 : ${VERBOSE:=false}  # [true|false] Print commands to console before running them
 : ${DRY_RUN:=false}  # [true|false] Do not execute, just print commands to the console
-: ${TRACE:=true}     # [true|false] Show the function trace in error/warning messages
+: ${TRACE:=false}     # [true|false] Show the function trace in error/warning messages
 
 # Primary qubsd files
 export QCOMMON="$QLIB/common.sh"
