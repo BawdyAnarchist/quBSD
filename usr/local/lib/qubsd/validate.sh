@@ -84,7 +84,7 @@ validate_param_gateway() {
     assert_cellname "$_value" || eval $(THROW $? _invalid "$_param" "$_value")
     [ "$_level" -le 1 ] && return 0
 
-    ctx_bootstrap_cell $_value "val_" || eval $(WARN _invalid "$_param" "$_value")
+    ctx_bootstrap_cell $_value "val_" || WARN _invalid "$_param" "$_value"
 }
 
 validate_param_ipv4() {
@@ -98,7 +98,7 @@ validate_param_ipv4() {
 
     # VM with CIDR is harmless, but warn user to prevent belief that it can be set like this
     _type=$(ctx_get ${_pfx}TYPE)
-    [ "$_type" = "VM" ] && eval $(WARN $_fn) && return 0  # No addtl checks for impotent IPV4
+    [ "$_type" = "VM" ] && WARN $_fn && return 0  # No addtl checks for impotent IPV4
 
     # Jails only. Pull relevant gateway information required for config/runtime guarantees
     _gw=$(query_cell_param "$_cell" GATEWAY) || eval $(THROW 151 _invalid "$_param" "$_value")
@@ -107,7 +107,8 @@ validate_param_ipv4() {
 
     # Static config checks
     [ "$_gw" = "none" ] && return 0   # Nothing further to check
-    [ "$_gw_type" = "VM" ] && eval $(WARN ${_fn}_2 $_gw) # VM-gw normally has DHCP (but not always)
+    [ "$_gw_type" = "VM" ] \
+        && WARN ${_fn}_2 $_gw && return 0 # VM-gw normally has DHCP (but not always)
     [ "$_cli_confs" ] && grep -Eqs "$_value" $_cli_confs \
         && eval $(THROW 151 ${_fn}_3 "$_cell" "$_value" "$_gw")  # Direct config collision
     [ "$_level" -le 2 ] && return 0
@@ -137,7 +138,7 @@ validate_param_maxmem() {
     query_sysmem
     _bytes=$(normalize_bytesize $_value)
     assert_int_comparison -l "$SYSMEM" -- $_bytes \
-        || eval $(WARN $_fn $_bytes "$_param" "$_value" $SYSMEM)
+        || WARN $_fn $_bytes "$_param" "$_value" $SYSMEM
 }
 
 validate_param_memsize() {
@@ -161,7 +162,7 @@ validate_param_mtu() {
 
     # THROW for IPv4 spec violations. WARN for IPv6 spec violation and > typical jumbo packet size
     assert_int_comparison -g 68 -l 65535 -- "$_value" || eval $(THROW 154 $_fn "$_value" 68 65535)
-    assert_int_comparison -g 1280 -l 9000 -- "$_value" || eval $(WARN ${_fn}_2 "$_value" 1280 9000)
+    assert_int_comparison -g 1280 -l 9000 -- "$_value" || WARN ${_fn}_2 "$_value" 1280 9000
 }
 
 validate_param_no_destroy() {
