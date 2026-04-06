@@ -1,12 +1,9 @@
 
 ### Next up
 
-
-qb-edit
-  - conduct_cells_reassessment should be done before the config change, and THROW/warn
-
 qb-list
   - something i did for qb-edit broke qb-list
+  - lower-case param naming isnt working now
 
 ### Import things in the code as I overhaul that still need addressed
 exec.postart

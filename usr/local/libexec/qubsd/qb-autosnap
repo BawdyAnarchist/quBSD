@@ -8,7 +8,7 @@ parse_args() {
     local _fn="parse_args" _opts OPTARG OPTIND
     while getopts dhs: _opts ; do case $_opts in
         d) DESTROY=true ;;
-        h) eval $(WARN usage) ; cat $ERR ; exit 0 ;;
+        h) WARN usage ; cat $ERR ; exit 0 ;;
         s) TTL="$OPTARG" ; assert_optarg || eval $(THROW $?) ;;
         *) exit 1 ;;
     esac ; done ; shift $(( OPTIND - 1 ))
