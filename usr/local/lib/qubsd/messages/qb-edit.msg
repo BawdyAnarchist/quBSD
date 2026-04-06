@@ -23,8 +23,12 @@ Must provide a <VALUE> for %s
 The only modifiable PARAMS for host are: <%s>
 /END/
 
+:ptype:
+Invalid usage of [-d <default>]
+/END/
+
 :type:
-Type mismatch. PARAM < %s > is for %s, but target < %s > is a %s
+Type mismatch. PARAM < %s > is for %s, but target < %s > is %s
 /END/
 
 :default_invalid:
@@ -48,6 +52,20 @@ New value is equal to the old
 :ipv4:
 Do not assign a unique CIDR to %s. This will cause networking breakage.
   IPV4 defaults can only be one of the following:  <none|auto|DHCP>
+/END/
+
+:use_force:
+Proposed changes would cause config/runtime errors. Use [-F] to override
+/END/
+
+:deletion_errors:
+%s
+Deleting PARAM: < %s > breaks the following cells:
+%s
+/END/
+
+:warning_header:
+The change was completed, but be advised of the following warnings:
 /END/
 
 :usage:
