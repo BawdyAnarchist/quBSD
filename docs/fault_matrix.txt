@@ -43,8 +43,10 @@ CODE  LEVEL      DESCRIPTION
 24    assert     ptype (base|jail|vm) failure
 25    assert     user failed to provide $OPTARG
 26    assert     devfs_rule failure
-27-   assert     <UNUSED>
--30   assert     <UNUSED>
+27    assert     pass formatting failure
+28    assert     pfx formatting failure
+29    assert     <UNUSED>
+30    assert     <UNUSED>
 31    assert     bhyve_custm formatting failure
 32    assert     bhyveopts formatting failure
 33    assert     ppt formatting failure

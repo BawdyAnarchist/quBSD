@@ -72,7 +72,15 @@ User Error: Bad options usage
 /END/
 
 :assert_param:
-Invalid parameter. Valid PARAMS are: %s
+Invalid parameter
+/END/
+
+:assert_pass:
+Internal Error: Invalid _pass passed to function
+/END/
+
+:assert_pfx:
+Internal Error: Invalid _pfx passed to function
 /END/
 
 :assert_ppt:

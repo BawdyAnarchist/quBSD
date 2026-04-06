@@ -175,7 +175,25 @@ assert_optarg() {
 # Ensures that $1 is part of the static PARAMS_ALL list
 assert_param() {
     local _fn="assert_param"
-    echo_grep -qd , "$PARAMS_ALL" "$1" || eval $(THROW 10 $_fn $PARAMS_ALL)
+    echo_grep -qd , "$PARAMS_ALL" "$1" || eval $(THROW 10 $_fn)
+}
+
+assert_params() {
+    local _fn="assert_param" IFS=,
+    for _param in $1 ; do
+        assert_param $_param || eval $(THROW $?)
+    done
+}
+
+assert_pass() {
+    local _fn="assert_pass" _val="$1"
+    echo "$_val" | grep -Eqs -- '^[0-9][0-9,]*$' || eval $(THROW 27 $_fn)
+}
+
+assert_pfx() {
+    local _fn="assert_pfx" _val="$1"
+    [ -z "$_val" ] && return 0  # _pfx can be null
+    echo "$_val" | grep -Eqs -- "^[a-zA-Z0-9_]+\$" || eval $(THROW 28 $_fn)
 }
 
 assert_ppt() {
