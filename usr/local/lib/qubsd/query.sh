@@ -150,7 +150,7 @@ query_gw_clients() {
 query_gw_client_configs() {
     local _fn="query_gw_client_configs" _val
     assert_args_set 1 "$1" || eval $(THROW $?)
-    _val=$(query_gw_clients $1 | sed "s|^|$D_CELLS/|; s| | $D_CELLS/|g")
+    _val=$(grep -Eo "GATEWAY=\"$1\"" $D_CELLS/* | sed -En "s|^($D_CELLS/.*):.*|\1|p")
     [ "$_val" ] && echo $_val && return 0 || return 133  # Not quoted -> returns single-line list
 }
 
