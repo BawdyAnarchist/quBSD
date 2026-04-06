@@ -185,15 +185,15 @@ assert_ppt() {
 }
 
 assert_ptype() {
-    local _fn="assert_type" _val="$1"
-    echo_grep -q "base BASE jail JAIL vm VM" "$_val" || eval $(THROW 24)
+    local _fn="assert_ptype" _val="$1"
+    echo_grep -q "base BASE jail JAIL vm VM" "$_val" || eval $(THROW 24 $_fn)
 }
 
 assert_schg() {
     local _fn="assert_schg"
     case $1 in
         none|sys|all) return 0 ;;
-        *) eval $(THROW 22 _fail2 SCHG $1 "Must be <none|sys|all>") ;;
+        *) eval $(THROW 22 $_fn) ;;
     esac
 }
 
@@ -201,13 +201,13 @@ assert_seclvl() {
     local _fn="assert_seclvl"
     case $1 in
         none|-1|-0|0|1|2|3) return 0 ;;
-        *) eval $(THROW 23 _fail2 SECLVL $1 "Must be <none|-1|0|1|2|3>") ;;
+        *) eval $(THROW 23 $_fn) ;;
     esac
 }
 
 assert_taps() {
     local _fn="assert_taps"
-    assert_int_comparison -g 0 -- "$1" || eval $(THROW 34 _generic "Require: Integer greater than 0")
+    assert_int_comparison -g 0 -- "$1" || eval $(THROW 34 $_fn)
 }
 assert_time_format() {
     local _fn="assert_time_format" _val="$1"
@@ -216,6 +216,6 @@ assert_time_format() {
 
 assert_vcpus() {
     local _fn="assert_vcpus"
-    assert_int_comparison -G 0 -- "$1" || eval $(THROW 35 _generic "Require: integer > 0")
+    assert_int_comparison -G 0 -- "$1" || eval $(THROW 35 $_fn)
 }
 
