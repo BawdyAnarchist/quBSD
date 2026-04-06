@@ -1,9 +1,7 @@
 
 ### Next up
 
-qb-list
-  - something i did for qb-edit broke qb-list
-  - lower-case param naming isnt working now
+go through the primitives (context.sh particularly) with a fine-tooth comb and make sure it's impossible to pass bad values to the functions. Aggressively sanitize all variables.
 
 ### Import things in the code as I overhaul that still need addressed
 exec.postart
