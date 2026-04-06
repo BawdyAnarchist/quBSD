@@ -6,8 +6,7 @@
 . $QCOMMON
 
 trap_init
-#DRY_RUN=true
-#TRACE=true
+
 parse_args() {
     local _fn="parse_args" _opts OPTARG OPTIND
     while getopts c:d:DFhp:qV _opts ; do case $_opts in
