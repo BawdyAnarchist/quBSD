@@ -221,21 +221,20 @@ query_param_values() {
 # ZFS queries may be passed $1 optionally to toggle pulling ALL datasets or only some
 
 query_datasets() {
-    local _fn="query_datasets" _dsets="$1" _pull
+    local _fn="query_datasets" _dsets="$1" _pull _newdsets
 
     # For each dataset passed, see if it's present. Assemble list of non-present datasets
     [ "$_dsets" ] && for _dset in $_dsets ; do
         echo_grep -q "$DATASETS" $_dset || _pull="$_pull $_dset"
     done
-    [ -z "$_pull" ] && return 0   # All datasets already present (no duplicate pull)
 
-    # Either add to the existing, or generate new DATASETS
-    if [ "$DATASETS" ] ; then
-        DATASETS=$(echo "$DATASETS" ; hush zfs list -Ho $DSET_PROPS $_pull) \
-            || eval $(THROW 121)
-    else
-        DATASETS=$(hush zfs list -Ho $DSET_PROPS $_pull) || eval $(THROW 121)
-    fi
+    # Either datasets are already present, or the caller incorrectly did not pass $1
+    [ -z "$_pull" ] && return 0
+
+    # Grab the new snapshots. Append/assign cached global. Remove blank lines
+    _newdsets=$(hush zfs list -Ho $DSET_PROPS $_pull) || eval $(THROW 121)
+    DATASETS=$(echo "$DATASETS" ; echo "$_newdsets")
+    DATASETS=$(echo "$DATASETS" | sed -E "/^\$/d")
     return 0
 }
 
@@ -263,34 +262,37 @@ query_zfs_recursive_defaults() {
 }
 
 query_rootsnaps() {
-    local _fn="query_rootsnaps" _dsets="$1" _pull
+    local _fn="query_rootsnaps" _dsets="$1" _pull _newsnaps
 
     # For each snapshot passed, see if it's present. Assemble list of non-present snapshot
     [ "$_dsets" ] && for _dset in $_dsets ; do
         echo_grep -q "$ROOTSNAPS" $_dset || _pull="$_pull $_dset"
-        [ -z "$_pull" ] && return 0    # All snapshots already present (no duplicate pull)
     done
 
-    # Either add to the existing, or generate new ROOTSNAPS
-    if [ "$ROOTSNAPS" ] ; then
-        ROOTSNAPS=$(echo "$ROOTSNAPS" ; hush zfs list -Ht snapshot -o $SNAP_PROPS $1) \
-            || eval $(THROW 122)
-    else
-        ROOTSNAPS=$(hush zfs list -Ht snapshot -o $SNAP_PROPS $1) \
-            || eval $(THROW 122)
-    fi
+    # Either datasets are already present, or the caller incorrectly did not pass $1
+    [ -z "$_pull" ] && return 0
+
+    # Grab the new snapshots. Append/assign cached global. Remove blank lines
+    _newsnaps=$(zfs list -Ht snapshot -o $SNAP_PROPS $_pull) || eval $(THROW 123)
+    ROOTSNAPS=$(echo "$ROOTSNAPS" ; echo "$_newsnaps")
+    ROOTSNAPS=$(echo "$ROOTSNAPS" | sed -E "/^\$/d")
     return 0
 }
 
 query_persistsnaps() {
-    local _fn="query_persistsnaps"
-    if [ "$PERSISTSNAPS" ] ; then
-        PERSISTSNAPS=$(echo "$PERSISTSNAPS" ; hush zfs list -Ht snapshot -o $SNAP_PROPS $1) \
-            || eval $(THROW 123)
-    else
-        PERSISTSNAPS=$(zfs list -Ht snapshot -o $SNAP_PROPS $1) || eval $(THROW 123)
-    fi
-    return $?
+    local _fn="query_persistsnaps" _dsets="$1" _pull _newsnaps
+
+    # For each snapshot passed, see if it's present. Assemble list of non-present snapshot
+    [ "$_dsets" ] && for _dset in $_dsets ; do
+        echo_grep -q "$PERSISTSNAPS" $_dset || _pull="$_pull $_dset"
+    done
+    # Either datasets are already present, or the caller incorrectly did not pass $1
+    [ -z "$_pull" ] && return 0
+
+    # Grab the new snapshots. Append/assign cached global. Remove blank lines
+    _newsnaps=$(zfs list -Ht snapshot -o $SNAP_PROPS $_pull) || eval $(THROW 123)
+    PERSISTSNAPS=$(echo "$PERSISTSNAPS" | sed -E "/^\$/d" ; echo "$_newsnaps")
+    return 0
 }
 
 query_zfs_mountpoint() {
