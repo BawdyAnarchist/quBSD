@@ -226,8 +226,8 @@ query_datasets() {
     # For each dataset passed, see if it's present. Assemble list of non-present datasets
     [ "$_dsets" ] && for _dset in $_dsets ; do
         echo_grep -q "$DATASETS" $_dset || _pull="$_pull $_dset"
-        [ -z "$_pull" ] && return 0   # All datasets already present (no duplicate pull)
     done
+    [ -z "$_pull" ] && return 0   # All datasets already present (no duplicate pull)
 
     # Either add to the existing, or generate new DATASETS
     if [ "$DATASETS" ] ; then
@@ -365,7 +365,7 @@ query_xwin_name() {
 
 query_xwin_socket() {
     local _fn="query_xwin_socket" _xid _val
-    _xid=$(query_net_active_xid) || eval $(THORW $?)
+    _xid=$(query_net_active_xid) || eval $(THROW $?)
     _val=$(xprop -id $_xid | sed -En "s/^WM_NAME.*:([0-9]+)\..*/\1/p") || eval $(THROW 233)
     [ "$_val" ] && echo "$_val" && return 0 || eval $(THROW 233)
 }
