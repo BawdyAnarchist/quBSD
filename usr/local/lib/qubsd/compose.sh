@@ -6,7 +6,7 @@ _resolve_rootenv_snapname() {
     local _rootsnaps _psmod _lstart _line _snap _creation _crea_unix _written
 
     # Try existing ROOTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
-    [ $ROOTSNAPS ] && _rootsnaps=$(echo "$ROOTSNAPS" | grep $_dset)
+    [ "$ROOTSNAPS" ] && _rootsnaps=$(echo "$ROOTSNAPS" | grep $_dset)
     if [ -z "$_rootsnaps" ] && unset ROOTSNAPS ; then
         query_rootsnaps $_dset || eval $(THROW $?)
     fi
@@ -45,7 +45,7 @@ _resolve_persist_snapname() {
     local _fn="_resolve_persist_snapname" _dset="$1" _persistsnaps _snap _written
 
     # Try existing PERSISTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
-    [ $PERSISTSNAPS ] && _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset)
+    [ "$PERSISTSNAPS" ] && _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset)
     if [ -z "$_persistsnaps" ] && unset $PERSISTSNAPS ; then
         query_persistsnaps $_dset || eval $(THROW $?)
     fi
@@ -65,7 +65,7 @@ _resolve_persist_snapname() {
 compose_root_reclone_cmds() {
     local _fn="compose_root_reclone_cmds" _pfx="$3" _pfxloc="rrc_"
     local  _cell _rt_ctx _rootenv _snap _die _r_mnt _r_dset _r_zfs_mnt
-    assert_args_set 2 "$1" "$2" && _cell="$1" _rt_ctx="$2" || $(THROW $?)
+    assert_args_set 2 "$1" "$2" && _cell="$1" _rt_ctx="$2" || eval $(THROW $?)
 
     # Compose the local vars based on their prefixes
     _rootenv=$(ctx_get ${_pfx}ROOTENV)
@@ -99,7 +99,7 @@ compose_root_reclone_cmds() {
 compose_persist_reclone_cmds() {
     local _fn="compose_persist_reclone_cmds" _pfx="$3" _pfxloc="prc_"
     local _cell _rt_ctx _snap _die _p_mnt _p_dset
-    assert_args_set 2 "$1" "$2" && _cell="$1" _rt_ctx="$2" || $(THROW $?)
+    assert_args_set 2 "$1" "$2" && _cell="$1" _rt_ctx="$2" || eval $(THROW $?)
 
     # Compose the local vars based on their prefixes
     _template=$(ctx_get ${_pfx}TEMPLATE)
