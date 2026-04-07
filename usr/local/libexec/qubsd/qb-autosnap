@@ -66,10 +66,9 @@ compose_new_snapshots_cmds() {
     [ "$_r_dset" ] && _r_snap="$_r_dset@$_suffix"
 
     # Don't snapshot running rootenv where updates/installs could cause partial/inconsistent state
-    [ "${_class##root*}" ] && { echo_grep -q "$ONJAILS" "$_cell" \
-        || echo_grep -q "$ONVMS" "$_cell" ;} && unset _r_snap
+    [ -z "${_class##root*}" ] && is_cell_running $_cell && unset _r_snap
 
-    # Update the primary _CMD. Note that the space in front of " $_r_snap" is required
+    # Update the primary _CMD. **The space in front of " $_r_snap" is required**
     [ -z "$_CMD_R_SNAPSHOT" ] && _zfs_r_cmd="zfs snapshot -o qb:ttl=$TTL"
     [ -z "$_CMD_P_SNAPSHOT" ] && _zfs_p_cmd="zfs snapshot -o qb:ttl=$TTL"
     _CMD_R_SNAPSHOT="$(printf "%b" "$_zfs_r_cmd" "$_CMD_R_SNAPSHOT" " $_r_snap")"
@@ -80,17 +79,17 @@ compose_thin_old_snaps_cmds() {
     local _fn="compose_thin_old_snaps_cmds"
     local _rsnaps _psnaps _snapshots _snap _clones _ttl _integer _creation _crea_unix _destroy
 
-    # Most _dsets should be found in SNAPSHOTS. Fallback to query_* if not found.
+    # Most snaps should already be in the cache, but query_*snaps greps and hydrates if necessary
     _class=$(ctx_get ${_pfx}CLASS)
+    # Only rootenvs will have root-dataset snapshots
     if [ "$_r_dset" ] && [ "$_class" ] && [ -z ${_class##root*} ] ; then
-        # Only rootenvs will have root-dataset snapshots
-        _rsnaps=$(echo "$SNAPSHOTS" | grep -E "^$_r_dset@") \
-            || _rsnaps=$(query_rootsnaps $_r_dset)
+        query_rootsnaps $_r_dset
+        _rsnaps=$(echo "$ROOTSNAPS" | grep -E "^$_r_dset@")
     fi
     # Even rootenvs typically have a persistent dataset. However, skip disp cells.
     if [ "$_p_dset" ] && [ "$_class" ] && [ -n "${_class#disp*}" ] ; then
-        _psnaps=$(echo "$SNAPSHOTS" | grep -E "^$_p_dset@") \
-            || _psnaps=$(query_persistsnaps $_p_dset)
+        query_persistsnaps $_p_dset
+        _psnaps=$(echo "$PERSISTSNAPS" | grep -E "^$_p_dset@")
     fi
     _snapshots="$(echo "$_rsnaps" ; echo "$_psnaps")"
 
