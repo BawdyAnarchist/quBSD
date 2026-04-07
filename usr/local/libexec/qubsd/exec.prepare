@@ -37,12 +37,12 @@ compose_commands() {
 
     # Only clone/reclone for non-rootjails. Otherwise we'll destroy the rootjail
     if [ ! "$CLASS" = "rootjail" ] ; then
-        compose_root_reclone_cmds $CELL $RT_CTX || eval $(THROW $?)
+        compose_reclone_root_cmds $CELL $RT_CTX || eval $(THROW $?)
     fi
 
     # Only clone/reclone for dispjails. Otherwise we'll destroy the appjail persistent data
     if [ "$CLASS" = "dispjail" ] ; then
-        compose_persist_reclone_cmds $CELL $RT_CTX || eval $(THROW $?)
+        compose_reclone_persist_cmds $CELL $RT_CTX || eval $(THROW $?)
     fi
 }
 
@@ -73,7 +73,7 @@ main() {
     execute_commands "$_COMMANDS" || eval $(THROW $?)
 
     # Successful completion of all tasks. Keep RT_CTX by removing it from the trap stack
-    [ "$CALLER" = "exec" ] && ! echo_grep "$DRY_RUN" '(true|TRUE)' && trap_pop
+    [ "$CALLER" = "exec" ] && ! echo_grep -q "$DRY_RUN" '(true|TRUE)' && trap_pop
 
     return 0
 }

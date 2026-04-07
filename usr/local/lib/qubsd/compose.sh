@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
-_resolve_rootenv_snapname() {
-    local _fn="_resolve_rootenv_snapname" _dset="$1"
+_resolve_snapname_rootenv() {
+    local _fn="_resolve_snapname_rootenv" _dset="$1"
     local _rootsnaps _psmod _lstart _line _snap _creation _crea_unix _written
 
     # Try existing ROOTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
@@ -41,8 +41,8 @@ EOF
 }
 
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
-_resolve_persist_snapname() {
-    local _fn="_resolve_persist_snapname" _dset="$1" _persistsnaps _snap _written
+_resolve_snapname_persist() {
+    local _fn="_resolve_snapname_persist" _dset="$1" _persistsnaps _snap _written
 
     # Try existing PERSISTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
     [ "$PERSISTSNAPS" ] && _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset)
@@ -62,8 +62,8 @@ _resolve_persist_snapname() {
 }
 
 # Caller should be careful if deconfliction via $1 (_pfx) is necessary
-compose_root_reclone_cmds() {
-    local _fn="compose_root_reclone_cmds" _pfx="$3" _pfxloc="rrc_"
+compose_reclone_root_cmds() {
+    local _fn="compose_reclone_root_cmds" _pfx="$3" _pfxloc="rrc_"
     local  _cell _rt_ctx _rootenv _snap _die _r_mnt _r_dset _r_zfs_mnt
     assert_args_set 2 "$1" "$2" && _cell="$1" _rt_ctx="$2" || eval $(THROW $?)
 
@@ -76,7 +76,7 @@ compose_root_reclone_cmds() {
     # Need the root dataset of the rootenv, to choose the snapshot
     ctx_bootstrap_cell $_rootenv $_pfxloc || eval $(THROW $? _generic "< $_rootenv > bootstrap failed")
 
-    _snap=$(_resolve_rootenv_snapname $(ctx_get ${_pfxloc}R_DSET))
+    _snap=$(_resolve_snapname_rootenv $(ctx_get ${_pfxloc}R_DSET))
     case $? in
         0)  : ;;
         2)  _die=$(( $(date +%s) + 30 ))
@@ -96,8 +96,8 @@ compose_root_reclone_cmds() {
 }
 
 # $1 required. Caller should be careful if deconfliction via $2 (_pfx) is necessary
-compose_persist_reclone_cmds() {
-    local _fn="compose_persist_reclone_cmds" _pfx="$3" _pfxloc="prc_"
+compose_reclone_persist_cmds() {
+    local _fn="compose_reclone_persist_cmds" _pfx="$3" _pfxloc="prc_"
     local _cell _rt_ctx _snap _die _p_mnt _p_dset
     assert_args_set 2 "$1" "$2" && _cell="$1" _rt_ctx="$2" || eval $(THROW $?)
 
@@ -110,7 +110,7 @@ compose_persist_reclone_cmds() {
     # Need the persist dataset of the template, to choose the snapshot
     ctx_bootstrap_cell $_template $_pfxloc || eval $(THROW $? _generic "< $_template > bootstrap failed")
 
-    _snap=$(_resolve_persist_snapname $(ctx_get ${_pfxloc}P_DSET))
+    _snap=$(_resolve_snapname_persist $(ctx_get ${_pfxloc}P_DSET))
     case $? in
         0) : ;;
         2)  _die=$(( $(date +%s) + 30 ))
