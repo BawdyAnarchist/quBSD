@@ -1,5 +1,6 @@
 #!/bin/sh
 
+####################################################################################################
 ############################################  HELPERS  #############################################
 
 # Simplify common `echo | grep` operations, while still providing a quiet and delimiter option
@@ -27,7 +28,9 @@ conv_to_lower() {
     echo "$1" | tr '[:upper:]' '[:lower:]'
 }
 
-###################################  BOOLEAN RESPONSE QUERIES  #####################################
+
+####################################################################################################
+#################################  PREDICATES (BOOLEAN RESPONSES)  #################################
 
 is_path_exist() {
     local _fn="is_path_exist"
@@ -81,16 +84,36 @@ query_user_continue() {
     esac
 }
 
-########################################  GET CELL CONFIG  #########################################
 
-# Simple function for grepping the PARAM="..." convention in config files
-query_file_param() {
-    local _fn="query_file_param" _param _file _val
+####################################################################################################
+#####################################  CELL AND PARAM CONFIG  ######################################
+
+# Returns the value associated with a particular input key ($1 passed to the function)
+query_file_keyval() {
+    local _fn="query_file_keyval" _param _file _val
     assert_args_set 2 "$1" "$2" && _param="$1" _file="$2" || eval $(THROW $?)
 
     _val=$(sed -En "s/^[ \t]*$_param=\"(.*)\"[ \t]*/\1/p" $_file)
     [ "$_val" ] && echo $_val && return 0
     return 1
+}
+
+# Returns the value of a cell parameter, including the resolution of values in defaults files
+query_cell_param() {
+    local _fn="query_cell_param" _cell _param _val _type _def_type
+    assert_args_set 2 "$1" "$2" && _cell="$1" _param="$2" || eval $(THROW $?)
+
+    # Happy path -> parameter found immediately in the cell conf
+    query_file_keyval $_param $D_CELLS/$_cell && return 0
+
+    # Backup path -> check the defaults. type defaults prioritized over base defaults
+    _type=$(query_cell_type $_cell) || eval $(THROW $?)
+    eval _def_type=\${DEF_${_type}}
+    query_file_keyval $_param $_def_type && return 0
+    query_file_keyval $_param $_def_base && return 0
+
+    # Failed to find a value for the parameter
+    eval $(THROW 131 ${_fn} "$_param" "$_cell")
 }
 
 # Return [JAIL|VM] based on $1 CLASS. Bootstraps parameter sourcing
@@ -110,25 +133,7 @@ query_cell_type() {
     return 0
 }
 
-# Single parameter extraction from cell config
-query_cell_param() {
-    local _fn="query_cell_param" _cell _param _val _type _def_type
-    assert_args_set 2 "$1" "$2" && _cell="$1" _param="$2" || eval $(THROW $?)
-
-    # Happy path -> parameter found immediately in the cell conf
-    query_file_param $_param $D_CELLS/$_cell && return 0
-
-    # Backup path -> check the defaults. type defaults prioritized over base defaults
-    _type=$(query_cell_type $_cell) || eval $(THROW $?)
-    eval _def_type=\${DEF_${_type}}
-    query_file_param $_param $_def_type && return 0
-    query_file_param $_param $_def_base && return 0
-
-    # Failed to find a value for the parameter
-    eval $(THROW 131 ${_fn} "$_param" "$_cell")
-}
-
-# Takes $1 PARAM and returns base|jail|vm, depending on where the highest level default lies
+# Require $1 (PARAM), returns: base|jail|vm. Base takes precedence, followed by type (jail vs VM)
 query_param_type() {
     local _fn="query_param_type"
     assert_args_set 1 "$1" || eval $(THROW $?)
@@ -217,24 +222,25 @@ query_param_values() {
 }
 
 
-#####################################  SYSTEM STATE QUERIES  #######################################
-# ZFS queries may be passed $1 optionally to toggle pulling ALL datasets or only some
+####################################################################################################
+######################################  ZFS/DATASET QUERIES  #######################################
 
 query_datasets() {
     local _fn="query_datasets" _dsets="$1" _pull _newdsets
 
     # For each dataset passed, see if it's present. Assemble list of non-present datasets
-    [ "$_dsets" ] && for _dset in $_dsets ; do
+    for _dset in $_dsets ; do
         echo_grep -q "$DATASETS" $_dset || _pull="$_pull $_dset"
     done
 
     # Either datasets are already present, or the caller incorrectly did not pass $1
     [ -z "$_pull" ] && return 0
 
-    # Grab the new snapshots. Append/assign cached global. Remove blank lines
-    _newdsets=$(hush zfs list -Ho $DSET_PROPS $_pull) || eval $(THROW 121)
+    # Cant THROW on zfs failure, because the datasets it successfully found will be lost
+    _newdsets=$(hush zfs list -Ho $DSET_PROPS $_pull)
     DATASETS=$(echo "$DATASETS" ; echo "$_newdsets")
-    DATASETS=$(echo "$DATASETS" | sed -E "/^\$/d")
+    DATASETS=$(echo "$DATASETS" | sed -E "/^\$/d")  # Remove blank lines
+
     return 0
 }
 
@@ -245,12 +251,12 @@ query_zfs_recursive_defaults() {
     local _fn="query_datasets_recursive_defaults" _dsets _snaps
     [ "$1" = "-s" ] && _snaps_only='true'
 
-    _dsets=$(query_file_param R_ZFS $DEF_BASE \
-            ;query_file_param P_ZFS $DEF_BASE \
-            ;query_file_param R_ZFS $DEF_JAIL \
-            ;query_file_param P_ZFS $DEF_JAIL \
-            ;query_file_param R_ZFS $DEF_VM   \
-            ;query_file_param P_ZFS $DEF_VM)
+    _dsets=$(query_file_keyval R_ZFS $DEF_BASE \
+            ;query_file_keyval P_ZFS $DEF_BASE \
+            ;query_file_keyval R_ZFS $DEF_JAIL \
+            ;query_file_keyval P_ZFS $DEF_JAIL \
+            ;query_file_keyval R_ZFS $DEF_VM   \
+            ;query_file_keyval P_ZFS $DEF_VM)
     _dsets=$(echo "$_dsets" | sort | uniq)
 
     if [ -z "$_snaps_only" ] ; then
@@ -265,17 +271,17 @@ query_rootsnaps() {
     local _fn="query_rootsnaps" _dsets="$1" _pull _newsnaps
 
     # For each snapshot passed, see if it's present. Assemble list of non-present snapshot
-    [ "$_dsets" ] && for _dset in $_dsets ; do
+    for _dset in $_dsets ; do
         echo_grep -q "$ROOTSNAPS" $_dset || _pull="$_pull $_dset"
     done
 
     # Either datasets are already present, or the caller incorrectly did not pass $1
     [ -z "$_pull" ] && return 0
 
-    # Grab the new snapshots. Append/assign cached global. Remove blank lines
-    _newsnaps=$(zfs list -Ht snapshot -o $SNAP_PROPS $_pull) || eval $(THROW 123)
+    # Cant THROW on zfs failure, because the datasets it successfully found will be lost
+    _newsnaps=$(zfs list -Ht snapshot -o $SNAP_PROPS $_pull)
     ROOTSNAPS=$(echo "$ROOTSNAPS" ; echo "$_newsnaps")
-    ROOTSNAPS=$(echo "$ROOTSNAPS" | sed -E "/^\$/d")
+    ROOTSNAPS=$(echo "$ROOTSNAPS" | sed -E "/^\$/d")  # Remove blank lines
     return 0
 }
 
@@ -283,15 +289,16 @@ query_persistsnaps() {
     local _fn="query_persistsnaps" _dsets="$1" _pull _newsnaps
 
     # For each snapshot passed, see if it's present. Assemble list of non-present snapshot
-    [ "$_dsets" ] && for _dset in $_dsets ; do
+    for _dset in $_dsets ; do
         echo_grep -q "$PERSISTSNAPS" $_dset || _pull="$_pull $_dset"
     done
     # Either datasets are already present, or the caller incorrectly did not pass $1
     [ -z "$_pull" ] && return 0
 
-    # Grab the new snapshots. Append/assign cached global. Remove blank lines
-    _newsnaps=$(zfs list -Ht snapshot -o $SNAP_PROPS $_pull) || eval $(THROW 123)
-    PERSISTSNAPS=$(echo "$PERSISTSNAPS" | sed -E "/^\$/d" ; echo "$_newsnaps")
+    # Cant THROW on zfs failure, because the datasets it successfully found will be lost
+    _newsnaps=$(zfs list -Ht snapshot -o $SNAP_PROPS $_pull)
+    PERSISTSNAPS=$(echo "$PERSISTSNAPS" ; echo "$_newsnaps")
+    PERSISTSNAPS=$(echo "$PERSISTSNAPS" | sed -E "/^\$/d")  # Remove blank lines
     return 0
 }
 
@@ -300,6 +307,10 @@ query_zfs_mountpoint() {
     assert_args_set 1 "$1" || eval $(THROW $?)
     echo_grep "$DATASETS" "$1" | awk '{print $2}' && return 0 || return 121
 }
+
+
+####################################################################################################
+#####################################  SYSTEM STATE QUERIES  #######################################
 
 query_onjails() {
     local _fn="query_onjails" _onjails
@@ -334,7 +345,7 @@ query_num_cpus() {
 
 # With $1 < cell>, all active IPaddr of a running jail. Without $1, active IPs of all running jails
 query_running_ips() {
-    local _fn="query_used_ips" _cell="$1" _val _onjails _jail_ips
+    local _fn="query_running_ips" _cell="$1" _val _jail_ips
 
     if [ "$_cell" ] ; then
         _val=$(ifconfig -j $_cell -a inet | awk '/inet / {print $2}')
@@ -345,7 +356,7 @@ query_running_ips() {
             _val=$(printf "%b" "$_val" "\n" "$_jail_ips")
         done
     fi
-    [ "$_val" ] && echo $_val && return 0 || return 212  # Not quoted -> returns single-line list
+    [ "$_val" ] && echo "$_val" && return 0 || return 212
 }
 
 
