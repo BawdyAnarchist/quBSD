@@ -1,5 +1,42 @@
 #!/bin/sh
 
+####################################################################################################
+############################################  HELPERS  #############################################
+
+
+# Require $1,$2,$3. Search for available IPaddr using the form: _ip0._ip1._ip2._ip3/_sub
+  # _ip0 is always '10', while _ip1._ip2 comprise the search space
+  # _ip3/_sub convention is '.2/30' for client-side of epair, and '.1/30' for gw side of epair
+  # _allocated is optional $4. Caller can supplement "used IPs" with their own adhoc list
+resolve_open_ipv4() {
+    local _fn="_resolve_open_ipv4" _ip1="$1" _ip3="$2" _sub="$3" _allocated="$4"
+    local _used _ip_test
+    assert_int_comparison -g 0 -L 255 "$_ip1" || eval $(THROW $? _generic "Invalid _ip1")
+    assert_int_comparison -g 0 -L 255 "$_ip3" || eval $(THROW $? _generic "Invalid _ip3")
+    assert_int_comparison -g 0 -L 31  "$_sub" || eval $(THROW $? _generic "Invalid _sub")
+
+    # Assemble the full list of used IPs for the comparison
+    _used="$(printf "%b" "$_allocated\n" "$(query_running_ips)\n" \
+           "$(query_param_values IPV4 | awk '{ print $3 }' | sort -u)")"
+
+    # A bit of awk magic guarantees this runs fast instead of nested while-loops + echo|grep (slow)
+    printf '%s\n' $_used | awk -F'[./]' -v _ip1="$_ip1" -v ip3="$_ip3" -v _sub="$_sub" '
+        $1 == "10" { used[$2, $3] = 1 }            # Parse the input
+        END {                                      # Search the space
+            for (i = _ip1; i <= 255; i++) {
+                for (j = 1; j <= 255; j++) {
+                    if (!((i, j) in used)) {       # Success. Address not found in hash map
+                        printf "10.%d.%d.%d/%d\n", i, j, ip3, _sub
+                        exit 0
+                    }
+                }
+            }
+            exit 1                                 # Failure. Exhausted the search space
+        }
+    ' || eval $(THROW 213 $_fn $_ip1 $_ip3)
+}
+
+
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
 _resolve_snapname_rootenv() {
     local _fn="_resolve_snapname_rootenv" _dset="$1"
@@ -7,7 +44,8 @@ _resolve_snapname_rootenv() {
 
     # Try existing ROOTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
     [ "$ROOTSNAPS" ] && _rootsnaps=$(echo "$ROOTSNAPS" | grep $_dset)
-    if [ -z "$_rootsnaps" ] && unset ROOTSNAPS ; then
+    if [ -z "$_rootsnaps" ] ; then
+        unset ROOTSNAPS
         query_rootsnaps $_dset || eval $(THROW $?)
     fi
 
@@ -46,7 +84,8 @@ _resolve_snapname_persist() {
 
     # Try existing PERSISTSNAPS. If unavail, grab _dset snaps. Then rev order for while/read loop
     [ "$PERSISTSNAPS" ] && _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset)
-    if [ -z "$_persistsnaps" ] && unset $PERSISTSNAPS ; then
+    if [ -z "$_persistsnaps" ] ; then
+        unset PERSISTSNAPS
         query_persistsnaps $_dset || eval $(THROW $?)
     fi
     _persistsnaps=$(echo "$PERSISTSNAPS" | grep $_dset \
@@ -79,9 +118,7 @@ compose_reclone_root_cmds() {
     _snap=$(_resolve_snapname_rootenv $(ctx_get ${_pfxloc}R_DSET))
     case $? in
         0)  : ;;
-        2)  _die=$(( $(date +%s) + 30 ))
-            _CMD_SNAPSHOT_ROOT="zfs snapshot -o qb:destroy_date=$_die -o qb:autosnap=- -o qb:autocreated=yes $_snap"
-            ;;
+        2) _CMD_SNAPSHOT_ROOT="zfs snapshot -o qb:ttl=1m $_snap" ;;
         *)  eval $(THROW $? _generic "failed to get root snapshot name") ;;
     esac
 
@@ -92,13 +129,13 @@ compose_reclone_root_cmds() {
         _r_zfs_mnt="$(query_zfs_mountpoint $_r_zfs)/$_cell"
         _CMD_UPDATE_R_MNT_RTCTX="sed -i '' -E \"s|^(R_MNT=\\\")|\1$_r_zfs_mnt|\" $_rt_ctx"
     fi
-    _CMD_CLONE_ROOT="zfs clone -o qb:autosnap=false $_snap $_r_dset"
+    _CMD_CLONE_ROOT="zfs clone $_snap $_r_dset"
 }
 
 # $1 required. Caller should be careful if deconfliction via $2 (_pfx) is necessary
 compose_reclone_persist_cmds() {
     local _fn="compose_reclone_persist_cmds" _pfx="$3" _pfxloc="prc_"
-    local _cell _rt_ctx _snap _die _p_mnt _p_dset
+    local _cell _rt_ctx _snap _p_mnt _p_dset
     assert_args_set 2 "$1" "$2" && _cell="$1" _rt_ctx="$2" || eval $(THROW $?)
 
     # Compose the local vars based on their prefixes
@@ -113,9 +150,7 @@ compose_reclone_persist_cmds() {
     _snap=$(_resolve_snapname_persist $(ctx_get ${_pfxloc}P_DSET))
     case $? in
         0) : ;;
-        2)  _die=$(( $(date +%s) + 30 ))
-            _CMD_SNAPSHOT_PERSIST="zfs snapshot -o qb:destroy_date=$_die -o qb:autosnap=- -o qb:autocreated=yes $_snap"
-            ;;
+        2) _CMD_SNAPSHOT_PERSIST="zfs snapshot -o qb:ttl=1m $_snap" ;;
         *)  eval $(THROW $? _generic "failed to get persistent snapshot name")  ;;
     esac
 
@@ -127,7 +162,7 @@ compose_reclone_persist_cmds() {
     else
         _CMD_DESTROY_PERSIST="zfs destroy -rRf $_p_dset"
     fi
-    _CMD_CLONE_PERSIST="zfs clone -o qb:autosnap=false $_snap $_p_dset"
+    _CMD_CLONE_PERSIST="zfs clone $_snap $_p_dset"
     _CMD_FIX_PW="fix_freebsd_pw $_cell $(ctx_get $_pfxloc) $_p_mnt"
 }
 
