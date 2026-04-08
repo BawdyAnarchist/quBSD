@@ -31,15 +31,17 @@ compose_flags_commands() {
 
     # Both native jail directory and /compat/<distro> should receive flags protections
     for _d in $_dirs ; do
-        [ -e "$R_MNT/$_d" ] && _CMD_CHFLAGS="chflags -fR schg $R_MNT/$_d ; $_CMD_CHFLAGS"
+        [ -e "$R_MNT/$_d" ] && _CMD_CHFLAGS="$(printf "%b" \
+            "chflags -fR schg $R_MNT/$_d" "\n$_CMD_CHFLAGS")"
     done
+
     for _c in $(hush ls -1 $R_MNT/compat) ; do
         for _d in $_dirs ; do
-            [ -e "$R_MNT/compat/$_c/$_d" ] \
-                && _CMD_CHFLAGS="chflags -fR schg $R_MNT/compat/$_c/$_d ; $_CMD_CHFLAGS"
+            [ -e "$R_MNT/compat/$_c/$_d" ] && _CMD_CHFLAGS="$(printf "%b" \
+                "chflags -fR schg $R_MNT/compat/$_c/$_d" "\n$_CMD_CHFLAGS")"
         done
     done
-    _CMD_CHFLAGS=$(echo $_CMD_CHFLAGS | sed -E 's|//|/|g')  # Removes double // directory paths
+    _CMD_CHFLAGS=$(echo "$_CMD_CHFLAGS" | sed -E 's|//|/|g')  # Removes double // directory paths
 
     # Slightly hacky but resolv is an exception to schg. Services need to modify this.
     [ -f "$R_MNT/etc/resolvconf.conf" ] && _resolvs="$R_MNT/etc/resolvconf.conf"
