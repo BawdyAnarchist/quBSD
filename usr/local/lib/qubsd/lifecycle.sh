@@ -19,15 +19,20 @@ execute_commands() {
 
 # Keeps main script execution syntax clean while allowing for global debug tools
 exec_cmd() {
-    local _fn="exec_cmd" _cmd="$1"
-    [ -z "$_cmd" ] && return 0   # Empty command would cause an error with printf
+    local _fn="exec_cmd" _cmd="$1" _line
+    [ -z "$_cmd" ] && return 0
 
+    # The while-read loop enables consistent " # " reporting for each command line
     case $DRY_RUN::$VERBOSE in
         true::*|TRUE::*)
-            printf " # %s\n" "$_cmd" >&2
+            printf "%s\n" "$_cmd" | while IFS= read -r _line ; do
+                printf " # %s\n" "$_line"
+            done >&2
             ;;
         *::true|*::TRUE)
-            printf " # %s\n" "$_cmd" >&2
+            printf "%s\n" "$_cmd" | while IFS= read -r _line ; do
+                printf " # %s\n" "$_line"
+            done >&2
             eval "$_cmd"
             ;;
         *)  eval "$_cmd" ;;
