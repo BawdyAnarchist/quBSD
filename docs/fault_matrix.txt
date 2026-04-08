@@ -110,6 +110,7 @@ CODE  LEVEL      DESCRIPTION
 210   runtime    Generic networking problem
 211   runtime    Route not available
 212   runtime    No IP addresses found for any running jails
+213   runtime    Failed to find available IPaddr in the range
 220   runtime    General system query error
 221   runtime    Query sysmem error
 222   runtime    num_cpus not found in sysctl
