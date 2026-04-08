@@ -11,11 +11,7 @@ compose_commands() {
 
     # Remove interfaces and handle files modification for those interfaces
     _intfs=$(jexec -l -U root $CELL ifconfig -g tap ; jexec -l -U root $CELL ifconfig -g epair)
-    for _intf in $_intfs; do
-       # If interface is an epair, pass [-d] destroy
-       [ -z "${_intf##epair*}" ] && _d='-d' || unset _d
-       _CMD_RM_INTF="remove_interface $_d $_intf $CELL ; $_CMD_RM_INTF"
-    done
+    compose_remove_interface_cmds "$_intfs" "$CELL"
 
     # /rw system files might be schg, but needed by rc.shutdown.
     _CMD_CHFLAGS="chflags -fR noschg $P_MNT/rw"
@@ -30,7 +26,7 @@ main() {
 
     compose_commands
 
-    _COMMANDS="_CMD_RM_INTF _CMD_CHFLAGS"
+    _COMMANDS="_CMD_RM_INTFS _CMD_CHFLAGS"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
     return 0
 }

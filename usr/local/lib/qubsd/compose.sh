@@ -36,6 +36,31 @@ resolve_open_ipv4() {
     ' || eval $(THROW 213 $_fn $_ip1 $_ip3)
 }
 
+compose_remove_interface_cmds() {
+    local _fn="compose_remove_interface_cmds" _intfs="$1" _cell="$2"
+
+    for _intf in $_intfs ; do
+        # First check if it's already on host
+        if quiet ifconfig $_intf ; then
+            _CMD_RM_INTFS="ifconfig $_intf destroy ; $_CMD_RM_INTFS"
+
+        # If a jail type cell was passed, check that as the first possibility to find/remove tap
+        elif quiet ifconfig -j "$_cell" "$_intf" ; then
+            _CMD_RM_INTFS="$(printf "%b" \
+                "ifconfig $_intf -vnet $_cell\n" \
+                "ifconfig $_intf destroy\n" \
+                "$_CMD_RM_INTFS")"
+
+        # If the above fails, then check each jail one by one
+        else
+           for _j in $(query_onjails ; echo $ONJAILS) ; do
+              quiet ifconfig -j "$_j" "$_intf" && _CMD_RM_INTFS="$(printf "%b" \
+                  "ifconfig $_intf -vnet $_j\n" \
+                  "ifconfig $_intf destroy")"
+           done
+        fi
+    done
+}
 
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
 _resolve_snapname_rootenv() {
