@@ -312,6 +312,22 @@ query_zfs_mountpoint() {
 ####################################################################################################
 #####################################  SYSTEM STATE QUERIES  #######################################
 
+# Returns a list of all epairs currently in use by the system (but without a/b designation)
+query_epairs() {
+    local _fn="query_epairs" _intf _epairs _eps
+
+    # Get all running jails and grab all the epairs on host
+    query_onjails  # Get all running jails
+    _epairs=$(hush ifconfig -g epair | sed -E "s|.\$||" | sort -u)
+
+    for _j in $ONJAILS ; do
+        _eps=$(hush ifconfig -j $_j -g epair | sed -E "s|.\$||")
+        _epairs=$(printf "%b" "$_epairs" "\n$_eps")
+        unset _eps
+    done
+    echo "$_epairs" | sed -E "/^\$/d" | sort -u  # remove blank lines and echo back the list
+}
+
 query_onjails() {
     local _fn="query_onjails" _onjails
     if [ "$ONJAILS" ] ; then
