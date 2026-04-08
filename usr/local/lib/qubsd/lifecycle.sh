@@ -26,12 +26,12 @@ exec_cmd() {
     case $DRY_RUN::$VERBOSE in
         true::*|TRUE::*)
             printf "%s\n" "$_cmd" | while IFS= read -r _line ; do
-                printf " # %s\n" "$_line"
+                printf "  # %s\n" "$_line"
             done >&2
             ;;
         *::true|*::TRUE)
             printf "%s\n" "$_cmd" | while IFS= read -r _line ; do
-                printf " # %s\n" "$_line"
+                printf "  # %s\n" "$_line"
             done >&2
             eval "$_cmd"
             ;;
