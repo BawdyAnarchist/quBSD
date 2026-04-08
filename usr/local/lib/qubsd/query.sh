@@ -330,12 +330,7 @@ query_epairs() {
 
 query_onjails() {
     local _fn="query_onjails" _onjails
-    if [ "$ONJAILS" ] ; then
-        _onjails=$(jls | sed "1 d" | awk '{print $2}') || eval $(THROW 201)
-        ONJAILS=$(echo "$ONJAILS" ; echo "$_onjails")
-    else
-        ONJAILS=$(jls | sed "1 d" | awk '{print $2}') || eval $(THROW 201)
-    fi
+    ONJAILS=$(jls | sed "1 d" | awk '{print $2}')
     return 0
 }
 
