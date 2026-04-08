@@ -1,6 +1,12 @@
 
 ### Next up
 
+exec.created and the networking stack
+   `remove_interface` needs transitioned to an overhaul compose_remove_interface_cmd, and exec.prestop needs switched too
+
+validate.sh
+   The ipv4 validations can probably leverage some new primitives in query.sh query_param_values IPV4
+
 
 ### Import things in the code as I overhaul that still need addressed
 exec.postart
@@ -8,7 +14,6 @@ exec.postart
 exec.created
   - I think I removed the chaining starts. Maybe think about adding that back in? Not sure. Maybe qb start should do that only
 When finished or near finish -> $D_CELLS/$_cell is just $QCONF. Replace everything
-
 
 
 ### Bugs
