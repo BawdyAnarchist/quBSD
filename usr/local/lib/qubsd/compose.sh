@@ -7,7 +7,7 @@
 # Require $1,$2,$3. Search for available IPaddr using the form: _ip0._ip1._ip2._ip3/_sub
   # _ip0 is always '10', while _ip1._ip2 comprise the search space
   # _ip3/_sub convention is '.2/30' for client-side of epair, and '.1/30' for gw side of epair
-  # _allocated is optional $4. Caller can supplement "used IPs" with their own adhoc list
+  # _allocated is optional $4. Caller can supplement _used with their own adhoc list
 resolve_open_ipv4() {
     local _fn="_resolve_open_ipv4" _ip1="$1" _ip3="$2" _sub="$3" _allocated="$4"
     local _used _ip_test
