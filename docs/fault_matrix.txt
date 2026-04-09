@@ -53,6 +53,11 @@ CODE  LEVEL      DESCRIPTION
 34    assert     taps formatting failure
 35    assert     vcpus formatting failure
 
+50    compose    <UNUSED>
+51    compose    <UNUSED>
+52-   compose    VM-to-VM connection unsupported
+-110  compose    <UNUSED>
+
 110   config     Path invalid
 111   config     Cell JCONF missing
 112   config     Cell QCONF missing
