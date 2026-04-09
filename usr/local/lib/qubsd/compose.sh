@@ -16,12 +16,12 @@ _resolve_available_ipv4() {
     assert_int_comparison -g 0 -L 31  "$_sub" || eval $(THROW $? _generic "Invalid _sub")
 
     # Assemble the full list of used IPs for the comparison
-    query_runtime_ips
+    query_runtime_ips   # Sets global $RT_IPS
     _config_ips="$(query_param_values IPV4 | awk '{ print $3 }' | sort -u)"
     _used="$(printf "%b" "$_config_ips" "\n$RT_IPS")"
 
     # A bit of awk magic guarantees this runs fast instead of nested while-loops + echo|grep (slow)
-    _newIP=$(printf '%s\n' $_used | awk -F'[./]' -v _ip1="$_ip1" -v ip3="$_ip3" -v _sub="$_sub" '
+    _newIP=$(printf '%s\n' $_used | awk -F '[./]' -v _ip1="$_ip1" -v ip3="$_ip3" -v _sub="$_sub" '
         $1 == "10" { used[$2, $3] = 1 }            # Parse the input
         END {                                      # Search the space
             for (i = _ip1; i <= 255; i++) {
@@ -44,10 +44,28 @@ _resolve_available_ipv4() {
 
 # Finds an unused epair.
 _resolve_available_epair() {
-    local _fn="_resolve_available_epair" _used="$1" _allocated="$2"
-    assert_args_set 1 "$_used" || eval $(THROW $?)
+    local _fn="_resolve_available_epair" _reserve="$1" _int=0 _newEP
 
+    query_runtime_epairs   # Sets global $RT_EPAIRS
 
+    # A bit of awk magic guarantees this runs fast instead of nested while-loops + echo|grep (slow)
+    _newEP=$(printf '%s\n' $RT_EPAIRS | awk -v _int="$_int" '
+        /^epair[0-9]/ { sub(/^epair/, ""); used[$0+0] = 1 }  # Parse the input
+        END {
+            for (i = _int; i <= 999; i++) {       # Search the space
+                if (!(i in used)) {
+                    printf "epair%d\n", i         # Success. Address not found in hash map
+                    exit 0
+                }
+            }
+            exit 1                                # Failure. Exhausted the search space
+        }
+    ') || eval $(THROW 213 $_fn)
+
+    # If _reserve was passed, then update the RT_EPAIRS, excluding _newEP from future use
+    [ "$_reserve"  ] && RT_EPAIRS="$(printf "%b" "$RT_EPAIRS" "\n$_newEP" | sed '/^$/d')"
+
+    echo "$_newEP"
 }
 
 compose_remove_interface_cmds() {
