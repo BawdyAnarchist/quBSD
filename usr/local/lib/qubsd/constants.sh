@@ -73,7 +73,7 @@ export CONTEXT="CALLER,JCONF,QCONF,P_DSET,P_MNT,R_DSET,R_MNT,RT_CTX"   # Conveni
 export CTX_VALIDATE="JCONF,P_DSET,R_DSET"     # Necessary validations in addition to PARAMS_
 export CLASSES="rootjail,appjail,dispjail,rootVM,appVM,dispVM,cjail"
 
-# Query cache for rapid stacked/looped information retreival
+# Cached query globals for rapid stacked/looped information retreival
 export QUERY="CELLS,CELLS_QPATHS,DATASETS,MOUNTS,NCPU,ONJAILS,ONVMS,PCICONF,PERSISTSNAPS,ROOTSNAPS,RT_EPAIRS,RT_IPS,RT_TAPS,SNAPSHOTS,SYSMEM"
 
 # zfs props relevant to qubsd operations. Used in `zfs list` queries
