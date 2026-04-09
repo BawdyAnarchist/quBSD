@@ -57,7 +57,7 @@ ctx_load_params() {
 
     # Don't clobber globals during sourcing. This MUST come first
     if [ "$_pfx" ] ; then
-        local $(echo $PARAMS_TYPE | sed "s/,/ /g")
+        local $(echo $PARAMS_ALL | sed "s/,/ /g")
         eval $_pfx=$_cell    # Simple way to get the cellname of a loaded context prefix
     fi
 
