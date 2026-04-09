@@ -42,7 +42,7 @@ _resolve_available_ipv4() {
     echo "$_newIP"
 }
 
-# Finds an unused epair.
+# Finds an unused epair
 _resolve_available_epair() {
     local _fn="_resolve_available_epair" _reserve="$1" _int=0 _newEP
 
@@ -68,6 +68,31 @@ _resolve_available_epair() {
     echo "$_newEP"
 }
 
+# Finds an unused tap
+_resolve_available_taps() {
+    local _fn="_resolve_available_taps" _reserve="$1" _int=0 _newTAP
+
+    query_runtime_taps     # Sets global $RT_TAPS. `quiet` because fstat can be noisy
+
+    # A bit of awk magic guarantees this runs fast instead of nested while-loops + echo|grep (slow)
+    _newTAP=$(printf '%s\n' $RT_TAPS | awk -v _int="$_int" '
+        /^tap[0-9]/ { sub(/^tap/, ""); used[$0+0] = 1 }  # Parse the input
+        END {
+            for (i = _int; i <= 999; i++) {     # Search the space
+                if (!(i in used)) {
+                    printf "tap%d\n", i         # Success. tap not found in hash map
+                    exit 0
+                }
+            }
+            exit 1                              # Failure. Exhausted the search space
+        }
+    ') || eval $(THROW 213 $_fn)
+
+    # If _reserve was passed, then update the RT_EPAIRS, excluding _newEP from future use
+    [ "$_reserve"  ] && RT_TAPS="$(printf "%b" "$RT_TAPS" "\n$_newTAP" | sed '/^$/d')"
+
+    echo "$_newTAP"
+}
 compose_remove_interface_cmds() {
     local _fn="compose_remove_interface_cmds" _intfs="$1" _cell="$2"
 
@@ -96,52 +121,77 @@ compose_remove_interface_cmds() {
 }
 
 compose_vif_cmds() {
-    local _fn="compose_vif_cmds" _cli="$1" _pfx="$2" _gw _gw_mod _ipv4 _cl_mod _cli_clis
+    local _fn="compose_vif_cmds"
     local _ip_search _cli_ip _gw_ip
 
     # With no gw, there are no vifs to configure
     { [ -z "$_gw" ] || [ "$_gw" = "none" ] || ! is_cell_running "$_gw" ;} && return 0
 
-    # Command modifiers for simplified command construction
-    [ "$_gw_type" = "JAIL" ]   && _gw_mod="-j $_gw"
-    [ ! "$_client"  = "host" ] && _cl_mod="-j $_client"
-
     # Grab the IP context and resolve the final IPs of cli/gw
-    quiet query_gw_clients && _ip_search="99 1 30" || _ip_search="1 1 30"
+    [ "$_cli_isgw" ] && _ip_search="99 1 30" || _ip_search="1 1 30"
 
-    case $ipv4 in
-        DHCP) _groupmod="group DHCPD"
+    case $_ipv4 in
+        ''|none) ;; ###### TBD. Not sure how I want to handle this yet. ########
+        DHCP) # For client DHCP, we only need the _gw IP (if jail).
+            _groupmod="group DHCPD"
+            [ "$_gw_type" = "JAIL" ] && _gw_ip=$(_resolve_available_ipv4 $_ip_search true)
             ;;
-        auto)
+        auto) # Assign both cl and gw IPs
+            _gw_ip=$(_resolve_available_ipv4 $_ip_search true)
+            _cl_ip=${_gw_ip%.*/*}.2/30
             ;;
-        *)
+        *) # Specifically designated IPaddr in the qconf
+            _cl_ip=$_ipv4
+            _gw_ip=${ipv4%.*/*}.1/${ipv4#*/}
             ;;
     esac
-    _cli_ip=$(_resolve_available_ipv4 $_ip_search)
+
+    # Command modifiers for simplified command construction
+    [ "$_cell"  = "JAIL" ]   && _cl_mod="-j $_cell"
+    [ "$_gw_type" = "JAIL" ] && _gw_mod="-j $_gw"
+}
+
+# These helpers are needed so that the primary cmd functions can used downward-scoped variables
+# and for clean designation of when the CELL is a gateway, vs when it is a client.
+_resolve_cl_context() {
+    local _fn="_resolve_cl_context" _cli="$1" _pfx="$2"
+    _type=$(ctx_get ${_pfx}TYPE)
+    _ipv4=$(ctx_get ${_pfx}IPV4)
+    _mtu=$(ctx_get ${_pfx}MTU)
+    _vifs=$(ctx_get ${_pfx}VIFS)
+    _gw=$(ctx_get ${_pfx}GATEWAY)
+    quiet query_gw_clients $_cli && _cli_isgw=true  # Needed for vif IP resolution conventions
 }
 
 # Full composition of the network stack commands for a single ell, and between its gw and clients
 compose_network_construction_cmds() {
     local _fn="compose_network_construction_cmds" _cell="$1" _pfx="$2"
-    local _caller _cell_type _gw _gw_type _ipv4 _mtu _clients
+    local _caller _client _type _ipv4 _mtu _gw _gw_type
     assert_args_set 1 "$_cell" || eval $(THROW $?)
     assert_pfx "$_pfx" || eval $(THROW $?)
 
     # Grab all relevant cli and gw context elements. These will downward scope to prevent drilling
     _caller=$(ctx_get ${_pfx}CALLER)  # Switches gw services restart (deconflict potential races)
-    _cell_type=$(ctx_get ${_pfx}TYPE)
-    _gw=$(ctx_get ${_pfx}GATEWAY)
-    ctx_bootstrap_cell $_gw "gw_"     # Need to global-namespace the gateway for network configs
-    _gw_type=$(ctx_get gw_TYPE)
-    _ipv4=$(ctx_get ${_pfx}IPV4)
-    _mtu=$(ctx_get ${_pfx}MTU)
     _clients=$(query_gw_clients "$_cell")
 
-    # Compose the virtual_interface (vif) configuration commands
+    # Compose the connection commands from CELL to _gw. CELL starts out as the client
+    _resolve_cl_context $_pfx      # Dynamically scoped variables (available for use in this func)
+    _gw_type=$(query_cell_type $_gw)
+    _CMD_NETWORK_VIF=$(compose_vif_cmds)
+    _CMD_NETWORK_CONFIG=$(compose_config_cmds)
+    _CMD_NETWORK_SERVICE=$(compose_service_cmds)
 
-    # Compose the config files modification commands
+    # CELL now becomes the gw_, and the downstream client commands are constructed
+    _gw_type=$(ctx_get ${_pfx}TYPE)
+    for _client in $clients ; do
+        _is_cell_running $_client || continue
+        ctx_load_runtime "$_client" "cl_" || continue
+        _resolve_cl_context "$_client" "cl_"
 
-    # Compose the services reset commands
+        _CMD_NETWORK_VIF="$(printf "%b" "$_CMD_NETWORK_VIF" "\n$(compose_vif_cmds)")"
+        _CMD_NETWORK_CONFIG="$(printf "%b" "$_CMD_NETWORK_VIF" "\n$(compose_config_cmds)")"
+        _CMD_NETWORK_SERVICE="$(printf "%b" "$_CMD_NETWORK_VIF" "\n$(compose_service_cmds)")"
+    done
 }
 
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
