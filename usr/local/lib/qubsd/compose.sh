@@ -3,7 +3,7 @@
 ####################################################################################################
 ############################################  HELPERS  #############################################
 
-
+# Finds an unused ipv4 address
 # Require $1,$2,$3. Search for available IPaddr using the form: _ip0._ip1._ip2._ip3/_sub
   # _ip0 is always '10', while _ip1._ip2 comprise the search space
   # _ip3/_sub convention is '.2/30' for client-side of epair, and '.1/30' for gw side of epair
@@ -194,7 +194,8 @@ compose_network_construction_cmds() {
     done
 }
 
-# Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
+# Return the least-stale snapshot possible. This could be an existing snapshot with no changes,
+# or it might be necessary to create a temporary snapshot. But dont snap a running rootenv.
 _resolve_snapname_rootenv() {
     local _fn="_resolve_snapname_rootenv" _dset="$1"
     local _rootsnaps _psmod _lstart _line _snap _creation _crea_unix _written
@@ -235,7 +236,8 @@ EOF
     fi
 }
 
-# Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
+# Return the least-stale snapshot possible. This could be an existing snapshot with no changes,
+# or it might be necessary to create a temporary snapshot.
 _resolve_snapname_persist() {
     local _fn="_resolve_snapname_persist" _dset="$1" _persistsnaps _snap _written
 
@@ -257,13 +259,14 @@ _resolve_snapname_persist() {
     echo "$_dset@$(date +%s)" && return 2   # '2' tells caller to perform a new snapshot
 }
 
-# Caller should be careful if deconfliction via $1 (_pfx) is necessary
+# Makes a full composition of the commands required to re/clone the rootenv dataset for appjail/VM
 compose_reclone_root_cmds() {
-    local _fn="compose_reclone_root_cmds" _pfx="$3" _pfxloc="rrc_"
-    local  _cell _rt_ctx _rootenv _snap _die _r_mnt _r_dset _r_zfs_mnt
-    assert_args_set 2 "$1" "$2" && _cell="$1" _rt_ctx="$2" || eval $(THROW $?)
+    local _fn="compose_reclone_root_cmds" _cell="$1" _pfx="$2" _pfxloc="rrc_"
+    local  _rt_ctx _rootenv _snap _die _r_mnt _r_dset _r_zfs_mnt
+    assert_args_set 1 "$1" || eval $(THROW $?)
 
-    # Compose the local vars based on their prefixes
+    # Dereference the required context variables
+    _rt_ctx=$(ctx_get ${_pfx}RT_CTX)
     _rootenv=$(ctx_get ${_pfx}ROOTENV)
     _r_zfs=$(ctx_get ${_pfx}R_ZFS)
     _r_dset=$(ctx_get ${_pfx}R_DSET)
@@ -272,6 +275,7 @@ compose_reclone_root_cmds() {
     # Need the root dataset of the rootenv, to choose the snapshot
     ctx_bootstrap_cell $_rootenv $_pfxloc || eval $(THROW $? _generic "< $_rootenv > bootstrap failed")
 
+    # Use exit code to determine if a new snapshot is needed/possible, for most recent rootenv state
     _snap=$(_resolve_snapname_rootenv $(ctx_get ${_pfxloc}R_DSET))
     case $? in
         0)  : ;;
@@ -289,13 +293,14 @@ compose_reclone_root_cmds() {
     _CMD_CLONE_ROOT="zfs clone $_snap $_r_dset"
 }
 
-# $1 required. Caller should be careful if deconfliction via $2 (_pfx) is necessary
+# Makes a full composition of the commands required to re/clone the persist dataset for dispjail/VM
 compose_reclone_persist_cmds() {
-    local _fn="compose_reclone_persist_cmds" _pfx="$3" _pfxloc="prc_"
-    local _cell _rt_ctx _snap _p_mnt _p_dset
-    assert_args_set 2 "$1" "$2" && _cell="$1" _rt_ctx="$2" || eval $(THROW $?)
+    local _fn="compose_reclone_persist_cmds" _cell="$1" _pfx="$2" _pfxloc="prc_"
+    local _rt_ctx _snap _p_mnt _p_dset
+    assert_args_set 1 "$_cell" || eval $(THROW $?)
 
-    # Compose the local vars based on their prefixes
+    # Dereference the required context variables
+    _rt_ctx=$(ctx_get ${_pfx}RT_CTX)
     _template=$(ctx_get ${_pfx}TEMPLATE)
     _p_zfs=$(ctx_get ${_pfx}P_ZFS)
     _p_dset=$(ctx_get ${_pfx}P_DSET)
@@ -304,6 +309,7 @@ compose_reclone_persist_cmds() {
     # Need the persist dataset of the template, to choose the snapshot
     ctx_bootstrap_cell $_template $_pfxloc || eval $(THROW $? _generic "< $_template > bootstrap failed")
 
+    # Use exit code to determine if a new snapshot is needed/possible, for most recent persist state
     _snap=$(_resolve_snapname_persist $(ctx_get ${_pfxloc}P_DSET))
     case $? in
         0) : ;;
