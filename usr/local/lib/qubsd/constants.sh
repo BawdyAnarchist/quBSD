@@ -74,7 +74,7 @@ export CTX_VALIDATE="JCONF,P_DSET,R_DSET"     # Necessary validations in additio
 export CLASSES="rootjail,appjail,dispjail,rootVM,appVM,dispVM,cjail"
 
 # Query results storage for rapid stacked/looped information retreival
-export QUERY="CELLS,CELLS_QPATHS,DATASETS,MOUNTS,NCPU,ONJAILS,ONVMS,PCICONF,PERSISTSNAPS,ROOTSNAPS,SNAPSHOTS,SYSMEM"
+export QUERY="CELLS,CELLS_QPATHS,DATASETS,MOUNTS,NCPU,ONJAILS,ONVMS,PCICONF,PERSISTSNAPS,ROOTSNAPS,RT_IPS,RT_EPAIRS,SNAPSHOTS,SYSMEM"
 
 # zfs props relevant to qubsd operations. Used in `zfs list` queries
 # DO NOT REORDER. Append only for new zfsprops, because awk uses this column ordering for parsing
