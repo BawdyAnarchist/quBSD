@@ -37,7 +37,7 @@ ctx_load_params() {
 
     # Guarantee sanitary inputs
     assert_cellname "$1" || eval $(THROW $?)
-    [ "$_pfx" ] && ! assert_pfx "$_pfx" && eval $(THROW $?)
+    assert_pfx "$_pfx" || eval $(THROW $?)
 
     # Derive the cell type and store in context (existence of QCONF path is verified here as well)
     _type=$(query_cell_type $_cell) || eval $(THROW $? ${_fn} $_cell)  # JAIL|VM
@@ -85,7 +85,7 @@ ctx_load_file() {
 
     # Guarantee sanitary inputs
     is_path_exist -f "$_file" || eval $(THROW $?)
-    [ "$_pfx" ] && ! assert_pfx "$_pfx" && eval $(THROW $?)
+    assert_pfx "$_pfx" || eval $(THROW $?)
 
     # First read the file to get PARAMS, then local them to prevent clobber before pfx is assigned
     if [ "$_pfx" ] ; then
@@ -107,7 +107,7 @@ ctx_load_mountpoints() {
 
     # Guarantee sanitary inputs
     assert_cellname "$1" || eval $(THROW $?)
-    [ "$_pfx" ] && ! assert_pfx "$_pfx" && eval $(THROW $?)
+    assert_pfx "$_pfx" || eval $(THROW $?)
 
     _r_dset=$(ctx_get ${_pfx}R_DSET)
     _p_dset=$(ctx_get ${_pfx}P_DSET)
@@ -134,7 +134,7 @@ ctx_validate_params() {
 
     # Guarantee sanitary inputs
     [ "$_cell" ] && ! assert_cellname "$_cell" && eval $(THROW $?)
-    [ "$_pfx" ] && ! assert_pfx "$_pfx" && eval $(THROW $?)
+    assert_pfx "$_pfx" || eval $(THROW $?)
 
     # If no PARAMS were passed, use the appropriate TYPE set and supplemental context globals
     [ -z "$_params" ] && _params="$(ctx_get ${_pfx}PARAMS_TYPE),$CTX_VALIDATE"
@@ -158,7 +158,7 @@ ctx_write_runtime() {
 
     #Guarantee sanitary inputs
     assert_cellname "$1" || eval $(THROW $?)
-    [ "$_pfx" ] && ! assert_pfx "$_pfx" && eval $(THROW $?)
+    assert_pfx "$_pfx" || eval $(THROW $?)
     # Double check the function usage by requiring $1 to be equivalent to the _pfx ctx
     [ "$_pfx" ] && { [ "$(ctx_get $_pfx)" = "$_cell" ] || eval $(THROW 7 _internal4) ;}
 
@@ -185,7 +185,7 @@ ctx_runtime_upsert() {
 
 ctx_load_runtime() {
     local _fn="load_runtime_context" _pfx="$1"
-    [ "$_pfx" ] && ! assert_pfx "$_pfx" && eval $(THROW $?)
+    assert_pfx "$_pfx" && eval $(THROW $?)
 
     _rt_ctx=$(ctx_get ${_pfx}RT_CTX)
     is_path_exist -f $_rt_ctx || eval $(THROW $? _missing_context $_rt_ctx)

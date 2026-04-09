@@ -15,3 +15,6 @@ Cell < %s > missing dataset at < %s >
 internal error: < %s > does not have a corresponding validation function < %s >
 /END/
 
+:_missing_context:
+Missing required runtime context file: < %s >
+/END/
