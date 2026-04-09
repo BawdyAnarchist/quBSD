@@ -239,7 +239,7 @@ query_datasets() {
     # Cant THROW on zfs failure, because the datasets it successfully found will be lost
     _newdsets=$(hush zfs list -Ho $DSET_PROPS $_pull)
     DATASETS=$(echo "$DATASETS" ; echo "$_newdsets")
-    DATASETS=$(echo "$DATASETS" | sed -E "/^\$/d")  # Remove blank lines
+    DATASETS=$(echo "$DATASETS" | sed -E '/^$/d')  # Remove blank lines
 
     return 0
 }
@@ -281,7 +281,7 @@ query_rootsnaps() {
     # Cant THROW on zfs failure, because the datasets it successfully found will be lost
     _newsnaps=$(zfs list -Ht snapshot -o $SNAP_PROPS $_pull)
     ROOTSNAPS=$(echo "$ROOTSNAPS" ; echo "$_newsnaps")
-    ROOTSNAPS=$(echo "$ROOTSNAPS" | sed -E "/^\$/d")  # Remove blank lines
+    ROOTSNAPS=$(echo "$ROOTSNAPS" | sed -E '/^$/d')  # Remove blank lines
     return 0
 }
 
@@ -298,7 +298,7 @@ query_persistsnaps() {
     # Cant THROW on zfs failure, because the datasets it successfully found will be lost
     _newsnaps=$(zfs list -Ht snapshot -o $SNAP_PROPS $_pull)
     PERSISTSNAPS=$(echo "$PERSISTSNAPS" ; echo "$_newsnaps")
-    PERSISTSNAPS=$(echo "$PERSISTSNAPS" | sed -E "/^\$/d")  # Remove blank lines
+    PERSISTSNAPS=$(echo "$PERSISTSNAPS" | sed -E '/^$/d')  # Remove blank lines
     return 0
 }
 
@@ -325,7 +325,7 @@ query_epairs() {
         _epairs=$(printf "%b" "$_epairs" "\n$_eps")
         unset _eps
     done
-    echo "$_epairs" | sed -E "/^\$/d" | sort -u  # remove blank lines and echo back the list
+    echo "$_epairs" | sed -E '/^$/d' | sort -u  # remove blank lines and echo back the list
 }
 
 query_onjails() {
@@ -355,19 +355,20 @@ query_num_cpus() {
 }
 
 # With $1 < cell>, all active IPaddr of a running jail. Without $1, active IPs of all running jails
-query_running_ips() {
-    local _fn="query_running_ips" _cell="$1" _val _jail_ips
+query_runtime_ips() {
+    local _fn="query_runtime_ips" _cell="$1" _val _jail_ips
 
-    if [ "$_cell" ] ; then
-        _val=$(ifconfig -j $_cell -a inet | awk '/inet / {print $2}')
-    else
-        query_onjails
-        for _jail in $ONJAILS ; do
-            _jail_ips=$(ifconfig -j $_jail -a inet | awk '/inet / {print $2}')
-            _val=$(printf "%b" "$_val" "\n" "$_jail_ips")
-        done
-    fi
-    [ "$_val" ] && echo "$_val" && return 0 || return 212
+    [ "$RT_IPS" ] && return 0  # Already have a list of used IPs.
+
+    query_onjails
+    for _jail in $ONJAILS ; do
+        _jail_ips=$(ifconfig -j $_jail -a inet | awk '/inet / {print $2}')
+        _val=$(printf "%b" "$_val" "\n$_jail_ips")
+        unset _jail_ips
+    done
+
+    [ "$_val" ] && RT_IPS="$(echo "$_val" | sed '/^$/d')" && return 0
+    return 212
 }
 
 
