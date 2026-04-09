@@ -126,7 +126,8 @@ query_cell_type() {
     _type=$(sed -En "s/CLASS=\"(.*)\"/\1/p" $D_CELLS/$_cell)
     case $_type in
         *jail) echo "JAIL" ;;
-        *VM) echo "VM" ;;
+        *VM)   echo "VM"   ;;
+        *host) echo "HOST" ;;
         *) eval $(THROW 18 ${_fn}2 "$_cell") ;;
     esac
 
@@ -372,6 +373,13 @@ query_runtime_epairs() {
     return 0
 }
 
+# Returns a list of all epairs currently in use by the system (but without a/b designation)
+query_runtime_taps() {
+    local _fn="query_runtime_taps" _fstat _taps _val
+    # Needs hush because fstat is noisy with stderr even on normal exit 0 queries
+    RT_TAPS=$(hush fstat | sed -En "s|/dev.*(tap[0-9]+) .*|\1|p" | awk '{print $5}')
+    return 0
+}
 ##########################################  X11 QUERIES  ###########################################
 
 query_net_active_xid() {
