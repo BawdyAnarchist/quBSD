@@ -41,12 +41,12 @@ compose_commands() {
 
     # Only clone/reclone for non-rootjails. Otherwise we'll destroy the rootjail
     if [ ! "$CLASS" = "rootjail" ] ; then
-        compose_reclone_root_cmds $CELL $RT_CTX || eval $(THROW $?)
+        compose_reclone_root_cmds $CELL || eval $(THROW $?)
     fi
 
     # Only clone/reclone for dispjails. Otherwise we'll destroy the appjail persistent data
     if [ "$CLASS" = "dispjail" ] ; then
-        compose_reclone_persist_cmds $CELL $RT_CTX || eval $(THROW $?)
+        compose_reclone_persist_cmds $CELL || eval $(THROW $?)
     fi
 }
 
