@@ -312,22 +312,6 @@ query_zfs_mountpoint() {
 ####################################################################################################
 #####################################  SYSTEM STATE QUERIES  #######################################
 
-# Returns a list of all epairs currently in use by the system (but without a/b designation)
-query_epairs() {
-    local _fn="query_epairs" _intf _epairs _eps
-
-    # Get all running jails and grab all the epairs on host
-    query_onjails  # Get all running jails
-    _epairs=$(hush ifconfig -g epair | sed -E "s|.\$||" | sort -u)
-
-    for _j in $ONJAILS ; do
-        _eps=$(hush ifconfig -j $_j -g epair | sed -E "s|.\$||")
-        _epairs=$(printf "%b" "$_epairs" "\n$_eps")
-        unset _eps
-    done
-    echo "$_epairs" | sed -E '/^$/d' | sort -u  # remove blank lines and echo back the list
-}
-
 query_onjails() {
     local _fn="query_onjails" _onjails
     ONJAILS=$(jls | sed "1 d" | awk '{print $2}')
@@ -356,7 +340,7 @@ query_num_cpus() {
 
 # With $1 < cell>, all active IPaddr of a running jail. Without $1, active IPs of all running jails
 query_runtime_ips() {
-    local _fn="query_runtime_ips" _cell="$1" _val _jail_ips
+    local _fn="query_runtime_ips" _jail_ips _val
 
     [ "$RT_IPS" ] && return 0  # Already have a list of used IPs.
 
@@ -371,6 +355,22 @@ query_runtime_ips() {
     return 212
 }
 
+# Returns a list of all epairs currently in use by the system (but without a/b designation)
+query_runtime_epairs() {
+    local _fn="query_runtime_epairs" _jail_eps _val
+
+    [ "$RT_EPAIRS" ] && return 0  # Already have a list of used IPs.
+
+    query_onjails
+    for _jail in $ONJAILS ; do
+        _jail_eps=$(hush ifconfig -j $_jail -g epair | sed -E "s|.\$||")
+        _val=$(printf "%b" "$_val" "\n$_jail_eps")
+        unset _jail_eps
+    done
+
+    [ "$_val" ] && RT_EPAIRS="$(echo "$_val" | sed '/^$/d' | sort -u)"
+    return 0
+}
 
 ##########################################  X11 QUERIES  ###########################################
 
