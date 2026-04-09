@@ -7,20 +7,21 @@
 # Require $1,$2,$3. Search for available IPaddr using the form: _ip0._ip1._ip2._ip3/_sub
   # _ip0 is always '10', while _ip1._ip2 comprise the search space
   # _ip3/_sub convention is '.2/30' for client-side of epair, and '.1/30' for gw side of epair
-  # _allocated is optional $4. Caller can supplement _used with their own adhoc list
-resolve_open_ipv4() {
-    local _fn="_resolve_open_ipv4" _ip1="$1" _ip3="$2" _sub="$3" _allocated="$4"
-    local _used _ip_test
+  # _reserve ($4) is optional, creating the side-effect up reserving the new IP in global USED_IPS
+_resolve_available_ipv4() {
+    local _fn="_resolve_available_ipv4" _ip1="$1" _ip3="$2" _sub="$3" _reserve="$4"
+    local _config_ips _used _newIP
     assert_int_comparison -g 0 -L 255 "$_ip1" || eval $(THROW $? _generic "Invalid _ip1")
     assert_int_comparison -g 0 -L 255 "$_ip3" || eval $(THROW $? _generic "Invalid _ip3")
     assert_int_comparison -g 0 -L 31  "$_sub" || eval $(THROW $? _generic "Invalid _sub")
 
     # Assemble the full list of used IPs for the comparison
-    _used="$(printf "%b" "$_allocated\n" "$(query_running_ips)\n" \
-           "$(query_param_values IPV4 | awk '{ print $3 }' | sort -u)")"
+    query_runtime_ips
+    _config_ips="$(query_param_values IPV4 | awk '{ print $3 }' | sort -u)"
+    _used="$(printf "%b" "$_config_ips" "\n$RT_IPS")"
 
     # A bit of awk magic guarantees this runs fast instead of nested while-loops + echo|grep (slow)
-    printf '%s\n' $_used | awk -F'[./]' -v _ip1="$_ip1" -v ip3="$_ip3" -v _sub="$_sub" '
+    _newIP=$(printf '%s\n' $_used | awk -F'[./]' -v _ip1="$_ip1" -v ip3="$_ip3" -v _sub="$_sub" '
         $1 == "10" { used[$2, $3] = 1 }            # Parse the input
         END {                                      # Search the space
             for (i = _ip1; i <= 255; i++) {
@@ -33,7 +34,20 @@ resolve_open_ipv4() {
             }
             exit 1                                 # Failure. Exhausted the search space
         }
-    ' || eval $(THROW 213 $_fn $_ip1 $_ip3)
+    ') || eval $(THROW 213 $_fn $_ip1 $_ip3)
+
+    # If _reserve was passed, then update the RT_IPS, excluding _newIP from future use
+    [ "$_reserve"  ] && RT_IPS="$(printf "%b" "$RT_IPS" "\n$_newIP" | sed '/^$/d')"
+
+    echo "$_newIP"
+}
+
+# Finds an unused epair.
+_resolve_available_epair() {
+    local _fn="_resolve_available_epair" _used="$1" _allocated="$2"
+    assert_args_set 1 "$_used" || eval $(THROW $?)
+
+
 }
 
 compose_remove_interface_cmds() {
@@ -60,6 +74,56 @@ compose_remove_interface_cmds() {
            done
         fi
     done
+    return 0
+}
+
+compose_vif_cmds() {
+    local _fn="compose_vif_cmds" _cli="$1" _pfx="$2" _gw _gw_mod _ipv4 _cl_mod _cli_clis
+    local _ip_search _cli_ip _gw_ip
+
+    # With no gw, there are no vifs to configure
+    { [ -z "$_gw" ] || [ "$_gw" = "none" ] || ! is_cell_running "$_gw" ;} && return 0
+
+    # Command modifiers for simplified command construction
+    [ "$_gw_type" = "JAIL" ]   && _gw_mod="-j $_gw"
+    [ ! "$_client"  = "host" ] && _cl_mod="-j $_client"
+
+    # Grab the IP context and resolve the final IPs of cli/gw
+    quiet query_gw_clients && _ip_search="99 1 30" || _ip_search="1 1 30"
+
+    case $ipv4 in
+        DHCP) _groupmod="group DHCPD"
+            ;;
+        auto)
+            ;;
+        *)
+            ;;
+    esac
+    _cli_ip=$(_resolve_available_ipv4 $_ip_search)
+}
+
+# Full composition of the network stack commands for a single ell, and between its gw and clients
+compose_network_construction_cmds() {
+    local _fn="compose_network_construction_cmds" _cell="$1" _pfx="$2"
+    local _caller _cell_type _gw _gw_type _ipv4 _mtu _clients
+    assert_args_set 1 "$_cell" || eval $(THROW $?)
+    assert_pfx "$_pfx" || eval $(THROW $?)
+
+    # Grab all relevant cli and gw context elements. These will downward scope to prevent drilling
+    _caller=$(ctx_get ${_pfx}CALLER)  # Switches gw services restart (deconflict potential races)
+    _cell_type=$(ctx_get ${_pfx}TYPE)
+    _gw=$(ctx_get ${_pfx}GATEWAY)
+    ctx_bootstrap_cell $_gw "gw_"     # Need to global-namespace the gateway for network configs
+    _gw_type=$(ctx_get gw_TYPE)
+    _ipv4=$(ctx_get ${_pfx}IPV4)
+    _mtu=$(ctx_get ${_pfx}MTU)
+    _clients=$(query_gw_clients "$_cell")
+
+    # Compose the virtual_interface (vif) configuration commands
+
+    # Compose the config files modification commands
+
+    # Compose the services reset commands
 }
 
 # Return the most recent rootenv snapshot possible. Must avoid running rootenv and stale data
