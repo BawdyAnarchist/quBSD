@@ -183,15 +183,6 @@ ctx_runtime_upsert() {
 #### STUB FOR NOW ####
 }
 
-ctx_load_runtime() {
-    local _fn="load_runtime_context" _pfx="$1"
-    assert_pfx "$_pfx" || eval $(THROW $?)
-
-    _rt_ctx=$(ctx_get ${_pfx}RT_CTX)
-    is_path_exist -f $_rt_ctx || eval $(THROW $? _missing_context $_rt_ctx)
-    . $_rt_ctx   # source (load) the runtime
-    return 0
-}
 
 #####################################  BOOTSTRAP ENTRY POINTS  #####################################
 

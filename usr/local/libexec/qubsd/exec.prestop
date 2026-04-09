@@ -22,7 +22,7 @@ main() {
     local _fn="main"
 
     # bootstrap only needs level 2. Otherwise established runtime might conflict with validation
-    mute ctx_load_runtime || ctx_bootstrap_runtime -l 2 $CELL || eval $(THROW $?)
+    mute ctx_load_file $RT_CTX || ctx_bootstrap_runtime -l 2 $CELL || eval $(THROW $?)
 
     compose_commands
 
@@ -31,5 +31,5 @@ main() {
     return 0
 }
 
-main || FATAL
-exit 0   # Guarantee that `jail` does not abort startup
+main || { : ; FATAL ;}  # Push exit code: 0 to FATAL. Prestop failure should never prevent jail stop
+exit 0   # Guarantee that `jail` does not abort shutdown

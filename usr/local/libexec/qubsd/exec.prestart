@@ -74,7 +74,7 @@ main2() {
 main1() {
    local _fn="main1"
 
-   ctx_load_runtime || eval $(THROW $?)
+   ctx_load_file $RT_CTX || eval $(THROW $?)
 
 	# Overlay must be symlinked with reference to the jail's root, not host (chroot).
 	cp "$0" $R_MNT/tmp/qb_prestart.sh && chmod +x $R_MNT/tmp/qb_prestart.sh
