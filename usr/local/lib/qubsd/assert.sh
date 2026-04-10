@@ -31,7 +31,7 @@ assert_bhyveopts() {
 # Impossible to fully assert bhyve_custm parameter user inputs. But some guarantees can be provided
 assert_bhyve_custm() {
     local _fn="assert_bhyve_custm" _val="$1"
-    echo "$_val" | grep -Eqs "^[a-zA-Z0-9 \-/_:,.=+]*$" || eval $(THROW 31 $_fn)
+    echo "$_val" | grep -Eqs "^[a-zA-Z0-9 -/_:,.=+]*$" || eval $(THROW 31 $_fn)
 }
 
 assert_bool_tf() {
@@ -100,7 +100,7 @@ assert_dataset_name() {
 
 assert_devfs_rule() {
     local _fn="assert_devfs_rule"
-    assert_int_comparison -g 0 "$1" || eval $(THROW 26 $_fn)
+    assert_int_comparison -g 0 -- "$1" || eval $(THROW 26 $_fn)
 }
 
 assert_integer() {

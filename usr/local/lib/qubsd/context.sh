@@ -125,7 +125,7 @@ ctx_validate_params() {
     local _cell _pfx _level _pass _params _value _param _validation_function
 
     while getopts :l:p:P: _opts ; do case $_opts in
-        l) assert_int_comparison -g 1 -l 3 "$OPTARG" && _level="$OPTARG" || eval $(THROW $?) ;;
+        l) _level="$OPTARG"  ;;
         p) assert_pass   "$OPTARG" && _pass="$OPTARG"   || eval $(THROW $?) ;;
         P) assert_params "$OPTARG" && _params="$OPTARG" || eval $(THROW $?) ;;
         *)  eval $(THROW 8 _internal1) ;;
@@ -135,6 +135,7 @@ ctx_validate_params() {
     # Guarantee sanitary inputs
     [ "$_cell" ] && ! assert_cellname "$_cell" && eval $(THROW $?)
     assert_pfx "$_pfx" || eval $(THROW $?)
+    assert_int_comparison -g 1 -l 3 -- "$_level" || eval $(THROW $?)
 
     # If no PARAMS were passed, use the appropriate TYPE set and supplemental context globals
     [ -z "$_params" ] && _params="$(ctx_get ${_pfx}PARAMS_TYPE),$CTX_VALIDATE"
@@ -144,8 +145,7 @@ ctx_validate_params() {
         eval  _value="\${${_pfx}$_param}"
 
         _validation_function="validate_param_$(conv_to_lower $_param)"
-        quiet type $_validation_function || eval $(THROW 6 $_fn $_param $_funct)
-
+        quiet type $_validation_function || eval $(THROW 6 $_fn "$_param" "$_funct")
         # _level _value _cell _pfx are downward-scoped to avoid 'param drilling' in validation
         eval $_validation_function || PASS -c $_pass || eval $(THROW $?)
     done
@@ -199,8 +199,8 @@ ctx_bootstrap_cell() {
     local _fn="ctx_bootstrap_cell" _cell="$1" _pfx="$2"
 
     ctx_unset $_pfx    # Start from blank slate
-    ctx_load_params $_cell $_pfx || eval $(THROW $? $_fn $_cell)
-    ctx_load_mountpoints $_cell $_pfx
+    ctx_load_params "$_cell" $_pfx || eval $(THROW $? $_fn "$_cell")
+    ctx_load_mountpoints "$_cell" $_pfx
     return 0
 }
 
