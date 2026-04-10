@@ -80,7 +80,7 @@ assert_cellname_new() {
 
 assert_class() {
     local _fn="assert_class"
-    echo_grep -qd , "$CLASSES" "$1" || eval $(THROW 18 $_fn $CLASSES)
+    echo_grep -qd , "$CLASSES" "$1" || eval $(THROW 18 $_fn "$CLASSES")
 }
 
 assert_cpuset() {
@@ -114,20 +114,20 @@ assert_int_comparison() {
     local _fn="assert_int_comparison" _opts OPTARG OPTIND _val _g _G _l _L
 
     while getopts :g:G:l:L: opts ; do case $opts in
-        g) assert_integer "$OPTARG" && _g="$OPTARG" || eval $(THROW 13 _internal3 $OPTARG) ;;
-        G) assert_integer "$OPTARG" && _G="$OPTARG" || eval $(THROW 13 _internal3 $OPTARG) ;;
-        l) assert_integer "$OPTARG" && _l="$OPTARG" || eval $(THROW 13 _internal3 $OPTARG) ;;
-        L) assert_integer "$OPTARG" && _L="$OPTARG" || eval $(THROW 13 _internal3 $OPTARG) ;;
+        g) assert_integer "$OPTARG" && _g="$OPTARG" || eval $(THROW 13 _internal3 "$OPTARG") ;;
+        G) assert_integer "$OPTARG" && _G="$OPTARG" || eval $(THROW 13 _internal3 "$OPTARG") ;;
+        l) assert_integer "$OPTARG" && _l="$OPTARG" || eval $(THROW 13 _internal3 "$OPTARG") ;;
+        L) assert_integer "$OPTARG" && _L="$OPTARG" || eval $(THROW 13 _internal3 "$OPTARG") ;;
         *) eval $(THROW 8 _internal1) ;;  # getopts warning suppressed because we handle it here
     esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-    assert_integer "$1" && _val="$1" || eval $(THROW 13 _internal3 $1)
+    assert_integer "$1" && _val="$1" || eval $(THROW 13 _internal3 "$1")
 
     # Check each option one by one. Opts and _val already sanitized as integer format -> no quotes
-    [ "$_g" ] && { [ $_val -ge $_g ] || eval $(THROW 14 ${_fn} $_val '<'  $_g) ;}
-    [ "$_G" ] && { [ $_val -gt $_G ] || eval $(THROW 14 ${_fn} $_val '<=' $_G) ;}
-    [ "$_l" ] && { [ $_val -le $_l ] || eval $(THROW 14 ${_fn} $_val '>'  $_l) ;}
-    [ "$_L" ] && { [ $_val -lt $_L ] || eval $(THROW 14 ${_fn} $_val '>=' $_L) ;}
+    [ "$_g" ] && { [ $_val -ge $_g ] || eval $(THROW 14 ${_fn} "$_val" '<'  "$_g") ;}
+    [ "$_G" ] && { [ $_val -gt $_G ] || eval $(THROW 14 ${_fn} "$_val" '<=' "$_G") ;}
+    [ "$_l" ] && { [ $_val -le $_l ] || eval $(THROW 14 ${_fn} "$_val" '>'  "$_l") ;}
+    [ "$_L" ] && { [ $_val -lt $_L ] || eval $(THROW 14 ${_fn} "$_val" '>=' "$_L") ;}
 
     return 0
 }
@@ -199,7 +199,7 @@ assert_pfx() {
 assert_ppt() {
     local _fn="assert_ppt"
     echo "$1" | grep -Eqs -- '^[ 0-9]+/[0-9]+/[0-9]+([[:blank:]]+[0-9]+/[0-9]+/[0-9]+)*[[:blank:]]*$' \
-        || eval $(THROW 33 $_fn $1)
+        || eval $(THROW 33 $_fn "$1")
 }
 
 assert_ptype() {
