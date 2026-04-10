@@ -26,7 +26,7 @@ compose_flags_commands() {
         sys) _dirs="/bin /sbin /boot /etc /lib /libexec /root /rw/etc /rw /usr/bin /usr/lib \
                     /usr/lib32 /usr/libdata /usr/libexec /usr/sbin /usr/local/lib /usr/local/lib32 \
                     /usr/local/libdata /usr/local/libexec /usr/local/sbin"
-            ;;
+        ;;
     esac
 
     # Both native jail directory and /compat/<distro> should receive flags protections

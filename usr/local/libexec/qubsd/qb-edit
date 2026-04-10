@@ -161,7 +161,7 @@ compose_modify() {
     case $RC in
         151) # Defaults should not receive CIDR IPV4.
             [ "$DEFAULT" ] && clear_err && WARN ipv4 ${FILE##*/}
-            ;;
+        ;;
     esac
 
     # We THROW not only for hard failures, but even just WARNs
@@ -173,7 +173,7 @@ compose_modify() {
         DEVFS_RULE)
             _CMD_JCONF_DEL="sed -i '' -E \"/.*devfs_ruleset=/d\" $D_JAILS/$CELL"
             _CMD_JCONF_ADD="_CMD_jconf_mod"
-            ;;
+        ;;
     esac
 
     # Modify the QCONF

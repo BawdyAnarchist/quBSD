@@ -1,8 +1,9 @@
 
 ### Next up
 
+validate_ipv4 actually needs to accept a VM with an IP addr. It should warn regardless so user knows to set up static IP in VM, but We can 100% grab that IP and pump it to a jail-gw for a static setup. In more complex scenarios, the validation might check if gw is VM, in which case that's an invalid option. Still, this probably shouldnt throw at jail/VM start, as it wont prevent the start, just foul the networking
+
 exec.created and the networking stack
-   `remove_interface` needs transitioned to an overhaul compose_remove_interface_cmd, and exec.prestop needs switched too
 
 validate.sh
    The ipv4 validations can probably leverage some new primitives in query.sh query_param_values IPV4
