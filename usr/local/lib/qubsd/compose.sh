@@ -37,7 +37,7 @@ _resolve_available_ipv4() {
     ') || eval $(THROW 213 $_fn $_ip1 $_ip3)
 
     # If _reserve was passed, then update the RT_IPS, excluding _newIP from future use
-    [ "$_reserve"  ] && RT_IPS="$(printf "%b" "$RT_IPS" "\n$_newIP" | sed '/^$/d')"
+    [ "$_reserve" ] && RT_IPS="$(printf "%b" "$RT_IPS" "\n$_newIP" | sed '/^$/d')"
 
     echo "$_newIP"
 }
@@ -63,7 +63,7 @@ _resolve_available_epair() {
     ') || eval $(THROW 213 $_fn)
 
     # If _reserve was passed, then update the RT_EPAIRS, excluding _newEP from future use
-    [ "$_reserve"  ] && RT_EPAIRS="$(printf "%b" "$RT_EPAIRS" "\n$_newEP" | sed '/^$/d')"
+    [ "$_reserve" ] && RT_EPAIRS="$(printf "%b" "$RT_EPAIRS" "\n$_newEP" | sed '/^$/d')"
 
     echo "$_newEP"
 }
@@ -89,10 +89,11 @@ _resolve_available_taps() {
     ') || eval $(THROW 213 $_fn)
 
     # If _reserve was passed, then update the RT_EPAIRS, excluding _newEP from future use
-    [ "$_reserve"  ] && RT_TAPS="$(printf "%b" "$RT_TAPS" "\n$_newTAP" | sed '/^$/d')"
+    [ "$_reserve" ] && RT_TAPS="$(printf "%b" "$RT_TAPS" "\n$_newTAP" | sed '/^$/d')"
 
     echo "$_newTAP"
 }
+
 compose_remove_interface_cmds() {
     local _fn="compose_remove_interface_cmds" _intfs="$1" _cell="$2"
 
@@ -120,51 +121,118 @@ compose_remove_interface_cmds() {
     return 0
 }
 
+# Disposition all taps and epairs: vnet to jail, apply ifconfig groups, bring up ip/mtu.
+# The design of this function is to resolve the appropriate variables for all the combinations of
+# cl/gw TYPE ; cl ipv4 ; and account for host handling. The presence of certain varibles is the
+# indication that an associated _cmd should be constructed, which finalizes in loop at the end.
 compose_vif_cmds() {
-    local _fn="compose_vif_cmds"
-    local _ip_search _cli_ip _gw_ip
+    local _fn="compose_vif_cmds" _cmd_vif _ip1 _mtu _mtu_mod
+    local _cl_vif _cl_grp _cl_j_mod _cl_ip _gw_vif _gw_grp _gw_j_mod _gw_ip _vif
+    local _cmds="_cmd_cl_vnet _cmd_gw_vnet _cmd_cl_grp _cmd_gw_grp _cmd_cl_inet _cmd_gw_inet"
 
     # With no gw, there are no vifs to configure
     { [ -z "$_gw" ] || [ "$_gw" = "none" ] || ! is_cell_running "$_gw" ;} && return 0
 
     # Grab the IP context and resolve the final IPs of cli/gw
-    [ "$_cli_isgw" ] && _ip_search="99 1 30" || _ip_search="1 1 30"
+    [ "$_cl_isgw" ] && _ip1="99" || _ip1="1"
 
-    case $_ipv4 in
-        ''|none) ;; ###### TBD. Not sure how I want to handle this yet. ########
-        DHCP) # For client DHCP, we only need the _gw IP (if jail).
-            _groupmod="group DHCPD"
-            [ "$_gw_type" = "JAIL" ] && _gw_ip=$(_resolve_available_ipv4 $_ip_search true)
-            ;;
-        auto) # Assign both cl and gw IPs
-            _gw_ip=$(_resolve_available_ipv4 $_ip_search true)
-            _cl_ip=${_gw_ip%.*/*}.2/30
-            ;;
-        *) # Specifically designated IPaddr in the qconf
-            _cl_ip=$_ipv4
-            _gw_ip=${ipv4%.*/*}.1/${ipv4#*/}
-            ;;
+    # Resolve mtu ahead of time. It wont always be used, but the resolution is the same
+    : ${_mtu:=$_cl_mtu}                  # Honor cl_mtu
+    : ${_mtu:=$(query_mtu_extif $_gw)}   # Fallback to gw's EXTIF MTU
+    : ${_mtu:=$_gw_mtu}                  # Final fallback to gw qconf mtu
+    [ "$_mtu" ] && _mtu_mod="mtu $_mtu"  # Final MTU decision
+
+    # Resolve gw and cl vifs depending on their type (tap vs epair)
+    case $_type:$_gw_type in
+        VM:VM) return 52  # No action. This is unsupported for now. This stanza must come first
+        ;;
+        *:VM)
+            _cl_vif=$_cl_extif                           # compose bhyve assigns/adds tap to RT_CTX
+            _cl_grp="group EXTIF group $_gw_cut"         # Standard ifconfig group assignments
+            [ ! "$_cl" = "host" ] && _cl_j_mod="-j $_cl"
+
+            # Resolve the IP. Assume "auto" implies DHCP (otherwise wouldnt make sense).
+            case $_ipv4 in
+                ''|none) : ;;  # Nothing to do
+                auto|DHCP) _cl_grp="$_cl_grp group QB-DHCPD" ;;
+                *) _cl_ip=$_ipv4 ;;
+            esac
+        ;;
+        VM:*)  # Assign the parameters relevant for _gw being a jail
+            _gw_vif=$_cl_extif                            # compose bhyve assigns/adds tap to RT_CTX
+            _gw_grp="group CLIENTS group $_cl_cut"        # Standard ifconfig group assignments
+            [ ! "$_gw" = "host" ] && _gw_j_mod="-j $_gw"  # Should never be host. Just being robust
+
+            # Resolve the IP. Assume "auto" implies DHCP (otherwise wouldnt make sense).
+            case $_cl_ipv4 in
+                ''|none) : ;;  # Nothing to do
+                auto|DHCP) _gw_ip=$(_resolve_available_ipv4 $_ip1 1 30 true) ;;
+                * ) _gw_ip=${__cl_ipv4%.*/*}.1/${_cl_ipv4#*/}  ;;
+            esac
+        ;;
+        *:*)
+            _vif=$(_resolve_available_epair true)         # vif resolution. true -> dont reuse epair
+            _cl_vif=${_vif}b
+            _gw_vif=${_vif}a
+            _cl_grp="group EXTIF group $_gw_cut"          # Standard ifconfig group assignments
+            _gw_grp="group CLIENTS group $_cl_cut"
+            [ ! "$_gw" = "host" ] && _gw_j_mod="-j $_gw"  # Should never be host. Just being robust
+            [ ! "$_cl" = "host" ] && _cl_j_mod="-j $_cl"
+
+            # Resolve the IP
+            case $_cl_ipv4 in
+                ''|none) : ;;  # Nothing to do
+                auto|DHCP)
+                    _cl_ip=$(_resolve_available_ipv4 $_ip1 2 30 true)
+                    _gw_ip=${__cl_ipv4%.*/*}.1/${_cl_ipv4#*/}
+                ;;
+                * ) _cl_ip=$_cl_ipv4
+                    _gw_ip=${__cl_ipv4%.*/*}.1/${_cl_ipv4#*/}
+                ;;
+            esac
+        ;;
     esac
 
-    # Command modifiers for simplified command construction
-    [ "$_cell"  = "JAIL" ]   && _cl_mod="-j $_cell"
-    [ "$_gw_type" = "JAIL" ] && _gw_mod="-j $_gw"
+    # Construct the full set of commands that will need to be run, depending on what was resolved
+    [ "$_cl_vif" ] && _cmd_cl_vnet="ifconfig $_cl_vif vnet $_cl"
+    [ "$_gw_vif" ] && _cmd_gw_vnet="ifconfig $_gw_vif vnet $_gw"
+    [ "$_cl_grp" ] && _cmd_cl_grp="ifconfig $_cl_j_mod $_cl_vif $_cl_grp_mod"
+    [ "$_gw_grp" ] && _cmd_gw_grp="ifconfig $_gw_j_mod $_gw_vif $_gw_grp_mod"
+    [ "$_cl_ip" ] && _cmd_cl_inet="ifconfig $_cl_j_mod $_cl_vif inet $_cl_ip $_mtu_mod up"
+    [ "$_gw_ip" ] && _cmd_gw_inet="ifconfig $_gw_j_mod $_gw_vif inet $_gw_ip $_mtu_mod up"
+
+    # Loop over all the _cmds to construct the final command
+    for _cmd in $_cmds ; do
+        [ "$_cmd" ] && _cmd_vif="$(printf "%b" "$_cmd_vif" "\n$_cmd")"
+    done
+    echo "$_cmd_vif" | sed '/^$/d'
 }
 
 # These helpers are needed so that the primary cmd functions can used downward-scoped variables
 # and for clean designation of when the CELL is a gateway, vs when it is a client.
 _resolve_cl_context() {
-    local _fn="_resolve_cl_context" _cli="$1" _pfx="$2"
-    _type=$(ctx_get ${_pfx}TYPE)
-    _ipv4=$(ctx_get ${_pfx}IPV4)
-    _mtu=$(ctx_get ${_pfx}MTU)
-    _vifs=$(ctx_get ${_pfx}VIFS)
-    _gw=$(ctx_get ${_pfx}GATEWAY)
-    quiet query_gw_clients $_cli && _cli_isgw=true  # Needed for vif IP resolution conventions
+    local _fn="_resolve_cl_context" _pfx="$2"
+    _cl="$1"
+    _cl_cut=$(echo $_cl | cut -c1-14)  # ifconfig group (user convenience), spec is < 15 chars
+    _cl_type=$(ctx_get ${_pfx}TYPE)
+    _cl_ipv4=$(ctx_get ${_pfx}IPV4)
+    _cl_mtu=$(ctx_get ${_pfx}MTU)
+    _cl_gw=$(ctx_get ${_pfx}GATEWAY)
+    _cl_extif=$(ctx_get ${_pfx}EXTIF)
+    quiet query_gw_clients $_cl && _cl_isgw=true  # Needed for vif IP resolution conventions
+}
+_resolve_gw_context() {
+    local _fn="_resolve_gw_context" _pfx="$2"
+    _gw="$1"
+    _gw_cut=$(echo $_gw | cut -c1-14)  # ifconfig group (user convenience), spec is < 15 chars
+    _gw_type=$(ctx_get ${_pfx}TYPE)
+    _gw_mtu=$(ctx_get ${_pfx}MTU)
+    _gw_extif=$(ctx_get ${_pfx}EXTIF)
 }
 
-# Full composition of the network stack commands for a single ell, and between its gw and clients
-compose_network_construction_cmds() {
+# Full composition of the network stack commands for a single cell, and between its gw and clients
+# Dynamically scoped variables are used with _resolve_cl/gw_context() to avoid drilling
+compose_network_stack_cmds() {
     local _fn="compose_network_construction_cmds" _cell="$1" _pfx="$2"
     local _caller _client _type _ipv4 _mtu _gw _gw_type
     assert_args_set 1 "$_cell" || eval $(THROW $?)
@@ -175,22 +243,25 @@ compose_network_construction_cmds() {
     _clients=$(query_gw_clients "$_cell")
 
     # Compose the connection commands from CELL to _gw. CELL starts out as the client
-    _resolve_cl_context $_pfx      # Dynamically scoped variables (available for use in this func)
-    _gw_type=$(query_cell_type $_gw)
-    _CMD_NETWORK_VIF=$(compose_vif_cmds)
-    _CMD_NETWORK_CONFIG=$(compose_config_cmds)
-    _CMD_NETWORK_SERVICE=$(compose_service_cmds)
+    _resolve_cl_context $_cell $_pfx
+    if is_cell_running $_gw && ctx_load_file $D_RUNTM/$_gw/ctx.conf $_pfx ; then
+        _resolve_gw_context $_gw "gw_"
+        _cmd_vif=$(compose_vif_cmds)
+        _cmd_config=$(compose_config_cmds)
+        _cmd_service=$(compose_service_cmds)
+    fi
 
     # CELL now becomes the gw_, and the downstream client commands are constructed
-    _gw_type=$(ctx_get ${_pfx}TYPE)
+    _resolve_gw_context $CELL $_pfx
+
     for _client in $clients ; do
-        _is_cell_running $_client || continue
-        ctx_load_runtime "$_client" "cl_" || continue
+        is_cell_running $_client || continue
+        ctx_load_file $D_RUNTM/$_client/ctx.conf "cl_" || continue
         _resolve_cl_context "$_client" "cl_"
 
-        _CMD_NETWORK_VIF="$(printf "%b" "$_CMD_NETWORK_VIF" "\n$(compose_vif_cmds)")"
-        _CMD_NETWORK_CONFIG="$(printf "%b" "$_CMD_NETWORK_VIF" "\n$(compose_config_cmds)")"
-        _CMD_NETWORK_SERVICE="$(printf "%b" "$_CMD_NETWORK_VIF" "\n$(compose_service_cmds)")"
+        _cmd_vif="$(printf "%b" "$_cmd_vif" "\n$(compose_vif_cmds)")"
+        compose_config_cmds
+        compose_service_cmds
     done
 }
 
