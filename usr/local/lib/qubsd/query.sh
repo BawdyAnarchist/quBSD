@@ -360,7 +360,7 @@ query_runtime_ips() {
 query_runtime_epairs() {
     local _fn="query_runtime_epairs" _jail_eps _val
 
-    [ "$RT_EPAIRS" ] && return 0  # Already have a list of used IPs.
+    [ "$RT_EPAIRS" ] && return 0  # Already have a list of used epairs
 
     query_onjails
     for _jail in $ONJAILS ; do
@@ -376,10 +376,20 @@ query_runtime_epairs() {
 # Returns a list of all epairs currently in use by the system (but without a/b designation)
 query_runtime_taps() {
     local _fn="query_runtime_taps" _fstat _taps _val
+
+    [ "$RT_TAPS" ] && return 0  # Already have a list of used taps
+
     # Needs hush because fstat is noisy with stderr even on normal exit 0 queries
     RT_TAPS=$(hush fstat | sed -En "s|/dev.*(tap[0-9]+) .*|\1|p" | awk '{print $5}')
     return 0
 }
+
+query_mtu_extif() {
+    local _fn="query_mtu_extif"
+    hush ifconfig -j "$1" -ag EXT_IF | sed -En "s/.*mtu ([^ \t]+)/\1/p"
+}
+
+
 ##########################################  X11 QUERIES  ###########################################
 
 query_net_active_xid() {
