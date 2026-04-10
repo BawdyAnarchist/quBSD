@@ -54,8 +54,13 @@ Do not assign a unique CIDR to %s. This will cause networking breakage.
   IPV4 defaults can only be one of the following:  <none|auto|DHCP>
 /END/
 
+:mtu:
+Recommend no default MTU. System already defaults to 1500. Focus on gateways, especially
+wireguard. Clients receive auto adjustment downwards to never exceed the gateway MTU.
+/END/
+
 :use_force:
-Proposed changes would cause config/runtime errors. Use [-F] to override
+  \n  PROPOSED CHANGES WOULD CAUSE CONFIG/RUNTIME ERRORS. Use [-F] to override
 /END/
 
 :deletion_errors:

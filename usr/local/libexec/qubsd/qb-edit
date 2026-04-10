@@ -164,17 +164,18 @@ compose_modify() {
         ;;
     esac
 
-    # We THROW not only for hard failures, but even just WARNs
-    is_path_exist -s "$ERR" && { [ "$FORCE" ] || eval $(THROW $? use_force) ;}
-
     # PARAMS that require special handling.
     case $PARAM in
+        MTU) [ "$DEFAULT" ] && WARN mtu ;;  # It's not recommended to set default MTU
         PPT) [ "$_old_val" ] && VALUE="$_old_val $VALUE" ;;  # If pre-existing PPT, just += $VALUE
         DEVFS_RULE)
             _CMD_JCONF_DEL="sed -i '' -E \"/.*devfs_ruleset=/d\" $D_JAILS/$CELL"
             _CMD_JCONF_ADD="_CMD_jconf_mod"
         ;;
     esac
+
+    # We THROW not only for hard failures, but even just WARNs
+    is_path_exist -s "$ERR" && { [ "$FORCE" ] || eval $(THROW $? use_force) ;}
 
     # Modify the QCONF
     _compose_del_param
