@@ -10,7 +10,7 @@ compose_commands() {
     local _fn="compose_commands" _intfs
 
     # Remove interfaces and handle files modification for those interfaces
-    _intfs=$(jexec -l -U root $CELL ifconfig -g tap ; jexec -l -U root $CELL ifconfig -g epair)
+    _intfs=$(ifconfig -j $CELL -g tap ; ifconfig -j $CELL -g epair)
     compose_remove_interface_cmds "$_intfs" "$CELL"
 
     # /rw system files might be schg, but needed by rc.shutdown.

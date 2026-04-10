@@ -95,26 +95,34 @@ _resolve_available_taps() {
 }
 
 compose_remove_interface_cmds() {
-    local _fn="compose_remove_interface_cmds" _intfs="$1" _cell="$2"
+    local _fn="compose_remove_interface_cmds" _intfs="$1" _cell="$2" _action
+
+    query_runtime_taps  # Returns cached global RT_TAPS
 
     for _intf in $_intfs ; do
-        # First check if it's already on host
-        if quiet ifconfig $_intf ; then
-            _CMD_RM_INTFS="ifconfig $_intf destroy ; $_CMD_RM_INTFS"
+        # A tap part of fstat (connected to running bhyve VM) would hang on `ifconfig destroy`
+        [ -z "${_intf##tap*}" ] && echo_grep -q "$RT_TAPS" "$_intf" \
+            && _action=down || _action=destroy
 
         # If a jail type cell was passed, check that as the first possibility to find/remove tap
-        elif quiet ifconfig -j "$_cell" "$_intf" ; then
+        if quiet ifconfig -j "$_cell" "$_intf" ; then
             _CMD_RM_INTFS="$(printf "%b" \
                 "ifconfig $_intf -vnet $_cell\n" \
-                "ifconfig $_intf destroy\n" \
+                "ifconfig $_intf $_action\n" \
                 "$_CMD_RM_INTFS")"
+
+        # If not, then check if the _intf is already on host
+        elif quiet ifconfig $_intf ; then
+            _CMD_RM_INTFS="$(printf "%b" \
+                          "ifconfig $_intf $_action\n" \
+                          "$_CMD_RM_INTFS")"
 
         # If the above fails, then check each jail one by one
         else
            for _j in $(query_onjails ; echo $ONJAILS) ; do
               quiet ifconfig -j "$_j" "$_intf" && _CMD_RM_INTFS="$(printf "%b" \
                   "ifconfig $_intf -vnet $_j\n" \
-                  "ifconfig $_intf destroy")"
+                  "ifconfig $_intf $_action")"
            done
         fi
     done
@@ -136,10 +144,11 @@ compose_vif_cmds() {
     # Grab the IP context and resolve the final IPs of cli/gw
     [ "$_cl_isgw" ] && _ip1="99" || _ip1="1"
 
-    # Resolve mtu ahead of time. It wont always be used, but the resolution is the same
-    : ${_mtu:=$_cl_mtu}                  # Honor cl_mtu
-    : ${_mtu:=$(query_mtu_extif $_gw)}   # Fallback to gw's EXTIF MTU
-    : ${_mtu:=$_gw_mtu}                  # Final fallback to gw qconf mtu
+    # $cl_MTU context implies loading defaults (say 1500) which breaks connections where gw MTU is
+    # lower (eg: wireguard). Thus _mtu should never exceed gw MTU, even if cl context is higher.
+    _mtu=$(query_mtu_extif $_gw)         # Prioritize actual runtime state of gw
+    : ${_mtu:=$_gw_mtu}                  # Fallback to the gw qconf
+    [ "$_cl_mtu" ] && [ "$_mtu" ] && [ $_cl_mtu -lt $_mtu ] && _mtu=$_cl_mtu  # keep cl MTU if lower
     [ "$_mtu" ] && _mtu_mod="mtu $_mtu"  # Final MTU decision
 
     # Resolve gw and cl vifs depending on their type (tap vs epair)
@@ -196,14 +205,14 @@ compose_vif_cmds() {
     # Construct the full set of commands that will need to be run, depending on what was resolved
     [ "$_cl_vif" ] && _cmd_cl_vnet="ifconfig $_cl_vif vnet $_cl"
     [ "$_gw_vif" ] && _cmd_gw_vnet="ifconfig $_gw_vif vnet $_gw"
-    [ "$_cl_grp" ] && _cmd_cl_grp="ifconfig $_cl_j_mod $_cl_vif $_cl_grp_mod"
-    [ "$_gw_grp" ] && _cmd_gw_grp="ifconfig $_gw_j_mod $_gw_vif $_gw_grp_mod"
+    [ "$_cl_grp" ] && _cmd_cl_grp="ifconfig $_cl_j_mod $_cl_vif $_cl_grp"
+    [ "$_gw_grp" ] && _cmd_gw_grp="ifconfig $_gw_j_mod $_gw_vif $_gw_grp"
     [ "$_cl_ip" ] && _cmd_cl_inet="ifconfig $_cl_j_mod $_cl_vif inet $_cl_ip $_mtu_mod up"
     [ "$_gw_ip" ] && _cmd_gw_inet="ifconfig $_gw_j_mod $_gw_vif inet $_gw_ip $_mtu_mod up"
 
     # Loop over all the _cmds to construct the final command
     for _cmd in $_cmds ; do
-        [ "$_cmd" ] && _cmd_vif="$(printf "%b" "$_cmd_vif" "\n$_cmd")"
+        [ "$_cmd" ] && _cmd_vif="$(printf "%b" "$_cmd_vif" "\n$(ctx_get $_cmd)")"
     done
     echo "$_cmd_vif" | sed '/^$/d'
 }
@@ -213,7 +222,8 @@ compose_vif_cmds() {
 _resolve_cl_context() {
     local _fn="_resolve_cl_context" _pfx="$2"
     _cl="$1"
-    _cl_cut=$(echo $_cl | cut -c1-14)  # ifconfig group (user convenience), spec is < 15 chars
+    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
+    _cl_cut="$(echo $_cl | cut -c1-14)_"
     _cl_type=$(ctx_get ${_pfx}TYPE)
     _cl_ipv4=$(ctx_get ${_pfx}IPV4)
     _cl_mtu=$(ctx_get ${_pfx}MTU)
@@ -224,7 +234,8 @@ _resolve_cl_context() {
 _resolve_gw_context() {
     local _fn="_resolve_gw_context" _pfx="$2"
     _gw="$1"
-    _gw_cut=$(echo $_gw | cut -c1-14)  # ifconfig group (user convenience), spec is < 15 chars
+    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
+    _gw_cut="$(echo $_gw | cut -c1-14)_"
     _gw_type=$(ctx_get ${_pfx}TYPE)
     _gw_mtu=$(ctx_get ${_pfx}MTU)
     _gw_extif=$(ctx_get ${_pfx}EXTIF)
@@ -244,25 +255,27 @@ compose_network_stack_cmds() {
 
     # Compose the connection commands from CELL to _gw. CELL starts out as the client
     _resolve_cl_context $_cell $_pfx
-    if is_cell_running $_gw && ctx_load_file $D_RUNTM/$_gw/ctx.conf $_pfx ; then
-        _resolve_gw_context $_gw "gw_"
-        _cmd_vif=$(compose_vif_cmds)
-        _cmd_config=$(compose_config_cmds)
-        _cmd_service=$(compose_service_cmds)
+    if is_cell_running $_cl_gw && ctx_load_file $D_RUNTM/$_cl_gw/ctx.conf "gw_" ; then
+        _resolve_gw_context $_cl_gw "gw_"
+        _CMD_NET_VIF="$(printf "%b" "$_CMD_NET_VIF" "\n$(compose_vif_cmds)")"
+#        _CMD_NET_CONFIG="$(printf "%b" "$_CMD_NET_CONFIG" "\n$(compose_config_cmds)")"
+#        _CMD_NET_SERVICE="$(printf "%b" "$_CMD_NET_SERVICE" "\n$(compose_service_cmds)")"
     fi
 
     # CELL now becomes the gw_, and the downstream client commands are constructed
     _resolve_gw_context $CELL $_pfx
-
-    for _client in $clients ; do
+    for _client in $_clients ; do
         is_cell_running $_client || continue
         ctx_load_file $D_RUNTM/$_client/ctx.conf "cl_" || continue
         _resolve_cl_context "$_client" "cl_"
 
-        _cmd_vif="$(printf "%b" "$_cmd_vif" "\n$(compose_vif_cmds)")"
-        compose_config_cmds
-        compose_service_cmds
+        _CMD_NET_VIF="$(printf "%b" "$_CMD_NET_VIF" "\n$(compose_vif_cmds)")"
+#        _CMD_NET_CONFIG="$(printf "%b" "$_CMD_NET_CONFIG" "\n$(compose_config_cmds)")"
+#        _CMD_NET_SERVICE="$(printf "%b" "$_CMD_NET_SERVICE" "\n$(compose_service_cmds)")"
     done
+    _CMD_NET_VIF="$(echo "$_CMD_NET_VIF" | sed '/^$/d')"
+#    _CMD_NET_CONFIG="$(echo "$_CMD_NET_CONFIG" | sed '/^$/d')"
+#    _CMD_NET_SERVICE="$(echo "$_CMD_NET_SERVICE" | sed '/^$/d')"
 }
 
 # Return the least-stale snapshot possible. This could be an existing snapshot with no changes,
