@@ -2,6 +2,11 @@
 %s
 /END/
 
+:execute_commands:
+Failed command:
+  # %s
+/END/
+
 :_internal0:
 Internal bug: set_ctx() is missing positional parameter(s)
 /END/

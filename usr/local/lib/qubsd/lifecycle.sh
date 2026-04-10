@@ -1,41 +1,35 @@
 #!/bin/sh
 
+# _CMDS are constructed to separate commands by lines, not semicolons. Thus, each line can be
+# read with some combo of: printed/executed; while preserving and printing any failure lines.
 execute_commands() {
-    local _func="execute_commands" _commands _cmd
+    local _fn="execute_commands" _commands _cmds _cmd
     assert_args_set 1 "$1" && _commands="$1"
 
-    # Sanitize execution globals to ensure against user typos like 'fals'
+    # Sanitize execution globals to ensure against user typos like 'fals' (intended 'false')
     [ "$DRY_RUN" ] && ! echo_grep -q "$DRY_RUN" '(true|TRUE|false|FALSE)' \
         && echo "DRY_RUN must be <true|false>" && exit 1
     [ "$VERBOSE" ] && ! echo_grep -q "$VERBOSE" '(true|TRUE|false|FALSE)' \
         && echo "DRY_RUN must be <true|false>" && exit 1
 
-    # Simple loop over all passed commands
-    for _command in $_commands ; do
-        _cmd=$(ctx_get $_command)
-        exec_cmd "$_cmd" || eval $(THROW 241 _generic "Failed Command: $_cmd")
+    # Loop over all passed commands. _cmds could have multiple lines.
+    for _cmds in $_commands ; do
+        _cmds=$(ctx_get $_cmds | sed '/^$/d')  # Remove blanks
+
+        # while-read loop enables consistent printing, execution, and error reporting
+        printf "%s\n" "$_cmds" | while IFS= read -r _cmd ; do
+            exec_cmd || eval $(THROW 241 $_fn "$_cmd")
+        done
     done
 }
 
 # Keeps main script execution syntax clean while allowing for global debug tools
 exec_cmd() {
-    local _fn="exec_cmd" _cmd="$1" _line
-    [ -z "$_cmd" ] && return 0
-
-    # The while-read loop enables consistent " # " reporting for each command line
+    local _fn="exec_cmd"
     case $DRY_RUN::$VERBOSE in
-        true::*|TRUE::*)
-            printf "%s\n" "$_cmd" | while IFS= read -r _line ; do
-                printf "  # %s\n" "$_line"
-            done >&2
-            ;;
-        *::true|*::TRUE)
-            printf "%s\n" "$_cmd" | while IFS= read -r _line ; do
-                printf "  # %s\n" "$_line"
-            done >&2
-            eval "$_cmd"
-            ;;
-        *)  eval "$_cmd" ;;
+        true::*|TRUE::*) printf "  # %s\n" "$_cmd" ;;
+        *::true|*::TRUE) printf "  # %s\n" "$_cmd" ; eval "$_cmd" ;;
+        *) eval "$_cmd" ;;
     esac
 }
 
