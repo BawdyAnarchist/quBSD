@@ -20,7 +20,7 @@ main() {
 
     # Monitor for new interfaces that appear as ifconfig group DHCPD
     while [ -f "$pidfile" ] ; do
-        for _intf in $(ifconfig -g DHCPD) ; do
+        for _intf in $(ifconfig -g "QB-DHCPD") ; do
             pgrep -qfl "dhclient.*$_intf" || dhclient -bc /tmp/qubsd_dhclient.conf $_intf
 
             # Prevents collisions/races from rapid-fire dhclient invocation (can lockup resolv.conf)
