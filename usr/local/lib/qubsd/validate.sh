@@ -282,7 +282,7 @@ validate_param_vcpus() {
     assert_vcpus $_value || eval $(THROW $? _invalid "$_param" "$_value")
     [ "$_level" -le 2 ] && return 0
 
-    query_ncpus
+    query_num_cpus
     # Ensure that vpcus doesnt exceed the number of system cpus or bhyve limits
     { [ "$_value" -gt "$NCPU" ] || [ "$_value" -gt 16 ] ;} && eval $(THROW 165 $_fn "$_param" "$_value" "$NCPU")
     return 0
