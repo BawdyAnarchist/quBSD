@@ -1,9 +1,10 @@
 
 ### Next up
 
+exec.created and the networking stack
+
 validate_ipv4 actually needs to accept a VM with an IP addr. It should warn regardless so user knows to set up static IP in VM, but We can 100% grab that IP and pump it to a jail-gw for a static setup. In more complex scenarios, the validation might check if gw is VM, in which case that's an invalid option. Still, this probably shouldnt throw at jail/VM start, as it wont prevent the start, just foul the networking
 
-exec.created and the networking stack
 
 validate.sh
    The ipv4 validations can probably leverage some new primitives in query.sh query_param_values IPV4
@@ -16,6 +17,9 @@ exec.created
   - I think I removed the chaining starts. Maybe think about adding that back in? Not sure. Maybe qb start should do that only
 When finished or near finish -> $D_CELLS/$_cell is just $QCONF. Replace everything
 
+### IMPORTANT NOTES
+
+The right way to handle a jail that has a VM gw that's already running, is the load_params, or ctx_bootstrap needs to grab from the VM's RT_CTX, from a new CONTEXT global: INTIF (client interface), that should have already been tagged in the bhyve implementation with something like: INTIF="net-firewall:tap0,other-jail:tap1" and so on. This is because there's no other reliable way to store who's taps belong to whom
 
 ### Bugs
 
