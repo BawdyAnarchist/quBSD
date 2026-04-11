@@ -3,17 +3,18 @@
 ####################################################################################################
 ############################################  HELPERS  #############################################
 
-# Finds an unused ipv4 address
-# Require $1,$2,$3. Search for available IPaddr using the form: _ip0._ip1._ip2._ip3/_sub
+# Finds an unused ipv4 address and assigns it to "$1" with eval. We use eval here because the
+# global cache: RT_IPS needs to be updated, which would be lost with a `new_ip=$(..)` subshell
+# Require $1,$2,$3,$4. Search for available IPaddr using the form: _ip0._ip1._ip2._ip3/_sub
   # _ip0 is always '10', while _ip1._ip2 comprise the search space
   # _ip3/_sub convention is '.2/30' for client-side of epair, and '.1/30' for gw side of epair
   # _reserve ($4) is optional, creating the side-effect up reserving the new IP in global USED_IPS
 _resolve_available_ipv4() {
-    local _fn="_resolve_available_ipv4" _ip1="$1" _ip3="$2" _sub="$3" _reserve="$4"
-    local _config_ips _used _newIP
-    assert_int_comparison -g 0 -L 255 "$_ip1" || eval $(THROW $? _generic "Invalid _ip1")
-    assert_int_comparison -g 0 -L 255 "$_ip3" || eval $(THROW $? _generic "Invalid _ip3")
-    assert_int_comparison -g 0 -L 31  "$_sub" || eval $(THROW $? _generic "Invalid _sub")
+    local _fn="_resolve_available_ipv4" _newvar="$1" _ip1="$2" _ip3="$3" _sub="$4" _reserve="$5"
+    local _config_ips _used _new_ip
+    assert_int_comparison -g 0 -L 255 -- "$_ip1" || eval $(THROW $? _generic "Invalid _ip1")
+    assert_int_comparison -g 0 -L 255 -- "$_ip3" || eval $(THROW $? _generic "Invalid _ip3")
+    assert_int_comparison -g 0 -L 31  -- "$_sub" || eval $(THROW $? _generic "Invalid _sub")
 
     # Assemble the full list of used IPs for the comparison
     query_runtime_ips   # Sets global $RT_IPS
@@ -21,7 +22,7 @@ _resolve_available_ipv4() {
     _used="$(printf "%b" "$_config_ips" "\n$RT_IPS")"
 
     # A bit of awk magic guarantees this runs fast instead of nested while-loops + echo|grep (slow)
-    _newIP=$(printf '%s\n' $_used | awk -F '[./]' -v _ip1="$_ip1" -v ip3="$_ip3" -v _sub="$_sub" '
+    _new_ip=$(printf '%s\n' $_used | awk -F '[./]' -v _ip1="$_ip1" -v ip3="$_ip3" -v _sub="$_sub" '
         $1 == "10" { used[$2, $3] = 1 }            # Parse the input
         END {                                      # Search the space
             for (i = _ip1; i <= 255; i++) {
@@ -36,20 +37,23 @@ _resolve_available_ipv4() {
         }
     ') || eval $(THROW 213 $_fn $_ip1 $_ip3)
 
-    # If _reserve was passed, then update the RT_IPS, excluding _newIP from future use
-    [ "$_reserve" ] && RT_IPS="$(printf "%b" "$RT_IPS" "\n$_newIP" | sed '/^$/d')"
+    # Again, we need to both A) return a useful result ; and B) update the global cache. Thus `eval`
+    eval $_newvar="$_new_ip"
 
-    echo "$_newIP"
+    # If _reserve was passed, then update the RT_IPS, excluding _new_ip from future use
+    [ "$_reserve" ] && RT_IPS="$(printf "%b" "$RT_IPS" "\n$_new_ip" | sed '/^$/d')"
+    return 0
 }
 
-# Finds an unused epair
+# Finds an unused epair and assigns it to "$1" with eval. We use eval here because the global
+# cache: RT_EPAIRS needs to be updated, which would be lost with a `new_ep=$(..)` subshell
 _resolve_available_epair() {
-    local _fn="_resolve_available_epair" _reserve="$1" _int=0 _newEP
+    local _fn="_resolve_available_epair" _newvar="$1" _reserve="$2" _int=0 _new_ep
 
     query_runtime_epairs   # Sets global $RT_EPAIRS
 
     # A bit of awk magic guarantees this runs fast instead of nested while-loops + echo|grep (slow)
-    _newEP=$(printf '%s\n' $RT_EPAIRS | awk -v _int="$_int" '
+    _new_ep=$(printf '%s\n' $RT_EPAIRS | awk -v _int="$_int" '
         /^epair[0-9]/ { sub(/^epair/, ""); used[$0+0] = 1 }  # Parse the input
         END {
             for (i = _int; i <= 999; i++) {       # Search the space
@@ -62,20 +66,23 @@ _resolve_available_epair() {
         }
     ') || eval $(THROW 213 $_fn)
 
-    # If _reserve was passed, then update the RT_EPAIRS, excluding _newEP from future use
-    [ "$_reserve" ] && RT_EPAIRS="$(printf "%b" "$RT_EPAIRS" "\n$_newEP" | sed '/^$/d')"
+    # Again, we need to both A) return a useful result ; and B) update the global cache. Thus `eval`
+    eval "$_newvar"="$_new_ep"
 
-    echo "$_newEP"
+    # If _reserve was passed, then update the RT_EPAIRS, excluding _new_ep from future use
+    [ "$_reserve" ] && RT_EPAIRS="$(printf "%b" "$RT_EPAIRS" "\n$_new_ep" | sed '/^$/d')"
+    return 0
 }
 
-# Finds an unused tap
-_resolve_available_taps() {
-    local _fn="_resolve_available_taps" _reserve="$1" _int=0 _newTAP
+# Finds an unused tap and assigns it to "$1" with eval. We use eval here because the global
+# cache: RT_TAPS needs to be updated, which would be lost with a `new_tap=$(..)` subshell
+_resolve_available_tap() {
+    local _fn="_resolve_available_tap" _newvar="$1" _reserve="$2" _int=0 _new_tap
 
     query_runtime_taps     # Sets global $RT_TAPS. `quiet` because fstat can be noisy
 
     # A bit of awk magic guarantees this runs fast instead of nested while-loops + echo|grep (slow)
-    _newTAP=$(printf '%s\n' $RT_TAPS | awk -v _int="$_int" '
+    _new_tap=$(printf '%s\n' $RT_TAPS | awk -v _int="$_int" '
         /^tap[0-9]/ { sub(/^tap/, ""); used[$0+0] = 1 }  # Parse the input
         END {
             for (i = _int; i <= 999; i++) {     # Search the space
@@ -88,16 +95,19 @@ _resolve_available_taps() {
         }
     ') || eval $(THROW 213 $_fn)
 
-    # If _reserve was passed, then update the RT_EPAIRS, excluding _newEP from future use
-    [ "$_reserve" ] && RT_TAPS="$(printf "%b" "$RT_TAPS" "\n$_newTAP" | sed '/^$/d')"
+    # Again, we need to both A) return a useful result ; and B) update the global cache. Thus `eval`
+    eval "$_newvar"="$_new_tap"
 
-    echo "$_newTAP"
+    # If _reserve was passed, then update the RT_EPAIRS, excluding _new_ep from future use
+    [ "$_reserve" ] && RT_TAPS="$(printf "%b" "$RT_TAPS" "\n$_new_tap" | sed '/^$/d')"
+    return 0
 }
 
 compose_remove_interface_cmds() {
     local _fn="compose_remove_interface_cmds" _intfs="$1" _cell="$2" _action
 
-    query_runtime_taps  # Returns cached global RT_TAPS
+    query_runtime_taps  # Side effects: cached global RT_TAPS
+    query_onjails       # Side effects: cached global ONJAILS
 
     for _intf in $_intfs ; do
         # A tap part of fstat (connected to running bhyve VM) would hang on `ifconfig destroy`
@@ -119,7 +129,7 @@ compose_remove_interface_cmds() {
 
         # If the above fails, then check each jail one by one
         else
-           for _j in $(query_onjails ; echo $ONJAILS) ; do
+           for _j in $ONJAILS ; do
               quiet ifconfig -j "$_j" "$_intf" && _CMD_RM_INTFS="$(printf "%b" \
                   "ifconfig $_intf -vnet $_j\n" \
                   "ifconfig $_intf $_action")"
@@ -134,7 +144,7 @@ compose_remove_interface_cmds() {
 # cl/gw TYPE ; cl ipv4 ; and account for host handling. The presence of certain varibles is the
 # indication that an associated _cmd should be constructed, which finalizes in loop at the end.
 compose_vif_cmds() {
-    local _fn="compose_vif_cmds" _cmd_vif _ip1 _mtu _mtu_mod
+    local _fn="compose_vif_cmds" _cmd_network_vif _ip1 _mtu _mtu_mod
     local _cl_vif _cl_grp _cl_j_mod _cl_ip _gw_vif _gw_grp _gw_j_mod _gw_ip _vif
     local _cmds="_cmd_cl_vnet _cmd_gw_vnet _cmd_cl_grp _cmd_gw_grp _cmd_cl_inet _cmd_gw_inet"
 
@@ -152,11 +162,11 @@ compose_vif_cmds() {
     [ "$_mtu" ] && _mtu_mod="mtu $_mtu"  # Final MTU decision
 
     # Resolve gw and cl vifs depending on their type (tap vs epair)
-    case $_type:$_gw_type in
+    case $_cl_type:$_gw_type in
         VM:VM) return 52  # No action. This is unsupported for now. This stanza must come first
         ;;
         *:VM)
-            _cl_vif=$_cl_extif                           # compose bhyve assigns/adds tap to RT_CTX
+            _cl_vif=$_gw_intif                           # compose bhyve assigns/adds tap to RT_CTX
             _cl_grp="group EXTIF group $_gw_cut"         # Standard ifconfig group assignments
             [ ! "$_cl" = "host" ] && _cl_j_mod="-j $_cl"
 
@@ -175,12 +185,14 @@ compose_vif_cmds() {
             # Resolve the IP. Assume "auto" implies DHCP (otherwise wouldnt make sense).
             case $_cl_ipv4 in
                 ''|none) : ;;  # Nothing to do
-                auto|DHCP) _gw_ip=$(_resolve_available_ipv4 $_ip1 1 30 true) ;;
+                auto|DHCP)
+                    _resolve_available_ipv4 _gw_ip $_ip1 1 30 true  # Assign $_gw_ip, update RT_IPS
+                ;;
                 * ) _gw_ip=${__cl_ipv4%.*/*}.1/${_cl_ipv4#*/}  ;;
             esac
         ;;
         *:*)
-            _vif=$(_resolve_available_epair true)         # vif resolution. true -> dont reuse epair
+            _resolve_available_epair _vif true            # Assign _vif, update RT_EPAIRS
             _cl_vif=${_vif}b
             _gw_vif=${_vif}a
             _cl_grp="group EXTIF group $_gw_cut"          # Standard ifconfig group assignments
@@ -192,11 +204,11 @@ compose_vif_cmds() {
             case $_cl_ipv4 in
                 ''|none) : ;;  # Nothing to do
                 auto|DHCP)
-                    _cl_ip=$(_resolve_available_ipv4 $_ip1 2 30 true)
-                    _gw_ip=${__cl_ipv4%.*/*}.1/${_cl_ipv4#*/}
+                    _resolve_available_ipv4 _cl_ip $_ip1 2 30 true  # Assign $_cl_ip, update RT_IPS
+                    _gw_ip=${_cl_ip%.*/*}.1/${_cl_ip#*/}
                 ;;
                 * ) _cl_ip=$_cl_ipv4
-                    _gw_ip=${__cl_ipv4%.*/*}.1/${_cl_ipv4#*/}
+                    _gw_ip=${_cl_ip%.*/*}.1/${_cl_ip#*/}
                 ;;
             esac
         ;;
@@ -212,15 +224,17 @@ compose_vif_cmds() {
 
     # Loop over all the _cmds to construct the final command
     for _cmd in $_cmds ; do
-        [ "$_cmd" ] && _cmd_vif="$(printf "%b" "$_cmd_vif" "\n$(ctx_get $_cmd)")"
+        [ "$_cmd" ] && _cmd_network_vif="$(printf "%b" "$_cmd_network_vif" "\n$(ctx_get $_cmd)")"
     done
-    echo "$_cmd_vif" | sed '/^$/d'
+
+    _CMD_NETWORK_VIF="$(printf "%b" "$_CMD_NETWORK_VIF" "\n$_cmd_network_vif")"
 }
 
 # These helpers are needed so that the primary cmd functions can used downward-scoped variables
 # and for clean designation of when the CELL is a gateway, vs when it is a client.
 _resolve_cl_context() {
     local _fn="_resolve_cl_context" _pfx="$2"
+    unset _cl _cl_cut _cl_type _cl_ipv4 _cl_mtu _cl_gw _cl_extif _cl_isgw
     _cl="$1"
     # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
     _cl_cut="$(echo $_cl | cut -c1-14)_"
@@ -229,53 +243,57 @@ _resolve_cl_context() {
     _cl_mtu=$(ctx_get ${_pfx}MTU)
     _cl_gw=$(ctx_get ${_pfx}GATEWAY)
     _cl_extif=$(ctx_get ${_pfx}EXTIF)
-    quiet query_gw_clients $_cl && _cl_isgw=true  # Needed for vif IP resolution conventions
+    quiet query_gw_clients "$_cl" && _cl_isgw=true  # Needed for vif IP resolution conventions
 }
 _resolve_gw_context() {
     local _fn="_resolve_gw_context" _pfx="$2"
+    unset _gw _gw_cut _gw_type _gw_mtu _gw_extif
     _gw="$1"
     # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
     _gw_cut="$(echo $_gw | cut -c1-14)_"
     _gw_type=$(ctx_get ${_pfx}TYPE)
     _gw_mtu=$(ctx_get ${_pfx}MTU)
-    _gw_extif=$(ctx_get ${_pfx}EXTIF)
+    # A gw-VM should have RT_CTX with INTIF="cell1_tapX,cell2_tapY,..."
+    _gw_intif=$(ctx_get ${_pfx}INTIF | sed -E "s/(^|.*,)${_cl}_(tap[0-9]+)(,|\$)/\2/")
 }
 
-# Full composition of the network stack commands for a single cell, and between its gw and clients
-# Dynamically scoped variables are used with _resolve_cl/gw_context() to avoid drilling
+# Full composition of the network stack commands for a single cell, and between its gw and clients.
+# Dynamically scoped variables are used with _resolve_cl/gw_context() to avoid drilling.
 compose_network_stack_cmds() {
     local _fn="compose_network_construction_cmds" _cell="$1" _pfx="$2"
     local _caller _client _type _ipv4 _mtu _gw _gw_type
     assert_args_set 1 "$_cell" || eval $(THROW $?)
     assert_pfx "$_pfx" || eval $(THROW $?)
 
-    # Grab all relevant cli and gw context elements. These will downward scope to prevent drilling
-    _caller=$(ctx_get ${_pfx}CALLER)  # Switches gw services restart (deconflict potential races)
-    _clients=$(query_gw_clients "$_cell")
+    # Set all necessary context elements
+    _resolve_cl_context $_cell $_pfx       # Downward scoped client variables
+    _caller=$(ctx_get ${_pfx}CALLER)       # Switches services restart (prevents races)
+    _clients=$(query_gw_clients "$_cell")  # List of clients that rely on CELL as gateway
+    ctx_unset "gw_"                        # Clean prefix. Ensures no stale values creep through
 
-    # Compose the connection commands from CELL to _gw. CELL starts out as the client
-    _resolve_cl_context $_cell $_pfx
+    # Commands that connect CELL to its gateway. GW must be running && ctx.conf must be available
     if is_cell_running $_cl_gw && ctx_load_file $D_RUNTM/$_cl_gw/ctx.conf "gw_" ; then
-        _resolve_gw_context $_cl_gw "gw_"
-        _CMD_NET_VIF="$(printf "%b" "$_CMD_NET_VIF" "\n$(compose_vif_cmds)")"
-#        _CMD_NET_CONFIG="$(printf "%b" "$_CMD_NET_CONFIG" "\n$(compose_config_cmds)")"
-#        _CMD_NET_SERVICE="$(printf "%b" "$_CMD_NET_SERVICE" "\n$(compose_service_cmds)")"
+        _resolve_gw_context $_cl_gw "gw_"  # Downward scoped gateway variables
+        compose_vif_cmds      # Appends global command: _CMD_NETWORK_VIF
+#       compose_config_cmds   # Appends global command: _CMD_NETWORK_CONFIG
+#       compose_service_cmds  # Appends global command: _CMD_NETWORK_SERVICE
     fi
 
-    # CELL now becomes the gw_, and the downstream client commands are constructed
-    _resolve_gw_context $CELL $_pfx
+    # Commands that connect CELL to its clients
+    ctx_unset "gw_"                    # Clean prefix. Ensures no stale values creep through
+    _resolve_gw_context $CELL $_pfx    # CELL becomes the gateway. Variables get downward scoped
     for _client in $_clients ; do
+
+        # Necessary context elements. Clean the prefix, file must load, downward scope cl variables
         is_cell_running $_client || continue
+        ctx_unset "cl_"
         ctx_load_file $D_RUNTM/$_client/ctx.conf "cl_" || continue
         _resolve_cl_context "$_client" "cl_"
 
-        _CMD_NET_VIF="$(printf "%b" "$_CMD_NET_VIF" "\n$(compose_vif_cmds)")"
-#        _CMD_NET_CONFIG="$(printf "%b" "$_CMD_NET_CONFIG" "\n$(compose_config_cmds)")"
-#        _CMD_NET_SERVICE="$(printf "%b" "$_CMD_NET_SERVICE" "\n$(compose_service_cmds)")"
+        compose_vif_cmds      # Appends global command: _CMD_NETWORK_VIF
+#       compose_config_cmds   # Appends global command: _CMD_NETWORK_CONFIG
+#       compose_service_cmds  # Appends global command: _CMD_NETWORK_SERVICE
     done
-    _CMD_NET_VIF="$(echo "$_CMD_NET_VIF" | sed '/^$/d')"
-#    _CMD_NET_CONFIG="$(echo "$_CMD_NET_CONFIG" | sed '/^$/d')"
-#    _CMD_NET_SERVICE="$(echo "$_CMD_NET_SERVICE" | sed '/^$/d')"
 }
 
 # Return the least-stale snapshot possible. This could be an existing snapshot with no changes,
