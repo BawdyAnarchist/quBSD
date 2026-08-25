@@ -43,8 +43,13 @@ THROW() {
     fi
 
     # Include the trace, print to $ERR, and echo the return code command.
-    { [ -z "${TRACE##TRUE}" ] || [ -z "${TRACE##true}" ] ;} && _msg="[$_fn][$_err_code]: $_msg"
-    [ "$_msg" ] && printf "$_msg\n" "$@" | sed "s/^/  /" >> $ERR
+    case $TRACE in
+        true|True|TRUE)
+            _msg="[$_fn][$_err_code]: $_msg"
+            [ "$_msg" ] && printf "$_msg\n" "$@" | sed "s/^/  /" >> $ERR
+        ;;
+    esac
+
     echo "return $_err_code"  # Safe for caller to `eval` this echo. $_err_code was sanitized
 }
 
