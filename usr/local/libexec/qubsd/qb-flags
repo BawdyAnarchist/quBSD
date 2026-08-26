@@ -3,58 +3,58 @@
 . $QCOMMON
 
 get_options() {
-	while getopts dhru opts ; do case $opts in
-		d) DOWN="true" ;;
-		h) get_msg2 -eu ;;
-		u) UP="true" ;;
-		r) RESTORE="true" ;;
-		*) exit 1 ;;
+    while getopts dhru opts ; do case $opts in
+        d) DOWN="true" ;;
+        h) get_msg2 -eu ;;
+        u) UP="true" ;;
+        r) RESTORE="true" ;;
+        *) exit 1 ;;
    esac  ;  done  ;  shift $(( OPTIND - 1 ))
 
-	JAIL="$1"
+    JAIL="$1"
 }
 
 checks() {
-	if [ -z "${DOWN}${UP}${RESTORE}" ] ; then
-		# User didn't specify an action
-		get_msg2 -Eum _e1
+    if [ -z "${DOWN}${UP}${RESTORE}" ] ; then
+        # User didn't specify an action
+        get_msg2 -Eum _e1
 
-	elif echo "${DOWN}${UP}${RESTORE}" | grep -Eqs "truetrue" ; then
-		# Can't specify multiple actions
-		get_msg2 -Eum _e2
+    elif echo "${DOWN}${UP}${RESTORE}" | grep -Eqs "truetrue" ; then
+        # Can't specify multiple actions
+        get_msg2 -Eum _e2
 
-	elif [ -z "$JAIL" ] ; then
-		# Must have a jail to operate on
-		get_msg2 -Eum _e3
+    elif [ -z "$JAIL" ] ; then
+        # Must have a jail to operate on
+        get_msg2 -Eum _e3
 
-	fi
+    fi
 
-	# Check for valid jail, exit if invalid
+    # Check for valid jail, exit if invalid
 # Actually, maybe this doesnt matter. No jail ops, just file ops
-#	chk_valid_jail -- "$JAIL" || get_msg2 -Eu
+#    chk_valid_jail -- "$JAIL" || get_msg2 -Eu
 }
 
 main() {
-	if [ "$DOWN" ] ; then
-		chflags -R noschg ${M_QROOT}/$JAIL
-		[ -e ${M_ZUSR}/$JAIL ] && chflags -R noschg ${M_ZUSR}/$JAIL
+    if [ "$DOWN" ] ; then
+        chflags -R noschg ${M_QROOT}/$JAIL
+        [ -e ${M_ZUSR}/$JAIL ] && chflags -R noschg ${M_ZUSR}/$JAIL
 
-	elif [ "$UP" ] ; then
+    elif [ "$UP" ] ; then
 
-		# Avoid errors by trying to set schg on /dev and other invalid locations
-		jdir="/bin /sbin /boot /etc /home /lib /libexec /root /rw /usr"
+        # Avoid errors by trying to set schg on /dev and other invalid locations
+        jdir="/bin /sbin /boot /etc /home /lib /libexec /root /rw /usr"
 
-		# Cycle through directories above and recursively schg
-	   for _dir in $jdir; do
-			chflags -fR schg "${M_QROOT}/${JAIL}/${_dir}"
-		done
+        # Cycle through directories above and recursively schg
+       for _dir in $jdir; do
+            chflags -fR schg "${M_QROOT}/${JAIL}/${_dir}"
+    done
 
-	elif [ "$RESTORE" ] ; then
-		# Jails might have different chflag settings if started or stopped
-		chk_isrunning "$JAIL" \
-									&& ${QLEXEC}/exec.poststart $JAIL \
-																|| ${QLEXEC}/exec.release $JAIL
-	fi
+    elif [ "$RESTORE" ] ; then
+        # Jails might have different chflag settings if started or stopped
+        chk_isrunning "$JAIL" \
+            && ${QLEXEC}/exec.poststart $JAIL $QCOMMON \
+            || ${QLEXEC}/exec.release $JAIL $QCOMMON
+    fi
 }
 
 
