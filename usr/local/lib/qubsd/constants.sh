@@ -69,7 +69,7 @@ export PARAMS_VM="BHYVEOPTS,BHYVE_CUSTM,MEMSIZE,PPT,TAPS,TMUX,VCPUS,VNC,WIREMEM"
 export PARAMS_ALL="$PARAMS_BASE,$PARAMS_JAIL,$PARAMS_VM"
 export PARAMS_HOST="AUTOSNAP,GATEWAY,IPV4,MTU"  # Only modifiable params for "cell" `host'
 export PARAMS_EXCL_DEFAULT="CLASS,PPT,TEMPLATE"
-export CONTEXT="CALLER,JCONF,QCONF,P_DSET,P_MNT,R_DSET,R_MNT,RT_CTX"   # Convenient context paths
+export CONTEXT="CALLER,EXT_IF,JCONF,QCONF,PARAMS_TYPE,P_DSET,P_MNT,R_DSET,R_MNT,RT_CTX,TYPE"  # Convenient supplemental context
 export CTX_VALIDATE="JCONF,P_DSET,R_DSET"     # Necessary validations in addition to PARAMS_
 export CLASSES="rootjail,appjail,dispjail,rootVM,appVM,dispVM,cjail"
 
