@@ -1,4 +1,5 @@
 
+
 ### Next up
 
 exec.created and the networking stack
@@ -8,6 +9,9 @@ validate_ipv4 actually needs to accept a VM with an IP addr. It should warn rega
 
 validate.sh
    The ipv4 validations can probably leverage some new primitives in query.sh query_param_values IPV4
+
+Remove the cryptography/checksum feature for internal NAT.
+   https://it-notes.dragas.net/2023/08/14/boosting-network-performance-in-freebsds-vnet-jails/
 
 
 ### Import things in the code as I overhaul that still need addressed
