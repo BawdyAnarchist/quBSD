@@ -1,5 +1,5 @@
+# quBSD: /usr/local/etc/X11/bspwmrc
 #!/bin/sh
-# /usr/local/etc/X11/bspwmrc
 
 # Set all border widths to 0 pixels.
 bspc config border_width 0

@@ -1,4 +1,4 @@
-# /usr/local/etc/dnscrypt-proxy/dnscrypt-proxy.toml
+# quBSD: /usr/local/etc/dnscrypt-proxy/dnscrypt-proxy.toml
 
 ##############################################
 #                                            #
@@ -77,7 +77,7 @@ odoh_servers = false
 ## Require servers defined by remote sources to satisfy specific properties
 
 # Server must support DNS security extensions (DNSSEC)
-require_dnssec = true 
+require_dnssec = true
 
 # Server must not log user queries (declarative)
 require_nolog = true
@@ -897,7 +897,7 @@ skip_incompatible = false
   [static.'quad9-doh']
   stamp = 'sdns://AgMAAAAAAAAABzkuOS45LjkgsBkgdEu7dsmrBT4B4Ht-BQ5HPSD3n3vqQ1-v5DydJC8SZG5zOS5xdWFkOS5uZXQ6NDQzCi9kbnMtcXVlcnk'
 
-  # quBSD: DoH and DNSSEC. Global coverage but moderate. Filters security risks + ads. Might break some sites 
+  # quBSD: DoH and DNSSEC. Global coverage but moderate. Filters security risks + ads. Might break some sites
   #        If you want to use this instead, change `server_names` above on line 32.
   #[static.'adguard-doh1']
   #stamp = 'sdns://AgMAAAAAAAAADDk0LjE0MC4xNC4xNCCaOjT3J965vKUQA9nOnDn48n3ZxSQpAcK6saROY1oCGQw5NC4xNDAuMTQuMTQKL2Rucy1xdWVyeQ'
