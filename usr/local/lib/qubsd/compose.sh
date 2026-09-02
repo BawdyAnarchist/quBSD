@@ -167,13 +167,13 @@ compose_vif_cmds() {
         ;;
         *:VM)
             _cl_vif=$_gw_intif                           # compose bhyve assigns/adds tap to RT_CTX
-            _cl_grp="group EXTIF group $_gw_cut"         # Standard ifconfig group assignments
+            _cl_grp="group EXT_IF group $_gw_cut"        # Standard ifconfig group assignments
             [ ! "$_cl" = "host" ] && _cl_j_mod="-j $_cl"
 
             # Resolve the IP. Assume "auto" implies DHCP (otherwise wouldnt make sense).
             case $_ipv4 in
                 ''|none) : ;;  # Nothing to do
-                auto|DHCP) _cl_grp="$_cl_grp group QB-DHCP" ;;
+                auto|DHCP) _cl_grp="$_cl_grp group DHCLIENT" ;;
                 *) _cl_ip=$_ipv4 ;;
             esac
         ;;
@@ -195,7 +195,7 @@ compose_vif_cmds() {
             _resolve_available_epair _vif true            # Assign _vif, update RT_EPAIRS
             _cl_vif=${_vif}b
             _gw_vif=${_vif}a
-            _cl_grp="group EXTIF group $_gw_cut"          # Standard ifconfig group assignments
+            _cl_grp="group EXT_IF group $_gw_cut"         # Standard ifconfig group assignments
             _gw_grp="group CLIENTS group $_cl_cut"
             [ ! "$_gw" = "host" ] && _gw_j_mod="-j $_gw"  # Should never be host. Just being robust
             [ ! "$_cl" = "host" ] && _cl_j_mod="-j $_cl"
@@ -207,10 +207,11 @@ compose_vif_cmds() {
                 auto)  # resolve available IPs and assign
                     _resolve_available_ipv4 _gw_ip $_ip1 1 30 true  # Assign $_gw_ip, update RT_IPS
                     _cl_ip=${_gw_ip%.*/*}.2/${_gw_ip#*/}
+                    _cl_grp="$_cl_grp group STATIC_IP"
                 ;;
                 DHCP)  # Resolve gw IP, tag cl with ifconfig group. (This isnt really recommended)
                     _resolve_available_ipv4 _gw_ip $_ip1 1 30 true  # Assign $_gw_ip, update RT_IPS
-                    _cl_grp="$_cl_grp group QB-DHCP"
+                    _cl_grp="$_cl_grp group DHCLIENT"
                 ;;
                 * ) # Enforce the gw/cl .1/.2 IP ending at the most basic level
                     _gw_ip=${_cl_ipv4%.*/*}.1/${_cl_ip#*/}
@@ -248,7 +249,7 @@ _resolve_cl_context() {
     _cl_ipv4=$(ctx_get ${_pfx}IPV4)
     _cl_mtu=$(ctx_get ${_pfx}MTU)
     _cl_gw=$(ctx_get ${_pfx}GATEWAY)
-    _cl_extif=$(ctx_get ${_pfx}EXTIF)
+    _cl_extif=$(ctx_get ${_pfx}EXT_IF)
     quiet query_gw_clients "$_cl" && _cl_isgw=true  # Needed for vif IP resolution conventions
 }
 _resolve_gw_context() {
