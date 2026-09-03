@@ -1,7 +1,7 @@
 #!/bin/sh
 
 ####################################################################################################
-############################################  HELPERS  #############################################
+###########################################  NETWORKING  ###########################################
 
 # Finds an unused ipv4 address and assigns it to "$1" with eval. We use eval here because the
 # global cache: RT_IPS needs to be updated, which would be lost with a `new_ip=$(..)` subshell
@@ -101,6 +101,34 @@ _resolve_available_tap() {
     # If _reserve was passed, then update the RT_EPAIRS, excluding _new_ep from future use
     [ "$_reserve" ] && RT_TAPS="$(printf "%b" "$RT_TAPS" "\n$_new_tap" | sed '/^$/d')"
     return 0
+}
+
+# These helpers are needed so that the primary cmd functions can used downward-scoped variables
+# and for clean designation of when the CELL is a gateway, vs when it is a client.
+_resolve_cl_context() {
+    local _fn="_resolve_cl_context" _pfx="$2"
+    unset _cl _cl_cut _cl_type _cl_ipv4 _cl_mtu _cl_gw _cl_extif _cl_isgw
+    _cl="$1"
+    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
+    _cl_cut="$(echo $_cl | cut -c1-14)_"
+    _cl_type=$(ctx_get ${_pfx}TYPE)
+    _cl_ipv4=$(ctx_get ${_pfx}IPV4)
+    _cl_mtu=$(ctx_get ${_pfx}MTU)
+    _cl_gw=$(ctx_get ${_pfx}GATEWAY)
+    _cl_extif=$(ctx_get ${_pfx}EXT_IF)
+    quiet query_gw_clients "$_cl" && _cl_isgw=true  # Needed for vif IP resolution conventions
+}
+
+_resolve_gw_context() {
+    local _fn="_resolve_gw_context" _pfx="$2"
+    unset _gw _gw_cut _gw_type _gw_mtu _gw_extif
+    _gw="$1"
+    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
+    _gw_cut="$(echo $_gw | cut -c1-14)_"
+    _gw_type=$(ctx_get ${_pfx}TYPE)
+    _gw_mtu=$(ctx_get ${_pfx}MTU)
+    # A gw-VM should have RT_CTX with INTIF="cell1_tapX,cell2_tapY,..."
+    _gw_intif=$(ctx_get ${_pfx}INTIF | sed -E "s/(^|.*,)${_cl}_(tap[0-9]+)(,|\$)/\2/")
 }
 
 compose_remove_interface_cmds() {
@@ -237,32 +265,6 @@ compose_vif_cmds() {
     _CMD_NETWORK_VIF="$(printf "%b" "$_CMD_NETWORK_VIF" "\n$_cmd_network_vif")"
 }
 
-# These helpers are needed so that the primary cmd functions can used downward-scoped variables
-# and for clean designation of when the CELL is a gateway, vs when it is a client.
-_resolve_cl_context() {
-    local _fn="_resolve_cl_context" _pfx="$2"
-    unset _cl _cl_cut _cl_type _cl_ipv4 _cl_mtu _cl_gw _cl_extif _cl_isgw
-    _cl="$1"
-    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
-    _cl_cut="$(echo $_cl | cut -c1-14)_"
-    _cl_type=$(ctx_get ${_pfx}TYPE)
-    _cl_ipv4=$(ctx_get ${_pfx}IPV4)
-    _cl_mtu=$(ctx_get ${_pfx}MTU)
-    _cl_gw=$(ctx_get ${_pfx}GATEWAY)
-    _cl_extif=$(ctx_get ${_pfx}EXT_IF)
-    quiet query_gw_clients "$_cl" && _cl_isgw=true  # Needed for vif IP resolution conventions
-}
-_resolve_gw_context() {
-    local _fn="_resolve_gw_context" _pfx="$2"
-    unset _gw _gw_cut _gw_type _gw_mtu _gw_extif
-    _gw="$1"
-    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
-    _gw_cut="$(echo $_gw | cut -c1-14)_"
-    _gw_type=$(ctx_get ${_pfx}TYPE)
-    _gw_mtu=$(ctx_get ${_pfx}MTU)
-    # A gw-VM should have RT_CTX with INTIF="cell1_tapX,cell2_tapY,..."
-    _gw_intif=$(ctx_get ${_pfx}INTIF | sed -E "s/(^|.*,)${_cl}_(tap[0-9]+)(,|\$)/\2/")
-}
 
 # Full composition of the network stack commands for a single cell, and between its gw and clients.
 # Dynamically scoped variables are used with _resolve_cl/gw_context() to avoid drilling.
@@ -302,6 +304,11 @@ compose_network_stack_cmds() {
     _CMD_NETWORK_VIF="$(printf "%b" "$_CMD_NETWORK_VIF\n" \
         "hush chflags noschg -R $_jetc $_jetc/resolv.conf $_jetc/resolvconf.conf")"
 }
+
+
+
+####################################################################################################
+#######################################  DATASET MANAGEMENT  #######################################
 
 # Return the least-stale snapshot possible. This could be an existing snapshot with no changes,
 # or it might be necessary to create a temporary snapshot. But dont snap a running rootenv.
