@@ -172,7 +172,7 @@ _resolve_gw_context() {
 # cl/gw TYPE ; cl ipv4 ; and account for host handling. The presence of certain varibles is the
 # indication that an associated _cmd should be constructed, which finalizes in loop at the end.
 compose_vif_cmds() {
-    local _fn="compose_vif_cmds" _cmd_network_vif _ip1 _mtu _mtu_mod
+    local _fn="compose_vif_cmds" _cmds_network_vif _ip1 _mtu _mtu_mod
     local _cl_vif _cl_grp _cl_j_mod _cl_ip _gw_vif _gw_grp _gw_j_mod _gw_ip _vif
     local _cmds="_cmd_cl_vnet _cmd_gw_vnet _cmd_cl_grp _cmd_gw_grp _cmd_cl_inet _cmd_gw_inet"
 
@@ -259,10 +259,10 @@ compose_vif_cmds() {
 
     # Loop over all the _cmds to construct the final command
     for _cmd in $_cmds ; do
-        [ "$_cmd" ] && _cmd_network_vif="$(printf "%b" "$_cmd_network_vif" "\n$(ctx_get $_cmd)")"
+        [ "$_cmd" ] && _cmds_network_vif="$(printf "%b" "$_cmds_network_vif" "\n$(ctx_get $_cmd)")"
     done
 
-    _CMD_NETWORK_VIF="$(printf "%b" "$_CMD_NETWORK_VIF" "\n$_cmd_network_vif")"
+    _CMDS_NETWORK_VIF="$(printf "%b" "$_CMDS_NETWORK_VIF" "\n$_cmds_network_vif")"
 }
 
 
@@ -283,7 +283,7 @@ compose_network_construction_cmds() {
     # Commands that connect CELL to its gateway. GW must be running && ctx.conf must be available
     if is_cell_running $_cl_gw && ctx_load_file $D_RUNTM/$_cl_gw/ctx.conf "gw_" ; then
         _resolve_gw_context $_cl_gw "gw_"  # Downward scoped gateway variables
-        compose_vif_cmds      # Appends global command: _CMD_NETWORK_VIF
+        compose_vif_cmds      # Appends global command: _CMDS_NETWORK_VIF
     fi
 
     # Commands that connect CELL to its clients
@@ -296,12 +296,12 @@ compose_network_construction_cmds() {
         ctx_unset "cl_"
         ctx_load_file $D_RUNTM/$_client/ctx.conf "cl_" || continue
         _resolve_cl_context "$_client" "cl_"
-        compose_vif_cmds      # Appends global command: _CMD_NETWORK_VIF
+        compose_vif_cmds      # Appends global command: _CMDS_NETWORK_VIF
     done
 
     # Ensure that flags are down and /etc/resolvconf.conf can be modified by qubsd-netconf in the jail
     _jetc="$(ctx_get ${_pfx}R_MNT)/etc"
-    _CMD_NETWORK_VIF="$(printf "%b" "$_CMD_NETWORK_VIF\n" \
+    _CMDS_NETWORK_VIF="$(printf "%b" "$_CMDS_NETWORK_VIF\n" \
         "hush chflags noschg -R $_jetc $_jetc/resolv.conf $_jetc/resolvconf.conf")"
 }
 
