@@ -103,34 +103,6 @@ _resolve_available_tap() {
     return 0
 }
 
-# These helpers are needed so that the primary cmd functions can used downward-scoped variables
-# and for clean designation of when the CELL is a gateway, vs when it is a client.
-_resolve_cl_context() {
-    local _fn="_resolve_cl_context" _pfx="$2"
-    unset _cl _cl_cut _cl_type _cl_ipv4 _cl_mtu _cl_gw _cl_extif _cl_isgw
-    _cl="$1"
-    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
-    _cl_cut="$(echo $_cl | cut -c1-14)_"
-    _cl_type=$(ctx_get ${_pfx}TYPE)
-    _cl_ipv4=$(ctx_get ${_pfx}IPV4)
-    _cl_mtu=$(ctx_get ${_pfx}MTU)
-    _cl_gw=$(ctx_get ${_pfx}GATEWAY)
-    _cl_extif=$(ctx_get ${_pfx}EXT_IF)
-    quiet query_gw_clients "$_cl" && _cl_isgw=true  # Needed for vif IP resolution conventions
-}
-
-_resolve_gw_context() {
-    local _fn="_resolve_gw_context" _pfx="$2"
-    unset _gw _gw_cut _gw_type _gw_mtu _gw_extif
-    _gw="$1"
-    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
-    _gw_cut="$(echo $_gw | cut -c1-14)_"
-    _gw_type=$(ctx_get ${_pfx}TYPE)
-    _gw_mtu=$(ctx_get ${_pfx}MTU)
-    # A gw-VM should have RT_CTX with INTIF="cell1_tapX,cell2_tapY,..."
-    _gw_intif=$(ctx_get ${_pfx}INTIF | sed -E "s/(^|.*,)${_cl}_(tap[0-9]+)(,|\$)/\2/")
-}
-
 compose_remove_interface_cmds() {
     local _fn="compose_remove_interface_cmds" _intfs="$1" _cell="$2" _action
 
@@ -165,6 +137,34 @@ compose_remove_interface_cmds() {
         fi
     done
     return 0
+}
+
+# These helpers are needed so that the primary cmd functions can used downward-scoped variables
+# and for clean designation of when the CELL is a gateway, vs when it is a client.
+_resolve_cl_context() {
+    local _fn="_resolve_cl_context" _pfx="$2"
+    unset _cl _cl_cut _cl_type _cl_ipv4 _cl_mtu _cl_gw _cl_extif _cl_isgw
+    _cl="$1"
+    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
+    _cl_cut="$(echo $_cl | cut -c1-14)_"
+    _cl_type=$(ctx_get ${_pfx}TYPE)
+    _cl_ipv4=$(ctx_get ${_pfx}IPV4)
+    _cl_mtu=$(ctx_get ${_pfx}MTU)
+    _cl_gw=$(ctx_get ${_pfx}GATEWAY)
+    _cl_extif=$(ctx_get ${_pfx}EXT_IF)
+    quiet query_gw_clients "$_cl" && _cl_isgw=true  # Needed for vif IP resolution conventions
+}
+
+_resolve_gw_context() {
+    local _fn="_resolve_gw_context" _pfx="$2"
+    unset _gw _gw_cut _gw_type _gw_mtu _gw_extif
+    _gw="$1"
+    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
+    _gw_cut="$(echo $_gw | cut -c1-14)_"
+    _gw_type=$(ctx_get ${_pfx}TYPE)
+    _gw_mtu=$(ctx_get ${_pfx}MTU)
+    # A gw-VM should have RT_CTX with INTIF="cell1_tapX,cell2_tapY,..."
+    _gw_intif=$(ctx_get ${_pfx}INTIF | sed -E "s/(^|.*,)${_cl}_(tap[0-9]+)(,|\$)/\2/")
 }
 
 # Disposition all taps and epairs: vnet to jail, apply ifconfig groups, bring up ip/mtu.
@@ -268,7 +268,7 @@ compose_vif_cmds() {
 
 # Full composition of the network stack commands for a single cell, and between its gw and clients.
 # Dynamically scoped variables are used with _resolve_cl/gw_context() to avoid drilling.
-compose_network_stack_cmds() {
+compose_network_construction_cmds() {
     local _fn="compose_network_construction_cmds" _cell="$1" _pfx="$2"
     local _caller _client _type _ipv4 _mtu _gw _gw_type
     assert_args_set 1 "$_cell" || eval $(THROW $?)
@@ -299,7 +299,7 @@ compose_network_stack_cmds() {
         compose_vif_cmds      # Appends global command: _CMD_NETWORK_VIF
     done
 
-    # Ensure that flags are down and /etc/resolvconf.conf can be modified by qubsd-netif in the jail
+    # Ensure that flags are down and /etc/resolvconf.conf can be modified by qubsd-netconf in the jail
     _jetc="$(ctx_get ${_pfx}R_MNT)/etc"
     _CMD_NETWORK_VIF="$(printf "%b" "$_CMD_NETWORK_VIF\n" \
         "hush chflags noschg -R $_jetc $_jetc/resolv.conf $_jetc/resolvconf.conf")"
