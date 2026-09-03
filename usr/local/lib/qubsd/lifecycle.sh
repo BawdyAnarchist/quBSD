@@ -7,9 +7,9 @@ execute_commands() {
     assert_args_set 1 "$1" && _commands="$1"
 
     # Sanitize execution globals to ensure against user typos like 'fals' (intended 'false')
-    [ "$DRY_RUN" ] && ! echo_grep -q "$DRY_RUN" '(true|TRUE|false|FALSE)' \
+    [ "$DRY_RUN" ] && ! echo_grep -q "$DRY_RUN" '(true|TRUE|True|false|FALSE|False)' \
         && echo "DRY_RUN must be <true|false>" && exit 1
-    [ "$VERBOSE" ] && ! echo_grep -q "$VERBOSE" '(true|TRUE|false|FALSE)' \
+    [ "$VERBOSE" ] && ! echo_grep -q "$VERBOSE" '(true|TRUE|True|false|FALSE|False)' \
         && echo "DRY_RUN must be <true|false>" && exit 1
 
     # Loop over all passed commands. _cmds could have multiple lines.
@@ -32,8 +32,8 @@ execute_commands() {
 exec_cmd() {
     local _fn="exec_cmd"
     case $DRY_RUN::$VERBOSE in
-        true::*|TRUE::*) printf "  # %s\n" "$_cmd" ;;
-        *::true|*::TRUE) printf "  # %s\n" "$_cmd" ; eval "$_cmd" ;;
+        true::*|TRUE::*|True::*) printf "  # %s\n" "$_cmd" ;;
+        *::true|*::TRUE|*::True) printf "  # %s\n" "$_cmd" ; eval "$_cmd" ;;
         *) eval "$_cmd" ;;
     esac
 }
