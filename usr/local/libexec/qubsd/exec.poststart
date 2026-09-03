@@ -43,11 +43,6 @@ compose_flags_commands() {
     done
     _CMD_CHFLAGS=$(echo "$_CMD_CHFLAGS" | sed -E 's|//|/|g')  # Removes double // directory paths
 
-    # Slightly hacky but resolv is an exception to schg. Services need to modify this.
-    [ -f "$R_MNT/etc/resolvconf.conf" ] && _resolvs="$R_MNT/etc/resolvconf.conf"
-    [ -f "$R_MNT/etc/resolv.conf" ]     && _resolvs="$_resolvs $R_MNT/etc/resolv.conf"
-    [ "$_resolvs" ] && _CMD_CHFLAGS_2="chflags noschg $_resolvs"
-
     # exec.poststart is always sent to background. Don't report seclvl change
     _CMD_SECLVL="quiet jexec -l -U root $CELL sysctl kern.securelevel=$SECLVL"
 }
@@ -61,7 +56,7 @@ main() {
     compose_rctl_commands
     compose_flags_commands
 
-    _COMMANDS="_CMD_MAXMEM _CMD_CPUSET _CMD_CHFLAGS _CMD_CHFLAGS_2 _CMD_SECLVL"
+    _COMMANDS="_CMD_MAXMEM _CMD_CPUSET _CMD_CHFLAGS _CMD_SECLVL"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
     return 0
 }
