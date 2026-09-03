@@ -262,7 +262,7 @@ compose_vif_cmds() {
         [ "$_cmd" ] && _cmds_network_vif="$(printf "%b" "$_cmds_network_vif" "\n$(ctx_get $_cmd)")"
     done
 
-    _CMDS_NETWORK_VIF="$(printf "%b" "$_CMDS_NETWORK_VIF" "\n$_cmds_network_vif")"
+    _CMDS_NETWORK_CONSTRUCTION="$(printf "%b" "$_CMDS_NETWORK_CONSTRUCTION" "\n$_cmds_network_vif")"
 }
 
 
@@ -283,7 +283,7 @@ _caller=$(ctx_get ${_pfx}CALLER)       # Switches services restart (prevents rac
     # Commands that connect CELL to its gateway. GW must be running && ctx.conf must be available
     if is_cell_running $_cl_gw && ctx_load_file $D_RUNTM/$_cl_gw/ctx.conf "gw_" ; then
         _resolve_gw_context $_cl_gw "gw_"  # Downward scoped gateway variables
-        compose_vif_cmds      # Appends global command: _CMDS_NETWORK_VIF
+        compose_vif_cmds      # Appends global command: _CMDS_NETWORK_CONSTRUCTION
     fi
 
     # Commands that connect CELL to its clients
@@ -296,12 +296,12 @@ _caller=$(ctx_get ${_pfx}CALLER)       # Switches services restart (prevents rac
         ctx_unset "cl_"
         ctx_load_file $D_RUNTM/$_client/ctx.conf "cl_" || continue
         _resolve_cl_context "$_client" "cl_"
-        compose_vif_cmds      # Appends global command: _CMDS_NETWORK_VIF
+        compose_vif_cmds      # Appends global command: _CMDS_NETWORK_CONSTRUCTION
     done
 
     # Ensure that flags are down and /etc/resolvconf.conf can be modified by qubsd-netconf in the jail
     _jetc="$(ctx_get ${_pfx}R_MNT)/etc"
-    _CMDS_NETWORK_VIF="$(printf "%b" "$_CMDS_NETWORK_VIF\n" \
+    _CMDS_NETWORK_CONSTRUCTION="$(printf "%b" "$_CMDS_NETWORK_CONSTRUCTION\n" \
         "hush chflags noschg -R $_jetc $_jetc/resolv.conf $_jetc/resolvconf.conf")"
 }
 
