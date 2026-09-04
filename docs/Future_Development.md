@@ -1,4 +1,20 @@
 
+relevant files
+/usr/local/bin/qubsd-netconfd.sh
+/usr/local/etc/rc.d/qubsd-netconfd
+/var/unbound/forward.conf
+/etc/pf.conf
+/etc/rc.conf
+/etc/resolv.conf
+/etc/resolvconf.conf
+
+cleanup
+qubsd-dhcpd
+
+
+exec.release -> final chflags can sometimes be a problem for non-existent (removed) datasets of disps
+
+make some lab notes on the networking model, particularly resolv and services
 
 ### Next up
 
