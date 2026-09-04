@@ -1,35 +1,39 @@
 #!/bin/sh
 
-. $2    # Source the libary. $2 is passed by /usr/local/etc/qubsd/jail.conf.d/base.conf
+. $2  # Passed by base.conf
 
-get_options() {
-	JAIL="$1"
-	get_jail_parameter -dqs CLASS   "$JAIL" || get_msg2 -m _e
-	get_jail_parameter -d   CONTROL "$JAIL" || get_msg2 -Em _e
-	get_jail_parameter -d   GATEWAY "$JAIL" || get_msg2 -Em _e
+CELL=$1
+RT_CTX=$D_RUNTM/$CELL/ctx.conf
+trap_init
+trap_push "$QLEXEC/exec.release $CELL"   # Cleanup mounts and runtime
+
+# resolvconf defaults to resolv.conf, but this file often has schg flags. Use a symlink instead
+compose_resolvconf_cmds() {
+    local _r_mnt=$(ctx_get R_MNT)
+    _resolv="/var/run/resolvconf/resolv.conf"
+    _CMD_LINK_RESOLV="chroot $_r_mnt /bin/sh -c 'ln -sf $_resolv /etc/resolv.conf'"
+    _CMD_SET_CONFIG="echo 'resolv_conf=$_resolv' > $_r_mnt/etc/resolvconf.conf"
 }
 
 main() {
-	# If exec script fails and jail start aborts, make sure to clean up the mounts
-	trap "$QLEXEC/exec.release $JAIL"
+    local _fn="main"
 
-	# Establish connections to the jail's upstream gateway and control jail
-	connect_client_to_gateway -t EXT_IF "$JAIL" "$GATEWAY"
+    # bootstrap only needs level 2. Otherwise established runtime might conflict with validation
+    mute ctx_load_file $RT_CTX || eval $(THROW $?)
 
-	# If this jail is also a gateway, connect it to downstream clients.
-	clients=$(get_info -e _CLIENTS "$JAIL" | tr '\n\t' ' ')
-	last_client=$(echo "$clients" | awk '{print $NF}')
-	for _CLI in $clients ; do
-		[ "$_CLI" = "$last_client" ] && _s="-s"  # -s currently unused, keeping for now until starts are fixed
-		chk_isrunning "$_CLI" && connect_client_to_gateway -t EXT_IF $_s "$_CLI" "$JAIL"
-	done
+    # Single unified network construction for CELL, based on its config
+    compose_network_construction_cmds $CELL
+
+    # Provide a means for resolvconf to make updates after jail start is complete
+    compose_resolvconf_cmds
+
+    _COMMANDS="_CMDS_NETWORK_CONSTRUCTION _CMD_LINK_RESOLV _CMD_SET_CONFIG"
+    execute_commands "$_COMMANDS" || eval $(THROW $?)
+
+    trap_pop   # Success. Remove the exec.release trap
+    return 0
 }
 
+main || FATAL
+exit 0   # Guarantee that `jail` does not abort startup
 
-get_global_variables
-
-get_options "$@"
-
-main
-
-exit 0   # Script exits success, to not abort jail startup
