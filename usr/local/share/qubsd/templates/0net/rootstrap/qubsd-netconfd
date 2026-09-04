@@ -17,7 +17,11 @@ procname="/bin/sh"
 start_cmd="${name}_start"
 
 qubsd_netconfd_start() {
-	/usr/sbin/daemon -p ${pidfile} ${command} ${pidfile}
+    # Run blocking to avoid racing exec.poststart to schg files before daemon can write them
+    ${command} true  # Flag alerts the service to exit early
+
+    # Invoke the command again, daemonized, so that the rc system can proceed
+	/usr/sbin/daemon -p ${pidfile} ${command}
 }
 
 load_rc_config $name

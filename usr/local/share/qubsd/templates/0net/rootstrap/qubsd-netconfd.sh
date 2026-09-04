@@ -81,8 +81,9 @@ push_static_dns() {
 }
 
 add_interface() {
-    local _groups _iface  # FBSD /bin/sh preserves _iface if value exists (from run_startup_actions)
+    local _groups _iface
 
+    # /bin/sh preserves `local _iface` value from parent (run_startup_actions)
     : ${_iface:=$(echo "$_line" | sed -En "s|.*add/repl iface iface#[0-9]+ ([[:alnum:]]+) .*|\1|p")}
     [ "$_iface" ] || return 0
 
@@ -91,6 +92,9 @@ add_interface() {
         *) IFACES="$IFACES,$_iface," ;; # _iface is not tracked. Add to the list
     esac
 
+    # Interfaces are already configured. Now they're internally tracked again. No services restart.
+    [ "$re_init_flag" ] && unset re_init_flag && return 0
+
     # The actions to take for a new vnet interface depend on the ifconfig group(s) set by host
     sleep .05  # Give host a moment to assign group (mitigate this daemon from racing the host)
     _groups=$(ifconfig $_iface | sed -En "s/groups: (.*)/\1/p")
@@ -98,11 +102,16 @@ add_interface() {
     case " $_groups " in
         *" DHCLIENT "*)  # Must come first to prevent static DNS assignment for DHCLIENTs
             pgrep -qfl "dhclient.*$_iface" || dhclient -bc /tmp/qubsd_dhclient.conf $_iface
+            [ "$dns" ] || push_static_dns
+            [ "$unbound" ] && restart_unbound=true
+            [ "$pf" ] && reload_pf=true
             [ "$wg" ] && restart_wg=true
         ;;
         *" STATIC_IP "*)
             # Dont push static DNS if dnscrypt is enabled (safer, in case the service dies)
             [ "$dns" ] || push_static_dns
+            [ "$unbound" ] && restart_unbound=true
+            [ "$pf" ] && reload_pf=true
             [ "$wg" ] && restart_wg=true
         ;;
         *" CLIENTS "*)
@@ -114,8 +123,8 @@ add_interface() {
 
 del_interface() {
     local _iface
-
     _iface=$(echo "$_line" | sed -En "s|.*delete iface iface#[0-9]+ ([[:alnum:]]+).*|\1|p")
+
     [ "$_iface" ] || return 0
     IFACES=$(echo "$IFACES" | sed -E "s/$_iface,//g") # remove interface from global tracker
 
@@ -135,17 +144,19 @@ restart_services() {
 run_startup_actions() {
     local _ifaces _iface
 
-    set_pf_wg_endpoint # Table persists after pf reload, but is still alterable at seclvl < 3
+    if [ "$init_flag" ] ; then
+        set_pf_wg_endpoint # Table persists after pf reload, but is still alterable at seclvl < 3
 
-    stdout_dhclient_conf > /tmp/qubsd_dhclient.conf  # Always written, doesnt hurt anything
+        stdout_dhclient_conf > /tmp/qubsd_dhclient.conf  # Always written, doesnt hurt anything
 
-    case "$dns:$unbound" in
-        :) : ;; # No action. resolvconf needs no reference to dns or unbound
-        true:*) # Dont let resolvconf overwrite unbound forward.conf (already points at dnscrypt)
-            stdout_dnscrypt_resolvconf > /etc/resolvconf.conf ;;
-        *:true) # resolvconf will overwrite unbound forward.conf with the highest priority DNS
-            stdout_unbound_resolvconf  > /etc/resolvconf.conf ;;
-    esac
+        case "$dns:$unbound" in
+            :) : ;; # No action. resolvconf needs no reference to dns or unbound
+            true:*) # Dont let resolvconf overwrite unbound forward.conf (already points at dnscrypt)
+                stdout_dnscrypt_resolvconf >> /etc/resolvconf.conf ;;
+            *:true) # resolvconf will overwrite unbound forward.conf with the highest priority DNS
+                stdout_unbound_resolvconf  >> /etc/resolvconf.conf ;;
+        esac
+    fi
 
     # Interfaces must be added/initialized at jail start
     _ifaces=$(ifconfig -l | tr ' ' '\n' | grep -E '^(epair[0-9]+[ab]|tap[0-9]+)$')
@@ -188,18 +199,23 @@ read_fifo_loop() {
     done
 }
 
+# Service file launches this script once, blocking; then a second time, daemonized.
+# Blocking prevents racing exec.poststart to schg files before daemon can write them
 main() {
     # Enabled services recorded as globals, to generate configs and flag restarts based on events
     get_services
 
-    # Generate config files, then add/initialize existing interfaces
+    # Generate the config files, track interfaces, add/initialize interfaces
+    [ "$first_init" ] || re_init_flag=true
     run_startup_actions
+    [ "$first_init" ] && exit 0  # Exit after first_init, to relaunch daemonized
 
     # Named pipe is used to monitor dynamic interface changes by the host made inside the jail
     open_fifo
     read_fifo_loop
 }
 
+first_init="$1"
 main
 exit 0
 
