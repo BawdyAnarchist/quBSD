@@ -1,0 +1,28 @@
+#!/bin/sh
+# /usr/local/etc/rc.d/qubsd-netconfd
+
+# PROVIDE: qubsd_netconfd
+# REQUIRE: LOGIN
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="qubsd_netconfd"
+desc="Monitors virtual interface add/del for service restarts"
+rcvar="${name}_enable"
+command="/usr/local/bin/qubsd-netconfd.sh"
+pidfile="/var/run/qubsd-netconfd.pid"
+procname="/bin/sh"
+
+start_cmd="${name}_start"
+
+qubsd_netconfd_start() {
+    # Run blocking to avoid racing exec.poststart to schg files before daemon can write them
+    ${command} true  # Flag alerts the service to exit early
+
+    # Invoke the command again, daemonized, so that the rc system can proceed
+	/usr/sbin/daemon -p ${pidfile} ${command}
+}
+
+load_rc_config $name
+run_rc_command "$1"
