@@ -21,6 +21,8 @@ cleanup_daemon() {
     exit 0
 }
 
+############################################  HELPERS  #############################################
+
 # daemon operates on internal vifs. Frequent renegotiation / quick backoff are unnecessary
 stdout_dhclient_conf() {
 cat << EOF
@@ -80,20 +82,19 @@ push_static_dns() {
     printf 'nameserver %s\n' "$_gw" | resolvconf -a "${_iface}.qubsd"
 }
 
-add_interface() {
-    local _groups _iface
+#########################################  DAEMON ACTIONS  #########################################
 
-    # /bin/sh preserves `local _iface` value from parent (run_startup_actions)
-    : ${_iface:=$(echo "$_line" | sed -En "s|.*add/repl iface iface#[0-9]+ ([[:alnum:]]+) .*|\1|p")}
+add_interface() {
+    local _groups _iface  # /bin/sh preserves `_iface` value if set by parent (run_first_init)
+
+    : ${_iface:=$(echo "$_line" | sed -En \
+        "s|.*add/repl iface iface#[0-9]+ ([[:alnum:]]+) .*|\1|p" | grep -E "epair|tap")}
     [ "$_iface" ] || return 0
 
     case ",$IFACES," in
-        *",$_iface,"*) return 0     ;; # _iface is already tracked. Ignore potentially duplicate signal
+        *",$_iface,"*) return 0      ;; # _iface is already tracked. Ignore potentially duplicate signal
         *) IFACES="$IFACES,$_iface," ;; # _iface is not tracked. Add to the list
     esac
-
-    # Interfaces are already configured. Now they're internally tracked again. No services restart.
-    [ "$re_init_flag" ] && unset re_init_flag && return 0
 
     # The actions to take for a new vnet interface depend on the ifconfig group(s) set by host
     sleep .05  # Give host a moment to assign group (mitigate this daemon from racing the host)
@@ -103,21 +104,19 @@ add_interface() {
         *" DHCLIENT "*)  # Must come first to prevent static DNS assignment for DHCLIENTs
             pgrep -qfl "dhclient.*$_iface" || dhclient -bc /tmp/qubsd_dhclient.conf $_iface
             [ "$dns" ] || push_static_dns
-            [ "$unbound" ] && restart_unbound=true
-            [ "$pf" ] && reload_pf=true
             [ "$wg" ] && restart_wg=true
+            [ "$pf" ] && reload_pf=true
+            [ "$unbound" ] && restart_unbound=true
         ;;
         *" STATIC_IP "*)
-            # Dont push static DNS if dnscrypt is enabled (safer, in case the service dies)
-            [ "$dns" ] || push_static_dns
-            [ "$unbound" ] && restart_unbound=true
-            [ "$pf" ] && reload_pf=true
+            # Dont push static DNS if dnscrypt or wg are enabled (safer in case service(s) die)
+            { [ "$dns" ] || [ "$wg" ] ;} || push_static_dns
             [ "$wg" ] && restart_wg=true
+            [ "$pf" ] && reload_pf=true
+            [ "$unbound" ] && restart_unbound=true
         ;;
         *" CLIENTS "*)
             [ "$dhcpd" ] && restart_dhcpd=true
-            [ "$wg" ]    && restart_wg=true
-            [ "$pf" ]    && reload_pf=true
     esac
 }
 
@@ -134,34 +133,46 @@ del_interface() {
 }
 
 restart_services() {
-    [ "$restart_dhcpd" ]   && unset restart_dhcpd   && service isc-dhcpd restart
-    [ "$restart_unbound" ] && unset restart_unbound && service local_unbound restart
     [ "$restart_wg" ]      && unset restart_wg      && service wireguard restart
-    [ "$restart_dns" ]     && unset restart_dns     && service dnscrypt-proxy restart
     [ "$reload_pf" ]       && unset reload_pf       && service pf reload
+    [ "$restart_dhcpd" ]   && unset restart_dhcpd   && service isc-dhcpd restart
+    [ "$restart_dns" ]     && unset restart_dns     && service dnscrypt-proxy restart
+    [ "$restart_unbound" ] && unset restart_unbound && service local_unbound restart
+    return 0
 }
 
-run_startup_actions() {
+##########################################  DAEMON SETUP  ##########################################
+
+run_first_init() {
     local _ifaces _iface
 
-    if [ "$init_flag" ] ; then
-        set_pf_wg_endpoint # Table persists after pf reload, but is still alterable at seclvl < 3
+    set_pf_wg_endpoint # Table persists after pf reload, but is still alterable at seclvl < 3
 
-        stdout_dhclient_conf > /tmp/qubsd_dhclient.conf  # Always written, doesnt hurt anything
+    stdout_dhclient_conf > /tmp/qubsd_dhclient.conf  # Always written, doesnt hurt anything
 
-        case "$dns:$unbound" in
-            :) : ;; # No action. resolvconf needs no reference to dns or unbound
-            true:*) # Dont let resolvconf overwrite unbound forward.conf (already points at dnscrypt)
-                stdout_dnscrypt_resolvconf >> /etc/resolvconf.conf ;;
-            *:true) # resolvconf will overwrite unbound forward.conf with the highest priority DNS
-                stdout_unbound_resolvconf  >> /etc/resolvconf.conf ;;
-        esac
-    fi
+    case "$dns:$unbound" in
+        :) : ;; # No action. resolvconf needs no reference to dns or unbound
+        true:*) # Dont let resolvconf overwrite unbound forward.conf (already points at dnscrypt)
+            stdout_dnscrypt_resolvconf >> /etc/resolvconf.conf ;;
+        *:true) # resolvconf will overwrite unbound forward.conf with the highest priority DNS
+            stdout_unbound_resolvconf  >> /etc/resolvconf.conf ;;
+    esac
 
     # Interfaces must be added/initialized at jail start
     _ifaces=$(ifconfig -l | tr ' ' '\n' | grep -E '^(epair[0-9]+[ab]|tap[0-9]+)$')
     for _iface in $_ifaces ; do
         add_interface
+    done
+
+    restart_services
+    return 0
+}
+
+run_second_init() {
+    local _ifaces _iface
+    _ifaces=$(ifconfig -l | tr ' ' '\n' | grep -E '^(epair[0-9]+[ab]|tap[0-9]+)$')
+    for _iface in $_ifaces ; do
+        IFACES="$IFACES,$_iface,"
     done
 }
 
@@ -206,16 +217,16 @@ main() {
     get_services
 
     # Generate the config files, track interfaces, add/initialize interfaces
-    [ "$first_init" ] || re_init_flag=true
-    run_startup_actions
-    [ "$first_init" ] && exit 0  # Exit after first_init, to relaunch daemonized
+    [ "$1" ] && run_first_init && exit 0
+
+    # Regenerate the tracked interface list
+    run_second_init
 
     # Named pipe is used to monitor dynamic interface changes by the host made inside the jail
     open_fifo
     read_fifo_loop
 }
 
-first_init="$1"
-main
+main "$1"
 exit 0
 
