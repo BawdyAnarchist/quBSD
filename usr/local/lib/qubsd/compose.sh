@@ -303,10 +303,7 @@ _caller=$(ctx_get ${_pfx}CALLER)       # Switches services restart (prevents rac
         compose_vif_cmds      # Appends global command: _CMDS_NETWORK_CONSTRUCTION
     done
 
-    # Ensure that flags are down and /etc/resolvconf.conf can be modified by qubsd-netconf in the jail
-    _jetc="$(ctx_get ${_pfx}R_MNT)/etc"
-    _CMDS_NETWORK_CONSTRUCTION="$(printf "%b" "$_CMDS_NETWORK_CONSTRUCTION\n" \
-        "hush chflags -R noschg $_jetc $_jetc/resolv.conf $_jetc/resolvconf.conf")"
+    return 0
 }
 
 
