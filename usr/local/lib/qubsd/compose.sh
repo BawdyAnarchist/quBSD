@@ -164,7 +164,7 @@ _resolve_gw_context() {
     _gw_type=$(ctx_get ${_pfx}TYPE)
     _gw_mtu=$(ctx_get ${_pfx}MTU)
     # A gw-VM should have RT_CTX with INTIF="cell1_tapX,cell2_tapY,..."
-    _gw_intif=$(ctx_get ${_pfx}INTIF | sed -E "s/(^|.*,)${_cl}_(tap[0-9]+)(,|\$)/\2/")
+    _gw_intif=$(ctx_get ${_pfx}INT_IF | sed -E "s/(^|.*,)${_cl}_(tap[0-9]+)(,|\$)/\2/")
 }
 
 # Disposition all taps and epairs: vnet to jail, apply ifconfig groups, bring up ip/mtu.
@@ -173,7 +173,7 @@ _resolve_gw_context() {
 # indication that an associated _cmd should be constructed, which finalizes in loop at the end.
 compose_vif_cmds() {
     local _fn="compose_vif_cmds" _cmds_network_vif _ip1 _mtu _mtu_mod
-    local _cl_vif _cl_grp _cl_j_mod _cl_ip _cl_rt _gw_vif _gw_grp _gw_j_mod _gw_ip _vif
+    local _cl_vif _cl_grp _cl_j_mod _cl_ip _cl_rt _cl_vif_mk _gw_vif _gw_grp _gw_j_mod _gw_ip _vif
     local _cmds="_cmd_cl_vif _cmd_cl_vnet _cmd_gw_vnet _cmd_cl_grp _cmd_gw_grp _cmd_cl_inet _cmd_gw_inet _cmd_cl_rt"
 
     # With no gw, there are no vifs to configure
@@ -225,6 +225,7 @@ compose_vif_cmds() {
             _gw_vif=${_vif}a
             _cl_grp="group EXT_IF group $_gw_cut"         # Standard ifconfig group assignments
             _gw_grp="group CLIENTS group $_cl_cut"
+            _cl_vif_mk=true
             [ ! "$_gw" = "host" ] && _gw_j_mod="-j $_gw"  # Should never be host. Just being robust
             [ ! "$_cl" = "host" ] && _cl_j_mod="-j $_cl"
 
@@ -252,7 +253,7 @@ compose_vif_cmds() {
     esac
 
     # Construct the full set of commands that will need to be run, depending on what was resolved
-    [ "$_cl_vif" ] && _cmd_cl_vif="quiet ifconfig ${_cl_vif%?} create"  # Noisy command. Quiet
+    [ "$_cl_vif_mk" ] && _cmd_cl_vif="quiet ifconfig ${_cl_vif%?} create"  # Noisy command. Quiet
     [ "$_cl_vif" ] && _cmd_cl_vnet="ifconfig $_cl_vif vnet $_cl"
     [ "$_gw_vif" ] && _cmd_gw_vnet="ifconfig $_gw_vif vnet $_gw"
     [ "$_cl_grp" ] && _cmd_cl_grp="ifconfig $_cl_j_mod $_cl_vif $_cl_grp"
