@@ -6,10 +6,10 @@ CELL=$1
 RT_CTX=$D_RUNTM/$CELL/ctx.conf
 trap_init
 trap_push "rm -rf $D_RUNTM/$CELL"
-#VERBOSE=true
+
 # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
 compose_cleanup_cmds() {
-    local _fn="compose_cleanup_cmds" _mounts _encrypt _proc
+    local _fn="compose_cleanup_cmds" _mounts _encroot _proc
 
     # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
     [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
@@ -20,11 +20,11 @@ compose_cleanup_cmds() {
 
     # Determine the mount status of the persistence
     if [ "$P_MNT" ] ; then
-        _encrypt=$(query_datasets $P_DSET ; echo_grep "$DATASETS" "$P_DSET" | awk '{print $5}')
-        { [ "$_encrypt" ] && [ ! "$_encrypt" = "off" ] ;} && _CMD_ENCRYPT="zfs umount -u $P_DSET"
+        _encroot=$(zfs list -o encryptionroot $P_DSET)
+        [ "$_encroot" = "$P_DSET" ] && _CMD_ENCRYPT="zfs umount -u $P_DSET"
     fi
 
-    # Flags come down after stopping, but fork process and silence, to reduce user lag
+    # Flags down after stopping, but fork and silence to reduce user lag. No libs avail after fork
     [ -d "$P_MNT" ] && _CMD_CHFLAGS="exec chflags -fR noschg $P_MNT > /dev/null 2>&1"
 
     # If dhcp is never found for, exec.poststart runs forever, and stays even after jail -r
