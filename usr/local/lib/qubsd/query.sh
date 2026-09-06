@@ -358,16 +358,20 @@ query_runtime_ips() {
 
 # Returns a list of all epairs currently in use by the system (but without a/b designation)
 query_runtime_epairs() {
-    local _fn="query_runtime_epairs" _jail_eps _val
+    local _fn="query_runtime_epairs" _jail_eps _host_eps _val
 
     [ "$RT_EPAIRS" ] && return 0  # Already have a list of used epairs
 
-    query_onjails
+    query_onjails  # Get the epairs inside of jails
     for _jail in $ONJAILS ; do
         _jail_eps=$(hush ifconfig -j $_jail -g epair | sed -E "s|.\$||")
         _val=$(printf "%b" "$_val" "\n$_jail_eps")
         unset _jail_eps
     done
+
+    # Get the epairs on host (whether used or not)
+    _host_eps=$(hush ifconfig -g epair | sed -E "s|.\$||")
+    _val=$(printf "%b" "$_val" "\n$_host_eps")
 
     [ "$_val" ] && RT_EPAIRS="$(echo "$_val" | sed '/^$/d' | sort -u)"
     return 0
