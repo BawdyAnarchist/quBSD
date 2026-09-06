@@ -1,5 +1,11 @@
 
-relevant files
+
+# net-firewall networking fixes (VM related and taps)
+Canonical VM INT_IF (that net-firewall connects to) will be tracked be rt.ctx, not ifconfig groups (limited by group length of 14 chars)
+**For now** -> will put a static file in rt.ctx for 0alpine to get the networking stuff hammered out. Ultimately the bhyve overhaul needs to fix this too
+
+
+# Networking switchover relevant files
 /usr/local/bin/qubsd-netconfd.sh
 /usr/local/etc/rc.d/qubsd-netconfd
 /var/unbound/forward.conf
@@ -8,13 +14,13 @@ relevant files
 /etc/resolv.conf
 /etc/resolvconf.conf
 
-cleanup
-qubsd-dhcpd
-
-
+# PROBLEMS
+host is not getting its interface
+error system not working
+qb-edit -h not working
 exec.release -> final chflags can sometimes be a problem for non-existent (removed) datasets of disps
-
-make some lab notes on the networking model, particularly resolv and services
+cleanup qubsd-dhcpd
+should you update EXT_IF, INT_IF, and CLIENTS for the rt.ctx? I dont think so, but it's still there in the runtime ctx files
 
 ### Next up
 

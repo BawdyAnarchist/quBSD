@@ -1,3 +1,4 @@
 *.swp
 c_code/xephyr-xclip
 c_code/qubsd_xclip
+docs/Future_Development.md
