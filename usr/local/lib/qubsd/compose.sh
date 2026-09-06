@@ -173,8 +173,8 @@ _resolve_gw_context() {
 # indication that an associated _cmd should be constructed, which finalizes in loop at the end.
 compose_vif_cmds() {
     local _fn="compose_vif_cmds" _cmds_network_vif _ip1 _mtu _mtu_mod
-    local _cl_vif _cl_grp _cl_j_mod _cl_ip _cl_rt _cl_vif_mk _gw_vif _gw_grp _gw_j_mod _gw_ip _vif
-    local _cmds="_cmd_cl_vif _cmd_cl_vnet _cmd_gw_vnet _cmd_cl_grp _cmd_gw_grp _cmd_cl_inet _cmd_gw_inet _cmd_cl_rt"
+    local _cl_vif _cl_grp _cl_j_mod _cl_ip _cl_rt _vif_mk _gw_vif _gw_grp _gw_j_mod _gw_ip _vif
+    local _cmds="_cmd_mk_vif _cmd_cl_vnet _cmd_gw_vnet _cmd_cl_grp _cmd_gw_grp _cmd_cl_inet _cmd_gw_inet _cmd_cl_rt"
 
     # With no gw, there are no vifs to configure
     { [ -z "$_gw" ] || [ "$_gw" = "none" ] || ! is_cell_running "$_gw" ;} && return 0
@@ -201,7 +201,7 @@ compose_vif_cmds() {
             # Resolve the IP. Assume "auto" implies DHCP (otherwise wouldnt make sense).
             case $_ipv4 in
                 ''|none) : ;;  # Nothing to do
-                auto|DHCP) _cl_grp="$_cl_grp group DHCLIENT" ;;
+                auto|DHCP) _cl_grp="group DHCLIENT $_cl_grp" ;;
                 *) _cl_ip=$_ipv4 ;;
             esac
         ;;
@@ -225,7 +225,7 @@ compose_vif_cmds() {
             _gw_vif=${_vif}a
             _cl_grp="group EXT_IF group $_gw_cut"         # Standard ifconfig group assignments
             _gw_grp="group CLIENTS group $_cl_cut"
-            _cl_vif_mk=true
+            _vif_mk=true
             [ ! "$_gw" = "host" ] && _gw_j_mod="-j $_gw"  # Should never be host. Just being robust
             [ ! "$_cl" = "host" ] && _cl_j_mod="-j $_cl"
 
@@ -236,12 +236,12 @@ compose_vif_cmds() {
                 auto)  # resolve available IPs and assign
                     _resolve_available_ipv4 _gw_ip $_ip1 1 30 true  # Assign $_gw_ip, update RT_IPS
                     _cl_ip=${_gw_ip%.*/*}.2/${_gw_ip#*/}
-                    _cl_grp="$_cl_grp group STATIC_IP"
+                    _cl_grp="group STATIC_IP $_cl_grp"
                     _cl_rt=${_gw_ip%/*}  # Default gateway
                 ;;
                 DHCP)  # Resolve gw IP, tag cl with ifconfig group. (This isnt really recommended)
                     _resolve_available_ipv4 _gw_ip $_ip1 1 30 true  # Assign $_gw_ip, update RT_IPS
-                    _cl_grp="$_cl_grp group DHCLIENT"
+                    _cl_grp="group DHCLIENT $_cl_grp"
                 ;;
                 * ) # Enforce the gw/cl .1/.2 IP ending at the most basic level
                     _gw_ip=${_cl_ipv4%.*/*}.1/${_cl_ip#*/}
@@ -253,14 +253,14 @@ compose_vif_cmds() {
     esac
 
     # Construct the full set of commands that will need to be run, depending on what was resolved
-    [ "$_cl_vif_mk" ] && _cmd_cl_vif="quiet ifconfig ${_cl_vif%?} create"  # Noisy command. Quiet
-    [ "$_cl_vif" ] && _cmd_cl_vnet="ifconfig $_cl_vif vnet $_cl"
+    [ "$_vif_mk" ] && _cmd_mk_vif="quiet ifconfig ${_cl_vif%?} create"  # Noisy command. Quiet
     [ "$_gw_vif" ] && _cmd_gw_vnet="ifconfig $_gw_vif vnet $_gw"
-    [ "$_cl_grp" ] && _cmd_cl_grp="ifconfig $_cl_j_mod $_cl_vif $_cl_grp"
     [ "$_gw_grp" ] && _cmd_gw_grp="ifconfig $_gw_j_mod $_gw_vif $_gw_grp"
-    [ "$_cl_ip" ] && _cmd_cl_inet="ifconfig $_cl_j_mod $_cl_vif inet $_cl_ip $_mtu_mod up"
-    [ "$_gw_ip" ] && _cmd_gw_inet="ifconfig $_gw_j_mod $_gw_vif inet $_gw_ip $_mtu_mod up"
-    [ "$_cl_rt" ] && _cmd_cl_rt="quiet route $_cl_j_mod add default $_cl_rt"  # Noisy command. Quiet
+    [ "$_gw_ip" ]  && _cmd_gw_inet="ifconfig $_gw_j_mod $_gw_vif inet $_gw_ip $_mtu_mod up"
+    [ "$_cl_vif" ] && _cmd_cl_vnet="ifconfig $_cl_vif vnet $_cl"
+    [ "$_cl_grp" ] && _cmd_cl_grp="ifconfig $_cl_j_mod $_cl_vif $_cl_grp"
+    [ "$_cl_ip" ]  && _cmd_cl_inet="ifconfig $_cl_j_mod $_cl_vif inet $_cl_ip $_mtu_mod up"
+    [ "$_cl_rt" ]  && _cmd_cl_rt="quiet route $_cl_j_mod add default $_cl_rt"  # Noisy command. Quiet
 
     # Loop over all the _cmds to construct the final command
     for _cmd in $_cmds ; do

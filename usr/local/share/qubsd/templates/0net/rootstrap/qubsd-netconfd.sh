@@ -72,10 +72,18 @@ set_pf_wg_endpoint() {
 }
 
 push_static_dns() {
-    local _addr _gw
+    local _addr _gw _count
 
-    _addr=$(ifconfig "$_iface" inet 2>/dev/null | awk '/inet /{print $2; exit}')
-    [ -n "$_addr" ] || return 0  # Safety check in case of missing IPaddr
+    # Use a while-loop to avoid races with host IP assignment. Clamp at 4 seconds total
+    _count=0
+    while : ; do
+        _count=$(( _count + 1 ))
+        sleep 0.2
+
+        _addr=$(ifconfig "$_iface" inet 2>/dev/null | awk '/inet /{print $2; exit}')
+        [ "$_addr" ] && break
+        [ $_count -gt 20 ] && return 1
+    done
 
     # Use the .2/.1 client/gw convention, and update resolvconf
     _gw="${_addr%.*}.1"
@@ -85,7 +93,7 @@ push_static_dns() {
 #########################################  DAEMON ACTIONS  #########################################
 
 add_interface() {
-    local _groups _iface  # /bin/sh preserves `_iface` value if set by parent (run_first_init)
+    local _groups _iface _count # /bin/sh preserves `_iface` value if set by parent (run_first_init)
 
     : ${_iface:=$(echo "$_line" | sed -En \
         "s|.*add/repl iface iface#[0-9]+ ([[:alnum:]]+) .*|\1|p" | grep -E "epair|tap")}
@@ -96,28 +104,36 @@ add_interface() {
         *) IFACES="$IFACES,$_iface," ;; # _iface is not tracked. Add to the list
     esac
 
-    # The actions to take for a new vnet interface depend on the ifconfig group(s) set by host
-    sleep .05  # Give host a moment to assign group (mitigate this daemon from racing the host)
-    _groups=$(ifconfig $_iface | sed -En "s/groups: (.*)/\1/p")
-
-    case " $_groups " in
-        *" DHCLIENT "*)  # Must come first to prevent static DNS assignment for DHCLIENTs
-            pgrep -qfl "dhclient.*$_iface" || dhclient -bc /tmp/qubsd_dhclient.conf $_iface
-            [ "$dns" ] || push_static_dns
-            [ "$wg" ] && restart_wg=true
-            [ "$pf" ] && reload_pf=true
-            [ "$unbound" ] && restart_unbound=true
-        ;;
-        *" STATIC_IP "*)
-            # Dont push static DNS if dnscrypt or wg are enabled (safer in case service(s) die)
-            { [ "$dns" ] || [ "$wg" ] ;} || push_static_dns
-            [ "$wg" ] && restart_wg=true
-            [ "$pf" ] && reload_pf=true
-            [ "$unbound" ] && restart_unbound=true
-        ;;
-        *" CLIENTS "*)
-            [ "$dhcpd" ] && restart_dhcpd=true
-    esac
+    # Actions depend on ifconfig group set by host. while-loop mitigates races
+    _count=0
+    while : ; do
+        sleep 0.1  # Give host a moment to assign group
+        _groups=$(ifconfig $_iface | sed -En "s/groups: (.*)/\1/p")
+        case " $_groups " in
+            *" DHCLIENT "*)
+                pgrep -qfl "dhclient.*$_iface" || dhclient -bc /tmp/qubsd_dhclient.conf $_iface
+                [ "$dns" ] || push_static_dns
+                [ "$wg" ] && restart_wg=true
+                [ "$pf" ] && reload_pf=true
+                [ "$unbound" ] && restart_unbound=true
+                break
+            ;;
+            *" STATIC_IP "*)
+                # Dont push static DNS if dnscrypt or wg are enabled (safer in case service(s) die)
+                { [ "$dns" ] || [ "$wg" ] ;} || push_static_dns &  # Background, due to anti-race sleep
+                [ "$wg" ] && restart_wg=true
+                [ "$pf" ] && reload_pf=true
+                [ "$unbound" ] && restart_unbound=true
+                break
+            ;;
+            *" CLIENTS "*)
+                [ "$dhcpd" ] && restart_dhcpd=true
+                break
+            ;;
+        esac
+        _count=$(( _count + 1 ))  # Don't spin forever. 2 seconds should be more than enough time
+        [ $_count -gt 20 ] && return 1
+    done
 }
 
 del_interface() {
