@@ -47,7 +47,6 @@ THROW() {
 
     # Print to $ERR, and echo the return code command.
     [ "$_msg" ] && printf "$_msg\n" "$@" | sed "s/^/  /" >> $ERR
-
     echo "return $_err_code"  # Safe for caller to `eval` this echo. $_err_code was sanitized
 }
 
