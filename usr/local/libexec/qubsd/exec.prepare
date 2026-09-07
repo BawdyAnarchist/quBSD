@@ -63,15 +63,15 @@ resolve_runtime_context() {
 resolve_host_context() {
     local _fn="resolve_host_context"
     [ -e "$D_RUNTM/host/ctx.conf" ] && return 0  # Host ctx already exists, do not recreate it
-    ctx_bootstrap_runtime -l 3 -P $PARAMS_HOST host host_
+    ctx_bootstrap_runtime -l 3 -p 18 -P $PARAMS_HOST host host_
 }
 
 main() {
     local _fn="main"
 
-    resolve_runtime_context || eval $(THROW $?)
+    resolve_host_context || eval $(THROW $?)  # Ensure host has a runtime context
 
-    resolve_host_context || eval $(THROW $?)
+    resolve_runtime_context || eval $(THROW $?)
 
     compose_commands || eval $(THROW $?)
 
