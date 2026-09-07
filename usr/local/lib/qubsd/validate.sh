@@ -314,7 +314,7 @@ validate_cellname() {
 validate_cellname_new() {
     local _fn="validate_cellname_new" _value="$_value" _r_zfs="$_cell" _u_zfs="$3"
     local _cellpath=$D_CELLS/$_value _jailpath=$D_JAILS/$_value
-    assert_new_cellname $_value || eval $(THROW 182)
+    assert_cellname_new $_value || eval $(THROW 182)
 
     # Check config file path and zfs dataset clobber.
     is_path_exist -f $_cellpath && eval $(THROW 182 $_fn "$_value" path "$_cellpath")
