@@ -17,7 +17,8 @@ clear_err() { rm -f $ERR ; return 0 ;}
 
 # Primary error, message, and tracing system
 THROW() {
-    local _err_code="$1" _msg_code="$2" _msg _args
+    local _err_code="$1" _msg_code="$2" _msg _args IFS
+    unset IFS  # Prevent any custom/stray IFS from causing delimiting errors
 
     # printf needs "$@". Shift out the control codes.
     [ "$_err_code" ] && shift && [ "$_msg_code" ] && shift
@@ -52,7 +53,8 @@ THROW() {
 
 # Warning system writes to the same $ERR file as THROW
 WARN() {
-    local _msg_code="$1" _msg _trace
+    local _msg_code="$1" _msg _trace IFS
+    unset IFS  # Prevent any custom/stray IFS from causing delimiting errors
     [ "$_msg_code" ] && shift  # printf needs "$@". Shift out the control codes.
 
     # Find the message in $MESSAGES. It must be surrounded by colons `:_msg_code:`
