@@ -24,7 +24,7 @@ ctx_unset() {
 
     # Resolve passed variables and unset them
     _pfx="$1" && unset $_pfx   # Unset cellname inside _pfx
-    [ -z "$_params" ] && _params="$PARAMS_ALL,$CONTEXT"
+    : ${_params="$PARAMS_ALL,$CONTEXT"}
     unset $(echo "$_params" | sed "s/,/ /g; s/^/$_pfx/; s/ / $_pfx/g")
 
     return 0
@@ -33,7 +33,7 @@ ctx_unset() {
 # This is the heart of the global context namespace. We deconflict global PARAM assignments with
 # _pfx ($2), which must be managed by callers. Lazy loading (sourcing) is fast/convenient. ~3ms.
 ctx_load_params() {
-    local _fn="ctx_load_params" _cell="$1" _pfx="$2" _type _caller _params_type _r_dset _p_dset
+    local _fn="ctx_load_params" _cell="$1" _pfx="$2" _type _caller _params_type _type_defs _r_dset _p_dset
 
     # Guarantee sanitary inputs
     assert_cellname "$1" || eval $(THROW $?)
@@ -53,6 +53,7 @@ ctx_load_params() {
 
     # Convert PARAMS_TYPE to space delimited with prefixes attached. Protect globals,
     _params_type=$(ctx_get ${_pfx}PARAMS_TYPE | sed "s|^|$_pfx|; s|,| $_pfx|g")
+
     unset $_params_type  # Unset the prefixed params to prevent accidents on stale variables
 
     # Don't clobber globals during sourcing. This MUST come first
@@ -62,9 +63,10 @@ ctx_load_params() {
     fi
 
     # Source base defaults, type defaults, and finally cell QCONF. Order matters
-    . $DEF_BASE
-    . $(ctx_get DEF_${_type})
-    . $D_CELLS/$_cell
+    _type_defs=$(ctx_get DEF_${_type})
+    [ -e "$DEF_BASE" ]       && . $DEF_BASE
+    [ -e "$_type_defs" ]     && . $_type_defs
+    [ -e "$D_CELLS/$_cell" ] && . $D_CELLS/$_cell
 
     # Avoid looping over PARAMS. Sed prints a variable assignment expression, then we evaluate it
     eval $(echo $_params_type | sed -E "s|$_pfx([^[:blank:]]+)|$_pfx\1=\\\$\1|g")  # Good magic
@@ -96,7 +98,7 @@ ctx_load_file() {
     . $_file  # Source the file
 
     # Avoid looping over PARAMS. Sed resolves a valid expression, then evaluates it
-    eval $(echo $_params | sed -E "s|([^[:blank:]]+)|$_pfx\1=\\\$\1|g")
+    eval $(echo $_params | sed -E "s|([^[:blank:]]+)|$_pfx\1=\\\$\1|g") # Good magic
     return 0
 }
 
@@ -138,7 +140,7 @@ ctx_validate_params() {
     assert_int_comparison -g 1 -l 3 -- "$_level" || eval $(THROW $?)
 
     # If no PARAMS were passed, use the appropriate TYPE set and supplemental context globals
-    [ -z "$_params" ] && _params="$(ctx_get ${_pfx}PARAMS_TYPE),$CTX_VALIDATE"
+    : ${_params:="$(ctx_get ${_pfx}PARAMS_TYPE),$CTX_VALIDATE"}
 
     for _param in $(echo $_params | tr ',' ' ') ; do
         unset _value  # Unset to prevent stale values from polluting the validation
@@ -154,7 +156,13 @@ ctx_validate_params() {
 # Initializes a new cell runtime in /var/run. This will clobber any existing runtime file
 ctx_write_runtime() {
     local _fn="ctx_write_runtime" _opts OPTIND OPTARG
-    local _cell="$1" _pfx="$2" _rt_ctx _runtime _val _line _ctx
+    local _cell="$1" _pfx="$2" _rt_ctx _params _val _line _ctx
+
+    while getopts P: _opts ; do case $_opts in
+        P) assert_params "$OPTARG" && _params="$OPTARG" || eval $(THROW $?) ;;
+        *)  eval $(THROW 8 _internal1) ;;
+    esac ; done ; shift $(( OPTIND - 1 ))
+    _cell="$1" _pfx="$2"
 
     #Guarantee sanitary inputs
     assert_cellname "$1" || eval $(THROW $?)
@@ -168,8 +176,8 @@ ctx_write_runtime() {
     mkdir -p $D_RUNTM/$_cell
 
     # Resolve the context values, generate the _rt_ctx lines, and write it
-    _runtime="$(ctx_get ${_pfx}PARAMS_TYPE),$(ctx_get ${_pfx}CONTEXT)"
-    for _param in $(echo "$_runtime" | tr ',' ' ') ; do
+    : ${_params:="$(ctx_get ${_pfx}PARAMS_TYPE),$(ctx_get ${_pfx}CONTEXT)"}
+    for _param in $(echo "$_params" | tr ',' ' ') ; do
         _val=$(ctx_get ${_pfx}$_param)
         eval _line='$_param=\"$_val\"'
         _ctx="$(printf "%b" "$_ctx" "\n$_line")"
@@ -206,6 +214,7 @@ ctx_bootstrap_cell() {
 
 # Load the cell context, validate the parameters based on options, and write the RT_CTX
 # Sanitization doesn't need to occur here, it's just an aggregation of functions that do sanitize
+# [-l] Validation level to perform ; [-p] error codes to PASS (not fail) ; [-P] PARAMS to validate
 ctx_bootstrap_runtime() {
     local _fn="ctx_bootstrap_runtime" _opts OPTIND OPTARG _cell _pfx _levelopt _passopt _paramsopt
 
