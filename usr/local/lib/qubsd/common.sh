@@ -10,7 +10,6 @@
 . $QLIB/assert.sh
 . $QLIB/validate.sh
 . $QLIB/compose.sh
-. $QLIB/network.sh
 . $QLIB/lifecycle.sh
 . $QLIB/bhyve.sh
 
