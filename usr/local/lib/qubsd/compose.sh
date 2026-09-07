@@ -217,7 +217,7 @@ compose_vif_cmds() {
                 auto|DHCP)
                     _resolve_available_ipv4 _gw_ip $_ip1 1 30 true  # Assign $_gw_ip, update RT_IPS
                 ;;
-                * ) _gw_ip=${__cl_ipv4%.*/*}.1/${_cl_ipv4#*/}  ;;
+                * ) _gw_ip=${_cl_ipv4%.*/*}.1/${_cl_ipv4#*/}  ;;
             esac
         ;;
         JAIL:JAIL|HOST:JAIL)
