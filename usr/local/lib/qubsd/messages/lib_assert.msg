@@ -1,6 +1,4 @@
 
-#########################################
-
 :assert_args_set:
 Argument missing or blank
 /END/
@@ -72,7 +70,7 @@ User Error: Bad options usage
 /END/
 
 :assert_param:
-Invalid parameter
+Invalid parameter <%s>
 /END/
 
 :assert_pass:
