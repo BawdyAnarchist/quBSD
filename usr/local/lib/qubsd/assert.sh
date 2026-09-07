@@ -61,7 +61,7 @@ assert_cellname() {
         | grep -Eqv '(--|-_|_-|__)' || eval $(THROW 16 $_fn)
 
     case $_val in
-        none|qubsd|host) eval $(THROW 16 ${_fn}_2) ;;
+        none|qubsd) eval $(THROW 16 ${_fn}_2) ;;
     esac
 }
 
