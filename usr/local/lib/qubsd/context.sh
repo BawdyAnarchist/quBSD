@@ -159,7 +159,7 @@ ctx_write_runtime() {
     local _cell="$1" _pfx="$2" _rt_ctx _params _val _line _ctx
 
     while getopts P: _opts ; do case $_opts in
-        P) assert_params "$OPTARG" && _params="$OPTARG" || eval $(THROW $?) ;;
+        P) assert_params "$OPTARG" && _params="$OPTARG,$CONTEXT" || eval $(THROW $?) ;;
         *)  eval $(THROW 8 _internal1) ;;
     esac ; done ; shift $(( OPTIND - 1 ))
     _cell="$1" _pfx="$2"
@@ -167,6 +167,7 @@ ctx_write_runtime() {
     #Guarantee sanitary inputs
     assert_cellname "$1" || eval $(THROW $?)
     assert_pfx "$_pfx" || eval $(THROW $?)
+
     # Double check the function usage by requiring $1 to be equivalent to the _pfx ctx
     [ "$_pfx" ] && { [ "$(ctx_get $_pfx)" = "$_cell" ] || eval $(THROW 7 _internal4) ;}
 
@@ -176,7 +177,8 @@ ctx_write_runtime() {
     mkdir -p $D_RUNTM/$_cell
 
     # Resolve the context values, generate the _rt_ctx lines, and write it
-    : ${_params:="$(ctx_get ${_pfx}PARAMS_TYPE),$(ctx_get ${_pfx}CONTEXT)"}
+    : ${_params:="$(ctx_get ${_pfx}PARAMS_TYPE),$CONTEXT"}
+
     for _param in $(echo "$_params" | tr ',' ' ') ; do
         _val=$(ctx_get ${_pfx}$_param)
         eval _line='$_param=\"$_val\"'
