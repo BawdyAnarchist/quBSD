@@ -175,12 +175,13 @@ assert_optarg() {
 # Ensures that $1 is part of the static PARAMS_ALL list
 assert_param() {
     local _fn="assert_param"
-    echo_grep -qd , "$PARAMS_ALL" "$1" || eval $(THROW 10 $_fn)
+    echo_grep -qd , "$PARAMS_ALL" "$1" || eval $(THROW 10 $_fn $1)
 }
 
 assert_params() {
-    local _fn="assert_param" IFS=,
-    for _param in $1 ; do
+    local _fn="assert_params"
+
+    for _param in $(echo $1 | tr ',' ' ') ; do
         assert_param $_param || eval $(THROW $?)
     done
 }
