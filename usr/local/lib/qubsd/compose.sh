@@ -173,8 +173,9 @@ _resolve_gw_context() {
 # indication that an associated _cmd should be constructed, which finalizes in loop at the end.
 compose_vif_cmds() {
     local _fn="compose_vif_cmds" _cmds_network_vif _ip1 _mtu _mtu_mod
-    local _cl_vif _cl_grp _cl_j_mod _cl_ip _cl_rt _vif_mk _gw_vif _gw_grp _gw_j_mod _gw_ip _vif
-    local _cmds="_cmd_mk_vif _cmd_cl_vnet _cmd_gw_vnet _cmd_cl_grp _cmd_gw_grp _cmd_cl_inet _cmd_gw_inet _cmd_cl_rt"
+    local _vif _cl_vif _cl_grp _cl_j_mod _cl_ip _cl_rt _vif_mk _gw_vif _gw_grp _gw_j_mod _gw_ip _vif
+    local _cmds _cmd_mk_vif _cmd_cl_vnet _cmd_gw_vnet _cmd_cl_grp _cmd_gw_grp _cmd_cl_inet _cmd_gw_inet _cmd_cl_rt _cmd_host
+    _cmds="_cmd_mk_vif _cmd_cl_vnet _cmd_gw_vnet _cmd_cl_grp _cmd_gw_grp _cmd_cl_inet _cmd_gw_inet _cmd_cl_rt _cmd_host"
 
     # With no gw, there are no vifs to configure
     { [ -z "$_gw" ] || [ "$_gw" = "none" ] || ! is_cell_running "$_gw" ;} && return 0
@@ -193,7 +194,7 @@ compose_vif_cmds() {
     case $_cl_type:$_gw_type in
         VM:VM) return 52  # No action. This is unsupported for now. This stanza must come first
         ;;
-        JAIL:VM)
+        JAIL:VM|HOST:VM)
             _cl_vif=$_gw_intif                           # compose bhyve assigns/adds tap to RT_CTX
             _cl_grp="group EXT_IF group $_gw_cut"        # Standard ifconfig group assignments
             [ ! "$_cl" = "host" ] && _cl_j_mod="-j $_cl"
@@ -219,7 +220,7 @@ compose_vif_cmds() {
                 * ) _gw_ip=${__cl_ipv4%.*/*}.1/${_cl_ipv4#*/}  ;;
             esac
         ;;
-        JAIL:JAIL)
+        JAIL:JAIL|HOST:JAIL)
             _resolve_available_epair _vif true            # Assign _vif, update RT_EPAIRS
             _cl_vif=${_vif}b
             _gw_vif=${_vif}a
@@ -257,10 +258,15 @@ compose_vif_cmds() {
     [ "$_gw_vif" ] && _cmd_gw_vnet="ifconfig $_gw_vif vnet $_gw"
     [ "$_gw_grp" ] && _cmd_gw_grp="ifconfig $_gw_j_mod $_gw_vif $_gw_grp"
     [ "$_gw_ip" ]  && _cmd_gw_inet="ifconfig $_gw_j_mod $_gw_vif inet $_gw_ip $_mtu_mod up"
-    [ "$_cl_vif" ] && _cmd_cl_vnet="ifconfig $_cl_vif vnet $_cl"
+    [ ! "$_cl" = "host" ] && _cmd_cl_vnet="ifconfig $_cl_vif vnet $_cl"
     [ "$_cl_grp" ] && _cmd_cl_grp="ifconfig $_cl_j_mod $_cl_vif $_cl_grp"
     [ "$_cl_ip" ]  && _cmd_cl_inet="ifconfig $_cl_j_mod $_cl_vif inet $_cl_ip $_mtu_mod up"
     [ "$_cl_rt" ]  && _cmd_cl_rt="quiet route $_cl_j_mod add default $_cl_rt"  # Noisy command. Quiet
+    if [ "$_cl" = "host" ] ; then  # Host gets either DHCP (resolvconf handled), or auto (needs resolvconf)
+        [ "$_cl_ip" ] \
+            && _cmd_host="echo 'nameserver $_cl_rt' | resolvconf -a $_cl_vif.qubsd" \
+            || _cmd_host="dhclient -b $_cl_vif"
+    fi
 
     # Loop over all the _cmds to construct the final command
     for _cmd in $_cmds ; do
@@ -295,7 +301,6 @@ _caller=$(ctx_get ${_pfx}CALLER)       # Switches services restart (prevents rac
     ctx_unset "gw_"                   # Clean prefix. Ensures no stale values creep through
     _resolve_gw_context $CELL $_pfx   # CELL becomes the gateway. Variables get downward scoped
     for _client in $_clients ; do
-
         # Necessary context elements. Clean the prefix, file must load, downward scope cl variables
         is_cell_running $_client || continue
         ctx_unset "cl_"
