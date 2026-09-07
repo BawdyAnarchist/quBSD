@@ -200,10 +200,10 @@ compose_vif_cmds() {
             [ ! "$_cl" = "host" ] && _cl_j_mod="-j $_cl"
 
             # Resolve the IP. Assume "auto" implies DHCP (otherwise wouldnt make sense).
-            case $_ipv4 in
+            case $_cl_ipv4 in
                 ''|none) : ;;  # Nothing to do
                 auto|DHCP) _cl_grp="group DHCLIENT $_cl_grp" ;;
-                *) _cl_ip=$_ipv4 ;;
+                *) _cl_ip=$_cl_ipv4 ;;
             esac
         ;;
         VM:JAIL)  # Assign the parameters relevant for _gw being a jail
@@ -281,7 +281,7 @@ compose_vif_cmds() {
 # Dynamically scoped variables are used with _resolve_cl/gw_context() to avoid drilling.
 compose_network_construction_cmds() {
     local _fn="compose_network_construction_cmds" _cell="$1" _pfx="$2"
-    local _caller _client _type _ipv4 _mtu _gw _gw_type
+    local _caller _clients _gw _clients
     assert_args_set 1 "$_cell" || eval $(THROW $?)
     assert_pfx "$_pfx" || eval $(THROW $?)
 
