@@ -421,7 +421,7 @@ query_xwin_pid() {
     local _fn="query_xwin_pid" _xid _val
     _xid=$(query_net_active_xid) || eval $(THROW $?)
     _val=$(xprop -id $_xid _NET_WM_PID | grep -Eo "[[:alnum:]]+$") || eval $(THROW 234)
-    [ "$_val" ] && echo "$_val" && return 0 || $(THROW 234)
+    [ "$_val" ] && echo "$_val" && return 0 || eval $(THROW 234)
 }
 
 query_xwin_cellname() {
