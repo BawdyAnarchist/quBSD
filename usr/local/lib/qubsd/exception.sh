@@ -53,7 +53,7 @@ THROW() {
 
 # Warning system writes to the same $ERR file as THROW
 WARN() {
-    local _msg_code="$1" _msg _trace IFS
+    local _msg_code="$1" _msg _trace _args IFS
     unset IFS  # Prevent any custom/stray IFS from causing delimiting errors
     [ "$_msg_code" ] && shift  # printf needs "$@". Shift out the control codes.
 
