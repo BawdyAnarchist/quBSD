@@ -60,7 +60,7 @@ WARN() {
         _msg=$(awk -v code=":$_msg_code:" '
             $1 == code { found=1; next }
             found && /^\/END\// { exit }
-            found { print }' $D_QMSG/lib*.msg $D_QMSG/$BASENAME.msg 2>/dev/null)
+            found { print }' $MESSAGES 2>/dev/null)
 
         if [ -z "$_msg" ] ; then
             _msg="Internal error: Message not found. Check \$MESSAGES"
