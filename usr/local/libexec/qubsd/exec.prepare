@@ -60,10 +60,18 @@ resolve_runtime_context() {
     return 0
 }
 
+resolve_host_context() {
+    local _fn="resolve_host_context"
+    [ -e "$D_RUNTM/host/ctx.conf" ] && return 0  # Host ctx already exists, do not recreate it
+    ctx_bootstrap_runtime -l 3 -P $PARAMS_HOST host host_
+}
+
 main() {
     local _fn="main"
 
     resolve_runtime_context || eval $(THROW $?)
+
+    resolve_host_context || eval $(THROW $?)
 
     compose_commands || eval $(THROW $?)
 
@@ -73,7 +81,7 @@ main() {
     execute_commands "$_COMMANDS" || eval $(THROW $?)
 
     # Successful completion of all tasks. Keep RT_CTX by removing it from the trap stack
-    [ "$CALLER" = "exec" ] && ! echo_grep -q "$DRY_RUN" '(true|TRUE)' && trap_pop
+    [ "$CALLER" = "exec" ] && ! echo_grep -q "$DRY_RUN" '(true|TRUE|True)' && trap_pop
 
     return 0
 }
