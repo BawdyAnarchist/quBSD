@@ -43,7 +43,7 @@ compose_commands() {
 
     # Only destroy persistent for dispjails. Disps have no P_MNT after reclone.
     if [ "$CLASS" = "dispjail" ] ; then
-        compose_reclone_persist_cmds $CELL || eval $(THROW $?) # Final command loop omits reclone
+        compose_reclone_persist_cmds $CELL || eval $(THROW $?)
     else
         # Fork and silence to reduce user lag. No libs avail after fork
         [ -d "$P_MNT" ] && _CMD_CHFLAGS="exec chflags -fR noschg $P_MNT > /dev/null 2>&1"
@@ -58,6 +58,7 @@ main() {
 
     compose_commands || eval $(THROW $?)
 
+    # Omit the RECLONE commands for the non-root clones, and disp persist datasets. Unnecessary
     _COMMANDS="_CMD_UNMOUNT _CMD_CLEAN_VARRUN _CMD_ENCRYPT
                _CMD_SNAPSHOT_ROOT _CMD_DESTROY_ROOT
                _CMD_SNAPSHOT_PERSIST _CMD_DESTROY_PERSIST
