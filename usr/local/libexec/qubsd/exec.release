@@ -24,9 +24,6 @@ compose_cleanup_cmds() {
         [ "$_encroot" = "$P_DSET" ] && _CMD_ENCRYPT="zfs umount -u $P_DSET"
     fi
 
-    # Flags down after stopping, but fork and silence to reduce user lag. No libs avail after fork
-    [ -d "$P_MNT" ] && _CMD_CHFLAGS="exec chflags -fR noschg $P_MNT > /dev/null 2>&1"
-
     # If dhcp is never found for, exec.poststart runs forever, and stays even after jail -r
     # Neither pkill -15; nor pkill -9; nor kill -15 work here. Only kill -9
     _proc=$(hush pgrep -f "exec.poststart $CELL")
@@ -44,9 +41,12 @@ compose_commands() {
         compose_reclone_root_cmds $CELL || eval $(THROW $?)
     fi
 
-    # Only clone/reclone for dispjails. Otherwise we'll destroy the appjail persistent data
+    # Only destroy persistent for dispjails. Disps have no P_MNT after reclone.
     if [ "$CLASS" = "dispjail" ] ; then
-        compose_reclone_persist_cmds $CELL || eval $(THROW $?)
+        compose_reclone_persist_cmds $CELL || eval $(THROW $?) # Final command loop omits reclone
+    else
+        # Fork and silence to reduce user lag. No libs avail after fork
+        [ -d "$P_MNT" ] && _CMD_CHFLAGS="exec chflags -fR noschg $P_MNT > /dev/null 2>&1"
     fi
 }
 
