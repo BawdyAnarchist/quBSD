@@ -4,17 +4,19 @@
 
 . /usr/local/lib/qubsd/common.sh
 
-SUBCMD="$1"
+main() {
+    [ -z "$subcmd" ] && eval $(THROW 1 _generic "qb: ERROR: No command provided")
+    case $subcmd in
+        help|-h|-H|--h|--help) eval $(THROW 1 usage) ;;
+    esac
 
-if [ -z "$SUBCMD" ] ; then
-	get_msg2 -Eum _e1        # No command provided
-elif echo "$SUBCMD" | grep -Eqi -- 'help|-h|-help|--h|--help' ; then
-	get_msg2 -eu             # Help requested
-fi
+    if [ -x "$QLEXEC/qb-$subcmd" ] ; then
+        shift
+        exec "$QLEXEC/qb-$subcmd" "$@"
+    else
+        eval $(THROW 1 _generic "qb: ERROR: < $subcmd > not found. Use [-h] for command list")
+    fi
+}
 
-if [ -x "$QLEXEC/qb-$SUBCMD" ] ; then
-	shift
-	exec "$QLEXEC/qb-$SUBCMD" "$@"
-else
-	get_msg2 -Eum _e2
-fi
+subcmd="$1"
+main || FATAL
