@@ -38,7 +38,8 @@ THROW() {
             _msg="Internal error: Message not found. Check \$MESSAGES"
         else
             # The count of '%s' in the $MESSAGE should match the positionals passed to THROW
-            _args=$(echo "$_msg" | awk -F '%s' '{n+=NF-1} END{print n}')
+            # WARNING: Usage of '%' in any message will affect printf later, unless it's just '%%'
+            _args=$(echo "$_msg" | awk '{n += gsub(/%s/, "&")} END{print n+0}')
             [ "$_args" = "$#" ] || _msg="Internal Error: THROW arg_count ($_args) != MESSAGES arg_count ($#)"
         fi
     fi
@@ -68,7 +69,8 @@ WARN() {
             _msg="Internal error: Message not found. Check \$MESSAGES"
         else
             # The count of '%s' in the $MESSAGE should match the positionals passed to THROW
-            _args=$(echo "$_msg" | awk -F '%s' '{n+=NF-1} END{print n}')
+            # WARNING: Usage of '%' in any message will affect printf later, unless it's just '%%'
+            _args=$(echo "$_msg" | awk '{n += gsub(/%s/, "&")} END{print n+0}')
             [ "$_args" = "$#" ] || _msg="Internal Error: THROW arg_count ($_args) != MESSAGES arg_count ($#)"
         fi
     fi
