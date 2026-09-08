@@ -55,6 +55,7 @@ resolve_runtime_context() {
 
     # If CALLER is empty, then qb isnt coordinating, and `jail` must initialize the runtime context
     if [ -z "$CALLER" ] ; then
+        # p_dsets are cloned from rootenv, disps from their template. They might not yet exist
         ctx_bootstrap_runtime -l 3 -p 169,170 $CELL || eval $(THROW $?)
     fi
     return 0
