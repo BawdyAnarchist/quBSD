@@ -1,5 +1,20 @@
 #!/bin/sh
 
+###################################################################################################
+#######################################  COMMAND EXECUTION  #######################################
+###################################################################################################
+
+# Reduce verbosity of appending new commands to a command stack. Slightly arcane, but good magic.
+# _cmdvar holds the name of the variable containing the execution stack. Caller should ALWAYS quote
+# the full `$2' argument (command). The result is appending a new command to a newline.
+append() {
+    local _cmdvar="$1" _newcmd="$2" _nl=$'\n'  # _nl is a posix newline. Avoids eval printf
+    [ "$_newcmd" ] || return 0
+
+    # Idempotent. \$_cmdvar can pass multiple times without mangling syntax.
+    eval "$_cmdvar=\"\${$_cmdvar:+\${$_cmdvar}\$_nl}\$_newcmd\""
+}
+
 # _CMDS are constructed to separate commands by lines, not semicolons. Thus, each line can be
 # read with some combo of: printed/executed; while preserving and printing any failure lines.
 execute_commands() {
@@ -37,6 +52,66 @@ exec_cmd() {
         *) eval "$_cmd" ;;
     esac
 }
+
+
+###################################################################################################
+##################################  PRIMARY LIFECYCLE FUNCTIONS  ##################################
+###################################################################################################
+
+life_generate_rtctx() {
+    local _fn="life_generate_rtctx" _cell="$1"
+    assert_cellname "$1" || eval $(THROW $?)
+}
+
+life_purge_stale_jail() {
+    local _fn="life_cleanup_jail" _cell="$1" _pfx="$2" _vif
+    assert_cellname "$1" || eval $(THROW $?)
+    assert_pfx "$2" || eval $(THROW $?)
+
+    # Use long form ctx reference, in case bad value from stale file overwrote RT_CTX
+    rm -rf $D_RUNTM/$CELL/ctx.conf
+
+    # Search for associated vifs and remove them
+    for _vif in $EXT_IF $INT_IF ; do
+        compose_remove_interface_cmds
+    done
+}
+
+life_cleanup_bhyve() {
+    local _fn="life_cleanup_bhyve" _cell="$1"
+    assert_cellname "$1" || eval $(THROW $?)
+
+}
+
+life_handle_rt_ctx() {
+    local _fn="life_handle_rt_ctx" _cell="$1"
+    assert_cellname "$1" || eval $(THROW $?)
+
+    # Check for cell on/off. If off but RT_CTX exists, this is an invalid state
+    # If invalid, then perform cleanup actions
+    # Once cleanup is complete, generate a new RT_CTX
+}
+
+lifecycle_bhyve() {
+    local _fn="start_cell" _cell="$1"
+    assert_cellname "$1" || eval $(THROW $?)
+
+    # p_dsets are cloned from rootenv, disps from their template. They might    not yet exist
+    ctx_bootstrap_runtime -l 3 -p 169,170 $CELL || eval $(THROW $?)
+
+
+}
+
+life_exec_bhyve() {
+
+}
+
+life_monitor_bhyve() {
+
+}
+
+
+
 
 
 ########################################################################################
