@@ -104,7 +104,7 @@ _resolve_available_tap() {
 }
 
 compose_remove_interface_cmds() {
-    local _fn="compose_remove_interface_cmds" _intfs="$1" _cell="$2" _action
+    local _fn="compose_remove_interface_cmds" _intfs="$1" _cell="$2" _action _CMDS
 
     query_runtime_taps  # Side effects: cached global RT_TAPS
     query_onjails       # Side effects: cached global ONJAILS
@@ -116,27 +116,23 @@ compose_remove_interface_cmds() {
 
         # If a jail type cell was passed, check that as the first possibility to find/remove tap
         if quiet ifconfig -j "$_cell" "$_intf" ; then
-            _CMD_RM_INTFS="$(printf "%b" \
-                "ifconfig $_intf -vnet $_cell\n" \
-                "ifconfig $_intf $_action\n" \
-                "$_CMD_RM_INTFS")"
+            append _CMDS "ifconfig $_intf -vnet $_cell"
+            append _CMDS "ifconfig $_intf $_action"
 
         # If not, then check if the _intf is already on host
         elif quiet ifconfig $_intf ; then
-            _CMD_RM_INTFS="$(printf "%b" \
-                          "ifconfig $_intf $_action\n" \
-                          "$_CMD_RM_INTFS")"
+            append _CMDS "ifconfig $_intf $_action"
 
         # If the above fails, then check each jail one by one
         else
-           for _j in $ONJAILS ; do
-              quiet ifconfig -j "$_j" "$_intf" && _CMD_RM_INTFS="$(printf "%b" \
-                  "ifconfig $_intf -vnet $_j\n" \
-                  "ifconfig $_intf $_action")"
-           done
+            for _j in $ONJAILS ; do
+                quiet ifconfig -j "$_j" "$_intf" \
+                    && append _CMDS "ifconfig $_intf -vnet $_j" \
+                    && append _CMDS "ifconfig $_intf $_action"
+            done
         fi
     done
-    return 0
+    printf "%s\n" "$_CMDS"
 }
 
 # These helpers are needed so that the primary cmd functions can used downward-scoped variables
@@ -172,10 +168,8 @@ _resolve_gw_context() {
 # cl/gw TYPE ; cl ipv4 ; and account for host handling. The presence of certain varibles is the
 # indication that an associated _cmd should be constructed, which finalizes in loop at the end.
 compose_vif_cmds() {
-    local _fn="compose_vif_cmds" _cmds_network_vif _ip1 _mtu _mtu_mod
+    local _fn="compose_vif_cmds" _cmds_network_vif _ip1 _mtu _mtu_mod _CMDS
     local _vif _cl_vif _cl_grp _cl_j_mod _cl_ip _cl_rt _vif_mk _gw_vif _gw_grp _gw_j_mod _gw_ip _vif
-    local _cmds _cmd_mk_vif _cmd_cl_vnet _cmd_gw_vnet _cmd_cl_grp _cmd_gw_grp _cmd_cl_inet _cmd_gw_inet _cmd_cl_rt _cmd_host
-    _cmds="_cmd_mk_vif _cmd_cl_vnet _cmd_gw_vnet _cmd_cl_grp _cmd_gw_grp _cmd_cl_inet _cmd_gw_inet _cmd_cl_rt _cmd_host"
 
     # With no gw, there are no vifs to configure
     { [ -z "$_gw" ] || [ "$_gw" = "none" ] || ! is_cell_running "$_gw" ;} && return 0
@@ -254,32 +248,27 @@ compose_vif_cmds() {
     esac
 
     # Construct the full set of commands that will need to be run, depending on what was resolved
-    [ "$_vif_mk" ] && _cmd_mk_vif="quiet ifconfig ${_cl_vif%?} create"  # Noisy command. Quiet
-    [ "$_gw_vif" ] && _cmd_gw_vnet="ifconfig $_gw_vif vnet $_gw"
-    [ "$_gw_grp" ] && _cmd_gw_grp="ifconfig $_gw_j_mod $_gw_vif $_gw_grp"
-    [ "$_gw_ip" ]  && _cmd_gw_inet="ifconfig $_gw_j_mod $_gw_vif inet $_gw_ip $_mtu_mod up"
-    [ ! "$_cl" = "host" ] && _cmd_cl_vnet="ifconfig $_cl_vif vnet $_cl"
-    [ "$_cl_grp" ] && _cmd_cl_grp="ifconfig $_cl_j_mod $_cl_vif $_cl_grp"
-    [ "$_cl_ip" ]  && _cmd_cl_inet="ifconfig $_cl_j_mod $_cl_vif inet $_cl_ip $_mtu_mod up"
-    [ "$_cl_rt" ]  && _cmd_cl_rt="quiet route $_cl_j_mod add default $_cl_rt"  # Noisy command. Quiet
+    [ "$_vif_mk" ] && append _CMDS "quiet ifconfig ${_cl_vif%?} create"  # Noisy command. Quiet
+    [ "$_gw_vif" ] && append _CMDS "ifconfig $_gw_vif vnet $_gw"
+    [ "$_gw_grp" ] && append _CMDS "ifconfig $_gw_j_mod $_gw_vif $_gw_grp"
+    [ "$_gw_ip" ]  && append _CMDS "ifconfig $_gw_j_mod $_gw_vif inet $_gw_ip $_mtu_mod up"
+    [ ! "$_cl" = "host" ] && append _CMDS "ifconfig $_cl_vif vnet $_cl"
+    [ "$_cl_grp" ] && append _CMDS "ifconfig $_cl_j_mod $_cl_vif $_cl_grp"
+    [ "$_cl_ip" ]  && append _CMDS "ifconfig $_cl_j_mod $_cl_vif inet $_cl_ip $_mtu_mod up"
+    [ "$_cl_rt" ]  && append _CMDS "quiet route $_cl_j_mod add default $_cl_rt"  # Noisy command. Quiet
     if [ "$_cl" = "host" ] ; then  # Host gets either DHCP (resolvconf handled), or auto (needs resolvconf)
         [ "$_cl_ip" ] \
-            && _cmd_host="echo 'nameserver $_cl_rt' | resolvconf -a $_cl_vif.qubsd" \
-            || _cmd_host="dhclient -b $_cl_vif"
+            && append _CMDS "echo 'nameserver $_cl_rt' | resolvconf -a $_cl_vif.qubsd" \
+            || append _CMDS "dhclient -b $_cl_vif"
     fi
 
-    # Loop over all the _cmds to construct the final command
-    for _cmd in $_cmds ; do
-        [ "$_cmd" ] && _cmds_network_vif="$(printf "%b" "$_cmds_network_vif" "\n$(ctx_get $_cmd)")"
-    done
-
-    _CMDS_NETWORK_CONSTRUCTION="$(printf "%b" "$_CMDS_NETWORK_CONSTRUCTION" "\n$_cmds_network_vif")"
+    printf "%s\n" "$_CMDS"
 }
 
 # Full composition of the network stack commands for a single cell, and between its gw and clients.
 # Dynamically scoped variables are used with _resolve_cl/gw_context() to avoid drilling.
 compose_network_construction_cmds() {
-    local _fn="compose_network_construction_cmds" _cell="$1" _pfx="$2"
+    local _fn="compose_network_construction_cmds" _cell="$1" _pfx="$2" _CMDS
     local _caller _clients _gw _clients
     assert_args_set 1 "$_cell" || eval $(THROW $?)
     assert_pfx "$_pfx" || eval $(THROW $?)
@@ -304,10 +293,10 @@ compose_network_construction_cmds() {
         ctx_unset "cl_"
         ctx_load_file $D_RUNTM/$_client/ctx.conf "cl_" || continue
         _resolve_cl_context "$_client" "cl_"
-        compose_vif_cmds      # Appends global command: _CMDS_NETWORK_CONSTRUCTION
+        _CMDS=$(compose_vif_cmds)     # Appends global command: _CMDS_NETWORK_CONSTRUCTION
     done
 
-    return 0
+    printf "%s\n" "$_CMDS"
 }
 
 

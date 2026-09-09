@@ -9,10 +9,11 @@ trap_push "$QLEXEC/exec.release $CELL"   # Cleanup mounts and runtime
 
 # resolvconf defaults to resolv.conf, but this file often has schg flags. Use a symlink instead
 compose_resolvconf_cmds() {
-    local _r_mnt=$(ctx_get R_MNT)
+    local _r_mnt=$(ctx_get R_MNT) _CMDS
     _resolv="/var/run/resolvconf/resolv.conf"
-    _CMD_LINK_RESOLV="chroot $_r_mnt /bin/sh -c 'ln -sf $_resolv /etc/resolv.conf'"
-    _CMD_SET_CONFIG="echo 'resolv_conf=$_resolv' > $_r_mnt/etc/resolvconf.conf"
+    append _CMD "chroot $_r_mnt /bin/sh -c 'ln -sf $_resolv /etc/resolv.conf'"
+    append _CMD "echo 'resolv_conf=$_resolv' > $_r_mnt/etc/resolvconf.conf"
+    printf "%s\n" "$_CMDS"
 }
 
 main() {
@@ -22,12 +23,12 @@ main() {
     mute ctx_load_file $RT_CTX || eval $(THROW $?)
 
     # Single unified network construction for CELL, based on its config
-    compose_network_construction_cmds $CELL
+    _CMDS_NETWORK_CONSTRUCTION=$(compose_network_construction_cmds $CELL) || eval $(THROW $?)
 
     # Provide a means for resolvconf to make updates after jail start is complete
-    compose_resolvconf_cmds
+    _CMDS_RESOLVCONF=$(compose_resolvconf_cmds)
 
-    _COMMANDS="_CMDS_NETWORK_CONSTRUCTION _CMD_LINK_RESOLV _CMD_SET_CONFIG"
+    _COMMANDS="_CMDS_NETWORK_CONSTRUCTION _CMDS_RESOLVCONF"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
 
     trap_pop   # Success. Remove the exec.release trap
