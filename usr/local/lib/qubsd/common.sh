@@ -24,6 +24,8 @@ exec 9>&1
 [ -d "$D_QX11" ] || mkdir -p $D_QX11
 [ -d "$D_XFER" ] || mkdir -p $D_XFER
 [ -d "$D_QTMP" ] || mkdir -p $D_QTMP
+[ -f "$DEBUG_PATH" ] && rm -f $DEBUG_PATH
+[ -f "$LOG_PATH" ]   && rm -f $LOG_PATH
 
 
 # CURRENT (OLD) SYSTEM LIBRARIES TO EVENTUALLY BE REMOVED
