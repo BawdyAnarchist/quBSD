@@ -132,7 +132,7 @@ compose_remove_interface_cmds() {
             done
         fi
     done
-    printf "%s\n" "$_CMDS"
+    emit_cmds "$_CMDS"
 }
 
 # These helpers are needed so that the primary cmd functions can used downward-scoped variables
@@ -262,7 +262,7 @@ compose_vif_cmds() {
             || append _CMDS "dhclient -b $_cl_vif"
     fi
 
-    printf "%s\n" "$_CMDS"
+    emit_cmds "$_CMDS"
 }
 
 # Full composition of the network stack commands for a single cell, and between its gw and clients.
@@ -296,7 +296,7 @@ compose_network_construction_cmds() {
         _CMDS=$(compose_vif_cmds)     # Appends global command: _CMDS_NETWORK_CONSTRUCTION
     done
 
-    printf "%s\n" "$_CMDS"
+    emit_cmds "$_CMDS"
 }
 
 
@@ -402,8 +402,8 @@ compose_reclone_root_cmds() {
         append _CMDS "sed -i '' -E \"s|^(R_MNT=\\\")|\1$_r_mnt|\" $_rt_ctx"
     fi
 
-    append _CMDS "zfs clone $_snap $_r_dset"
-    printf "%s\n" "$_CMDS"  # Print back to the caller
+    append _CMDS "zfs clone $_snap $_r_dset"  # Final clone op can now be added to the cmd stack
+    emit_cmds "$_CMDS"
 }
 
 # Makes a full composition of the commands required to re/clone the persist dataset for dispjail/VM
@@ -439,8 +439,8 @@ compose_reclone_persist_cmds() {
         append _CMDS "sed -i '' -E \"s|^(P_MNT=\\\")|\1$_p_mnt|\" $_rt_ctx"
         eval ${_pfx}P_MNT=$_p_mnt   # Update the globals with P_MNT since it will be created in _CMDS
     fi
-    append _CMDS "zfs clone $_snap $_p_dset"
+    append _CMDS "zfs clone $_snap $_p_dset"  # Final clone op can now be added to the cmd stack
     append _CMDS "fix_freebsd_pw $_cell $(ctx_get $_pfxloc) $_p_mnt"
-    printf "%s\n" "$_CMDS"  # Print back to the caller
+    emit_cmds "$_CMDS"
 }
 

@@ -13,7 +13,7 @@ compose_resolvconf_cmds() {
     _resolv="/var/run/resolvconf/resolv.conf"
     append _CMDS "chroot $_r_mnt /bin/sh -c 'ln -sf $_resolv /etc/resolv.conf'"
     append _CMDS "echo 'resolv_conf=$_resolv' > $_r_mnt/etc/resolvconf.conf"
-    printf "%s\n" "$_CMDS"
+    emit_cmds "$_CMDS"
 }
 
 main() {

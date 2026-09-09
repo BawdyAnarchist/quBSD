@@ -29,7 +29,7 @@ compose_cleanup_cmds() {
     _proc=$(hush pgrep -f "exec.poststart $CELL")
     [ "$_proc" ] && append _CMDS "kill -9 $_proc"
 
-    printf "%s\n" "$_CMDS"
+    emit_cmds "$_CMDS"
 }
 
 compose_commands() {

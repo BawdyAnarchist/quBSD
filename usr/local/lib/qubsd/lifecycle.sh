@@ -15,6 +15,9 @@ append() {
     eval "$_cmdvar=\"\${$_cmdvar:+\${$_cmdvar}\$_nl}\$_newcmd\""
 }
 
+# Simple helper for emitting composed commands
+emit_cmds() { printf '%s\n' "$1" ;}
+
 # _CMDS are constructed to separate commands by lines, not semicolons. Thus, each line can be
 # read with some combo of: printed/executed; while preserving and printing any failure lines.
 execute_commands() {
