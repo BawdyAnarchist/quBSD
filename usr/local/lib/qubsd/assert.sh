@@ -233,6 +233,13 @@ assert_time_format() {
     echo "$_val" | grep -Eqs "^[1-9]+[0-9]*(s|m|H|D|W|Y)\$" || eval $(THROW 20 $_fn)
 }
 
+assert_varname() {
+    local _fn="assert_varname" _varname="$1"
+    assert_args_set 1 "$1" || eval $(THROW $?)
+    echo "$_varname" | grep -Eqs '^[a-zA-Z_][a-zA-Z0-9_]*$' || eval $(THROW 5 _internal5 $_varname)
+    return 0
+}
+
 assert_vcpus() {
     local _fn="assert_vcpus"
     assert_int_comparison -G 0 -- "$1" || eval $(THROW 35 $_fn)
