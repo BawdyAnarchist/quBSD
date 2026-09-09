@@ -19,4 +19,4 @@ main() {
 }
 
 subcmd="$1"
-main || FATAL
+main "$@" || FATAL
