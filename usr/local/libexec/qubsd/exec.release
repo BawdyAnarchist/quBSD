@@ -27,7 +27,8 @@ compose_cleanup_cmds() {
     # If dhcp is never found for, exec.poststart runs forever, and stays even after jail -r
     # Neither pkill -15; nor pkill -9; nor kill -15 work here. Only kill -9
     _proc=$(hush pgrep -f "exec.poststart $CELL")
-    [ "$_proc" ] && _CMDS "kill -9 $_proc"
+    [ "$_proc" ] && append _CMDS "kill -9 $_proc"
+
     printf "%s\n" "$_CMDS"
 }
 
