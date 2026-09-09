@@ -287,7 +287,6 @@ compose_network_construction_cmds() {
 
     # Set all necessary context elements
     _resolve_cl_context $_cell $_pfx       # Downward scoped client variables
-_caller=$(ctx_get ${_pfx}CALLER)       # Switches services restart (prevents races)  ### NOTE: PROBABLY TO BE DEPRECATED IN FAVOR OF qubsd-netconfd
     _clients=$(query_gw_clients "$_cell")  # List of clients that rely on CELL as gateway
     ctx_unset "gw_"                        # Clean prefix. Ensures no stale values creep through
 
