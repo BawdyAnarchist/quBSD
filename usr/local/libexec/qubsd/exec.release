@@ -9,26 +9,26 @@ trap_push "rm -rf $D_RUNTM/$CELL"
 
 # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
 compose_cleanup_cmds() {
-    local _fn="compose_cleanup_cmds" _mounts _encroot _proc _CMD
+    local _fn="compose_cleanup_cmds" _mounts _encroot _proc _CMDS
 
     # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
     [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
-    [ "$_mounts" ] && append _CMD "umount -f $_mounts"
+    [ "$_mounts" ] && append _CMDS "umount -f $_mounts"
 
     # Clean up the jail's /var/run directory
-    append _CMD "hush rm -rf $D_RUNTM/$CELL"
+    append _CMDS "hush rm -rf $D_RUNTM/$CELL"
 
     # Determine the mount status of the persistence
     if [ "$P_MNT" ] ; then
         _encroot=$(zfs list -o encryptionroot $P_DSET)
-        [ "$_encroot" = "$P_DSET" ] && append _CMD "zfs umount -u $P_DSET"
+        [ "$_encroot" = "$P_DSET" ] && append _CMDS "zfs umount -u $P_DSET"
     fi
 
     # If dhcp is never found for, exec.poststart runs forever, and stays even after jail -r
     # Neither pkill -15; nor pkill -9; nor kill -15 work here. Only kill -9
     _proc=$(hush pgrep -f "exec.poststart $CELL")
-    [ "$_proc" ] && _CMD "kill -9 $_proc"
-
+    [ "$_proc" ] && _CMDS "kill -9 $_proc"
+    printf "%s\n" "$_CMDS"
 }
 
 compose_commands() {

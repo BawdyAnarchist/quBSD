@@ -49,7 +49,7 @@ compose_prepare_cmds() {
 
     # Guarantee basic persistence directories. mkdir is idempotent
     [ "$P_MNT" ] && append _CMDS "hush mkdir -p $P_MNT/$OV $P_MNT/home"
-    return 0
+    printf "%s\n" "$_CMDS"
 }
 
 compose_commands() {
