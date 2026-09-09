@@ -41,11 +41,10 @@ ctx_load_params() {
 
     # Derive the cell type and store in context (existence of QCONF path is verified here as well)
     _type=$(query_cell_type $_cell) || eval $(THROW $? ${_fn} $_cell)  # JAIL|VM
-    _caller="${0##*/}"  # jail needs the caller (qb|exec) to determine who owns the runtime context
 
     # CONTEXT variables
     eval ${_pfx}TYPE=$_type
-    eval ${_pfx}CALLER=${_caller%%[.-]*}
+    eval ${_pfx}CALLER=${BASENAME%%[.-]*}        # (qb|exec) owns the runtime context
     eval ${_pfx}PARAMS_TYPE=\"$PARAMS_BASE,\${PARAMS_${_type}}\"
     eval ${_pfx}QCONF=$D_CELLS/$_cell            # qubsd.conf.d/cells
     eval ${_pfx}JCONF=$D_JAILS/$_cell            # jail.conf.d/jails
