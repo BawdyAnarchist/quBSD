@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Debug probing. Use `echo "text" >&9` to get stdout probes even inside a subshell
+exec 9>&1
+
 ## SINGLE SOURCE FOR LIBRARY MODULARITY
 . /usr/local/lib/qubsd/constants.sh  # Bootstrap global constants
 
