@@ -9,41 +9,41 @@ trap_push "rm -rf $D_RUNTM/$CELL"
 
 # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
 compose_cleanup_cmds() {
-    local _fn="compose_cleanup_cmds" _mounts _encroot _proc
+    local _fn="compose_cleanup_cmds" _mounts _encroot _proc _CMD
 
     # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
     [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
-    [ "$_mounts" ] && _CMD_UNMOUNT="umount -f $_mounts"
+    [ "$_mounts" ] && append _CMD "umount -f $_mounts"
 
     # Clean up the jail's /var/run directory
-    _CMD_CLEAN_VARRUN="hush rm -rf $D_RUNTM/$CELL"
+    append _CMD "hush rm -rf $D_RUNTM/$CELL"
 
     # Determine the mount status of the persistence
     if [ "$P_MNT" ] ; then
         _encroot=$(zfs list -o encryptionroot $P_DSET)
-        [ "$_encroot" = "$P_DSET" ] && _CMD_ENCRYPT="zfs umount -u $P_DSET"
+        [ "$_encroot" = "$P_DSET" ] && append _CMD "zfs umount -u $P_DSET"
     fi
 
     # If dhcp is never found for, exec.poststart runs forever, and stays even after jail -r
     # Neither pkill -15; nor pkill -9; nor kill -15 work here. Only kill -9
     _proc=$(hush pgrep -f "exec.poststart $CELL")
-    [ "$_proc" ] && _CMD_KILL_POSTSTART="kill -9 $_proc"
+    [ "$_proc" ] && _CMD "kill -9 $_proc"
 
 }
 
 compose_commands() {
     local _fn="compose_commands"
 
-    compose_cleanup_cmds
+    _CMDS_CLEANUP=$(compose_cleanup_cmds)
 
     # Only clone/reclone for non-rootjails. Otherwise we'll destroy the rootjail
     if [ ! "$CLASS" = "rootjail" ] ; then
-        compose_reclone_root_cmds $CELL || eval $(THROW $?)
+        _CMDS_RECLONE_ROOT=$(compose_reclone_root_cmds $CELL) || eval $(THROW $?)
     fi
 
     # Only destroy persistent for dispjails. Disps have no P_MNT after reclone.
     if [ "$CLASS" = "dispjail" ] ; then
-        compose_reclone_persist_cmds $CELL || eval $(THROW $?)
+        _CMDS_RECLONE_PERSIST=$(compose_reclone_persist_cmds $CELL) || eval $(THROW $?)
     else
         # Fork and silence to reduce user lag. No libs avail after fork
         [ -d "$P_MNT" ] && _CMD_CHFLAGS="exec chflags -fR noschg $P_MNT > /dev/null 2>&1"
@@ -59,10 +59,7 @@ main() {
     compose_commands || eval $(THROW $?)
 
     # Omit the RECLONE commands for the non-root clones, and disp persist datasets. Unnecessary
-    _COMMANDS="_CMD_UNMOUNT _CMD_CLEAN_VARRUN _CMD_ENCRYPT
-               _CMD_SNAPSHOT_ROOT _CMD_DESTROY_ROOT
-               _CMD_SNAPSHOT_PERSIST _CMD_DESTROY_PERSIST
-               _CMD_KILL_POSTSTART _CMD_CHFLAGS"
+    _COMMANDS="_CMDS_CLEANUP _CMDS_RECLONE_ROOT _CMDS_RECLONE_PERSIST _CMD_CHFLAGS"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
     return 0
 }

@@ -10,7 +10,7 @@
   # _ip3/_sub convention is '.2/30' for client-side of epair, and '.1/30' for gw side of epair
   # _reserve ($4) is optional, creating the side-effect up reserving the new IP in global USED_IPS
 _resolve_available_ipv4() {
-    local _fn="_resolve_available_ipv4" _newvar="$1" _ip1="$2" _ip3="$3" _sub="$4" _reserve="$5"
+    local _fn="_resolve_available_ipv4" _varname="$1" _ip1="$2" _ip3="$3" _sub="$4" _reserve="$5"
     local _config_ips _used _new_ip
     assert_int_comparison -g 0 -L 255 -- "$_ip1" || eval $(THROW $? _generic "Invalid _ip1")
     assert_int_comparison -g 0 -L 255 -- "$_ip3" || eval $(THROW $? _generic "Invalid _ip3")
@@ -38,7 +38,7 @@ _resolve_available_ipv4() {
     ') || eval $(THROW 213 $_fn $_ip1 $_ip3)
 
     # Again, we need to both A) return a useful result ; and B) update the global cache. Thus `eval`
-    eval $_newvar="$_new_ip"
+    eval $_varname="$_new_ip"
 
     # If _reserve was passed, then update the RT_IPS, excluding _new_ip from future use
     [ "$_reserve" ] && RT_IPS="$(printf "%b" "$RT_IPS" "\n$_new_ip" | sed '/^$/d')"
@@ -48,7 +48,7 @@ _resolve_available_ipv4() {
 # Finds an unused epair and assigns it to "$1" with eval. We use eval here because the global
 # cache: RT_EPAIRS needs to be updated, which would be lost with a `new_ep=$(..)` subshell
 _resolve_available_epair() {
-    local _fn="_resolve_available_epair" _newvar="$1" _reserve="$2" _int=0 _new_ep
+    local _fn="_resolve_available_epair" _varname="$1" _reserve="$2" _int=0 _new_ep
 
     query_runtime_epairs   # Sets global $RT_EPAIRS
 
@@ -67,7 +67,7 @@ _resolve_available_epair() {
     ') || eval $(THROW 213 $_fn)
 
     # Again, we need to both A) return a useful result ; and B) update the global cache. Thus `eval`
-    eval "$_newvar"="$_new_ep"
+    eval "$_varname"="$_new_ep"
 
     # If _reserve was passed, then update the RT_EPAIRS, excluding _new_ep from future use
     [ "$_reserve" ] && RT_EPAIRS="$(printf "%b" "$RT_EPAIRS" "\n$_new_ep" | sed '/^$/d')"
@@ -77,7 +77,7 @@ _resolve_available_epair() {
 # Finds an unused tap and assigns it to "$1" with eval. We use eval here because the global
 # cache: RT_TAPS needs to be updated, which would be lost with a `new_tap=$(..)` subshell
 _resolve_available_tap() {
-    local _fn="_resolve_available_tap" _newvar="$1" _reserve="$2" _int=0 _new_tap
+    local _fn="_resolve_available_tap" _varname="$1" _reserve="$2" _int=0 _new_tap
 
     query_runtime_taps     # Sets global $RT_TAPS. `quiet` because fstat can be noisy
 
@@ -96,7 +96,7 @@ _resolve_available_tap() {
     ') || eval $(THROW 213 $_fn)
 
     # Again, we need to both A) return a useful result ; and B) update the global cache. Thus `eval`
-    eval "$_newvar"="$_new_tap"
+    eval "$_varname"="$_new_tap"
 
     # If _reserve was passed, then update the RT_EPAIRS, excluding _new_ep from future use
     [ "$_reserve" ] && RT_TAPS="$(printf "%b" "$RT_TAPS" "\n$_new_tap" | sed '/^$/d')"
@@ -276,7 +276,6 @@ compose_vif_cmds() {
     _CMDS_NETWORK_CONSTRUCTION="$(printf "%b" "$_CMDS_NETWORK_CONSTRUCTION" "\n$_cmds_network_vif")"
 }
 
-
 # Full composition of the network stack commands for a single cell, and between its gw and clients.
 # Dynamically scoped variables are used with _resolve_cl/gw_context() to avoid drilling.
 compose_network_construction_cmds() {
@@ -383,7 +382,7 @@ _resolve_snapname_persist() {
 
 # Makes a full composition of the commands required to re/clone the rootenv dataset for appjail/VM
 compose_reclone_root_cmds() {
-    local _fn="compose_reclone_root_cmds" _cell="$1" _pfx="$2" _pfxloc="rrc_"
+    local _fn="compose_reclone_root_cmds" _cell="$1" _pfx="$2" _pfxloc="rrc_" _CMDS
     local  _rt_ctx _rootenv _snap _die _r_mnt _r_dset _r_zfs_mnt
     assert_args_set 1 "$1" || eval $(THROW $?)
 
@@ -401,23 +400,26 @@ compose_reclone_root_cmds() {
     _snap=$(_resolve_snapname_rootenv $(ctx_get ${_pfxloc}R_DSET))
     case $? in
         0)  : ;;
-        2) _CMD_SNAPSHOT_ROOT="zfs snapshot -o qb:ttl=1m $_snap" ;;
+        2) append _CMDS "zfs snapshot -o qb:ttl=1m $_snap" ;;
         *)  eval $(THROW $? _generic "failed to get root snapshot name") ;;
     esac
 
-    # R_MNT is null, then RT_CTX needs updated after clone. Otherwise, RT_CTX is fine, just destroy/reclone
     if [ "$_r_mnt" ] ; then
-        _CMD_DESTROY_ROOT="zfs destroy -rRf $_r_dset"
+        # Existence of R_MNT is definitive that the dataset exists (and thus needs to be recloned)
+        append _CMDS "zfs destroy -rRf $_r_dset"
     else
-        _r_zfs_mnt="$(query_zfs_mountpoint $_r_zfs)/$_cell"
-        _CMD_UPDATE_R_MNT_RTCTX="sed -i '' -E \"s|^(R_MNT=\\\")|\1$_r_zfs_mnt|\" $_rt_ctx"
+        # Dataset does not exist, thus doesnt need a destroy _cmd. But the RT_CTX does need updated
+        _r_mnt="$(query_zfs_mountpoint $_r_zfs)/$_cell"
+        append _CMDS "sed -i '' -E \"s|^(R_MNT=\\\")|\1$_r_mnt|\" $_rt_ctx"
     fi
-    _CMD_CLONE_ROOT="zfs clone $_snap $_r_dset"
+
+    append _CMDS "zfs clone $_snap $_r_dset"
+    printf "%s\n" "$_CMDS"  # Print back to the caller
 }
 
 # Makes a full composition of the commands required to re/clone the persist dataset for dispjail/VM
 compose_reclone_persist_cmds() {
-    local _fn="compose_reclone_persist_cmds" _cell="$1" _pfx="$2" _pfxloc="prc_"
+    local _fn="compose_reclone_persist_cmds" _cell="$1" _pfx="$2" _pfxloc="prc_" _CMDS
     local _rt_ctx _snap _p_mnt _p_dset
     assert_args_set 1 "$_cell" || eval $(THROW $?)
 
@@ -435,19 +437,21 @@ compose_reclone_persist_cmds() {
     _snap=$(_resolve_snapname_persist $(ctx_get ${_pfxloc}P_DSET))
     case $? in
         0) : ;;
-        2) _CMD_SNAPSHOT_PERSIST="zfs snapshot -o qb:ttl=1m $_snap" ;;
+        2) append _CMDS "zfs snapshot -o qb:ttl=1m $_snap" ;;
         *)  eval $(THROW $? _generic "failed to get persistent snapshot name")  ;;
     esac
 
-    # P_MNT is null, then RT_CTX needs updated after clone. Otherwise, RT_CTX is fine, just destroy/reclone
-    if [ -z "$_p_mnt" ] ; then
-        _p_mnt="$(query_zfs_mountpoint $_p_zfs)/$_cell"
-        _CMD_UPDATE_P_MNT_RTCTX="sed -i '' -E \"s|^(P_MNT=\\\")|\1$_p_mnt|\" $_rt_ctx"
-        eval ${_pfx}P_MNT=$_p_mnt   # Update the globals with P_MNT since it will be created in _CMDS
+    if [ "$_p_mnt" ] ; then
+        # Existence of P_MNT is definitive that the dataset exists (and thus needs to be recloned)
+        append _CMDS "zfs destroy -rRf $_p_dset"
     else
-        _CMD_DESTROY_PERSIST="zfs destroy -rRf $_p_dset"
+        # Dataset does not exist, thus doesnt need a destroy _cmd. But the RT_CTX does need updated
+        _p_mnt="$(query_zfs_mountpoint $_p_zfs)/$_cell"
+        append _CMDS "sed -i '' -E \"s|^(P_MNT=\\\")|\1$_p_mnt|\" $_rt_ctx"
+        eval ${_pfx}P_MNT=$_p_mnt   # Update the globals with P_MNT since it will be created in _CMDS
     fi
-    _CMD_CLONE_PERSIST="zfs clone $_snap $_p_dset"
-    _CMD_FIX_PW="fix_freebsd_pw $_cell $(ctx_get $_pfxloc) $_p_mnt"
+    append _CMDS "zfs clone $_snap $_p_dset"
+    append _CMDS "fix_freebsd_pw $_cell $(ctx_get $_pfxloc) $_p_mnt"
+    printf "%s\n" "$_CMDS"  # Print back to the caller
 }
 
