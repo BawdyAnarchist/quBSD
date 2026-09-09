@@ -7,15 +7,16 @@ RT_CTX=$D_RUNTM/$CELL/ctx.conf
 trap_init
 
 compose_rctl_commands() {
-    local _fn="compose_rctl_commands"
+    local _fn="compose_rctl_commands" _CMDS
 
     # Establish max memory allocation and jail CPUs
-    [ "$MAXMEM" = "none" ] || _CMD_MAXMEM="rctl -a jail:${CELL}:memoryuse:deny=${MAXMEM}"
-    [ "$CPUSET" = "none" ] || _CMD_CPUSET="cpuset -j $CELL -cl $CPUSET"
+    [ "$MAXMEM" = "none" ] || append _CMDS "rctl -a jail:${CELL}:memoryuse:deny=${MAXMEM}"
+    [ "$CPUSET" = "none" ] || append _CMDS "cpuset -j $CELL -cl $CPUSET"
+    emit_cmds "$_CMDS"
 }
 
 compose_flags_commands() {
-    local _fn="compose_flags_commands" _dirs _dir _d
+    local _fn="compose_flags_commands" _dirs _dir _d _CMDS _cmds_chflags
 
     # Rootjail file protections can prevent updates, installs, and disrupt appjail starts
     [ "$CLASS" = "rootjail" ] && return 0
@@ -33,21 +34,23 @@ compose_flags_commands() {
     for _dir in $_dirs ; do
         _d=$R_MNT/$_dir
         [ -e "$_d" ] || continue ;
-        _CMD_CHFLAGS="$(printf "%b" "$_CMD_CHFLAGS" "\nchflags -fR schg $_d")"
+        append _cmds_chflags "chflags -fR schg $_d"
     done
 
     for _c in $(hush ls -1 $R_MNT/compat) ; do
         for _dir in $_dirs ; do
             _d=$R_MNT/compat/$_c/$_dir
             [ -e "$_d" ] || continue
-            _CMD_CHFLAGS="$(printf "%b" "$_CMD_CHFLAGS" "\nchflags -fR schg $_d")"
+            append _cmds_chflags "chflags -fR schg $_d"
         done
     done
 
-    _CMD_CHFLAGS=$(echo "$_CMD_CHFLAGS" | sed -E 's|//|/|g')  # Removes double // directory paths
+    append _CMDS "$(echo "$_cmds_chflags" | sed -E 's|//|/|g')"  # Removes double // directory paths
 
     # exec.poststart is always sent to background. Don't report seclvl change
-    _CMD_SECLVL="quiet jexec -l -U root $CELL sysctl kern.securelevel=$SECLVL"
+    append _CMDS "quiet jexec -l -U root $CELL sysctl kern.securelevel=$SECLVL"
+
+    emit_cmds "$_CMDS"
 }
 
 main() {
@@ -56,10 +59,9 @@ main() {
     # bootstrap only needs level 2. Otherwise established runtime might conflict with validation
     mute ctx_load_file $RT_CTX || ctx_bootstrap_runtime -l 2 $CELL || eval $(THROW $?)
 
-    compose_rctl_commands
-    compose_flags_commands
+    append_compose _COMMANDS compose_rctl_commands
+    append_compose _COMMANDS compose_flags_commands
 
-    _COMMANDS="_CMD_MAXMEM _CMD_CPUSET _CMD_CHFLAGS _CMD_SECLVL"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
     return 0
 }

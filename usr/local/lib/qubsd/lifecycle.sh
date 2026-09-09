@@ -8,11 +8,22 @@
 # _cmdvar holds the name of the variable containing the execution stack. Caller should ALWAYS quote
 # the full `$2' argument (command). The result is appending a new command to a newline.
 append() {
-    local _cmdvar="$1" _newcmd="$2" _nl=$'\n'  # _nl is a posix newline. Avoids eval printf
+    local _cmdvar="$1" _newcmd="$2" _nl=$'\n'  # _nl is posix newline to avoid printf
     [ "$_newcmd" ] || return 0
 
     # Idempotent. \$_cmdvar can pass multiple times without mangling syntax.
+    # _nl is only printed if there's already commands in the stack
     eval "$_cmdvar=\"\${$_cmdvar:+\${$_cmdvar}\$_nl}\$_newcmd\""
+}
+
+# Makes chaining sets of compose_functions actually compose properly while preserving || $(THROW)
+append_compose() {
+    local _cmdvar="$1" _newcmds
+    shift
+
+    # unset $_cmdvar to avoid duplicate code blocks. "$@" executes the passed command, and if
+    # successful, appends the new code block to $_cmdvar. This preserves THROW codes and $ERR
+    _newcmds=$(unset $_cmdvar ; "$@") && append "$_cmdvar" "$_newcmds"
 }
 
 # Simple helper for emitting composed commands
@@ -21,7 +32,7 @@ emit_cmds() { printf '%s\n' "$1" ;}
 # _CMDS are constructed to separate commands by lines, not semicolons. Thus, each line can be
 # read with some combo of: printed/executed; while preserving and printing any failure lines.
 execute_commands() {
-    local _fn="execute_commands" _commands _cmds _cmd _line _lines
+    local _fn="execute_commands" _commands _cmd _line _lines
     assert_args_set 1 "$1" && _commands="$1"
 
     # Sanitize execution globals to ensure against user typos like 'fals' (intended 'false')
@@ -30,19 +41,13 @@ execute_commands() {
     [ "$VERBOSE" ] && ! echo_grep -q "$VERBOSE" '(true|TRUE|True|false|FALSE|False)' \
         && echo "DRY_RUN must be <true|false>" && exit 1
 
-    # Loop over all passed commands. _cmds could have multiple lines.
-    for _cmds in $_commands ; do
-        _cmds=$(ctx_get $_cmds | sed '/^$/d')  # Remove blanks
-        [ -z "$_cmds" ] && continue
-
-        # Use index to execute lines. `while read` creates a subshell, which borks tty on user input
-        _lines=$(echo "$_cmds" | wc -l)
-        _line=1
-        while [ "$_line" -le "$_lines" ] ; do
-            _cmd=$(echo "$_cmds" | sed -n "${_line}p")
-            exec_cmd || eval $(THROW 241 $_fn "$_cmd")
-            _line=$(( _line + 1 ))
-        done
+    # Use index to execute lines. `while read` creates a subshell, which borks tty on user input
+    _lines=$(printf '%s\n' "$_commands" | wc -l)
+    _line=1
+    while [ "$_line" -le "$_lines" ] ; do
+        _cmd=$(printf '%s\n' "$_commands" | sed -n "${_line}p")
+        exec_cmd || eval $(THROW 241 $_fn "$_cmd")
+        _line=$(( _line + 1 ))
     done
 }
 

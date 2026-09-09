@@ -7,14 +7,16 @@ RT_CTX=$D_RUNTM/$CELL/ctx.conf
 trap_init
 
 compose_commands() {
-    local _fn="compose_commands" _intfs
+    local _fn="compose_commands" _intfs _CMDS
 
     # Remove interfaces and handle files modification for those interfaces
     _intfs=$(ifconfig -j $CELL -g tap ; ifconfig -j $CELL -g epair)
-    _CMDS_REMOVE_INTERFACES=$(compose_remove_interface_cmds "$_intfs" "$CELL")
+    append_compose _CMDS compose_remove_interface_cmds "$_intfs" "$CELL"
 
     # /rw system files might be schg, but needed by rc.shutdown.
-    _CMD_CHFLAGS="chflags -fR noschg $P_MNT/rw"
+    append _CMD "chflags -fR noschg $P_MNT/rw"
+
+    emit_cmds "$_CMD"
 }
 
 
@@ -24,9 +26,8 @@ main() {
     # bootstrap only needs level 2. Otherwise established runtime might conflict with validation
     mute ctx_load_file $RT_CTX || ctx_bootstrap_runtime -l 2 $CELL || eval $(THROW $?)
 
-    compose_commands
+    _COMMANDS=$(compose_commands)
 
-    _COMMANDS="_CMDS_REMOVE_INTERFACES _CMD_CHFLAGS"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
     return 0
 }

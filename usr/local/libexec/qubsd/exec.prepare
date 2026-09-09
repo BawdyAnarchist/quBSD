@@ -30,6 +30,7 @@ resolve_runtime_context() {
 
 compose_prepare_cmds() {
     local _fn="compose_prepare_cmds" _mounts _mounted _CMDS
+    unset _CMDS
 
     # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
     [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
@@ -54,19 +55,21 @@ compose_prepare_cmds() {
 }
 
 compose_commands() {
-    local _fn="compose_commands"
+    local _fn="compose_commands" _CMDS
 
-    _CMDS_PREPARE=$(compose_prepare_cmds)
+    append_compose _CMDS compose_prepare_cmds
 
     # Only clone/reclone for non-rootjails. Otherwise we'll destroy the rootjail
     if [ ! "$CLASS" = "rootjail" ] ; then
-        _CMDS_RECLONE_ROOT=$(compose_reclone_root_cmds $CELL) || eval $(THROW $?)
+        append_compose _CMDS compose_reclone_root_cmds $CELL || eval $(THROW $?)
     fi
 
     # Only clone/reclone for dispjails. Otherwise we'll destroy the appjail persistent data
     if [ "$CLASS" = "dispjail" ] ; then
-        _CMDS_RECLONE_PERSIST=$(compose_reclone_persist_cmds $CELL) || eval $(THROW $?)
+        append_compose _CMDS compose_reclone_persist_cmds $CELL || eval $(THROW $?)
     fi
+
+    emit_cmds "$_CMDS"
 }
 
 main() {
@@ -76,9 +79,7 @@ main() {
 
     resolve_runtime_context || eval $(THROW $?)
 
-    compose_commands || eval $(THROW $?)
-
-    _COMMANDS="_CMDS_PREPARE _CMDS_RECLONE_ROOT _CMDS_RECLONE_PERSIST"
+    _COMMANDS=$(compose_commands) || eval $(THROW $?)
     execute_commands "$_COMMANDS" || eval $(THROW $?)
 
     # Successful completion of all tasks. Keep RT_CTX by removing it from the trap stack

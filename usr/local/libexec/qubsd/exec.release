@@ -33,21 +33,21 @@ compose_cleanup_cmds() {
 }
 
 compose_commands() {
-    local _fn="compose_commands"
+    local _fn="compose_commands" _CMDS
 
-    _CMDS_CLEANUP=$(compose_cleanup_cmds)
+    append_compose _CMDS compose_cleanup_cmds
 
     # Only clone/reclone for non-rootjails. Otherwise we'll destroy the rootjail
     if [ ! "$CLASS" = "rootjail" ] ; then
-        _CMDS_RECLONE_ROOT=$(compose_reclone_root_cmds $CELL) || eval $(THROW $?)
+        append_compose _CMDS compose_reclone_root_cmds $CELL || eval $(THROW $?)
     fi
 
     # Only destroy persistent for dispjails. Disps have no P_MNT after reclone.
     if [ "$CLASS" = "dispjail" ] ; then
-        _CMDS_RECLONE_PERSIST=$(compose_reclone_persist_cmds $CELL) || eval $(THROW $?)
+        append_compose _CMDS compose_reclone_persist_cmds $CELL || eval $(THROW $?)
     else
         # Fork and silence to reduce user lag. No libs avail after fork
-        [ -d "$P_MNT" ] && _CMD_CHFLAGS="exec chflags -fR noschg $P_MNT > /dev/null 2>&1"
+        [ -d "$P_MNT" ] && append _CMDS "exec chflags -fR noschg $P_MNT > /dev/null 2>&1"
     fi
 }
 
@@ -57,10 +57,9 @@ main() {
     # bootstrap only needs level 2. Otherwise established runtime might conflict with validation
     mute ctx_load_file $RT_CTX || ctx_bootstrap_runtime -l 2 $CELL || eval $(THROW $?)
 
-    compose_commands || eval $(THROW $?)
+    _COMMANDS=$(compose_commands) || eval $(THROW $?)
 
     # Omit the RECLONE commands for the non-root clones, and disp persist datasets. Unnecessary
-    _COMMANDS="_CMDS_CLEANUP _CMDS_RECLONE_ROOT _CMDS_RECLONE_PERSIST _CMD_CHFLAGS"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
     return 0
 }
