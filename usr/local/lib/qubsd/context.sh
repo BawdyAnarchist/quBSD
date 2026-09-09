@@ -44,7 +44,7 @@ ctx_load_params() {
 
     # CONTEXT variables
     eval ${_pfx}TYPE=$_type
-    eval ${_pfx}CALLER=${BASENAME%%[.-]*}        # (qb|exec) owns the runtime context
+    eval ${_pfx}OWNER=${BASENAME%%[.-]*}        # (qb|exec) owns the runtime context
     eval ${_pfx}PARAMS_TYPE=\"$PARAMS_BASE,\${PARAMS_${_type}}\"
     eval ${_pfx}QCONF=$D_CELLS/$_cell            # qubsd.conf.d/cells
     eval ${_pfx}JCONF=$D_JAILS/$_cell            # jail.conf.d/jails

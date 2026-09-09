@@ -51,10 +51,10 @@ resolve_runtime_context() {
 
     # Load runtime context. 'exec' caller shouldn't exist, if it does, it's stale
     mute ctx_load_file $RT_CTX   # Dont care if it fails, and dont want an $ERR if it fails
-    [ "$CALLER" = "exec" ] && rm -f $RT_CTX && unset CALLER
+    [ "$OWNER" = "exec" ] && rm -f $RT_CTX && unset OWNER
 
-    # If CALLER is empty, then qb isnt coordinating, and `jail` must initialize the runtime context
-    if [ -z "$CALLER" ] ; then
+    # If OWNER is empty, then qb isnt coordinating, and `jail` must initialize the runtime context
+    if [ -z "$OWNER" ] ; then
         # p_dsets are cloned from rootenv, disps from their template. They might not yet exist
         ctx_bootstrap_runtime -l 3 -p 169,170 $CELL || eval $(THROW $?)
     fi
@@ -82,7 +82,7 @@ main() {
     execute_commands "$_COMMANDS" || eval $(THROW $?)
 
     # Successful completion of all tasks. Keep RT_CTX by removing it from the trap stack
-    [ "$CALLER" = "exec" ] && ! echo_grep -q "$DRY_RUN" '(true|TRUE|True)' && trap_pop
+    [ "$OWNER" = "exec" ] && ! echo_grep -q "$DRY_RUN" '(true|TRUE|True)' && trap_pop
 
     return 0
 }
