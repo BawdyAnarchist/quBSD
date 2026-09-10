@@ -32,6 +32,12 @@ conv_to_lower() {
 ####################################################################################################
 #################################  PREDICATES (BOOLEAN RESPONSES)  #################################
 
+is_blank() {
+    local _fn="is_blank"
+    assert_args_set 1 "$1"  || eval $(THROW $?)
+    [ "$1" = "${1#*[![:space:]]}" ] && return 0  ||  return 1
+}
+
 is_path_exist() {
     local _fn="is_path_exist"
     assert_args_set 2 "$1" "$2" || eval $(THROW $?)
