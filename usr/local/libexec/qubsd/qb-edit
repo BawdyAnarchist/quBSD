@@ -76,14 +76,12 @@ parse_args() {
 # Repeat commands. DEL/ADD avoids potential syntax pollution inherent to sed search-and-replace.
 _compose_del_param() {
     local _fn="compose_cmd_helper"
-    _CMD_DEL="sed -i '' -E \"/^$PARAM=/d\" $FILE"
-    return 0
+    printf "%b" "sed -i '' -E \"/^$PARAM=/d\" $FILE"
 }
 _compose_add_param() {
     local _fn="compose_cmd_helper" _tmpfile
     make_tmp _tmpfile
-    _CMD_ADD="{ cat $FILE ; echo $PARAM=\\\"$VALUE\\\" ;} | sort > $_tmpfile && mv $_tmpfile $FILE"
-    return 0
+    printf "%b" "{ cat $FILE ; echo $PARAM=\\\"$VALUE\\\" ;} | sort > $_tmpfile && mv $_tmpfile $FILE"
 }
 # Putting this sed command into a variable would be escape-char hell. Offload to function
 _CMD_jconf_mod() {
@@ -92,22 +90,22 @@ _CMD_jconf_mod() {
 }
 
 compose_delete() {
-    local _fn="compose_delete" _old_val _def_type _badcells _err_msg _pfx=old_
+    local _fn="compose_delete" _old_val _def_type _badcells _err_msg _CMDS _pfx=old_
     [ -z "$DELETE" ] && return 0   # No [-D] option, skip
 
     # Relevant, or potentially relevant variables
     ctx_load_file $FILE $_pfx
     _old_val=$(ctx_get ${_pfx}$PARAM)
 
-    # Check that there's something to delete, and create the accompanying _CMD
+    # Check that there's something to delete, and append the accompanying _CMDS
     grep -Eqs "^$PARAM=" $FILE || eval $(THROW 4 delete_nothing $PARAM $FILE)
-    _compose_del_param
+    append_compose _CMDS _compose_del_param
 
     # PPT could have multiple values. If user gave VALUE, only delete that one, keep the others
     if [ "$PARAM" = "PPT" ] && [ "$VALUE" ] ; then
         _old_val="$(ctx_get ${_pfx}PPT)"
         VALUE=$(echo "$_old_val" | sed -E "s|[ ]*$VALUE[ ]*||")
-        [ "$VALUE" ] && _compose_add_param
+        [ "$VALUE" ] && append _CMDS _compose_add_param
     else
         unset VALUE  # This is critical for the check later, as it depends on -z test
     fi
@@ -141,11 +139,12 @@ compose_delete() {
         WARN deletion_errors "$_err_msg" $PARAM "$_badcells"
         eval $(THROW 4 use_force)
     fi
-    return 0
+
+    emit_cmds "$_CMDS"
 }
 
 compose_modify() {
-    local _fn="compose_modify" _old_val _pfx=old_
+    local _fn="compose_modify" _old_val _CMDS _pfx=old_
     [ "$DELETE" ] && return 0   # [-D] implicitly means we're not modifying the qconf
 
     # Relevant, or potentially relevant variables
@@ -169,8 +168,8 @@ compose_modify() {
         MTU) [ "$DEFAULT" ] && WARN mtu ;;  # It's not recommended to set default MTU
         PPT) [ "$_old_val" ] && VALUE="$_old_val $VALUE" ;;  # If pre-existing PPT, just += $VALUE
         DEVFS_RULE)
-            _CMD_JCONF_DEL="sed -i '' -E \"/.*devfs_ruleset=/d\" $D_JAILS/$CELL"
-            _CMD_JCONF_ADD="_CMD_jconf_mod"
+            append _CMDS "sed -i '' -E \"/.*devfs_ruleset=/d\" $D_JAILS/$CELL"
+            append _CMDS "_CMD_jconf_mod"  # sed here is too complex. Run function as standalone
         ;;
     esac
 
@@ -178,9 +177,9 @@ compose_modify() {
     is_path_exist -s "$ERR" && { [ "$FORCE" ] || eval $(THROW $? use_force) ;}
 
     # Modify the QCONF
-    _compose_del_param
-    _compose_add_param
-    return 0
+    append_compose _CMDS _compose_del_param
+    append_compose _CMDS _compose_add_param
+    emit_cmds "$_CMDS"
 }
 
 compose_warn() {
@@ -188,7 +187,7 @@ compose_warn() {
     if [ -s "$ERR" ] ; then
         _err="$(cat $ERR)" && clear_err
         WARN warning_header
-        _CMD_WARN="cat \"$ERR\" ; echo \"$_err\""
+        printf "%b" "cat \"$ERR\" ; echo \"$_err\""
     fi
 }
 
@@ -196,11 +195,10 @@ main() {
     local _fn="main"
 
     parse_args "$@"  || eval $(THROW $?)
-    compose_delete   || eval $(THROW $?)
-    compose_modify   || eval $(THROW $?)
-    compose_warn
+    append_compose _COMMANDS compose_delete   || eval $(THROW $?)
+    append_compose _COMMANDS compose_modify   || eval $(THROW $?)
+    append_compose _COMMANDS compose_warn
 
-    _COMMANDS="_CMD_DEL _CMD_ADD _CMD_JCONF_DEL _CMD_JCONF_ADD _CMD_WARN"
     execute_commands "$_COMMANDS" || eval $(THROW $?)
 }
 
