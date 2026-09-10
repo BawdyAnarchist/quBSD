@@ -55,29 +55,9 @@ calculate_destroy_date() {
     echo "(${_ttl%?} * $_mult) + $_crea_unix" | bc  # Final destroy date in unix time
 }
 
-compose_new_snapshots_cmds() {
-    local _fn="compose_new_snapshots_cmds" _r_snap _p_snap _zfs_r_cmd _zfs_p_cmd
-
-    # Make sure the cell is flagged for autosnap, or return silently back to caller
-    echo "$_autosnaps" | grep -Eqs "^$_cell\$" || return 1
-
-    # Generate notional snap names
-    [ "$_p_dset" ] && _p_snap="$_p_dset@$_suffix"
-    [ "$_r_dset" ] && _r_snap="$_r_dset@$_suffix"
-
-    # Don't snapshot running rootenv where updates/installs could cause partial/inconsistent state
-    [ -z "${_class##root*}" ] && is_cell_running $_cell && unset _r_snap
-
-    # Update the primary _CMD. **The space in front of " $_r_snap" is required**
-    [ -z "$_CMD_R_SNAPSHOT" ] && _zfs_r_cmd="zfs snapshot -o qb:ttl=$TTL"
-    [ -z "$_CMD_P_SNAPSHOT" ] && _zfs_p_cmd="zfs snapshot -o qb:ttl=$TTL"
-    _CMD_R_SNAPSHOT="$(printf "%b" "$_zfs_r_cmd" "$_CMD_R_SNAPSHOT" " $_r_snap")"
-    _CMD_P_SNAPSHOT="$(printf "%b" "$_zfs_p_cmd" "$_CMD_P_SNAPSHOT" " $_p_snap")"
-}
-
 compose_thin_old_snaps_cmds() {
     local _fn="compose_thin_old_snaps_cmds"
-    local _rsnaps _psnaps _snapshots _snap _clones _ttl _integer _creation _crea_unix _destroy
+    local _rsnaps _psnaps _snapshots _snap _clones _ttl _integer _creation _crea_unix _destroy _CMDS
 
     # Most snaps should already be in the cache, but query_*snaps greps and hydrates if necessary
     _class=$(ctx_get ${_pfx}CLASS)
@@ -105,14 +85,16 @@ compose_thin_old_snaps_cmds() {
 
         # Final command addition. Mute the comparison to not pollute $ERR
         mute assert_int_comparison -G $_destroy -- $DATE && [ "$_clones" = "-" ] \
-            && _CMD_DESTROY="$(printf "%b" "$_CMD_DESTROY\n" "hush zfs destroy $_snap")"
+            && append _CMDS "hush zfs destroy $_snap"
     done << EOF
 $_snapshots
 EOF
+
+    emit_cmds "$_CMDS"
 }
 
-manage_composition_loop() {
-    local _fn="manage_composition_loop" _class _autosnaps _suffix _r_dset _p_dset _pfx="t_"
+compose_zfs_commands() {
+    local _fn="compose_zfs_commands" _class _autosnaps _suffix _r_dset _p_dset _r_snaps _p_snaps _pfx="t_"
 
     query_qconf_cells_and_paths     # Populate globals: $CELLS and $CELLS_QPATHS
     query_zfs_recursive_defaults    # Sets global DATASETS. Prevents repeat/excess zfs calls
@@ -141,11 +123,27 @@ manage_composition_loop() {
         [ "$(ctx_get ${_pfx}R_MNT)" ] && _r_dset=$(ctx_get ${_pfx}R_DSET)
         [ "$(ctx_get ${_pfx}P_MNT)" ] && _p_dset=$(ctx_get ${_pfx}P_DSET)
 
-        # Prepare the commands
-        [ "$TTL" ] && compose_new_snapshots_cmds
-        [ "$DESTROY" ] && compose_thin_old_snaps_cmds
-        unset _r_dset _p_dset  # Keep the variables clean
+        # Cell should be autosnap; and not a running rootenv (could cause partial/inconsistent state
+        echo "$_autosnaps" | grep -Eqs "^$_cell\$" || continue
+        [ -z "${_class##root*}" ] && is_cell_running $_cell && continue
+
+        # If root/persist (_r/_p) dataset was found, the add it to the snaps list
+        if [ "$TTL" ] ; then
+            [ "$_r_dset" ] && _r_snaps="${_r_snaps} $_r_dset@$_suffix"
+            [ "$_p_dset" ] && _p_snaps="${_p_snaps} $_p_dset@$_suffix"
+        fi
+
+        # Compose the destroy commands while inside the loop
+        [ "$DESTROY" ] && append_compose _CMDS compose_thin_old_snaps_cmds
+
+        unset _r_dset _p_dset # Keep the variables clean
     done
+
+    # Spaces in the snaps assignment loop, even if there are no snaps could be non-zero but blank
+    is_blank "$_r_snaps" || append _CMDS "zfs snapshot -o qb:ttl=${TTL} $_r_snaps"
+    is_blank "$_p_snaps" || append _CMDS "zfs snapshot -o qb:ttl=${TTL} $_p_snaps"
+
+    emit_cmds "$_CMDS"
 }
 
 
@@ -153,10 +151,11 @@ main() {
     local _fn="main"
 
     parse_args "$@" || eval $(THROW $?)
-    manage_composition_loop
 
-    _COMMANDS="_CMD_R_SNAPSHOT _CMD_P_SNAPSHOT _CMD_DESTROY"
+    _COMMANDS=$(compose_zfs_commands)
+
     execute_commands "$_COMMANDS" || eval $(THROW $?)
+
     return 0
 }
 
