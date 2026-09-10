@@ -36,7 +36,7 @@ calculate_snap_suffix() {
         M) _date='+%Y_%b%d_M' ;;
         Y) _date='+%Y_%b%d_Y' ;;
     esac
-    echo $(date $_date)  # Snap will have this @name
+    date $_date  # Snap will have this @name
 }
 
 calculate_destroy_date() {
