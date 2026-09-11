@@ -281,19 +281,19 @@ compose_network_construction_cmds() {
     # Commands that connect CELL to its gateway. GW must be running && ctx.conf must be available
     if is_cell_running $_cl_gw && ctx_load_file $D_RUNTM/$_cl_gw/ctx.conf "gw_" ; then
         _resolve_gw_context $_cl_gw "gw_"  # Downward scoped gateway variables
-        compose_vif_cmds      # Appends global command: _CMDS_NETWORK_CONSTRUCTION
+        compose_vif_cmds
     fi
 
     # Commands that connect CELL to its clients
     ctx_unset "gw_"                   # Clean prefix. Ensures no stale values creep through
-    _resolve_gw_context $CELL $_pfx   # CELL becomes the gateway. Variables get downward scoped
+    _resolve_gw_context $_cell $_pfx   # CELL becomes the gateway. Variables get downward scoped
     for _client in $_clients ; do
         # Necessary context elements. Clean the prefix, file must load, downward scope cl variables
         is_cell_running $_client || continue
         ctx_unset "cl_"
         ctx_load_file $D_RUNTM/$_client/ctx.conf "cl_" || continue
         _resolve_cl_context "$_client" "cl_"
-        _CMDS=$(compose_vif_cmds)     # Appends global command: _CMDS_NETWORK_CONSTRUCTION
+        append _CMDS compose_vif_cmds
     done
 
     emit_cmds "$_CMDS"
