@@ -19,7 +19,7 @@ exec 9>&1
 # Verify Environment
 [ -d "$D_CELLS" ] || mkdir -p $D_CELLS
 [ -d "$D_JAILS" ] || mkdir -p $D_JAILS
-[ -d "$D_QRUN" ] || mkdir -p $D_RUNTM
+[ -d "$D_RUNTM" ] || mkdir -p $D_RUNTM
 [ -d "$D_QERR" ] || mkdir -p $D_QERR
 [ -d "$D_QX11" ] || mkdir -p $D_QX11
 [ -d "$D_XFER" ] || mkdir -p $D_XFER
