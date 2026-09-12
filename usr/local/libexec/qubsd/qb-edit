@@ -86,7 +86,7 @@ _compose_add_param() {
 # Putting this sed command into a variable would be escape-char hell. Offload to function
 _CMD_jconf_mod() {
     sed -i '' -E "/^[[:blank:]]*$CELL[[:blank:]]*\{/a\\
-	devfs_ruleset=\"$VALUE\"" $D_JAILS/$CELL   # Leading tab here is literal. Do not change
+	devfs_ruleset=\"$VALUE\"\;" $D_JAILS/$CELL   # Leading tab here is literal. Do not change
 }
 
 compose_delete() {
