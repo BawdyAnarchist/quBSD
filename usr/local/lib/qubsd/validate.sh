@@ -144,7 +144,7 @@ validate_param_maxmem() {
 validate_param_memsize() {
     local _fn="validate_param_memsize" _bytes
 
-    assert_bytesize $_value || eval $(THROW $? "$_param" "$_value")
+    assert_bytesize $_value || eval $(THROW $? "$_fn" "$_param" "$_value")
     [ "$_level" -le 2 ] && return 0
 
     query_sysmem
