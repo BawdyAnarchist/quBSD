@@ -83,7 +83,7 @@ main() {
     execute_commands "$_COMMANDS" || eval $(THROW $?)
 
     # Successful completion of all tasks. Keep RT_CTX by removing it from the trap stack
-    [ "$OWNER" = "exec" ] && ! echo_grep -q "$DRY_RUN" '(true|TRUE|True)' && trap_pop
+    ! echo_grep -q "$DRY_RUN" '(true|TRUE|True)' && trap_pop
 
     return 0
 }
