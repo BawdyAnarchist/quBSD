@@ -293,7 +293,7 @@ compose_network_construction_cmds() {
         ctx_unset "cl_"
         ctx_load_file $D_RUNTM/$_client/ctx.conf "cl_" || continue
         _resolve_cl_context "$_client" "cl_"
-        append _CMDS compose_vif_cmds
+        append_compose _CMDS compose_vif_cmds
     done
 
     emit_cmds "$_CMDS"

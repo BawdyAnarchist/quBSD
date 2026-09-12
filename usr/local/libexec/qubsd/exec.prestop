@@ -11,12 +11,13 @@ compose_commands() {
 
     # Remove interfaces and handle files modification for those interfaces
     _intfs=$(ifconfig -j $CELL -g tap ; ifconfig -j $CELL -g epair)
+
     append_compose _CMDS compose_remove_interface_cmds "$_intfs" "$CELL"
 
     # /rw system files might be schg, but needed by rc.shutdown.
-    append _CMD "chflags -fR noschg $P_MNT/rw"
+    append _CMDS "chflags -fR noschg $P_MNT/rw"
 
-    emit_cmds "$_CMD"
+    emit_cmds "$_CMDS"
 }
 
 
