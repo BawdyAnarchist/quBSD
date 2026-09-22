@@ -104,7 +104,7 @@ _resolve_available_tap() {
 }
 
 compose_remove_interface_cmds() {
-    local _fn="compose_remove_interface_cmds" _intfs="$1" _cell="$2" _action _CMDS
+    local _fn="compose_remove_interface_cmds" _intfs="$1" _cell="$2" _action
 
     query_runtime_taps  # Side effects: cached global RT_TAPS
     query_onjails       # Side effects: cached global ONJAILS
@@ -132,7 +132,6 @@ compose_remove_interface_cmds() {
             done
         fi
     done
-    emit_cmds "$_CMDS"
 }
 
 # These helpers are needed so that the primary cmd functions can used downward-scoped variables
@@ -168,7 +167,7 @@ _resolve_gw_context() {
 # cl/gw TYPE ; cl ipv4 ; and account for host handling. The presence of certain varibles is the
 # indication that an associated _cmd should be constructed, which finalizes in loop at the end.
 compose_vif_cmds() {
-    local _fn="compose_vif_cmds" _cmds_network_vif _ip1 _mtu _mtu_mod _CMDS
+    local _fn="compose_vif_cmds" _cmds_network_vif _ip1 _mtu _mtu_mod
     local _vif _cl_vif _cl_grp _cl_j_mod _cl_ip _cl_rt _vif_mk _gw_vif _gw_grp _gw_j_mod _gw_ip _vif
 
     # With no gw, there are no vifs to configure
@@ -261,14 +260,12 @@ compose_vif_cmds() {
             && append _CMDS "echo 'nameserver $_cl_rt' | resolvconf -a $_cl_vif.qubsd" \
             || append _CMDS "dhclient -b $_cl_vif"
     fi
-
-    emit_cmds "$_CMDS"
 }
 
 # Full composition of the network stack commands for a single cell, and between its gw and clients.
 # Dynamically scoped variables are used with _resolve_cl/gw_context() to avoid drilling.
 compose_network_construction_cmds() {
-    local _fn="compose_network_construction_cmds" _cell="$1" _pfx="$2" _CMDS
+    local _fn="compose_network_construction_cmds" _cell="$1" _pfx="$2"
     local _caller _clients _gw _clients
     assert_args_set 1 "$_cell" || eval $(THROW $?)
     assert_pfx "$_pfx" || eval $(THROW $?)
@@ -293,10 +290,8 @@ compose_network_construction_cmds() {
         ctx_unset "cl_"
         ctx_load_file $D_RUNTM/$_client/ctx.conf "cl_" || continue
         _resolve_cl_context "$_client" "cl_"
-        append_compose _CMDS compose_vif_cmds
+        compose_vif_cmds
     done
-
-    emit_cmds "$_CMDS"
 }
 
 
@@ -371,7 +366,7 @@ _resolve_snapname_persist() {
 
 # Makes a full composition of the commands required to re/clone the rootenv dataset for appjail/VM
 compose_reclone_root_cmds() {
-    local _fn="compose_reclone_root_cmds" _cell="$1" _pfx="$2" _pfxloc="rrc_" _CMDS
+    local _fn="compose_reclone_root_cmds" _cell="$1" _pfx="$2" _pfxloc="rrc_"
     local  _rt_ctx _rootenv _snap _die _r_mnt _r_dset _r_zfs_mnt
     assert_args_set 1 "$1" || eval $(THROW $?)
 
@@ -403,12 +398,11 @@ compose_reclone_root_cmds() {
     fi
 
     append _CMDS "zfs clone $_snap $_r_dset"  # Final clone op can now be added to the cmd stack
-    emit_cmds "$_CMDS"
 }
 
 # Makes a full composition of the commands required to re/clone the persist dataset for dispjail/VM
 compose_reclone_persist_cmds() {
-    local _fn="compose_reclone_persist_cmds" _cell="$1" _pfx="$2" _pfxloc="prc_" _CMDS
+    local _fn="compose_reclone_persist_cmds" _cell="$1" _pfx="$2" _pfxloc="prc_"
     local _rt_ctx _snap _p_mnt _p_dset
     assert_args_set 1 "$_cell" || eval $(THROW $?)
 
@@ -441,6 +435,5 @@ compose_reclone_persist_cmds() {
     fi
     append _CMDS "zfs clone $_snap $_p_dset"  # Final clone op can now be added to the cmd stack
     append _CMDS "fix_freebsd_pw $_cell $(ctx_get $_pfxloc) $_p_mnt"
-    emit_cmds "$_CMDS"
 }
 

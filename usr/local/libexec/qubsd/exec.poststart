@@ -7,16 +7,15 @@ RT_CTX=$D_RUNTM/$CELL/ctx.conf
 trap_init
 
 compose_rctl_commands() {
-    local _fn="compose_rctl_commands" _CMDS
+    local _fn="compose_rctl_commands"
 
     # Establish max memory allocation and jail CPUs
     [ "$MAXMEM" = "none" ] || append _CMDS "rctl -a jail:${CELL}:memoryuse:deny=${MAXMEM}"
     [ "$CPUSET" = "none" ] || append _CMDS "cpuset -j $CELL -cl $CPUSET"
-    emit_cmds "$_CMDS"
 }
 
 compose_flags_commands() {
-    local _fn="compose_flags_commands" _dirs _dir _d _CMDS _cmds_chflags
+    local _fn="compose_flags_commands" _dirs _dir _d _cmds_chflags
 
     # Rootjail file protections can prevent updates, installs, and disrupt appjail starts
     [ "$CLASS" = "rootjail" ] && return 0
@@ -49,8 +48,6 @@ compose_flags_commands() {
 
     # exec.poststart is always sent to background. Don't report seclvl change
     append _CMDS "quiet jexec -l -U root $CELL sysctl kern.securelevel=$SECLVL"
-
-    emit_cmds "$_CMDS"
 }
 
 main() {
@@ -59,10 +56,10 @@ main() {
     # bootstrap only needs level 2. Otherwise established runtime might conflict with validation
     mute ctx_load_file $RT_CTX || ctx_bootstrap_runtime -l 2 $CELL || eval $(THROW $?)
 
-    append_compose _COMMANDS compose_rctl_commands
-    append_compose _COMMANDS compose_flags_commands
+    compose_rctl_commands
+    compose_flags_commands
 
-    execute_commands "$_COMMANDS" || eval $(THROW $?)
+    execute_commands "$_CMDS" || eval $(THROW $?)
     return 0
 }
 

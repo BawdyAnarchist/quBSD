@@ -9,7 +9,7 @@ trap_push "rm -rf $D_RUNTM/$CELL"
 
 # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
 compose_cleanup_cmds() {
-    local _fn="compose_cleanup_cmds" _mounts _encroot _proc _CMDS
+    local _fn="compose_cleanup_cmds" _mounts _encroot _proc
 
     # Extra safety mechanism to prevent lingering mounts or cleanup rare kill -9
     [ "$R_MNT" ] && _mounts=$(mount | grep -Eo "$R_MNT/[^[:blank:]]+" | tr '\n' ' ')
@@ -28,23 +28,21 @@ compose_cleanup_cmds() {
     # Neither pkill -15; nor pkill -9; nor kill -15 work here. Only kill -9
     _proc=$(hush pgrep -f "exec.poststart $CELL")
     [ "$_proc" ] && append _CMDS "kill -9 $_proc"
-
-    emit_cmds "$_CMDS"
 }
 
 compose_commands() {
-    local _fn="compose_commands" _CMDS
+    local _fn="compose_commands"
 
-    append_compose _CMDS compose_cleanup_cmds
+    compose_cleanup_cmds
 
     # Only clone/reclone for non-rootjails. Otherwise we'll destroy the rootjail
     if [ ! "$CLASS" = "rootjail" ] ; then
-        append_compose _CMDS compose_reclone_root_cmds $CELL || eval $(THROW $?)
+        compose_reclone_root_cmds $CELL || eval $(THROW $?)
     fi
 
     # Only destroy persistent for dispjails. Disps have no P_MNT after reclone.
     if [ "$CLASS" = "dispjail" ] ; then
-        append_compose _CMDS compose_reclone_persist_cmds $CELL || eval $(THROW $?)
+        compose_reclone_persist_cmds $CELL || eval $(THROW $?)
     else
         # Fork and silence to reduce user lag. No libs avail after fork
         [ -d "$P_MNT" ] && append _CMDS "exec chflags -fR noschg $P_MNT > /dev/null 2>&1"
@@ -57,7 +55,7 @@ main() {
     # bootstrap only needs level 2. Otherwise established runtime might conflict with validation
     mute ctx_load_file $RT_CTX || ctx_bootstrap_runtime -l 2 $CELL || eval $(THROW $?)
 
-    _COMMANDS=$(compose_commands) || eval $(THROW $?)
+    compose_commands || eval $(THROW $?)
 
     # Omit the RECLONE commands for the non-root clones, and disp persist datasets. Unnecessary
     execute_commands "$_COMMANDS" || eval $(THROW $?)

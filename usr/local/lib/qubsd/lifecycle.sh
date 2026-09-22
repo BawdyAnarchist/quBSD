@@ -16,19 +16,6 @@ append() {
     eval "$_cmdvar=\"\${$_cmdvar:+\${$_cmdvar}\$_nl}\$_newcmd\""
 }
 
-# Makes chaining sets of compose_functions actually compose properly while preserving || $(THROW)
-append_compose() {
-    local _cmdvar="$1" _newcmds
-    shift
-
-    # unset $_cmdvar to avoid duplicate code blocks. "$@" executes the passed command, and if
-    # successful, appends the new code block to $_cmdvar. This preserves THROW codes and $ERR
-    _newcmds=$(unset $_cmdvar ; "$@") && append "$_cmdvar" "$_newcmds"
-}
-
-# Simple helper for emitting composed commands
-emit_cmds() { printf '%s\n' "$1" ;}
-
 # _CMDS are constructed to separate commands by lines, not semicolons. Thus, each line can be
 # read with some combo of: printed/executed; while preserving and printing any failure lines.
 execute_commands() {
@@ -65,11 +52,6 @@ exec_cmd() {
 ###################################################################################################
 ##################################  PRIMARY LIFECYCLE FUNCTIONS  ##################################
 ###################################################################################################
-
-life_generate_rtctx() {
-    local _fn="life_generate_rtctx" _cell="$1"
-    assert_cellname "$1" || eval $(THROW $?)
-}
 
 life_purge_stale_jail() {
     local _fn="life_cleanup_jail" _cell="$1" _pfx="$2" _vif

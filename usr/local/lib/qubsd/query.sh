@@ -34,8 +34,7 @@ conv_to_lower() {
 
 is_blank() {
     local _fn="is_blank"
-    assert_args_set 1 "$1"  || eval $(THROW $?)
-    [ "$1" = "${1#*[![:space:]]}" ] && return 0  ||  return 1
+    [ "$1" = "${1#*[![:space:]]}" ] && return 0 || return 1
 }
 
 is_path_exist() {
@@ -246,7 +245,7 @@ query_datasets() {
     # Cant THROW on zfs failure, because the datasets it successfully found will be lost
     _newdsets=$(hush zfs list -Ho $DSET_PROPS $_pull)
     DATASETS=$(echo "$DATASETS" ; echo "$_newdsets")
-    DATASETS=$(echo "$DATASETS" | sed -E '/^$/d')  # Remove blank lines
+    DATASETS=$(echo "$DATASETS" | sed -E '/^$/d' | sort -u)  # Remove blank lines
 
     return 0
 }
@@ -264,7 +263,7 @@ query_zfs_recursive_defaults() {
             ;query_file_keyval P_ZFS $DEF_JAIL \
             ;query_file_keyval R_ZFS $DEF_VM   \
             ;query_file_keyval P_ZFS $DEF_VM)
-    _dsets=$(echo "$_dsets" | sort | uniq)
+    _dsets=$(echo "$_dsets" | sort -u)
 
     if [ -z "$_snaps_only" ] ; then
         DATASETS=$(hush zfs list -Hro $DSET_PROPS $_dsets) || eval $(THROW 120)
@@ -288,7 +287,7 @@ query_rootsnaps() {
     # Cant THROW on zfs failure, because the datasets it successfully found will be lost
     _newsnaps=$(zfs list -Ht snapshot -o $SNAP_PROPS $_pull)
     ROOTSNAPS=$(echo "$ROOTSNAPS" ; echo "$_newsnaps")
-    ROOTSNAPS=$(echo "$ROOTSNAPS" | sed -E '/^$/d')  # Remove blank lines
+    ROOTSNAPS=$(echo "$ROOTSNAPS" | sed -E '/^$/d' | sort -u)  # Remove blank lines and duplicates
     return 0
 }
 
@@ -305,7 +304,7 @@ query_persistsnaps() {
     # Cant THROW on zfs failure, because the datasets it successfully found will be lost
     _newsnaps=$(zfs list -Ht snapshot -o $SNAP_PROPS $_pull)
     PERSISTSNAPS=$(echo "$PERSISTSNAPS" ; echo "$_newsnaps")
-    PERSISTSNAPS=$(echo "$PERSISTSNAPS" | sed -E '/^$/d')  # Remove blank lines
+    PERSISTSNAPS=$(echo "$PERSISTSNAPS" | sed -E '/^$/d' | sort -u)  # Remove blank lines and duplicates
     return 0
 }
 
