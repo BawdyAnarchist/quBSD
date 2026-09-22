@@ -3,6 +3,33 @@
 ####################################################################################################
 ###########################################  NETWORKING  ###########################################
 
+# These helpers are needed so that the primary cmd functions can used downward-scoped variables
+# and for clean designation of when the CELL is a gateway, vs when it is a client.
+_resolve_cl_context() {
+    local _fn="_resolve_cl_context" _pfx="$2"
+    unset _cl _cl_cut _cl_type _cl_ipv4 _cl_mtu _cl_gw _cl_extif _cl_isgw
+    _cl="$1"
+    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
+    _cl_cut="$(echo $_cl | cut -c1-14)_"
+    _cl_type=$(ctx_get ${_pfx}TYPE)
+    _cl_ipv4=$(ctx_get ${_pfx}IPV4)
+    _cl_mtu=$(ctx_get ${_pfx}MTU)
+    _cl_gw=$(ctx_get ${_pfx}GATEWAY)
+    _cl_extif=$(ctx_get ${_pfx}EXT_IF)
+    quiet query_gw_clients "$_cl" && _cl_isgw=true  # Needed for vif IP resolution conventions
+}
+_resolve_gw_context() {
+    local _fn="_resolve_gw_context" _pfx="$2"
+    unset _gw _gw_cut _gw_type _gw_mtu _gw_extif
+    _gw="$1"
+    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
+    _gw_cut="$(echo $_gw | cut -c1-14)_"
+    _gw_type=$(ctx_get ${_pfx}TYPE)
+    _gw_mtu=$(ctx_get ${_pfx}MTU)
+    # A gw-VM should have RT_CTX with INTIF="cell1_tapX,cell2_tapY,..."
+    _gw_intif=$(ctx_get ${_pfx}INT_IF | sed -E "s/(^|.*,)${_cl}_(tap[0-9]+)(,|\$)/\2/")
+}
+
 # Finds an unused ipv4 address and assigns it to "$1" with eval. We use eval here because the
 # global cache: RT_IPS needs to be updated, which would be lost with a `new_ip=$(..)` subshell
 # Require $1,$2,$3,$4. Search for available IPaddr using the form: _ip0._ip1._ip2._ip3/_sub
@@ -132,34 +159,6 @@ compose_remove_interface_cmds() {
             done
         fi
     done
-}
-
-# These helpers are needed so that the primary cmd functions can used downward-scoped variables
-# and for clean designation of when the CELL is a gateway, vs when it is a client.
-_resolve_cl_context() {
-    local _fn="_resolve_cl_context" _pfx="$2"
-    unset _cl _cl_cut _cl_type _cl_ipv4 _cl_mtu _cl_gw _cl_extif _cl_isgw
-    _cl="$1"
-    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
-    _cl_cut="$(echo $_cl | cut -c1-14)_"
-    _cl_type=$(ctx_get ${_pfx}TYPE)
-    _cl_ipv4=$(ctx_get ${_pfx}IPV4)
-    _cl_mtu=$(ctx_get ${_pfx}MTU)
-    _cl_gw=$(ctx_get ${_pfx}GATEWAY)
-    _cl_extif=$(ctx_get ${_pfx}EXT_IF)
-    quiet query_gw_clients "$_cl" && _cl_isgw=true  # Needed for vif IP resolution conventions
-}
-
-_resolve_gw_context() {
-    local _fn="_resolve_gw_context" _pfx="$2"
-    unset _gw _gw_cut _gw_type _gw_mtu _gw_extif
-    _gw="$1"
-    # ifconfig group spec is < 15 chars, *and cannot end in a digit*. Thus the trailing underscore
-    _gw_cut="$(echo $_gw | cut -c1-14)_"
-    _gw_type=$(ctx_get ${_pfx}TYPE)
-    _gw_mtu=$(ctx_get ${_pfx}MTU)
-    # A gw-VM should have RT_CTX with INTIF="cell1_tapX,cell2_tapY,..."
-    _gw_intif=$(ctx_get ${_pfx}INT_IF | sed -E "s/(^|.*,)${_cl}_(tap[0-9]+)(,|\$)/\2/")
 }
 
 # Disposition all taps and epairs: vnet to jail, apply ifconfig groups, bring up ip/mtu.
