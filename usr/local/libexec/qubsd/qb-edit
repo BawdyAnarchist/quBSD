@@ -75,13 +75,13 @@ parse_args() {
 
 # Repeat commands. DEL/ADD avoids potential syntax pollution inherent to sed search-and-replace.
 _compose_del_param() {
-    local _fn="compose_cmd_helper"
-    printf "%b" "sed -i '' -E \"/^$PARAM=/d\" $FILE"
+    local _fn="_compose_del_param"
+    append _CMDS "sed -i '' -E \"/^$PARAM=/d\" $FILE"
 }
 _compose_add_param() {
-    local _fn="compose_cmd_helper" _tmpfile
+    local _fn="_compose_add_param" _tmpfile
     make_tmp _tmpfile
-    printf "%b" "{ cat $FILE ; echo $PARAM=\\\"$VALUE\\\" ;} | sort > $_tmpfile && mv $_tmpfile $FILE"
+    append _CMDS "{ cat $FILE ; echo $PARAM=\\\"$VALUE\\\" ;} | sort > $_tmpfile && mv $_tmpfile $FILE"
 }
 # Putting this sed command into a variable would be escape-char hell. Offload to function
 _CMD_jconf_mod() {
@@ -90,7 +90,7 @@ _CMD_jconf_mod() {
 }
 
 compose_delete() {
-    local _fn="compose_delete" _old_val _def_type _badcells _err_msg _CMDS _pfx=old_
+    local _fn="compose_delete" _old_val _def_type _badcells _err_msg _pfx=old_
     [ -z "$DELETE" ] && return 0   # No [-D] option, skip
 
     # Relevant, or potentially relevant variables
@@ -99,13 +99,13 @@ compose_delete() {
 
     # Check that there's something to delete, and append the accompanying _CMDS
     grep -Eqs "^$PARAM=" $FILE || eval $(THROW 4 delete_nothing $PARAM $FILE)
-    append_compose _CMDS _compose_del_param
+    _compose_del_param
 
     # PPT could have multiple values. If user gave VALUE, only delete that one, keep the others
     if [ "$PARAM" = "PPT" ] && [ "$VALUE" ] ; then
         _old_val="$(ctx_get ${_pfx}PPT)"
         VALUE=$(echo "$_old_val" | sed -E "s|[ ]*$VALUE[ ]*||")
-        [ "$VALUE" ] && append _CMDS _compose_add_param
+        [ "$VALUE" ] && _compose_add_param
     else
         unset VALUE  # This is critical for the check later, as it depends on -z test
     fi
@@ -139,12 +139,10 @@ compose_delete() {
         WARN deletion_errors "$_err_msg" $PARAM "$_badcells"
         eval $(THROW 4 use_force)
     fi
-
-    emit_cmds "$_CMDS"
 }
 
 compose_modify() {
-    local _fn="compose_modify" _old_val _CMDS _pfx=old_
+    local _fn="compose_modify" _old_val _pfx=old_
     [ "$DELETE" ] && return 0   # [-D] implicitly means we're not modifying the qconf
 
     # Relevant, or potentially relevant variables
@@ -177,9 +175,8 @@ compose_modify() {
     is_path_exist -s "$ERR" && { [ "$FORCE" ] || eval $(THROW $? use_force) ;}
 
     # Modify the QCONF
-    append_compose _CMDS _compose_del_param
-    append_compose _CMDS _compose_add_param
-    emit_cmds "$_CMDS"
+    _compose_del_param
+    _compose_add_param
 }
 
 compose_warn() {
@@ -195,11 +192,11 @@ main() {
     local _fn="main"
 
     parse_args "$@"  || eval $(THROW $?)
-    append_compose _COMMANDS compose_delete   || eval $(THROW $?)
-    append_compose _COMMANDS compose_modify   || eval $(THROW $?)
-    append_compose _COMMANDS compose_warn
+    compose_delete   || eval $(THROW $?)
+    compose_modify   || eval $(THROW $?)
+    compose_warn
 
-    execute_commands "$_COMMANDS" || eval $(THROW $?)
+    execute_commands "$_CMDS" || eval $(THROW $?)
 }
 
 main "$@" || FATAL
