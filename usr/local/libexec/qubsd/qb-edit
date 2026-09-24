@@ -32,6 +32,10 @@ parse_args() {
     [ "$PARAM" ] || eval $(THROW 4 param_missing)
     [ -z "$DELETE" ] && [ -z "$VALUE" ] && eval $(THROW 4 value_missing $PARAM)
 
+    # Normalize and sanitize PARAM
+    PARAM=$(conv_to_upper "$PARAM")  # Standardize user input (user-friendly :upper/lower: input)
+    assert_param $PARAM || eval $(THROW $?)        # Sanitize user input
+
     # Sanitize CELL/DEFAULT
     if [ "$CELL" ] && [ "$DEFAULT" ] ; then
         eval $(THROW 4 mutual_exclusive)           # Cant be both CELL and DEFAULT
@@ -49,9 +53,6 @@ parse_args() {
         FILE=$D_QCONF/defaults.$(conv_to_lower $TYPE).conf  # Defaults file to operate on
     fi
 
-    # Sanitize PARAM
-    PARAM=$(conv_to_upper "$PARAM")  # Standardize user input (user-friendly :upper/lower: input)
-    assert_param $PARAM || eval $(THROW $?)        # Sanitize user input
     PTYPE=$(conv_to_upper $(query_param_type $PARAM))
     case $PTYPE in
         JAIL) [ "$TYPE" = "JAIL" ] || eval $(THROW 4 type $PARAM $PTYPE ${FILE##*/} $TYPE) ;;
